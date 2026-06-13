@@ -26,7 +26,12 @@ A live, self-updating tournament predictor in your terminal. Starting from bare-
   3. After a match result is recorded, both teams' Elo ratings update correctly using standard Elo formula with configurable K-factor (default 60)
   4. All state (played matches, Elo ratings) persists across script restarts by loading from JSON files (teams.json, bracket.json, played.json)
   5. JSON writes use atomic write pattern (write to .tmp, then os.replace) to prevent file corruption on crash
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Data Loading & Bracket Validation (scaffold, state.py load+validate, seed data, main.py entry, validation tests)
+- [ ] 01-02-PLAN.md — Elo Engine & State Persistence (elo.py, atomic save functions, --record-match flow, persistence tests)
+
 **UI hint**: yes
 
 ### Phase 2: Monte Carlo Simulation
@@ -101,7 +106,7 @@ A live, self-updating tournament predictor in your terminal. Starting from bare-
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. State & Elo Foundation | 0/0 | Not started | - |
+| 1. State & Elo Foundation | 0/2 | Not started | - |
 | 2. Monte Carlo Simulation | 0/0 | Not started | - |
 | 3. Live API Integration | 0/0 | Not started | - |
 | 4. Main Loop & Shutdown | 0/0 | Not started | - |
