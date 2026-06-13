@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A live, self-updating tournament predictor in your terminal — when a match ends, within seconds the script detects it, updates Elo, re-simulates, and shows how every team's odds changed.
-**Current focus:** Phase 2: Monte Carlo Simulation
+**Current focus:** Phase 3: Live API Integration
 
 ## Current Position
 
-Phase: 2 of 6 (Monte Carlo Simulation)
-Plan: 2 of 2 in current phase
-Status: Phase 2 planned — 2 plans ready
-Last activity: 2026-06-13 — Phase 2 planned (2 plans, 2 waves)
+Phase: 3 of 6 (Live API Integration)
+Plan: 0 of 0 in current phase
+Status: Phase 3 context gathered — ready for planning
+Last activity: 2026-06-13 — Phase 3 context gathered (5 areas discussed)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -35,16 +35,27 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 
+## Phase 3 Decisions (Live API Integration)
+
+- **D-01:** Team-name matching only — no api_id_mapping.json for MVP
+- **D-02:** Match by both team names (deterministic per unique knockout match pairings)
+- **D-03:** Unmatchable matches → log warning with raw data + skip
+- **D-04:** Single `src/fetcher.py` for HTTP + processing
+- **D-05:** Two functions: `fetch_raw_matches()` + `process_matches()`
+- **D-06:** Full match record returned by process_matches()
+- **D-07:** Monkeypatch requests.get for testing — no extra test deps
+- **D-08:** Single `test_fetcher.py` following existing patterns
+- **D-09:** Minimal JSON fixtures matching only consumed fields
+- **D-10:** Case-insensitive alias lookup via team_aliases.json — no fuzzy matching
+- **D-11:** Normalization logic inside fetcher.py (private function)
+- **D-12:** Aliases loaded by main.py, passed as explicit parameter
+- **D-13:** Retry 3x with exponential backoff (1s, 2s, 4s) → cached fallback → continue
+- **D-14:** HTTP 429 respects Retry-After header or 60s wait
+- **D-15:** Data errors → log + skip that match, continue processing others
+- **D-16:** API key validated on startup — fail fast on missing/403
+- **D-17:** API_TIMEOUT in constants.py (10s)
+
 ## Accumulated Context
-
-### Decisions
-
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- **Phase 1 (Roadmap):** 6-phase structure following dependency chain — State/Elo → Simulation → API Integration → Main Loop → Console Output → CLI Polish
-- **Phase 1 (Roadmap):** MVP mode — vertical slices for each phase; `rich` library for console output (per research recommendation)
-- **Phase 1 (Roadmap):** Iterative Python for Monte Carlo (profile later for numpy if >5s threshold exceeded)
 
 ### Pending Todos
 
@@ -63,5 +74,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-13
-Stopped at: Phase 2 planned
-Resume file: .planning/phases/02-monte-carlo-simulation/02-01-PLAN.md
+Stopped at: Phase 3 context gathered
+Resume file: .planning/phases/03-live-api-integration/03-CONTEXT.md
