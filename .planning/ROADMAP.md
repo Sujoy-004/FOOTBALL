@@ -7,7 +7,7 @@ A live, self-updating tournament predictor in your terminal. Starting from bare-
 ## Phases
 
 - [x] **Phase 1: State & Elo Foundation** - JSON persistence, Elo rating engine, and bracket validation
-- [ ] **Phase 2: Monte Carlo Simulation** - 50K+ iteration tournament simulation and probability aggregation
+- [x] **Phase 2: Monte Carlo Simulation** - 50K+ iteration tournament simulation and probability aggregation
 - [ ] **Phase 3: Live API Integration** - Football-Data.org API fetcher with retry logic and cached fallback
 - [ ] **Phase 4: Main Loop & Shutdown** - Continuous polling loop with Ctrl+C graceful shutdown
 - [ ] **Phase 5: Console Output & Formatting** - Formatted probability tables, delta tracking, and ANSI colors
@@ -48,8 +48,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Core simulation engine (simulation.py + tests + main.py wiring)
-- [ ] 02-02-PLAN.md — Performance benchmark (benchmark script + verification)
+- [x] 02-01-PLAN.md — Core simulation engine (simulation.py + tests + main.py wiring)
+- [x] 02-02-PLAN.md — Performance benchmark (benchmark script + verification) — PASS (1.268s for 50K)
 
 ### Phase 3: Live API Integration
 **Goal**: System fetches live match results from Football-Data.org API with robust error handling — retries on failure, cached data fallback, and never crashes due to network issues.
@@ -92,7 +92,12 @@ Plans:
   3. Output uses ANSI colors for clear visual hierarchy on supported terminals (team names, percentages, deltas)
   4. On terminals without ANSI support (or same-pipe output), output falls back to clean plain text automatically
   5. Console output includes timestamped match detection events, Elo change summaries, and simulation progress
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Core probability table with ANSI colors, delta tracking, and risers/fallers
+- [ ] 05-02-PLAN.md — Remaining output blocks (header, match alerts, heartbeat, shutdown, errors)
+
 **UI hint**: yes
 
 ### Phase 6: CLI Interface & Polish
@@ -115,8 +120,8 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. State & Elo Foundation | 2/2 | Complete | 2026-06-13 |
-| 2. Monte Carlo Simulation | 2/2 | Planned | - |
+| 2. Monte Carlo Simulation | 2/2 | Complete | 2026-06-13 |
 | 3. Live API Integration | 0/2 | Planned | - |
 | 4. Main Loop & Shutdown | 0/0 | Not started | - |
-| 5. Console Output & Formatting | 0/0 | Not started | - |
+| 5. Console Output & Formatting | 0/2 | Planned | - |
 | 6. CLI Interface & Polish | 0/0 | Not started | - |
