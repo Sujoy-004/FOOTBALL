@@ -6,6 +6,8 @@ structure is valid before simulation.
 """
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +72,78 @@ def load_played(data_dir: Path | str | None = None) -> dict[str, dict]:
     path = _resolve_data_dir(data_dir) / "played.json"
     with open(path, encoding="utf-8") as f:
         return json.load(f)
+
+
+# ─── Save functions ──────────────────────────────────────────────────────
+
+
+def _atomic_write_json(data: dict | list, path: Path) -> None:
+    """Write JSON data to a file atomically using tempfile + os.replace.
+
+    Uses mkstemp (not NamedTemporaryFile) for Windows compatibility.
+    Temp file is created in the same directory as the target to guarantee
+    same-filesystem rename (os.replace is atomic only on same filesystem).
+
+    Args:
+        data: JSON-serializable data to write.
+        path: Target file path.
+
+    Raises:
+        OSError: If file writing fails.
+        TypeError: If data is not JSON-serializable.
+    """
+    dir_path = path.parent
+    dir_path.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=str(dir_path),
+        prefix=path.stem + ".",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, str(path))
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def save_teams(teams: dict[str, dict], data_dir: Path | str | None = None) -> None:
+    """Save teams data to teams.json atomically.
+
+    Args:
+        teams: Mapping of team name to team data dict.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "teams.json"
+    _atomic_write_json(teams, path)
+
+
+def save_bracket(bracket: list[dict], data_dir: Path | str | None = None) -> None:
+    """Save bracket data to bracket.json atomically.
+
+    Args:
+        bracket: List of match objects.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "bracket.json"
+    _atomic_write_json(bracket, path)
+
+
+def save_played(played: dict[str, dict], data_dir: Path | str | None = None) -> None:
+    """Save played match data to played.json atomically.
+
+    Args:
+        played: Mapping of match_id to match result dict.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "played.json"
+    _atomic_write_json(played, path)
 
 
 # ─── Validation ──────────────────────────────────────────────────────────
