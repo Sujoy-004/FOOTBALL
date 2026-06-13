@@ -1,4 +1,4 @@
-"""Comprehensive tests for state.py load/validate functions and main.py.
+"""Comprehensive tests for state.py load/save/validate functions and main.py.
 
 All file I/O tests use tmp_path to avoid modifying real data files.
 """
@@ -14,6 +14,9 @@ from src.state import (
     load_bracket,
     load_played,
     load_teams,
+    save_bracket,
+    save_played,
+    save_teams,
     validate_bracket,
 )
 
@@ -95,6 +98,67 @@ def test_load_bracket_invalid(tmp_path):
     (tmp_path / "bracket.json").write_text(json.dumps(bad_bracket), encoding="utf-8")
     with pytest.raises(ValueError, match="Duplicate match_id"):
         load_bracket(data_dir=tmp_path)
+
+
+# ─── Save/persistence tests ──────────────────────────────────────────────
+
+
+def test_teams_roundtrip(tmp_path):
+    """save_teams → load_teams roundtrip should return identical data."""
+    data = {"Argentina": {"elo": 2100}, "France": {"elo": 2050}}
+    save_teams(data, data_dir=tmp_path)
+    loaded = load_teams(data_dir=tmp_path)
+    assert loaded == data
+
+
+def test_bracket_roundtrip(tmp_path):
+    """save_bracket → load_bracket roundtrip should return identical data."""
+    data = [
+        {"match_id": "R16_1", "round": "R16", "team_a": "Arg", "team_b": "Nig", "source_matches": None, "winner": None},
+        {"match_id": "QF_1", "round": "QF", "team_a": None, "team_b": None, "source_matches": ["R16_1"], "winner": None},
+    ]
+    save_bracket(data, data_dir=tmp_path)
+    loaded = load_bracket(data_dir=tmp_path)
+    assert loaded == data
+
+
+def test_played_roundtrip(tmp_path):
+    """save_played → load_played roundtrip should return identical data."""
+    data = {
+        "R16_1": {
+            "team_a": "Argentina", "team_b": "Mexico",
+            "winner": "Argentina", "home_score": 2, "away_score": 1,
+            "completed_at": "2026-06-15T22:05:01Z",
+        }
+    }
+    save_played(data, data_dir=tmp_path)
+    loaded = load_played(data_dir=tmp_path)
+    assert loaded == data
+
+
+def test_atomic_write_safety(tmp_path):
+    """No temp files should remain after a successful atomic write."""
+    data = {"Team": {"elo": 1500}}
+    save_teams(data, data_dir=tmp_path)
+    # Check no .tmp files linger in the target directory
+    tmp_files = list(tmp_path.glob("*.tmp"))
+    assert len(tmp_files) == 0, f"Temp files found: {tmp_files}"
+
+
+def test_data_dir_created(tmp_path):
+    """save_teams should auto-create nested data directories."""
+    nested = tmp_path / "new" / "sub"
+    save_teams({"T": {"elo": 1500}}, data_dir=nested)
+    assert (nested / "teams.json").exists()
+
+
+def test_saved_file_is_valid_json(tmp_path):
+    """Saved JSON file should be valid and loadable."""
+    data = {"Team": {"elo": 1500}}
+    save_teams(data, data_dir=tmp_path)
+    with open(tmp_path / "teams.json", encoding="utf-8") as f:
+        loaded = json.load(f)
+    assert loaded == data
 
 
 # ─── main.py tests ───────────────────────────────────────────────────────
