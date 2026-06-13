@@ -1,1 +1,9 @@
 # .planning/ - GSD research artifacts are committed (part of project planning docs)
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
