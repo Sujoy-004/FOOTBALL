@@ -57,12 +57,16 @@ Plans:
 **Depends on**: Phase 1
 **Requirements**: DATA-01, DATA-03
 **Success Criteria** (what must be TRUE):
-  1. System fetches match results from Football-Data.org API and filters to finished knockout matches
-  2. API failures automatically trigger retry logic (3 retries with exponential backoff) before giving up
-  3. On persistent API failure, system falls back to last known cached data and continues operating without crashing
-  4. System matches API response teams to internal bracket teams via ID mapping, with clear error if mapping is missing
-  5. Console log shows informative messages for API fetch success, failure, retries, and match detection events
-**Plans**: TBD
+   1. System fetches match results from Football-Data.org API and filters to finished knockout matches
+   2. API failures automatically trigger retry logic (3 retries with exponential backoff) before giving up
+   3. On persistent API failure, system falls back to last known cached data and continues operating without crashing
+   4. System matches API response teams to internal bracket teams via team-name aliases, with clear error if mapping is missing
+   5. Console log shows informative messages for API fetch success, failure, retries, and match detection events
+**Plans**: 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Core fetcher module + unit tests (fetch_raw_matches, process_matches, 9 test cases)
+- [ ] 03-02-PLAN.md — main.py integration + API key validation + human verification
 
 ### Phase 4: Main Loop & Shutdown
 **Goal**: System runs autonomously — polls continuously, detects new matches, triggers re-simulation, and shuts down gracefully on Ctrl+C.
@@ -112,7 +116,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. State & Elo Foundation | 2/2 | Complete | 2026-06-13 |
 | 2. Monte Carlo Simulation | 2/2 | Planned | - |
-| 3. Live API Integration | 0/0 | Not started | - |
+| 3. Live API Integration | 0/2 | Planned | - |
 | 4. Main Loop & Shutdown | 0/0 | Not started | - |
 | 5. Console Output & Formatting | 0/0 | Not started | - |
 | 6. CLI Interface & Polish | 0/0 | Not started | - |
