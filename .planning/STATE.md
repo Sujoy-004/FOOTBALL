@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A live, self-updating tournament predictor in your terminal — when a match ends, within seconds the script detects it, updates Elo, re-simulates, and shows how every team's odds changed.
-**Current focus:** Phase 3: Live API Integration
+**Current focus:** Phase 4: Main Loop & Shutdown
 
 ## Current Position
 
-Phase: 3 of 6 (Live API Integration)
+Phase: 4 of 6 (Main Loop & Shutdown)
 Plan: 0 of 0 in current phase
-Status: Phase 3 context gathered — ready for planning
-Last activity: 2026-06-13 — Phase 3 context gathered (5 areas discussed)
+Status: Phase 4 context gathered — ready for planning
+Last activity: 2026-06-13 — Phase 4 context gathered (4 areas discussed)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -71,8 +71,19 @@ None yet.
 |----------|------|--------|-------------|
 | *(none)* | | | |
 
+## Phase 4 Decisions (Main Loop & Shutdown)
+
+- **D-01:** `while True` loop with `signal.signal(SIGINT)` handler — running flag pattern
+- **D-02:** Loop logic in main.py — no new module
+- **D-03:** Next-poll calculation (not fixed sleep) — prevents drift
+- **D-04:** Default polling interval 60s, configurable via `POLL_INTERVAL` in constants.py
+- **D-05:** First poll fires immediately on startup
+- **D-06:** Ctrl+C finishes current iteration, then saves and exits
+- **D-07:** On shutdown, print "Final Championship Probabilities" banner + table
+- **D-08:** Track `last_sim_time`, force re-sim if >3600s with no new matches
+
 ## Session Continuity
 
 Last session: 2026-06-13
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-live-api-integration/03-CONTEXT.md
+Stopped at: Phase 4 context gathered
+Resume file: .planning/phases/04-main-loop-shutdown/04-CONTEXT.md
