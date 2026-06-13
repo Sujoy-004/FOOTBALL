@@ -17,12 +17,15 @@ def sample_teams():
 
 @pytest.fixture
 def sample_bracket():
-    """Returns a list of 4 matches with a simple R16→QF structure."""
+    """Returns a list of 4 matches with a valid R16→QF→SF DAG structure."""
     return [
         {"match_id": "R16_1", "round": "R16", "team_a": "Argentina", "team_b": "Nigeria", "source_matches": None, "winner": None},
         {"match_id": "R16_2", "round": "R16", "team_a": "France", "team_b": "Mexico", "source_matches": None, "winner": None},
+        {"match_id": "R16_3", "round": "R16", "team_a": "Brazil", "team_b": "Japan", "source_matches": None, "winner": None},
+        {"match_id": "R16_4", "round": "R16", "team_a": "Spain", "team_b": "Senegal", "source_matches": None, "winner": None},
         {"match_id": "QF_1", "round": "QF", "team_a": None, "team_b": None, "source_matches": ["R16_1", "R16_2"], "winner": None},
         {"match_id": "QF_2", "round": "QF", "team_a": None, "team_b": None, "source_matches": ["R16_3", "R16_4"], "winner": None},
+        {"match_id": "SF_1", "round": "SF", "team_a": None, "team_b": None, "source_matches": ["QF_1", "QF_2"], "winner": None},
     ]
 
 
