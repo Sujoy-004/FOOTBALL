@@ -6,7 +6,7 @@ A live, self-updating tournament predictor in your terminal. Starting from bare-
 
 ## Phases
 
-- [ ] **Phase 1: State & Elo Foundation** - JSON persistence, Elo rating engine, and bracket validation
+- [x] **Phase 1: State & Elo Foundation** - JSON persistence, Elo rating engine, and bracket validation
 - [ ] **Phase 2: Monte Carlo Simulation** - 50K+ iteration tournament simulation and probability aggregation
 - [ ] **Phase 3: Live API Integration** - Football-Data.org API fetcher with retry logic and cached fallback
 - [ ] **Phase 4: Main Loop & Shutdown** - Continuous polling loop with Ctrl+C graceful shutdown
@@ -29,8 +29,8 @@ A live, self-updating tournament predictor in your terminal. Starting from bare-
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Data Loading & Bracket Validation (scaffold, state.py load+validate, seed data, main.py entry, validation tests)
-- [ ] 01-02-PLAN.md — Elo Engine & State Persistence (elo.py, atomic save functions, --record-match flow, persistence tests)
+- [x] 01-01-PLAN.md — Data Loading & Bracket Validation (scaffold, state.py load+validate, seed data, main.py entry, validation tests)
+- [x] 01-02-PLAN.md — Elo Engine & State Persistence (elo.py, atomic save functions, integration test)
 
 **UI hint**: yes
 
@@ -45,7 +45,11 @@ Plans:
   3. Simulation uses current Elo ratings to determine match win probabilities via the Elo expected score formula
   4. Simulation output is reproducible when using a fixed random seed
   5. Simulation handles bracket edge cases correctly (e.g., partially completed bracket skips already-played matches)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Core simulation engine (simulation.py + tests + main.py wiring)
+- [ ] 02-02-PLAN.md — Performance benchmark (benchmark script + verification)
 
 ### Phase 3: Live API Integration
 **Goal**: System fetches live match results from Football-Data.org API with robust error handling — retries on failure, cached data fallback, and never crashes due to network issues.
@@ -106,8 +110,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. State & Elo Foundation | 0/2 | Not started | - |
-| 2. Monte Carlo Simulation | 0/0 | Not started | - |
+| 1. State & Elo Foundation | 2/2 | Complete | 2026-06-13 |
+| 2. Monte Carlo Simulation | 2/2 | Planned | - |
 | 3. Live API Integration | 0/0 | Not started | - |
 | 4. Main Loop & Shutdown | 0/0 | Not started | - |
 | 5. Console Output & Formatting | 0/0 | Not started | - |
