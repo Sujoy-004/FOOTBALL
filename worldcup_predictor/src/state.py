@@ -142,7 +142,7 @@ def validate_bracket(matches: list[dict[str, Any]]) -> None:
 def _resolve_data_dir(data_dir: Path | str | None) -> Path:
     """Resolve the data directory, defaulting to constants.DATA_DIR."""
     if data_dir is None:
-        return constants.DATA_DIR
-    if isinstance(data_dir, str):
-        return Path(data_dir)
-    return data_dir
+        result = constants.DATA_DIR
+    else:
+        result = data_dir
+    return Path(result) if isinstance(result, str) else result
