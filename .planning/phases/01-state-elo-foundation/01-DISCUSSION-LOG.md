@@ -31,15 +31,10 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| Flat match list | `[match_id, round, team_a, team_b, source_matches, winner]` | ✓ |
-| Nested rounds | `{round_of_16: [...], quarterfinals: [...], ...}` | |
-
-| Option | Description | Selected |
-|--------|-------------|----------|
 | Minimal played | `{match_id: {"winner": "Argentina"}}` | |
 | Full record | Full match record with team_a, team_b, winner, scores, timestamp | ✓ |
 
-**User's choice:** Minimal teams, flat bracket list, full played record
+**User's choice:** Minimal teams, full played record
 **Notes:** "Store facts, not just state" — full played.json for debugging, restart recovery, future analytics. Negligible storage cost.
 
 ---
@@ -48,11 +43,16 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
+| Flat match list | `[match_id, round, team_a, team_b, source_matches, winner]` | ✓ |
+| Nested rounds | `{round_of_16: [...], quarterfinals: [...], ...}` | |
+
+| Option | Description | Selected |
+|--------|-------------|----------|
 | Dynamic resolution | Match by team names at runtime — no mapping file | |
 | Static mapping file | `data/api_id_mapping.json` hardcoded | |
 | Both | Dynamic primary + static fallback | ✓ |
 
-**User's choice:** Dynamic primary + static fallback
+**User's choice:** Flat bracket list, dynamic primary + static fallback
 **Notes:** Phase 3 logic: try dynamic → if ambiguous → consult api_id_mapping.json → if unresolved → raise error. Known pitfalls: USA/United States, Korea Republic/South Korea, IR Iran/Iran.
 
 ---

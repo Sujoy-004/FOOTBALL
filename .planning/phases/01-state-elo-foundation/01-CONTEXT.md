@@ -23,10 +23,10 @@ Requirements: DATA-02, ELO-01, VAL-01
 
 ### State Persistence Schemas
 - **D-05:** `teams.json` — minimal schema: `{"Argentina": {"elo": 2100}}`. Extend with additional fields later.
-- **D-06:** `bracket.json` — flat match list array (not nested rounds): `[{"match_id": "R16_1", "round": "R16", "team_a": "Argentina", "team_b": "Mexico", "source_matches": null, "winner": null}]`. Easier to validate, traverse, and look up.
-- **D-07:** `played.json` — full match record: `{"R16_1": {"team_a": "Argentina", "team_b": "Mexico", "winner": "Argentina", "home_score": 2, "away_score": 1, "completed_at": "2026-06-15T22:05:01Z"}}`. Store facts, not just state — better debugging and future analytics.
+- **D-06:** `played.json` — full match record: `{"R16_1": {"team_a": "Argentina", "team_b": "Mexico", "winner": "Argentina", "home_score": 2, "away_score": 1, "completed_at": "2026-06-15T22:05:01Z"}}`. Store facts, not just state — better debugging and future analytics.
 
 ### Bracket Representation
+- **D-07:** `bracket.json` — flat match list array (not nested rounds): `[{"match_id": "R16_1", "round": "R16", "team_a": "Argentina", "team_b": "Mexico", "source_matches": null, "winner": null}]`. Easier to validate, traverse, and look up.
 - **D-08:** API-to-bracket mapping strategy: dynamic team-name matching as primary, `api_id_mapping.json` as static fallback for ambiguous cases
 - **D-09:** `api_id_mapping.json` is a Phase 3 concern — not created or implemented in Phase 1
 - **D-10:** Phase 3 fallback flow: try dynamic matching → if ambiguous, consult `api_id_mapping.json` → if still unresolved, raise clear error
