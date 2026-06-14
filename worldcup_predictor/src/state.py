@@ -371,6 +371,138 @@ def validate_bracket(matches: list[dict[str, Any]]) -> None:
             _dfs(mid)
 
 
+def validate_annex_c(annex_c: dict) -> None:
+    """Validate annex_c.json structure. Raises ValueError on failure.
+
+    Validates:
+    1. Exactly ANNEX_C_ENTRIES keys (495 = C(12,8)).
+    2. Every key contains 8 sorted, comma-separated group letters (A-L).
+    3. Every value has exactly 8 assignment keys (1A, 1B, 1D, 1E, 1G, 1I, 1K, 1L).
+    4. No self-references (e.g., '1A' never maps to '3A').
+    5. No value references a group letter not in the key.
+
+    Args:
+        annex_c: The Annex C lookup table loaded from annex_c.json.
+
+    Raises:
+        ValueError: If any validation check fails, with a descriptive message.
+    """
+    # Step 1: Verify it's a dict
+    if not isinstance(annex_c, dict):
+        raise ValueError("Annex C data must be a dict")
+
+    # Step 2: Extract data keys (exclude _meta)
+    data_keys: dict[str, Any] = {
+        k: v for k, v in annex_c.items() if k != "_meta"
+    }
+
+    if len(data_keys) != constants.ANNEX_C_ENTRIES:
+        raise ValueError(
+            f"Expected {constants.ANNEX_C_ENTRIES} Annex C entries, "
+            f"got {len(data_keys)}"
+        )
+
+    valid_groups: set[str] = set("ABCDEFGHIJKL")
+    expected_value_keys: set[str] = {
+        "1A", "1B", "1D", "1E", "1G", "1I", "1K", "1L",
+    }
+
+    # Step 3: Validate each entry (deterministic order)
+    for key in sorted(data_keys.keys()):
+        value = data_keys[key]
+
+        # 3a: Split key and verify parts count
+        parts = key.split(",")
+        if len(parts) != 8:
+            raise ValueError(
+                f"Annex C key '{key}': expected 8 groups, got {len(parts)}"
+            )
+
+        # 3b: Verify groups are sorted alphabetically
+        if parts != sorted(parts):
+            raise ValueError(
+                f"Annex C key '{key}': groups not sorted alphabetically"
+            )
+
+        # 3c: Verify every part is a valid group letter
+        for part in parts:
+            if part not in valid_groups:
+                raise ValueError(
+                    f"Annex C key '{key}': invalid group letter '{part}'"
+                )
+
+        # 3d: Verify no duplicate letters
+        if len(set(parts)) != 8:
+            raise ValueError(
+                f"Annex C key '{key}': duplicate group letter"
+            )
+
+        # 3e: Verify value structure
+        if not isinstance(value, dict):
+            raise ValueError(
+                f"Annex C entry '{key}': expected a dict, "
+                f"got {type(value).__name__}"
+            )
+
+        actual_keys = set(value.keys())
+        if actual_keys != expected_value_keys:
+            raise ValueError(
+                f"Annex C entry '{key}': missing or extra assignment keys. "
+                f"Expected {sorted(expected_value_keys)}, "
+                f"got {sorted(actual_keys)}"
+            )
+
+        # 3f: Validate each assignment (no self-reference, no out-of-key ref)
+        for vk, v in value.items():
+            # Extract referenced group: "3H" -> "H"
+            if not isinstance(v, str) or not v.startswith("3") or len(v) != 2:
+                raise ValueError(
+                    f"Annex C entry '{key}': invalid reference '{v}'"
+                )
+            ref = v[1]  # Second character is the group letter
+
+            if ref not in valid_groups:
+                raise ValueError(
+                    f"Annex C entry '{key}': invalid reference '{v}'"
+                )
+
+            if ref not in parts:
+                raise ValueError(
+                    f"Annex C entry '{key}': references group {ref} "
+                    f"not in key"
+                )
+
+            # Check self-reference: value key's group must differ from ref
+            vk_group = vk[1]  # e.g., "1A" -> "A"
+            if vk_group == ref:
+                raise ValueError(
+                    f"Annex C entry '{key}': self-reference "
+                    f"'{vk}' -> '{v}'"
+                )
+
+
+def load_annex_c(data_dir: Path | str | None = None) -> dict:
+    """Load Annex C lookup table from annex_c.json and validate.
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to
+            constants.DATA_DIR.
+
+    Returns:
+        dict: The Annex C table with 495 entries plus optional _meta key.
+
+    Raises:
+        FileNotFoundError: If annex_c.json does not exist.
+        json.JSONDecodeError: If annex_c.json contains invalid JSON.
+        ValueError: If Annex C validation fails.
+    """
+    path = _resolve_data_dir(data_dir) / "annex_c.json"
+    with open(path, encoding="utf-8") as f:
+        annex_c: dict = json.load(f)
+    validate_annex_c(annex_c)
+    return annex_c
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────
 
 
