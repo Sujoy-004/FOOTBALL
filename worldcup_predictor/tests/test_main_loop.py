@@ -37,6 +37,64 @@ def _runner_code() -> str:
     )
 
 
+def _runner_code_with_flag(flag: str) -> str:
+    """Inline Python that mocks requests.get, passes `flag` as CLI arg, then calls main.main()."""
+    return (
+        f"import os, sys\n"
+        f"os.environ['POLL_INTERVAL'] = '1'\n"
+        f"os.environ['FOOTBALL_API_KEY'] = 'test_dummy_key'\n"
+        f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
+        f"os.chdir({str(MAIN_DIR)!r})\n"
+        f"sys.argv = ['main.py', {flag!r}]\n"
+        f"import requests\n"
+        f"import src.constants\n"
+        f"src.constants.API_TIMEOUT = 1\n"
+        f"class _MockResp:\n"
+        f"  status_code=200\n"
+        f"  def json(self):\n"
+        f"    return {{}}\n"
+        f"  def raise_for_status(self):\n"
+        f"    pass\n"
+        f"  @property\n"
+        f"  def ok(self):\n"
+        f"    return True\n"
+        f"requests.get = lambda url, **kw: _MockResp()\n"
+        f"import main\n"
+        f"main.main()\n"
+    )
+
+
+def test_once_flag_runs_single_cycle():
+    """--once runs a single fetch->simulate->print cycle, then exits (no polling loop)."""
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "-c", _runner_code_with_flag("--once")],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        stdout, stderr = proc.communicate()
+        assert False, (
+            f"--once should exit within 10s, did not. "
+            f"stdout={stdout!r} stderr={stderr!r}"
+        )
+    # --once should exit cleanly (code 0)
+    assert proc.returncode == 0, (
+        f"--once should exit code 0, got {proc.returncode}. "
+        f"stdout={stdout!r} stderr={stderr!r}"
+    )
+    # Must contain simulation output (confirms sim ran)
+    assert "UPDATED PROBABILITIES" in stdout or "Initial probabilities" in stdout, (
+        f"--once must print probability output. stdout={stdout!r}"
+    )
+    # Must NOT contain more than 1 "Polling..." heartbeat (confirms single _run_iteration call, no loop)
+    heartbeat_count = stdout.count("Polling...")
+    assert heartbeat_count <= 1, (
+        f"--once should have at most 1 heartbeat, got {heartbeat_count}. stdout={stdout!r}"
+    )
+
+
 def test_main_loop_runs_iterations():
     """Loop should run multiple fetch cycles when poll interval is short.
 
@@ -131,7 +189,9 @@ def test_seed_propagates_through_run_iteration(monkeypatch):
         captured_seeds.append(seed)
         return {name: {"qf": 0.5, "sf": 0.3, "final": 0.1, "champion": 0.05} for name in teams}
 
+    # Patch both module-level and local reference (main.py imports via `from ... import`)
     monkeypatch.setattr(src.simulation, "run_simulation", mock_sim)
+    monkeypatch.setattr(main_mod, "run_simulation", mock_sim)
 
     teams = {"Arg": {"elo": 2000}, "Bra": {"elo": 2000}}
     bracket = [
