@@ -4,6 +4,7 @@ Loads state, enters a continuous polling loop (default 60s interval),
 and handles graceful shutdown via SIGINT/SIGTERM.
 """
 
+import argparse
 import json
 import logging
 import os
@@ -18,6 +19,46 @@ from src.simulation import run_simulation
 
 
 _running = True
+
+
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments.
+
+    Args:
+        argv: Argument list (None = use sys.argv). Exposed for testing.
+
+    Returns:
+        Namespace with once (bool), no_color (bool), seed (int | None).
+    """
+    parser = argparse.ArgumentParser(
+        prog="wc-predict",
+        description="World Cup Dynamic Predictor — live tournament odds in your terminal.",
+        epilog=(
+            "By default, the tool runs continuously, polling the Football-Data.org "
+            "API every 60 seconds and re-simulating after each new match. "
+            "Press Ctrl+C for a graceful shutdown with final probabilities."
+        ),
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        dest="once",
+        help="Run a single fetch\u2192simulate\u2192print cycle, then exit",
+    )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        dest="no_color",
+        help="Disable ANSI color output (overrides terminal auto-detection)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Random seed for reproducible simulation (same seed + same data = same results)",
+    )
+    return parser.parse_args(argv)
 
 
 def _signal_handler(signum, frame):
@@ -131,6 +172,8 @@ def validate_api_key() -> str:
 
 def main() -> None:
     """Load state, then enter continuous polling loop until signal."""
+    args = _parse_args()
+
     # Windows Console Host ANSI initialization (Python 3.10/3.11 quirk)
     if sys.platform == "win32":
         os.system("")
@@ -143,6 +186,10 @@ def main() -> None:
         played = state.load_played()
         api_key = validate_api_key()
         aliases = state.load_aliases()
+
+        # Apply --no-color before any console output (D-05)
+        if args.no_color:
+            output.NO_COLOR = True
 
         output.print_header(teams, bracket, played, aliases)
 

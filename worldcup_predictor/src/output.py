@@ -14,10 +14,13 @@ from src.constants import POLL_INTERVAL
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+NO_COLOR = False
+"""Module-level flag: set to True to disable ANSI color output. Set from main.py after arg parsing (D-05)."""
+
 
 def _supports_color() -> bool:
-    """Return True if stdout is a TTY (ANSI codes supported)."""
-    return sys.stdout.isatty()
+    """Return True if stdout is a TTY and NO_COLOR is not set."""
+    return sys.stdout.isatty() and not NO_COLOR
 
 
 def _ansi(code: str) -> Callable[[str], str]:
