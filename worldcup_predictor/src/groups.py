@@ -493,3 +493,109 @@ def compute_standings(
         standings[group_letter] = team_list
 
     return standings
+
+
+# ─── Third-place ranking and advancement ────────────────────────────────
+
+
+def rank_third_placed(standings: dict[str, list[dict]]) -> list[dict]:
+    """Rank third-placed teams across all 12 groups using 5-step tiebreaker.
+
+    5-step cross-group tiebreaker per D-15 (NO H2H — Pitfall 4 guard):
+    1. Overall points (descending)
+    2. Overall goal difference (descending)
+    3. Overall goals scored (descending)
+    4. Fair play conduct_score (ascending — lower positive penalty points = better)
+    5. FIFA ranking (ascending — lower rank number = better)
+
+    Uses Elo as FIFA ranking proxy (higher Elo = better = lower rank number).
+    Phase 10 expected to replace with real FIFA ranking data.
+
+    Args:
+        standings: Output of compute_standings() — dict mapping group letter
+                   to list of team standings dicts sorted by position (1-4).
+
+    Returns:
+        List of dicts sorted by rank (1st = best, 12th = worst), each with:
+        {group, team, pts, gd, gs, conduct_score}.
+    """
+    third_placed: list[dict] = []
+
+    for group_letter in "ABCDEFGHIJKL":
+        if group_letter not in standings:
+            continue
+        group_standings = standings[group_letter]
+        if len(group_standings) < 3:
+            continue
+        # Position 3 = index 2 (standings are sorted by position 1-4)
+        third = group_standings[2]
+        entry = {
+            "group": group_letter,
+            "team": third["team"],
+            "pts": third["pts"],
+            "gd": third["gd"],
+            "gs": third["gs"],
+            "conduct_score": third["conduct_score"],
+            "_elo": third.get("elo", 1500.0),  # internal — for sorting only
+        }
+        third_placed.append(entry)
+
+    # Sort by 5-step tiebreaker
+    # Use -elo as fifa_rank proxy (higher Elo → lower fifa_rank → sorts earlier)
+    third_placed.sort(
+        key=lambda t: (-t["pts"], -t["gd"], -t["gs"], t["conduct_score"], -t["_elo"])
+    )
+
+    # Strip internal _elo field from output
+    result: list[dict] = []
+    for t in third_placed:
+        result.append({
+            "group": t["group"],
+            "team": t["team"],
+            "pts": t["pts"],
+            "gd": t["gd"],
+            "gs": t["gs"],
+            "conduct_score": t["conduct_score"],
+        })
+
+    return result
+
+
+def select_advancers(
+    standings: dict[str, list[dict]],
+    third_ranked: list[dict],
+) -> dict[str, dict[int, str | None]]:
+    """Select top 2 per group + top 8 best third-placed teams.
+
+    Per D-12 and ADVANCEMENT rules:
+    - Top 2 from each group (positions 1 and 2) auto-advance → 24 teams
+    - Top 8 of the 12 third-placed teams also advance → 8 teams
+    - Total advancing: 32 teams (Round of 32)
+
+    Args:
+        standings: Output of compute_standings().
+        third_ranked: Output of rank_third_placed(), sorted best-to-worst.
+
+    Returns:
+        Dict mapping group letter to {1: winner, 2: runner_up, 3: third_team_or_none}.
+        Always contains keys 1, 2, 3 for all 12 groups (A-L). Position 4 is
+        excluded per D-12. Key 3 is None for groups whose third-placed team
+        does not advance.
+    """
+    # Groups whose third-placed team is in the top 8
+    top8_groups: set[str] = {t["group"] for t in third_ranked[:8]}
+
+    advancers: dict[str, dict[int, str | None]] = {}
+
+    for group_letter in "ABCDEFGHIJKL":
+        if group_letter not in standings:
+            continue
+        group = standings[group_letter]
+        third_team: str | None = group[2]["team"] if group_letter in top8_groups else None
+        advancers[group_letter] = {
+            1: group[0]["team"],
+            2: group[1]["team"],
+            3: third_team,
+        }
+
+    return advancers
