@@ -1,98 +1,146 @@
 {
+  "Algeria": {
+    "elo": 1516
+  },
   "Argentina": {
     "elo": 2115
-  },
-  "France": {
-    "elo": 2063
-  },
-  "Brazil": {
-    "elo": 2090
-  },
-  "England": {
-    "elo": 2050
-  },
-  "Spain": {
-    "elo": 2157
-  },
-  "Portugal": {
-    "elo": 2030
-  },
-  "Netherlands": {
-    "elo": 2045
-  },
-  "Germany": {
-    "elo": 2010
-  },
-  "Italy": {
-    "elo": 1980
-  },
-  "Croatia": {
-    "elo": 1960
-  },
-  "Belgium": {
-    "elo": 1940
-  },
-  "Uruguay": {
-    "elo": 1930
-  },
-  "Japan": {
-    "elo": 1900
-  },
-  "Morocco": {
-    "elo": 1910
-  },
-  "Senegal": {
-    "elo": 1880
-  },
-  "Switzerland": {
-    "elo": 1875
-  },
-  "USA": {
-    "elo": 1860
-  },
-  "Mexico": {
-    "elo": 1850
-  },
-  "Nigeria": {
-    "elo": 1830
-  },
-  "Denmark": {
-    "elo": 1890
-  },
-  "South Korea": {
-    "elo": 1820
-  },
-  "Iran": {
-    "elo": 1810
-  },
-  "Serbia": {
-    "elo": 1840
-  },
-  "Poland": {
-    "elo": 1835
-  },
-  "Ukraine": {
-    "elo": 1865
-  },
-  "Austria": {
-    "elo": 1825
-  },
-  "Ecuador": {
-    "elo": 1815
-  },
-  "Cameroon": {
-    "elo": 1790
-  },
-  "Canada": {
-    "elo": 1800
   },
   "Australia": {
     "elo": 1780
   },
+  "Austria": {
+    "elo": 1825
+  },
+  "Belgium": {
+    "elo": 1940
+  },
+  "Bosnia and Herzegovina": {
+    "elo": 1372
+  },
+  "Brazil": {
+    "elo": 2090
+  },
+  "Canada": {
+    "elo": 1800
+  },
+  "Cape Verde": {
+    "elo": 1360
+  },
+  "Colombia": {
+    "elo": 1576
+  },
+  "Croatia": {
+    "elo": 1960
+  },
+  "Curaçao": {
+    "elo": 1300
+  },
+  "Czech Republic": {
+    "elo": 1468
+  },
+  "DR Congo": {
+    "elo": 1444
+  },
+  "Ecuador": {
+    "elo": 1815
+  },
+  "Egypt": {
+    "elo": 1512
+  },
+  "England": {
+    "elo": 2050
+  },
+  "France": {
+    "elo": 2063
+  },
+  "Germany": {
+    "elo": 2010
+  },
+  "Ghana": {
+    "elo": 1336
+  },
+  "Haiti": {
+    "elo": 1296
+  },
+  "Iran": {
+    "elo": 1810
+  },
   "Iraq": {
     "elo": 1770
   },
+  "Ivory Coast": {
+    "elo": 1496
+  },
+  "Japan": {
+    "elo": 1900
+  },
+  "Jordan": {
+    "elo": 1376
+  },
+  "Mexico": {
+    "elo": 1850
+  },
+  "Morocco": {
+    "elo": 1910
+  },
+  "Netherlands": {
+    "elo": 2045
+  },
   "New Zealand": {
     "elo": 1775
+  },
+  "Norway": {
+    "elo": 1504
+  },
+  "Panama": {
+    "elo": 1492
+  },
+  "Paraguay": {
+    "elo": 1464
+  },
+  "Portugal": {
+    "elo": 2030
+  },
+  "Qatar": {
+    "elo": 1404
+  },
+  "Saudi Arabia": {
+    "elo": 1384
+  },
+  "Scotland": {
+    "elo": 1460
+  },
+  "Senegal": {
+    "elo": 1880
+  },
+  "South Africa": {
+    "elo": 1388
+  },
+  "South Korea": {
+    "elo": 1820
+  },
+  "Spain": {
+    "elo": 2157
+  },
+  "Sweden": {
+    "elo": 1476
+  },
+  "Switzerland": {
+    "elo": 1875
+  },
+  "Tunisia": {
+    "elo": 1448
+  },
+  "Türkiye": {
+    "elo": 1540
+  },
+  "United States": {
+    "elo": 1860
+  },
+  "Uruguay": {
+    "elo": 1930
+  },
+  "Uzbekistan": {
+    "elo": 1428
   }
 }
