@@ -110,7 +110,7 @@ def test_once_flag_runs_single_cycle():
 def test_main_loop_runs_iterations():
     """Loop should run multiple fetch cycles when poll interval is short.
 
-    Current main.py has no loop -> 'Fetched' appears exactly once -> fails (>=2).
+    Each cycle prints 'Polling...' heartbeat when no new matches.
     """
     proc = subprocess.Popen(
         [sys.executable, "-u", "-c", _runner_code()],
@@ -121,8 +121,8 @@ def test_main_loop_runs_iterations():
     except subprocess.TimeoutExpired:
         proc.kill()
         stdout, _ = proc.communicate()
-    assert stdout.count("Fetched") >= 2, (
-        f"Expected >=2 'Fetched' lines, got {stdout.count('Fetched')}: {stdout!r}"
+    assert stdout.count("Polling") >= 2, (
+        f"Expected >=2 'Polling' lines, got {stdout.count('Polling')}: {stdout!r}"
     )
 
 

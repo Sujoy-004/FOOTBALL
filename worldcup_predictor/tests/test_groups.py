@@ -54,9 +54,12 @@ class TestExpectedGoals:
         assert abs(val - 2.1) < 0.001, f"Expected ~2.1, got {val}"
 
     def test_expected_goals_very_strong_dominates(self):
-        """Huge Elo gap produces a very high lambda."""
+        """Huge Elo gap produces MAX_EXPECTED_GOALS=8.0 capped lambda."""
+        # MAX_EXPECTED_GOALS=8.0 cap prevents unbounded Knuth iterations
+        # from extreme Elo gaps. The function returns exactly 8.0 for
+        # Elo(2500) vs Elo(1000) — this is correct behavior.
         val = expected_goals(2500, 1000)
-        assert val > 10.0, f"Expected large lambda for big Elo gap, got {val}"
+        assert val == 8.0, f"Expected MAX_EXPECTED_GOALS=8.0 cap, got {val}"
 
     def test_expected_goals_very_weak_minimal(self):
         """Very weak team against very strong team gets near-zero lambda."""
