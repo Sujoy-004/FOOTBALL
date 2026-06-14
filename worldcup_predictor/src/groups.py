@@ -6,6 +6,7 @@ and resolves Annex C R32 matchups.
 
 import math
 import random
+from collections import defaultdict
 
 from src import constants
 
@@ -146,3 +147,349 @@ def simulate_group_matches(
         results[group_letter] = group_results
 
     return results
+
+
+# ─── Tiebreaker functions ──────────────────────────────────────────────
+
+
+def _compute_conduct_score(yellow_cards: int, red_cards: int) -> int:
+    """Compute fair play conduct score as positive penalty points.
+
+    Per D-04 through D-06 and PITFALLS.md Pitfall 8:
+    - Each yellow card = +1 penalty point
+    - Each red card (straight) = +4 penalty points
+
+    Lower score = better conduct. This follows RESPONSE.md Clarification 1:
+    conduct score is stored as positive penalty points, sorted ASCENDING.
+
+    Args:
+        yellow_cards: Total yellow cards for the team across all group matches.
+        red_cards: Total red cards (straight) for the team.
+
+    Returns:
+        Integer penalty points (lower = better conduct).
+    """
+    return (yellow_cards * 1) + (red_cards * 4)
+
+
+def _compute_h2h(
+    cluster: list[dict],
+    results: dict[str, dict],
+) -> tuple[dict[str, int], dict[str, int], dict[str, int]]:
+    """Compute H2H points, GD, and GS among a set of tied teams.
+
+    Scans all matches in the group results. Only matches where BOTH teams
+    are in the tied set are considered (the 'mini-tournament' among tied teams).
+
+    Args:
+        cluster: List of team data dicts (must have 'team' key).
+        results: Per-group match results dict (keyed by match_id).
+
+    Returns:
+        Tuple of (h2h_pts, h2h_gd, h2h_gs) dicts mapping team -> stat value.
+    """
+    tied_teams: set[str] = {t["team"] for t in cluster}
+
+    h2h_pts: dict[str, int] = {}
+    h2h_gd: dict[str, int] = {}
+    h2h_gs: dict[str, int] = {}
+
+    for t in cluster:
+        team = t["team"]
+        h2h_pts[team] = 0
+        h2h_gd[team] = 0
+        h2h_gs[team] = 0
+
+    for match in results.values():
+        ta: str = match["team_a"]
+        tb: str = match["team_b"]
+
+        if ta not in tied_teams or tb not in tied_teams:
+            continue
+
+        sa: int = match["score_a"]
+        sb: int = match["score_b"]
+
+        # Points: standard 3/1/0
+        if sa > sb:
+            h2h_pts[ta] += 3
+        elif sb > sa:
+            h2h_pts[tb] += 3
+        else:
+            h2h_pts[ta] += 1
+            h2h_pts[tb] += 1
+
+        # Goal difference
+        gd = sa - sb
+        h2h_gd[ta] += gd
+        h2h_gd[tb] -= gd
+
+        # Goals scored
+        h2h_gs[ta] += sa
+        h2h_gs[tb] += sb
+
+    return h2h_pts, h2h_gd, h2h_gs
+
+
+def _resolve_by_values(
+    cluster: list[dict],
+    values: dict[str, int | float],
+    results: dict[str, dict],
+    depth: int,
+    *,
+    reverse: bool = True,
+) -> list[dict] | None:
+    """Try to resolve a tied cluster by grouping teams by a sort value.
+
+    Groups teams by their value for a given tiebreaker criterion. If the
+    group creates multiple distinct value tiers, recursively resolve each
+    tier using _tiebreak_group (restarting the chain from step 1).
+
+    Args:
+        cluster: List of tied team data dicts.
+        values: Dict mapping team name -> sort value for this criterion.
+        results: Per-group match results dict for H2H recomputation.
+        depth: Current recursion depth (to guard against infinite loops).
+        reverse: If True, sort descending (higher value = better).
+
+    Returns:
+        Sorted list if resolved, or None if all teams have same value
+        (no separation at this step).
+    """
+    groups: dict[int | float, list[dict]] = defaultdict(list)
+    for t in cluster:
+        groups[values[t["team"]]].append(t)
+
+    if len(groups) == 1:
+        return None  # Not resolved at this step
+
+    sorted_vals = sorted(groups.keys(), reverse=reverse)
+    result: list[dict] = []
+    for v in sorted_vals:
+        resolved = _tiebreak_group(groups[v], results, depth + 1)
+        result.extend(resolved)
+    return result
+
+
+def _resolve_tied_cluster(
+    cluster: list[dict],
+    results: dict[str, dict],
+    depth: int,
+) -> list[dict]:
+    """Apply the full 7-step tiebreaker chain to resolve a tied cluster.
+
+    Each step attempts to separate teams. If a step creates value tiers,
+    the separated teams are resolved recursively from step 1 until all
+    positions are determined. If all 7 steps fail, team name is used as
+    arbitrary deterministic tiebreaker.
+
+    Args:
+        cluster: List of team data dicts tied on points.
+        results: Per-group match results dict for H2H recomputation.
+        depth: Current recursion depth.
+
+    Returns:
+        Sorted list of team data dicts.
+    """
+    if len(cluster) <= 1:
+        return cluster
+
+    # Compute H2H stats once (used by steps 1-3)
+    h2h_pts, h2h_gd, h2h_gs = _compute_h2h(cluster, results)
+
+    # Steps 1-7: Apply each criterion
+    # Step 1: H2H points (higher = better)
+    result = _resolve_by_values(cluster, h2h_pts, results, depth, reverse=True)
+    if result is not None:
+        return result
+
+    # Step 2: H2H goal difference (higher = better)
+    result = _resolve_by_values(cluster, h2h_gd, results, depth, reverse=True)
+    if result is not None:
+        return result
+
+    # Step 3: H2H goals scored (higher = better)
+    result = _resolve_by_values(cluster, h2h_gs, results, depth, reverse=True)
+    if result is not None:
+        return result
+
+    # Step 4: Overall goal difference (higher = better)
+    values_gd = {t["team"]: t["gd"] for t in cluster}
+    result = _resolve_by_values(cluster, values_gd, results, depth, reverse=True)
+    if result is not None:
+        return result
+
+    # Step 5: Overall goals scored (higher = better)
+    values_gs = {t["team"]: t["gs"] for t in cluster}
+    result = _resolve_by_values(cluster, values_gs, results, depth, reverse=True)
+    if result is not None:
+        return result
+
+    # Step 6: Fair play conduct score (lower = better, ascending)
+    values_co = {t["team"]: t["conduct_score"] for t in cluster}
+    result = _resolve_by_values(cluster, values_co, results, depth, reverse=False)
+    if result is not None:
+        return result
+
+    # Step 7: Elo rating as FIFA ranking proxy (higher = better, descending)
+    values_elo = {t["team"]: t["elo"] for t in cluster}
+    result = _resolve_by_values(cluster, values_elo, results, depth, reverse=True)
+    if result is not None:
+        return result
+
+    # All 7 steps failed — break ties by team name (deterministic)
+    return sorted(cluster, key=lambda t: t["team"])
+
+
+def _tiebreak_group(
+    team_data_list: list[dict],
+    results: dict[str, dict],
+    depth: int = 0,
+) -> list[dict]:
+    """Recursively sort a group's teams using the FIFA 2026 7-step tiebreaker.
+
+    Implements recursive narrowing per D-14: teams are first sorted by points.
+    Any cluster of teams with equal points enters the 7-step tiebreaker chain.
+    When a partial resolution occurs, the resolved team(s) are assigned their
+    positions and the remaining tied teams are recursed on from step 1.
+
+    Args:
+        team_data_list: List of team data dicts with keys: team, pts, gd, gs,
+                        conduct_score, elo.
+        results: Per-group match results dict (keyed by match_id).
+        depth: Recursion depth guard (raises ValueError if > 10).
+
+    Returns:
+        List of team data dicts sorted by final ranking (best first).
+
+    Raises:
+        ValueError: If recursion depth exceeds 10 (infinite loop guard).
+    """
+    if depth > 10:
+        raise ValueError("Tiebreaker recursion exceeded max depth")
+
+    n = len(team_data_list)
+    if n <= 1:
+        return team_data_list
+
+    # Sort by points descending (always the primary criterion)
+    sorted_teams = sorted(team_data_list, key=lambda t: t["pts"], reverse=True)
+
+    # Walk the sorted list and resolve tied clusters
+    result: list[dict] = []
+    i = 0
+    while i < n:
+        j = i + 1
+        while j < n and sorted_teams[j]["pts"] == sorted_teams[i]["pts"]:
+            j += 1
+
+        cluster = sorted_teams[i:j]
+        if len(cluster) == 1:
+            result.append(cluster[0])
+        else:
+            result.extend(_resolve_tied_cluster(cluster, results, depth))
+        i = j
+
+    return result
+
+
+def compute_standings(
+    results: dict[str, dict[str, dict]],
+    elo_ratings: dict[str, float],
+) -> dict[str, list[dict]]:
+    """Compute sorted group standings from match results for all 12 groups.
+
+    For each group (A-L), accumulates points, GD, GS, fair play cards from
+    match results, then applies the FIFA 2026 7-step tiebreaker chain via
+    _tiebreak_group. Positions 1-4 are assigned after sorting.
+
+    Per RESPONSE.md Clarification 2: `elo_ratings` provides Elo proxy for
+    FIFA ranking (step 7 of the tiebreaker). Higher Elo = better = wins
+    tiebreak. Phase 10 expected to replace with real FIFA ranking data.
+
+    Args:
+        results: Match results dict from simulate_group_matches():
+                 {group_letter: {match_id: {team_a, team_b, score_a, score_b,
+                 winner, yellow_cards_a, red_cards_a, ...}}}
+        elo_ratings: Dict mapping team name -> Elo rating (used as FIFA
+                     ranking proxy for step 7 of the tiebreaker).
+
+    Returns:
+        Dict mapping group letter to list of team standings dicts sorted
+        by final ranking (position 1 = group winner). Each entry has keys:
+        team, pts, gd, gs, yellow_cards, red_cards, conduct_score, elo,
+        position.
+    """
+    standings: dict[str, list[dict]] = {}
+
+    for group_letter in "ABCDEFGHIJKL":
+        if group_letter not in results:
+            continue
+
+        group_results = results[group_letter]
+
+        # Collect unique teams and initialize stats
+        team_stats: dict[str, dict] = {}
+        for match in group_results.values():
+            for side in ("team_a", "team_b"):
+                team = match[side]
+                if team not in team_stats:
+                    team_stats[team] = {
+                        "team": team,
+                        "pts": 0,
+                        "gd": 0,
+                        "gs": 0,
+                        "yellow_cards": 0,
+                        "red_cards": 0,
+                        "conduct_score": 0,
+                        "elo": elo_ratings.get(team, 1500.0),
+                    }
+
+        # Accumulate stats from each match
+        for match in group_results.values():
+            ta: str = match["team_a"]
+            tb: str = match["team_b"]
+            sa: int = match["score_a"]
+            sb: int = match["score_b"]
+
+            # Points: win=3, draw=1, loss=0
+            if sa > sb:
+                team_stats[ta]["pts"] += 3
+            elif sb > sa:
+                team_stats[tb]["pts"] += 3
+            else:
+                team_stats[ta]["pts"] += 1
+                team_stats[tb]["pts"] += 1
+
+            # Goal difference
+            gd = sa - sb
+            team_stats[ta]["gd"] += gd
+            team_stats[tb]["gd"] -= gd
+
+            # Goals scored
+            team_stats[ta]["gs"] += sa
+            team_stats[tb]["gs"] += sb
+
+            # Fair play cards
+            team_stats[ta]["yellow_cards"] += match.get("yellow_cards_a", 0)
+            team_stats[ta]["red_cards"] += match.get("red_cards_a", 0)
+            team_stats[tb]["yellow_cards"] += match.get("yellow_cards_b", 0)
+            team_stats[tb]["red_cards"] += match.get("red_cards_b", 0)
+
+        # Compute conduct scores (positive penalty points, lower = better)
+        for stats in team_stats.values():
+            stats["conduct_score"] = _compute_conduct_score(
+                stats["yellow_cards"], stats["red_cards"]
+            )
+
+        # Sort using recursive tiebreaker
+        team_list = list(team_stats.values())
+        team_list = _tiebreak_group(team_list, group_results)
+
+        # Assign final positions 1-4
+        for i, t_stats in enumerate(team_list):
+            t_stats["position"] = i + 1
+
+        standings[group_letter] = team_list
+
+    return standings
