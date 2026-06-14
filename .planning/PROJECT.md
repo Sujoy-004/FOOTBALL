@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A self-updating tournament predictor for football fans and B.Tech students. It polls a live match API, updates team Elo ratings after every real result, re-runs thousands of Monte Carlo simulations, and prints updated championship probabilities to the console — all in real time. No manual bracket filling, no static predictions.
+A self-updating tournament predictor for football fans and B.Tech students. It polls the BSD live match API, updates team Elo ratings after every real result, re-runs thousands of Monte Carlo simulations, and prints updated championship probabilities to the console — all in real time. Now targeting the full 48-team FIFA World Cup 2026 format with group stage, Annex C R32 routing, and 104-match tournament tree.
 
 ## Core Value
 
@@ -17,13 +17,28 @@ The v1.0 MVP is complete. The tool can:
 1. **Load state** from JSON files (32 teams, 23 bracket matches)
 2. **Compute Elo ratings** using standard Elo formula with configurable K-factor
 3. **Simulate** the remaining knockout tournament 50,000+ times in ~1.3s
-4. **Fetch live results** from Football-Data.org API with automatic retry and cached fallback
+4. **Fetch live results** from BSD API with automatic retry and cached fallback
 5. **Poll continuously** every 60 seconds, auto-detecting new matches and re-simulating
 6. **Display** color-coded probability tables with delta tracking (▲/▼)
 7. **Run one-off** with `--once`, control color with `--no-color`, reproduce with `--seed`
 
 **Test coverage:** 98 passing tests across 10 test modules
 **Codebase:** ~2,200 LOC Python
+
+## Current Milestone: v1.1 World Cup 2026 Support
+
+**Goal:** Migrate from 32-team knockout-only format to the full 48-team FIFA World Cup 2026 with group stage, Annex C R32 routing, and verified BSD live-data integration.
+
+**Target features:**
+- 48-team dataset with researched Elo ratings, group assignments, and BSD aliases
+- 12 group definitions (A–L) with validated structure
+- 495-entry Annex C lookup table for R32 third-place routing
+- Group stage simulation engine (round-robin, 7-step tiebreaker, 5-step third-place ranking, Poisson scoring)
+- Full knockout bracket (R32 → R16 → QF → SF → TPP → FINAL) with Annex C resolution
+- BSD live-data ingestion for group stage matches
+- Console display of group standings + third-place bubble indicator
+- All test fixtures updated; E2E test with live BSD smoke test
+- All 7 SOTs batch-updated for 48-team format
 
 ## Requirements
 
@@ -42,7 +57,41 @@ The v1.0 MVP is complete. The tool can:
 - ✓ **SHUT-01**: Save state and print final probabilities on Ctrl+C — v1.0
 - ✓ **CLI-01**: CLI flags: --once, --no-color, --help, --seed — v1.0
 
-### Active (v2.0)
+### Active (v1.1)
+
+- [ ] **DATA2-01**: 48 teams with Elo ratings and group assignments
+- [ ] **DATA2-02**: 12 group definitions (groups A–L, 4 teams each)
+- [ ] **DATA2-03**: 495-entry Annex C lookup table
+- [ ] **DATA2-04**: BSD team aliases for all 48 teams
+- [ ] **DATA2-05**: validate_groups() — structure validation
+- [ ] **DATA2-06**: validate_annex_c() — 495-entry validation
+- [ ] **GROUPS-01**: Group standings computation
+- [ ] **GROUPS-02**: 7-step within-group tiebreaker chain
+- [ ] **GROUPS-03**: 5-step cross-group third-place ranking
+- [ ] **GROUPS-04**: 72 round-robin group match simulation
+- [ ] **GROUPS-05**: Advancement selection (24 auto + 8 best third)
+- [ ] **GROUPS-06**: Annex C R32 matchup resolution
+- [ ] **GROUPS-07**: Performance benchmark (< 15s for 50K)
+- [ ] **BRKT-01**: 40-match bracket.json with slot types
+- [ ] **BRKT-02**: R32 group_position slot resolution
+- [ ] **BRKT-03**: R32 annex_c_third slot resolution
+- [ ] **BRKT-04**: R16–FINAL source_matches pattern
+- [ ] **BRKT-05**: Third-place match simulation
+- [ ] **BRKT-06**: run_full_simulation() 48-team pipeline
+- [ ] **BRKT-07**: Bracket validation (10+ sub-checks)
+- [ ] **BRKT-08**: v1.0 knockout tests still pass
+- [ ] **INTG-01**: BSD API ingests group match results
+- [ ] **INTG-02**: played_groups.json persistence
+- [ ] **INTG-03**: Group standings console display
+- [ ] **INTG-04**: Third-place bubble indicator
+- [ ] **INTG-05**: Console header for 48-team format
+- [ ] **INTG-06**: All test fixtures updated
+- [ ] **INTG-07**: E2E mock test through full pipeline
+- [ ] **INTG-08**: Live BSD smoke test with --once
+- [ ] **INTG-09**: test_main_loop fix
+- [ ] **INTG-10**: All 7 SOTs batch-updated
+
+### Future (v2.0+)
 
 - [ ] **V2-01**: Most-likely full bracket visualization
 - [ ] **V2-02**: Dark horse detection (gap between Elo and probability)
@@ -51,46 +100,49 @@ The v1.0 MVP is complete. The tool can:
 - [ ] **V2-05**: What-if mode (simulate hypothetical match results)
 - [ ] **V2-06**: Backtesting against historical tournaments
 - [ ] **V2-07**: NumPy-accelerated simulation for larger iterations
-- [ ] **V2-08**: Group stage simulation
 
 ### Out of Scope
 
 | Feature | Reason |
 |---------|--------|
 | User accounts or login | Not needed for single-user CLI tool |
-| Web dashboard | Console-only for MVP; v2.0 candidate |
+| Web dashboard | Console-only; v2.0 candidate |
 | ML models (XGBoost, neural nets) | Beyond scope; Elo is sufficient |
 | Multi-tournament support | Only current World Cup |
 | Historical data analysis | Beyond current tournament scope |
 | Mobile notifications | Post-MVP enhancement |
 | Betting odds comparison | Post-MVP enhancement |
+| Player-level modeling | Massive data pipeline for marginal gain |
+| NumPy acceleration | Not needed at current simulation scale |
 
 ## Context
 
 - Python 3.10+ CLI application, no graphical interface
-- Uses Football-Data.org free API (rate limit: 10 req/min, poll every 60s)
-- All state persisted as JSON files (teams.json, bracket.json, played.json)
-- Knockout stage only (Round of 16 → Quarterfinals → Semifinals → Final)
+- Uses BSD sports API (`sports.bzzoiro.com`) with token authentication
+- All state persisted as JSON files (teams.json, groups.json, bracket.json, annex_c.json, played.json, played_groups.json)
+- Full 48-team tournament: 12 groups (A–L) → R32 → R16 → QF → SF → TPP → FINAL (104 matches)
 - Standard Elo rating system with configurable K-factor (default 60)
-- No draws in knockout matches (penalties produce a winner)
-- Codebase: ~2,200 LOC Python across 8 modules + 10 test files
+- Group stage uses Poisson score model for goal difference (required for tiebreakers); knockout uses binary Elo win/loss
+- R32 third-place routing via 495-entry Annex C lookup table
+- Codebase: ~2,200 LOC Python across 8 modules + 10 test files (growing to ~3,000+ with v1.1)
 
 ## Constraints
 
 - **Language**: Python 3.10+ — must run on Windows, macOS, Linux
-- **Dependencies**: Minimal (requests library for HTTP, random for simulation)
+- **Dependencies**: Minimal (requests library for HTTP, random for simulation, python-dotenv for .env)
 - **Storage**: JSON files only — no database
-- **API**: Football-Data.org free tier — 10 requests/min limit
+- **API**: BSD sports API — token auth, 200-result pagination
 - **UI**: Console-only — no web framework, no frontend
-- **Scope**: Knockout stage only — group stage deferred
+- **Scope**: 48-team FIFA World Cup 2026 format with full group stage and knockout
 - **Persistence**: State must survive script restarts via JSON files
+- **Performance**: 50K iterations must complete within 60s poll interval
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Python 3.10+ | Fast prototyping, rich ecosystem, cross-platform | ✓ Good |
-| Football-Data.org API | Free tier, reliable match data, well-documented | ✓ Good |
+| BSD sports API | Free tier, reliable match data, well-documented | ✓ Good |
 | Elo rating system | Simple, transparent, well-understood formula | ✓ Good |
 | Monte Carlo simulation | Straightforward probability estimation | ✓ Good |
 | JSON file persistence | No database setup, human-readable, easy to debug | ✓ Good |
@@ -98,7 +150,28 @@ The v1.0 MVP is complete. The tool can:
 | Pure stdlib ANSI | No colorama dependency, works cross-platform | ✓ Good |
 | `--once` skips state save | Single-cycle mode doesn't change state, no save needed | ✓ Good |
 | `--seed` on every sim | Reproducibility without global random state pollution | ✓ Good |
+| Group-position slot types | R32 teams unresolved until runtime; avoids hardcoding team names | ✓ Good |
+| Annex C lookup table | 495-entry JSON file, validated at startup | ✓ Good |
+| Separate group/knockout persistence | Played_groups.json prevents bracket contamination | ✓ Good |
+| Poisson scoring for group matches | Required for goal-difference tiebreakers | ⚠️ Revisit (needs calibration) |
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition:**
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone:**
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
 
-*Last updated: 2026-06-14 after v1.0 milestone*
+*Last updated: 2026-06-14 after v1.1 milestone initialization*

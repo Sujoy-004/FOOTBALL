@@ -76,42 +76,42 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA2-01 | TBD | Pending |
-| DATA2-02 | TBD | Pending |
-| DATA2-03 | TBD | Pending |
-| DATA2-04 | TBD | Pending |
-| DATA2-05 | TBD | Pending |
-| DATA2-06 | TBD | Pending |
-| GROUPS-01 | TBD | Pending |
-| GROUPS-02 | TBD | Pending |
-| GROUPS-03 | TBD | Pending |
-| GROUPS-04 | TBD | Pending |
-| GROUPS-05 | TBD | Pending |
-| GROUPS-06 | TBD | Pending |
-| GROUPS-07 | TBD | Pending |
-| BRKT-01 | TBD | Pending |
-| BRKT-02 | TBD | Pending |
-| BRKT-03 | TBD | Pending |
-| BRKT-04 | TBD | Pending |
-| BRKT-05 | TBD | Pending |
-| BRKT-06 | TBD | Pending |
-| BRKT-07 | TBD | Pending |
-| BRKT-08 | TBD | Pending |
-| INTG-01 | TBD | Pending |
-| INTG-02 | TBD | Pending |
-| INTG-03 | TBD | Pending |
-| INTG-04 | TBD | Pending |
-| INTG-05 | TBD | Pending |
-| INTG-06 | TBD | Pending |
-| INTG-07 | TBD | Pending |
-| INTG-08 | TBD | Pending |
-| INTG-09 | TBD | Pending |
-| INTG-10 | TBD | Pending |
+| DATA2-01 | Phase 7 | Pending |
+| DATA2-02 | Phase 7 | Pending |
+| DATA2-03 | Phase 7 | Pending |
+| DATA2-04 | Phase 7 | Pending |
+| DATA2-05 | Phase 7 | Pending |
+| DATA2-06 | Phase 7 | Pending |
+| GROUPS-01 | Phase 8 | Pending |
+| GROUPS-02 | Phase 8 | Pending |
+| GROUPS-03 | Phase 8 | Pending |
+| GROUPS-04 | Phase 8 | Pending |
+| GROUPS-05 | Phase 8 | Pending |
+| GROUPS-06 | Phase 8 | Pending |
+| GROUPS-07 | Phase 8 | Pending |
+| BRKT-01 | Phase 9 | Pending |
+| BRKT-02 | Phase 9 | Pending |
+| BRKT-03 | Phase 9 | Pending |
+| BRKT-04 | Phase 9 | Pending |
+| BRKT-05 | Phase 9 | Pending |
+| BRKT-06 | Phase 9 | Pending |
+| BRKT-07 | Phase 9 | Pending |
+| BRKT-08 | Phase 9 | Pending |
+| INTG-01 | Phase 10 | Pending |
+| INTG-02 | Phase 10 | Pending |
+| INTG-03 | Phase 10 | Pending |
+| INTG-04 | Phase 10 | Pending |
+| INTG-05 | Phase 10 | Pending |
+| INTG-06 | Phase 10 | Pending |
+| INTG-07 | Phase 10 | Pending |
+| INTG-08 | Phase 10 | Pending |
+| INTG-09 | Phase 10 | Pending |
+| INTG-10 | Phase 10 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 31 total
-- Mapped to phases: 0
-- Unmapped: 31 ⚠️
+- Mapped to phases: 31
+- Unmapped: 0 ✅
 
 ---
 
