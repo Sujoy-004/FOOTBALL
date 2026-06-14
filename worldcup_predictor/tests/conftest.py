@@ -136,3 +136,9 @@ def sample_groups():
             }
         }
     }
+
+
+@pytest.fixture
+def sample_elo():
+    """Returns Elo ratings for the sample group's 4 teams."""
+    return {"Mexico": 1850.0, "South Africa": 1700.0, "South Korea": 1650.0, "Czech Republic": 1468.0}
