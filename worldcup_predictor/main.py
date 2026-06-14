@@ -8,6 +8,7 @@ import argparse
 import json
 import logging
 import os
+import random
 import signal
 import sys
 import time
@@ -79,6 +80,38 @@ def _next_poll_sleep(interval: float) -> None:
         time.sleep(0.5)
 
 
+def _compute_group_display(groups, teams, played_groups):
+    """Run a single deterministic group simulation iteration for display.
+
+    Uses seed=0 for reproducibility. This is fast (~0.01s) — one iteration
+    of 72 group matches is negligible compared to the 50K main simulation.
+
+    Args:
+        groups: Group definitions dict.
+        teams: Team data dict.
+        played_groups: Dict of played group match results.
+
+    Returns:
+        Tuple of (standings, third_ranked) from compute_standings() and
+        rank_third_placed(). Returns ({}, []) if groups is empty.
+    """
+    if not groups:
+        return {}, []
+    from src.groups import (
+        compute_standings, rank_third_placed,
+        precompute_matchup_lambdas, simulate_group_matches,
+    )
+    elo = {n: d["elo"] for n, d in teams.items()}
+    lambdas = precompute_matchup_lambdas(groups, elo)
+    results = simulate_group_matches(
+        groups, teams, elo, random.Random(0),
+        fair_play=False, matchup_lambdas=lambdas,
+        played_groups=played_groups or {},
+    )
+    standings = compute_standings(results, elo)
+    return standings, rank_third_placed(standings)
+
+
 def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_key, aliases, last_sim_time, last_request_time, prev_probs=None, seed=None):
     """Run one fetch -> process -> simulate -> print cycle.
 
@@ -111,6 +144,10 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     if last_sim_time > 0 and now - last_sim_time > 3600:
         output.print_auto_refresh()
         probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=seed)
+        # Group standings display per D-15: show on hourly refresh
+        standings, third_ranked = _compute_group_display(groups, teams, played_groups)
+        output.print_group_standings(standings, third_ranked)
+        output.print_third_place_bubble(third_ranked)
         output.print_probability_table(probs)
         return now, last_request_time, probs
 
@@ -164,11 +201,24 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             played_groups[m["match_id"]] = m
         state.save_played_groups(played_groups)
 
+    # D-15: group standings display behavior
+    #   - New group match ingested → show
+    #   - Hourly refresh → show (handled above in hourly block)
+    #   - Regular heartbeat (no new matches) → skip
+    show_group_display = bool(new_group_matches)
+
     # Simulate and print results
     sim_start = time.time()
     probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=seed)
     sim_elapsed = time.time() - sim_start
     output.print_simulation_duration(sim_elapsed)
+
+    # Group standings (D-15: only on new matches or hourly, skip on heartbeat)
+    if show_group_display:
+        standings, third_ranked = _compute_group_display(groups, teams, played_groups)
+        output.print_group_standings(standings, third_ranked)
+        output.print_third_place_bubble(third_ranked)
+
     output.print_probability_table(probs, prev_probs)
     if prev_probs is not None:
         output.print_delta_summary(probs, prev_probs)
