@@ -33,3 +33,106 @@ def sample_bracket():
 def sample_played():
     """Returns an empty played matches dict."""
     return {}
+
+
+@pytest.fixture
+def sample_group_matches_results():
+    """Returns a pre-built simulated match results dict for Group A.
+
+    Structure matches the output of simulate_group_matches() — 6 matches
+    with deterministic fixed scores for testing standings computation.
+    """
+    return {
+        "A": {
+            "GS_A_01": {
+                "team_a": "Mexico",
+                "team_b": "South Africa",
+                "score_a": 2,
+                "score_b": 1,
+                "winner": "Mexico",
+                "yellow_cards_a": 0,
+                "red_cards_a": 0,
+                "yellow_cards_b": 0,
+                "red_cards_b": 0,
+            },
+            "GS_A_02": {
+                "team_a": "Mexico",
+                "team_b": "South Korea",
+                "score_a": 1,
+                "score_b": 1,
+                "winner": None,
+                "yellow_cards_a": 0,
+                "red_cards_a": 0,
+                "yellow_cards_b": 0,
+                "red_cards_b": 0,
+            },
+            "GS_A_03": {
+                "team_a": "Mexico",
+                "team_b": "Czech Republic",
+                "score_a": 3,
+                "score_b": 0,
+                "winner": "Mexico",
+                "yellow_cards_a": 0,
+                "red_cards_a": 0,
+                "yellow_cards_b": 0,
+                "red_cards_b": 0,
+            },
+            "GS_A_04": {
+                "team_a": "South Africa",
+                "team_b": "South Korea",
+                "score_a": 0,
+                "score_b": 2,
+                "winner": "South Korea",
+                "yellow_cards_a": 0,
+                "red_cards_a": 0,
+                "yellow_cards_b": 0,
+                "red_cards_b": 0,
+            },
+            "GS_A_05": {
+                "team_a": "South Africa",
+                "team_b": "Czech Republic",
+                "score_a": 1,
+                "score_b": 0,
+                "winner": "South Africa",
+                "yellow_cards_a": 0,
+                "red_cards_a": 0,
+                "yellow_cards_b": 0,
+                "red_cards_b": 0,
+            },
+            "GS_A_06": {
+                "team_a": "South Korea",
+                "team_b": "Czech Republic",
+                "score_a": 2,
+                "score_b": 1,
+                "winner": "South Korea",
+                "yellow_cards_a": 0,
+                "red_cards_a": 0,
+                "yellow_cards_b": 0,
+                "red_cards_b": 0,
+            },
+        }
+    }
+
+
+@pytest.fixture
+def sample_groups():
+    """Returns a minimal groups.json-like dict with just Group A.
+
+    Contains 4 teams and 6 matches with null winners, matching the
+    structure consumed by simulate_group_matches().
+    """
+    return {
+        "groups": {
+            "A": {
+                "teams": ["Mexico", "South Africa", "South Korea", "Czech Republic"],
+                "matches": [
+                    {"match_id": "GS_A_01", "team_a": "Mexico", "team_b": "South Africa", "winner": None, "score_a": None, "score_b": None},
+                    {"match_id": "GS_A_02", "team_a": "Mexico", "team_b": "South Korea", "winner": None, "score_a": None, "score_b": None},
+                    {"match_id": "GS_A_03", "team_a": "Mexico", "team_b": "Czech Republic", "winner": None, "score_a": None, "score_b": None},
+                    {"match_id": "GS_A_04", "team_a": "South Africa", "team_b": "South Korea", "winner": None, "score_a": None, "score_b": None},
+                    {"match_id": "GS_A_05", "team_a": "South Africa", "team_b": "Czech Republic", "winner": None, "score_a": None, "score_b": None},
+                    {"match_id": "GS_A_06", "team_a": "South Korea", "team_b": "Czech Republic", "winner": None, "score_a": None, "score_b": None},
+                ],
+            }
+        }
+    }
