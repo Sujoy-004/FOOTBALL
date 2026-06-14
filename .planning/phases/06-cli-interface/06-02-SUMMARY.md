@@ -124,6 +124,14 @@ None - plan executed exactly as written.
 - All tests pass (pre-existing failures documented and unchanged)
 - Ready for milestone completion
 
+## Self-Check: PASSED
+
+All file and commit verifications passed:
+- All 3 source files exist on disk ✓
+- All 4 commits found in git log in correct order (RED → GREEN → test → docs) ✓
+- `python -c "import main; a=main._parse_args(['--once','--no-color','--seed','42'])"` — all 3 flags parsed correctly ✓
+- `pytest tests/test_main_loop.py -v` — 4 pass, 1 pre-existing failure unchanged ✓
+
 ---
 
 *Phase: 06-cli-interface*
