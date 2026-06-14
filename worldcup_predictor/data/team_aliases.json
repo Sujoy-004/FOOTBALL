@@ -1,12 +1,78 @@
 {
-  "United States": ["USA", "United States of America"],
-  "Iran": ["IR Iran", "Islamic Republic of Iran"],
-  "South Korea": ["Korea Republic"],
-  "Great Britain": ["United Kingdom"],
-  "Ivory Coast": ["Cote d'Ivoire", "Côte d'Ivoire"],
-  "DR Congo": ["Congo DR", "Democratic Republic of the Congo"],
-  "North Korea": ["DPR Korea", "Democratic People's Republic of Korea"],
-  "Czech Republic": ["Czechia"],
-  "North Macedonia": ["Macedonia"],
-  "Eswatini": ["Swaziland"]
+  "United States": [
+    "USA",
+    "United States of America"
+  ],
+  "Iran": [
+    "IR Iran",
+    "Islamic Republic of Iran"
+  ],
+  "South Korea": [
+    "Korea Republic"
+  ],
+  "Ivory Coast": [
+    "Cote d'Ivoire",
+    "Côte d'Ivoire"
+  ],
+  "DR Congo": [
+    "Congo DR",
+    "Democratic Republic of the Congo"
+  ],
+  "Czech Republic": [
+    "Czechia"
+  ],
+  "Algeria": [],
+  "Argentina": [],
+  "Australia": [],
+  "Austria": [],
+  "Belgium": [],
+  "Bosnia and Herzegovina": [
+    "Bosnia-Herzegovina"
+  ],
+  "Brazil": [],
+  "Canada": [],
+  "Cape Verde": [
+    "Cabo Verde"
+  ],
+  "Colombia": [],
+  "Croatia": [],
+  "Curaçao": [
+    "Curacao"
+  ],
+  "Ecuador": [],
+  "Egypt": [],
+  "England": [
+    "Great Britain"
+  ],
+  "France": [],
+  "Germany": [],
+  "Ghana": [],
+  "Haiti": [],
+  "Iraq": [],
+  "Japan": [],
+  "Jordan": [],
+  "Mexico": [],
+  "Morocco": [],
+  "Netherlands": [
+    "Holland"
+  ],
+  "New Zealand": [],
+  "Norway": [],
+  "Panama": [],
+  "Paraguay": [],
+  "Portugal": [],
+  "Qatar": [],
+  "Saudi Arabia": [],
+  "Scotland": [],
+  "Senegal": [],
+  "South Africa": [],
+  "Spain": [],
+  "Sweden": [],
+  "Switzerland": [],
+  "Tunisia": [],
+  "Türkiye": [
+    "Turkey"
+  ],
+  "Uruguay": [],
+  "Uzbekistan": []
 }
