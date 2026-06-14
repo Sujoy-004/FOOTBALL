@@ -10,7 +10,7 @@ A live, self-updating tournament predictor in your terminal. Starting from bare-
 - [x] **Phase 2: Monte Carlo Simulation** - 50K+ iteration tournament simulation and probability aggregation
 - [ ] **Phase 3: Live API Integration** - Football-Data.org API fetcher with retry logic and cached fallback
 - [ ] **Phase 4: Main Loop & Shutdown** - Continuous polling loop with Ctrl+C graceful shutdown
-- [ ] **Phase 5: Console Output & Formatting** - Formatted probability tables, delta tracking, and ANSI colors
+- [x] **Phase 5: Console Output & Formatting** - Formatted probability tables, delta tracking, and ANSI colors
 - [ ] **Phase 6: CLI Interface & Polish** - Command-line flags and final integration polish
 
 ## Phase Details
@@ -95,8 +95,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Core probability table with ANSI colors, delta tracking, and risers/fallers
-- [ ] 05-02-PLAN.md — Remaining output blocks (header, match alerts, heartbeat, shutdown, errors)
+- [x] 05-01-PLAN.md — Core probability table with ANSI colors, delta tracking, and risers/fallers
+- [x] 05-02-PLAN.md — Remaining output blocks (header, match alerts, heartbeat, shutdown, errors)
 
 **UI hint**: yes
 
@@ -111,7 +111,11 @@ Plans:
   3. `--no-color` flag disables ANSI color output explicitly (overrides auto-detection)
   4. `--seed <N>` flag enables reproducible Monte Carlo simulation runs
   5. All flags work together correctly (e.g., `python wc-predict.py --once --no-color --seed 42`)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Argparse + --help + --no-color (argparse framework, NO_COLOR flag, tests)
+- [ ] 06-02-PLAN.md — --once + --seed (single-cycle mode, reproducibility propagation, tests)
 
 ## Progress
 
@@ -123,5 +127,5 @@ Plans:
 | 2. Monte Carlo Simulation | 2/2 | Complete | 2026-06-13 |
 | 3. Live API Integration | 0/2 | Planned | - |
 | 4. Main Loop & Shutdown | 0/0 | Not started | - |
-| 5. Console Output & Formatting | 0/2 | Planned | - |
+| 5. Console Output & Formatting | 2/2 | Complete | 2026-06-14 |
 | 6. CLI Interface & Polish | 0/0 | Not started | - |
