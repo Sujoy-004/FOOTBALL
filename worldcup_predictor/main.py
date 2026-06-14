@@ -76,8 +76,19 @@ def _next_poll_sleep(interval: float) -> None:
         time.sleep(0.5)
 
 
-def _run_iteration(teams, bracket, played, api_key, aliases, last_sim_time, last_request_time, prev_probs=None):
+def _run_iteration(teams, bracket, played, api_key, aliases, last_sim_time, last_request_time, prev_probs=None, seed=None):
     """Run one fetch -> process -> simulate -> print cycle.
+
+    Args:
+        teams: Team data dict.
+        bracket: Bracket match list.
+        played: Dict of played matches.
+        api_key: Football-Data.org API key.
+        aliases: Team alias mappings.
+        last_sim_time: Timestamp of last simulation.
+        last_request_time: Timestamp of last API request.
+        prev_probs: Previous iteration probabilities for delta display.
+        seed: int or None. Passed to run_simulation() for reproducible Monte Carlo (D-03, D-04).
 
     Returns (updated_last_sim_time, updated_last_request_time, probs).
     """
@@ -91,7 +102,7 @@ def _run_iteration(teams, bracket, played, api_key, aliases, last_sim_time, last
     # Hourly re-sim check: if >3600s since last sim with no new matches, refresh
     if last_sim_time > 0 and now - last_sim_time > 3600:
         output.print_auto_refresh()
-        probs = run_simulation(teams, bracket, played, iterations=50000)
+        probs = run_simulation(teams, bracket, played, iterations=50000, seed=seed)
         output.print_probability_table(probs)
         return now, last_request_time, probs
 
@@ -129,7 +140,7 @@ def _run_iteration(teams, bracket, played, api_key, aliases, last_sim_time, last
 
     # Simulate and print results
     sim_start = time.time()
-    probs = run_simulation(teams, bracket, played, iterations=50000)
+    probs = run_simulation(teams, bracket, played, iterations=50000, seed=seed)
     sim_elapsed = time.time() - sim_start
     output.print_simulation_duration(sim_elapsed)
     output.print_probability_table(probs, prev_probs)
@@ -193,6 +204,15 @@ def main() -> None:
 
         output.print_header(teams, bracket, played, aliases)
 
+        # ── --once mode: single iteration, immediate exit (D-01, D-02) ──
+        if args.once:
+            _run_iteration(
+                teams, bracket, played, api_key, aliases,
+                last_sim_time=0.0, last_request_time=0.0,
+                prev_probs=None, seed=args.seed,
+            )
+            sys.exit(0)
+
         # Register signal handlers
         signal.signal(signal.SIGINT, _signal_handler)
         signal.signal(signal.SIGTERM, _signal_handler)
@@ -207,6 +227,7 @@ def main() -> None:
         last_sim_time, last_request_time, prev_probs = _run_iteration(
             teams, bracket, played, api_key, aliases,
             last_sim_time, last_request_time, prev_probs,
+            seed=args.seed,
         )
 
         # Continuous polling loop
@@ -217,10 +238,11 @@ def main() -> None:
             last_sim_time, last_request_time, prev_probs = _run_iteration(
                 teams, bracket, played, api_key, aliases,
                 last_sim_time, last_request_time, prev_probs,
+                seed=args.seed,
             )
 
         # Shutdown path
-        final_probs = run_simulation(teams, bracket, played, iterations=50000)
+        final_probs = run_simulation(teams, bracket, played, iterations=50000, seed=args.seed)
         output.print_shutdown_banner(final_probs)
 
         state.save_teams(teams)
