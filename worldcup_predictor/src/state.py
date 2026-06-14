@@ -164,6 +164,41 @@ def save_played(played: dict[str, dict], data_dir: Path | str | None = None) -> 
     _atomic_write_json(played, path)
 
 
+def load_played_groups(data_dir: Path | str | None = None) -> dict[str, dict]:
+    """Load played group matches from played_groups.json.
+
+    Returns empty dict if the file does not exist (graceful bootstrap per D-09).
+    Created group match results persist in a separate file (played_groups.json)
+    to avoid contaminating the knockout match storage (played.json).
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        dict[str, dict]: Mapping of match_id to group match result dict, or
+        empty dict if the file does not yet exist.
+    """
+    path = _resolve_data_dir(data_dir) / "played_groups.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_played_groups(played_groups: dict[str, dict], data_dir: Path | str | None = None) -> None:
+    """Save played group match data to played_groups.json atomically.
+
+    Follows the same atomic write pattern as save_played() using
+    _atomic_write_json() (tempfile.mkstemp + os.replace).
+
+    Args:
+        played_groups: Mapping of match_id to group match result dict.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "played_groups.json"
+    _atomic_write_json(played_groups, path)
+
+
 def validate_groups(groups: dict, teams: dict[str, dict] | None = None) -> None:
     """Validate groups.json structure. Raises ValueError on failure.
 
