@@ -12,13 +12,17 @@ from pathlib import Path
 import pytest
 
 from src.state import (
+    load_annex_c,
     load_bracket,
+    load_groups,
     load_played,
     load_teams,
     save_bracket,
     save_played,
     save_teams,
+    validate_annex_c,
     validate_bracket,
+    validate_groups,
 )
 
 
@@ -301,3 +305,121 @@ except FileNotFoundError as e:
     )
     assert result.returncode == 1, f"Expected exit 1, got {result.returncode}"
     assert "File not found" in result.stderr, f"Missing error: {result.stderr}"
+
+
+# ─── validate_groups tests ──────────────────────────────────────────
+
+
+def _make_valid_groups(teams_override=None):
+    """Build a valid 12-group dict for testing purposes."""
+    groups = {}
+    all_teams = teams_override or [f"Team_{i}" for i in range(48)]
+    for idx, letter in enumerate("ABCDEFGHIJKL"):
+        team_slice = all_teams[idx * 4 : (idx + 1) * 4]
+        matches = []
+        for mnum in range(1, 7):
+            matches.append({
+                "match_id": f"GS_{letter}_{mnum:02d}",
+                "team_a": team_slice[0],
+                "team_b": team_slice[1] if mnum == 1 else team_slice[min(mnum, 3)],
+                "winner": None,
+                "score_a": None,
+                "score_b": None,
+            })
+        groups[letter] = {"teams": list(team_slice), "matches": matches}
+    return {"groups": groups}
+
+
+def test_valid_groups_passes():
+    """A valid 12-group (A-L) structure with 4 teams and 6 matches each passes."""
+    validate_groups(_make_valid_groups())
+
+
+def test_valid_groups_wrong_group_count():
+    """Structure with only 11 groups should raise ValueError."""
+    data = _make_valid_groups()
+    # Remove group L (last entry)
+    groups = data["groups"]
+    del groups["L"]
+    with pytest.raises(ValueError, match="Expected.*12 groups.*got 11"):
+        validate_groups(data)
+
+
+def test_valid_groups_wrong_team_count():
+    """A group with only 3 teams should raise ValueError."""
+    data = _make_valid_groups()
+    data["groups"]["A"]["teams"] = data["groups"]["A"]["teams"][:3]
+    with pytest.raises(ValueError, match="Group A.*expected 4 teams.*got 3"):
+        validate_groups(data)
+
+
+def test_valid_groups_wrong_match_count():
+    """A group with only 5 matches should raise ValueError."""
+    data = _make_valid_groups()
+    data["groups"]["B"]["matches"] = data["groups"]["B"]["matches"][:5]
+    with pytest.raises(ValueError, match="Group B.*expected 6 matches.*got 5"):
+        validate_groups(data)
+
+
+def test_valid_groups_duplicate_team():
+    """Same team appearing in 2+ groups should raise ValueError."""
+    data = _make_valid_groups()
+    # Put Team_0 into group B as well (it's already in group A)
+    data["groups"]["B"]["teams"][0] = "Team_0"
+    with pytest.raises(ValueError, match="Team.*Team_0.*appears in multiple"):
+        validate_groups(data)
+
+
+def test_valid_groups_duplicate_match_id():
+    """Duplicate match_id across groups should raise ValueError."""
+    data = _make_valid_groups()
+    # Create duplicate within group B (prefix check passes, duplicate check fires)
+    data["groups"]["B"]["matches"][5]["match_id"] = "GS_B_01"
+    with pytest.raises(ValueError, match="Duplicate match_id"):
+        validate_groups(data)
+
+
+def test_valid_groups_invalid_match_id():
+    """match_id not matching GS_{group}_NN pattern should raise ValueError."""
+    data = _make_valid_groups()
+    data["groups"]["A"]["matches"][0]["match_id"] = "GS_X_01"
+    with pytest.raises(ValueError, match="does not start with.*GS_A_"):
+        validate_groups(data)
+
+
+def test_valid_groups_team_not_in_teams():
+    """Team in groups but not in teams dict should raise ValueError."""
+    groups_data = _make_valid_groups()
+    teams_dict = {"Team_0": {"elo": 1500}, "Team_1": {"elo": 1500}}
+    with pytest.raises(ValueError, match="not found in teams"):
+        validate_groups(groups_data, teams=teams_dict)
+
+
+def test_load_groups_success(tmp_path):
+    """load_groups should return dict with 'groups' key from valid JSON."""
+    data = _make_valid_groups()
+    (tmp_path / "groups.json").write_text(json.dumps(data), encoding="utf-8")
+    loaded = load_groups(data_dir=tmp_path)
+    assert "groups" in loaded
+
+
+def test_load_groups_file_not_found(tmp_path):
+    """load_groups should raise FileNotFoundError when groups.json missing."""
+    with pytest.raises(FileNotFoundError):
+        load_groups(data_dir=tmp_path)
+
+
+def test_load_groups_invalid_json(tmp_path):
+    """load_groups should raise json.JSONDecodeError on malformed JSON."""
+    (tmp_path / "groups.json").write_text("{invalid json!!!", encoding="utf-8")
+    with pytest.raises(json.JSONDecodeError):
+        load_groups(data_dir=tmp_path)
+
+
+def test_load_groups_validation_error(tmp_path):
+    """load_groups should raise ValueError for invalid groups data."""
+    data = _make_valid_groups()
+    del data["groups"]["A"]
+    (tmp_path / "groups.json").write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="Expected.*12 groups"):
+        load_groups(data_dir=tmp_path)
