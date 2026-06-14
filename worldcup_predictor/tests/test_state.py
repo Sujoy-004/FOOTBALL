@@ -3,6 +3,7 @@
 All file I/O tests use tmp_path to avoid modifying real data files.
 """
 
+import itertools
 import json
 import os
 import subprocess
@@ -423,3 +424,123 @@ def test_load_groups_validation_error(tmp_path):
     (tmp_path / "groups.json").write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(ValueError, match="Expected.*12 groups"):
         load_groups(data_dir=tmp_path)
+
+
+# ─── validate_annex_c tests ─────────────────────────────────────────
+
+
+def _make_valid_annex_c():
+    """Build a valid 495-entry Annex C lookup table via itertools.combinations.
+    
+    Each entry maps 8 winner-group slots to third-place groups from the combo.
+    Uses offset-based assignment with self-reference fallback: for each winner
+    group, picks combo[(i+1) % 8]; if that equals the winner group (self-ref),
+    falls back to combo[(i+2) % 8] which is guaranteed distinct.
+    """
+    all_groups = list("ABCDEFGHIJKL")
+    winner_groups = ["A", "B", "D", "E", "G", "I", "K", "L"]
+    data = {}
+    for combo in itertools.combinations(all_groups, 8):
+        key = ",".join(combo)
+        value = {}
+        for i, wg in enumerate(winner_groups):
+            ref = combo[(i + 1) % 8]
+            if ref == wg:
+                ref = combo[(i + 2) % 8]
+            value[f"1{wg}"] = f"3{ref}"
+        data[key] = value
+    return data
+
+
+def test_annex_c_valid_passes():
+    """495 valid entries created by itertools.combinations pass without exception."""
+    validate_annex_c(_make_valid_annex_c())
+
+
+def test_annex_c_wrong_count():
+    """Dict with fewer than 495 entries should raise ValueError."""
+    data = _make_valid_annex_c()
+    # Remove one entry
+    keys = list(data.keys())
+    del data[keys[0]]
+    with pytest.raises(ValueError, match="Expected.*495.*Annex C"):
+        validate_annex_c(data)
+
+
+def test_annex_c_unsorted_key():
+    """A key with unsorted group letters should raise ValueError."""
+    data = _make_valid_annex_c()
+    data["H,A,B,C,D,E,F,G"] = data.pop("A,B,C,D,E,F,G,H")
+    with pytest.raises(ValueError, match="not sorted"):
+        validate_annex_c(data)
+
+
+def test_annex_c_missing_value_key():
+    """An entry missing one of the 8 assignment keys should raise ValueError."""
+    data = _make_valid_annex_c()
+    # Remove the "1A" key from the first value
+    first_key = next(iter(data))
+    del data[first_key]["1A"]
+    with pytest.raises(ValueError, match="missing or extra assignment keys"):
+        validate_annex_c(data)
+
+
+def test_annex_c_self_reference():
+    """A self-reference (e.g. '1A' -> '3A') should raise ValueError."""
+    data = _make_valid_annex_c()
+    data["A,B,C,D,E,F,G,H"]["1A"] = "3A"
+    with pytest.raises(ValueError, match="self-reference"):
+        validate_annex_c(data)
+
+
+def test_annex_c_out_of_key_reference():
+    """A value referencing a group not in its key should raise ValueError."""
+    data = _make_valid_annex_c()
+    data["A,B,C,D,E,F,G,H"]["1A"] = "3I"
+    with pytest.raises(ValueError, match="not in key"):
+        validate_annex_c(data)
+
+
+def test_annex_c_invalid_group_letter():
+    """A key containing a non-A-L letter should raise ValueError."""
+    data = _make_valid_annex_c()
+    data["A,B,C,D,E,F,G,X"] = data.pop("A,B,C,D,E,F,G,H")
+    with pytest.raises(ValueError, match="invalid group letter"):
+        validate_annex_c(data)
+
+
+def test_load_annex_c_success(tmp_path):
+    """load_annex_c should return dict from valid JSON file."""
+    data = _make_valid_annex_c()
+    (tmp_path / "annex_c.json").write_text(json.dumps(data), encoding="utf-8")
+    loaded = load_annex_c(data_dir=tmp_path)
+    assert len(loaded) == 495
+
+
+def test_load_annex_c_file_not_found(tmp_path):
+    """load_annex_c should raise FileNotFoundError when annex_c.json missing."""
+    with pytest.raises(FileNotFoundError):
+        load_annex_c(data_dir=tmp_path)
+
+
+# ─── Production data verification tests ─────────────────────────────
+
+
+def test_production_groups_validates():
+    """Real groups.json passes validate_groups with cross-reference to teams.json."""
+    data_dir = MAIN_DIR / "data"
+    with open(data_dir / "groups.json", encoding="utf-8") as f:
+        groups = json.load(f)
+    with open(data_dir / "teams.json", encoding="utf-8") as f:
+        teams = json.load(f)
+    # Should not raise
+    validate_groups(groups, teams=teams)
+
+
+def test_production_annex_c_validates():
+    """Real annex_c.json passes validate_annex_c."""
+    data_dir = MAIN_DIR / "data"
+    with open(data_dir / "annex_c.json", encoding="utf-8") as f:
+        annex_c = json.load(f)
+    # Should not raise
+    validate_annex_c(annex_c)
