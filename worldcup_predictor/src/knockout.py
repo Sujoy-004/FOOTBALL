@@ -6,6 +6,7 @@ from collections import defaultdict
 from src.elo import expected_score
 from src.groups import (
     compute_standings,
+    precompute_matchup_lambdas,
     rank_third_placed,
     select_advancers,
     resolve_r32_matchups,
@@ -133,18 +134,39 @@ def run_full_simulation(
     played: dict[str, dict],
     iterations: int = 50000,
     seed: int | None = None,
+    played_groups: dict[str, dict] | None = None,
 ) -> dict[str, dict[str, float]]:
+    """Run full tournament simulation: group stage -> Annex C -> knockout.
+
+    Args:
+        teams: Dict of team name -> team data.
+        groups: Group definitions dict.
+        bracket: Knockout bracket match list.
+        annex_c: Annex C third-place lookup table.
+        played: Dict of played knockout matches.
+        iterations: Number of Monte Carlo iterations (default 50000).
+        seed: Random seed for reproducibility.
+        played_groups: Dict of played group match results. Forwarded to
+                       simulate_group_matches() so real results are used
+                       instead of simulating.
+
+    Returns:
+        Dict mapping team name to dict of probabilities for each round.
+    """
     rng = random.Random(seed)
     round_map = _build_round_map(bracket)
     elo_ratings = {name: data["elo"] for name, data in teams.items()}
 
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
+    # Precompute λ values once (Elo ratings don't change across iterations)
+    matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings)
+
     for _ in range(iterations):
         winner_progression: dict[str, str] = {}
         sf_losers: dict[str, str | None] = {}
 
-        results = simulate_group_matches(groups, teams, elo_ratings, rng)
+        results = simulate_group_matches(groups, teams, elo_ratings, rng, fair_play=False, matchup_lambdas=matchup_lambdas, played_groups=played_groups)
         standings = compute_standings(results, elo_ratings)
         third_ranked = rank_third_placed(standings)
         advancers = select_advancers(standings, third_ranked)

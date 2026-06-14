@@ -11,6 +11,9 @@ from collections import defaultdict
 from src import constants
 
 
+MAX_EXPECTED_GOALS = 8.0
+
+
 def expected_goals(
     rating_a: float, rating_b: float, base_rate: float | None = None
 ) -> float:
@@ -18,6 +21,9 @@ def expected_goals(
 
     Computes team A's expected goal rate (lambda parameter for Poisson) against
     team B at neutral venue modified by home advantage for team A.
+    Capped at MAX_EXPECTED_GOALS (8.0) to prevent unrealistically high
+    expectations for extreme Elo gaps, which would also make the Knuth
+    Poisson sampler prohibitively expensive.
 
     Args:
         rating_a: Elo rating of team A (the "home" side in the fixture).
@@ -26,14 +32,54 @@ def expected_goals(
                    Defaults to constants.EXPECTED_GOALS_BASE_RATE.
 
     Returns:
-        Float >= 0 representing team A's expected goals (Poisson lambda).
+        Float >= 0 representing team A's expected goals (Poisson lambda),
+        capped at MAX_EXPECTED_GOALS.
     """
     adj_base = (base_rate if base_rate is not None else constants.EXPECTED_GOALS_BASE_RATE) * 1.05
-    return adj_base * (10.0 ** ((rating_a - rating_b) / 400.0))
+    return min(adj_base * (10.0 ** ((rating_a - rating_b) / 400.0)), MAX_EXPECTED_GOALS)
+
+
+_POISSON_TABLES: dict[float, list[int]] = {}
+_TABLE_BITS = 10
+_TABLE_SIZE = 1 << _TABLE_BITS
+
+
+def _build_poisson_table(lam: float) -> list[int]:
+    """Build a precomputed inverse-CDF lookup table for Poisson(lam).
+
+    Maps uniform [0, 1) quantized to _TABLE_SIZE buckets directly to
+    Poisson samples. Replaces the Knuth while-loop with O(1) table lookup:
+    one getrandbits call + one list index per sample.
+    """
+    if lam <= 0.0:
+        return [0] * _TABLE_SIZE
+    term = math.exp(-lam)
+    total = 0.0
+    k = 0
+    cdf = []
+    while total < 0.999999:
+        total += term
+        cdf.append(total)
+        k += 1
+        term *= lam / k
+    table = []
+    idx = 0
+    for k, cum_prob in enumerate(cdf):
+        boundary = int(cum_prob * _TABLE_SIZE)
+        while idx < boundary:
+            table.append(k)
+            idx += 1
+    while len(table) < _TABLE_SIZE:
+        table.append(len(cdf) - 1)
+    return table
 
 
 def _poisson_sample(lam: float, rng: random.Random) -> int:
-    """Draw a Poisson-distributed integer using the Knuth algorithm.
+    """Draw a Poisson-distributed integer using inverse-CDF table lookup.
+
+    Precomputes a lookup table on first use for each lambda, then samples
+    via a single getrandbits call and list index. Much faster than the
+    Knuth algorithm for the common case of small-to-moderate lambda.
 
     Args:
         lam: The lambda parameter (mean) of the Poisson distribution.
@@ -44,23 +90,23 @@ def _poisson_sample(lam: float, rng: random.Random) -> int:
     """
     if lam <= 0.0:
         return 0
-    k = 0
-    p = 1.0
-    bound = math.exp(-lam)
-    while p > bound:
-        k += 1
-        p *= rng.random()
-    return k - 1
+    table = _POISSON_TABLES.get(lam)
+    if table is None:
+        table = _build_poisson_table(lam)
+        _POISSON_TABLES[lam] = table
+    return table[rng.getrandbits(_TABLE_BITS)]
 
 
 def _simulate_single_match(
-    team_a: str, team_b: str, elo_a: float, elo_b: float, rng: random.Random
+    team_a: str, team_b: str, elo_a: float, elo_b: float, rng: random.Random,
+    lambda_a: float | None = None, lambda_b: float | None = None,
+    fair_play: bool = True,
 ) -> dict:
     """Simulate a single group match, returning scores, winner, and card counts.
 
     Goals are drawn from a Poisson distribution whose lambda is determined
-    by the Elo-to-goals formula (expected_goals). Card counts are drawn from
-    separate Poisson distributions (YC ~ Poisson(2.0), RC ~ Poisson(0.05)).
+    by the Elo-to-goals formula (expected_goals). Precomputed lambda values
+    can be passed directly to avoid recomputation in tight loops.
 
     Args:
         team_a: Name of team A (home side — receives home advantage).
@@ -68,13 +114,17 @@ def _simulate_single_match(
         elo_a: Elo rating of team A.
         elo_b: Elo rating of team B.
         rng: Seeded random.Random instance.
+        lambda_a: Precomputed expected goals for team A. If None, computed.
+        lambda_b: Precomputed expected goals for team B. If None, computed.
 
     Returns:
         Dict with keys: team_a, team_b, score_a, score_b, winner,
         yellow_cards_a, red_cards_a, yellow_cards_b, red_cards_b.
     """
-    lambda_a = expected_goals(elo_a, elo_b)
-    lambda_b = expected_goals(elo_b, elo_a)
+    if lambda_a is None:
+        lambda_a = expected_goals(elo_a, elo_b)
+    if lambda_b is None:
+        lambda_b = expected_goals(elo_b, elo_a)
 
     score_a = _poisson_sample(lambda_a, rng)
     score_b = _poisson_sample(lambda_b, rng)
@@ -86,10 +136,13 @@ def _simulate_single_match(
     else:
         winner = None
 
-    yc_a = _poisson_sample(2.0, rng)
-    rc_a = _poisson_sample(0.05, rng)
-    yc_b = _poisson_sample(2.0, rng)
-    rc_b = _poisson_sample(0.05, rng)
+    if fair_play:
+        yc_a = _poisson_sample(2.0, rng)
+        rc_a = _poisson_sample(0.05, rng)
+        yc_b = _poisson_sample(2.0, rng)
+        rc_b = _poisson_sample(0.05, rng)
+    else:
+        yc_a = rc_a = yc_b = rc_b = 0
 
     return {
         "team_a": team_a,
@@ -104,17 +157,47 @@ def _simulate_single_match(
     }
 
 
+def precompute_matchup_lambdas(
+    groups: dict,
+    elo_ratings: dict[str, float],
+) -> dict[str, tuple[float, float]]:
+    """Precompute expected goals (λ) for every group match.
+
+    λ values depend only on Elo ratings, which are fixed for a simulation run.
+    Computing them once and reusing across iterations saves ~5.8s per 50K sims.
+
+    Args:
+        groups: Groups dict (with or without "groups" wrapper key).
+        elo_ratings: Dict mapping team name → Elo rating.
+
+    Returns:
+        Dict mapping match_id → (lambda_a, lambda_b).
+    """
+    groups_data = groups.get("groups", groups)
+    lambdas: dict[str, tuple[float, float]] = {}
+    for group_data in groups_data.values():
+        for match in group_data["matches"]:
+            mid = match["match_id"]
+            ta, tb = match["team_a"], match["team_b"]
+            ea, eb = elo_ratings[ta], elo_ratings[tb]
+            lambdas[mid] = (expected_goals(ea, eb), expected_goals(eb, ea))
+    return lambdas
+
+
 def simulate_group_matches(
     groups: dict,
     teams: dict[str, dict],
     elo_ratings: dict[str, float],
     rng: random.Random,
+    fair_play: bool = True,
+    matchup_lambdas: dict[str, tuple[float, float]] | None = None,
+    played_groups: dict[str, dict] | None = None,
 ) -> dict[str, dict[str, dict]]:
     """Simulate all unplayed group matches across all 12 groups.
 
     For each group (A–L), each match with a null winner is simulated using
-    the Poisson score model. Already-played matches are skipped (their results
-    are preserved). The input groups dict is NOT mutated.
+    the Poisson score model. Matches present in played_groups use their real
+    results instead of simulating (D-07). The input groups dict is NOT mutated.
 
     Args:
         groups: The groups dict loaded from groups.json, with structure
@@ -122,30 +205,107 @@ def simulate_group_matches(
         teams: Dict mapping team names to their data dicts (contains "elo").
         elo_ratings: Pre-computed dict mapping team names to Elo ratings.
         rng: Seeded random.Random instance for reproducibility.
+        fair_play: If True, simulate yellow/red cards. If False, all cards
+                   set to 0 (avoids 66% of Poisson draws for performance).
+        matchup_lambdas: Precomputed λ values for each match. If None,
+                         computed on first call (and returned via closure).
+        played_groups: Dict of real group match results keyed by match_id.
+                       Matches in this dict use real results instead of
+                       simulation. Defaults to empty dict.
 
     Returns:
         Nested dict: {group_letter: {match_id: match_result_dict}}
         where match_result_dict has keys: team_a, team_b, score_a, score_b,
         winner, yellow_cards_a, red_cards_a, yellow_cards_b, red_cards_b.
     """
-    results: dict[str, dict[str, dict]] = {}
     groups_data = groups.get("groups", groups)
+    played_groups = played_groups or {}
 
+    if matchup_lambdas is None:
+        matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings)
+
+    getrandbits = rng.getrandbits
+    poisson_tables = _POISSON_TABLES
+    build_table = _build_poisson_table
+    table_bits = _TABLE_BITS
+
+    results: dict[str, dict[str, dict]] = {}
     for group_letter, group_data in groups_data.items():
         group_results: dict[str, dict] = {}
         for match in group_data["matches"]:
             mid = match["match_id"]
-            team_a = match["team_a"]
-            team_b = match["team_b"]
 
-            elo_a = elo_ratings[team_a]
-            elo_b = elo_ratings[team_b]
+            # Inject real result if this match was played (D-07)
+            if mid in played_groups:
+                pg = played_groups[mid]
+                group_results[mid] = {
+                    "team_a": pg["team_a"],
+                    "team_b": pg["team_b"],
+                    "score_a": pg["home_score"],
+                    "score_b": pg["away_score"],
+                    "winner": pg["winner"],
+                    "yellow_cards_a": 0,
+                    "red_cards_a": 0,
+                    "yellow_cards_b": 0,
+                    "red_cards_b": 0,
+                }
+                continue
 
-            result = _simulate_single_match(team_a, team_b, elo_a, elo_b, rng)
-            group_results[mid] = result
+            ta: str = match["team_a"]
+            tb: str = match["team_b"]
+            la, lb = matchup_lambdas[mid]
 
+            # Inlined _poisson_sample for score_a
+            if la <= 0.0:
+                score_a = 0
+            else:
+                table = poisson_tables.get(la)
+                if table is None:
+                    table = build_table(la)
+                    poisson_tables[la] = table
+                score_a = table[getrandbits(table_bits)]
+
+            # Inlined _poisson_sample for score_b
+            if lb <= 0.0:
+                score_b = 0
+            else:
+                table = poisson_tables.get(lb)
+                if table is None:
+                    table = build_table(lb)
+                    poisson_tables[lb] = table
+                score_b = table[getrandbits(table_bits)]
+
+            if score_a > score_b:
+                winner = ta
+            elif score_b > score_a:
+                winner = tb
+            else:
+                winner = None
+
+            if fair_play:
+                yc_table = poisson_tables.get(2.0)
+                if yc_table is None:
+                    yc_table = build_table(2.0)
+                    poisson_tables[2.0] = yc_table
+                rc_table = poisson_tables.get(0.05)
+                if rc_table is None:
+                    rc_table = build_table(0.05)
+                    poisson_tables[0.05] = rc_table
+                yc_a = yc_table[getrandbits(table_bits)]
+                rc_a = rc_table[getrandbits(table_bits)]
+                yc_b = yc_table[getrandbits(table_bits)]
+                rc_b = rc_table[getrandbits(table_bits)]
+            else:
+                yc_a = rc_a = yc_b = rc_b = 0
+
+            group_results[mid] = {
+                "team_a": ta, "team_b": tb,
+                "score_a": score_a, "score_b": score_b,
+                "winner": winner,
+                "yellow_cards_a": yc_a, "red_cards_a": rc_a,
+                "yellow_cards_b": yc_b, "red_cards_b": rc_b,
+            }
         results[group_letter] = group_results
-
     return results
 
 
@@ -452,29 +612,32 @@ def compute_standings(
             sa: int = match["score_a"]
             sb: int = match["score_b"]
 
+            ts_a = team_stats[ta]
+            ts_b = team_stats[tb]
+
             # Points: win=3, draw=1, loss=0
             if sa > sb:
-                team_stats[ta]["pts"] += 3
+                ts_a["pts"] += 3
             elif sb > sa:
-                team_stats[tb]["pts"] += 3
+                ts_b["pts"] += 3
             else:
-                team_stats[ta]["pts"] += 1
-                team_stats[tb]["pts"] += 1
+                ts_a["pts"] += 1
+                ts_b["pts"] += 1
 
             # Goal difference
             gd = sa - sb
-            team_stats[ta]["gd"] += gd
-            team_stats[tb]["gd"] -= gd
+            ts_a["gd"] += gd
+            ts_b["gd"] -= gd
 
             # Goals scored
-            team_stats[ta]["gs"] += sa
-            team_stats[tb]["gs"] += sb
+            ts_a["gs"] += sa
+            ts_b["gs"] += sb
 
-            # Fair play cards
-            team_stats[ta]["yellow_cards"] += match.get("yellow_cards_a", 0)
-            team_stats[ta]["red_cards"] += match.get("red_cards_a", 0)
-            team_stats[tb]["yellow_cards"] += match.get("yellow_cards_b", 0)
-            team_stats[tb]["red_cards"] += match.get("red_cards_b", 0)
+            # Cards (fields always present)
+            ts_a["yellow_cards"] += match["yellow_cards_a"]
+            ts_a["red_cards"] += match["red_cards_a"]
+            ts_b["yellow_cards"] += match["yellow_cards_b"]
+            ts_b["red_cards"] += match["red_cards_b"]
 
         # Compute conduct scores (positive penalty points, lower = better)
         for stats in team_stats.values():

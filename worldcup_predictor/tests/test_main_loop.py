@@ -33,44 +33,46 @@ def _runner_code() -> str:
         f"    return True\n"
         f"requests.get = lambda url, **kw: _MockResp()\n"
         f"import src.knockout\n"
-        f"def _mock_sim(teams, groups, bracket, annex_c, played, iterations=50000, seed=None):\n"
-        f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
-        f"src.knockout.run_full_simulation = _mock_sim\n"
-        f"import main\n"
-        f"main.run_full_simulation = _mock_sim\n"
-        f"main.main()\n"
-    )
+         f"def _mock_sim(*args, **kwargs):\n"
+         f"    teams = args[0] if args else kwargs.get('teams', {{}})\n"
+         f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
+         f"src.knockout.run_full_simulation = _mock_sim\n"
+         f"import main\n"
+         f"main.run_full_simulation = _mock_sim\n"
+         f"main.main()\n"
+     )
 
 
 def _runner_code_with_flag(flag: str) -> str:
     """Inline Python that mocks requests.get + run_full_simulation, passes `flag` as CLI arg, then calls main.main()."""
     return (
-        f"import os, sys\n"
-        f"os.environ['POLL_INTERVAL'] = '1'\n"
-        f"os.environ['BSD_API_KEY'] = 'test_dummy_key'\n"
-        f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
-        f"os.chdir({str(MAIN_DIR)!r})\n"
-        f"sys.argv = ['main.py', {flag!r}]\n"
-        f"import requests\n"
-        f"import src.constants\n"
-        f"src.constants.API_TIMEOUT = 1\n"
-        f"class _MockResp:\n"
-        f"  status_code=200\n"
-        f"  def json(self):\n"
-        f"    return {{}}\n"
-        f"  def raise_for_status(self):\n"
-        f"    pass\n"
-        f"  @property\n"
-        f"  def ok(self):\n"
-        f"    return True\n"
-        f"requests.get = lambda url, **kw: _MockResp()\n"
-        f"import src.knockout\n"
-        f"def _mock_sim(teams, groups, bracket, annex_c, played, iterations=50000, seed=None):\n"
-        f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
-        f"src.knockout.run_full_simulation = _mock_sim\n"
-        f"import main\n"
-        f"main.run_full_simulation = _mock_sim\n"
-        f"main.main()\n"
+         f"import os, sys\n"
+         f"os.environ['POLL_INTERVAL'] = '1'\n"
+         f"os.environ['BSD_API_KEY'] = 'test_dummy_key'\n"
+         f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
+         f"os.chdir({str(MAIN_DIR)!r})\n"
+         f"sys.argv = ['main.py', {flag!r}]\n"
+         f"import requests\n"
+         f"import src.constants\n"
+         f"src.constants.API_TIMEOUT = 1\n"
+         f"class _MockResp:\n"
+         f"  status_code=200\n"
+         f"  def json(self):\n"
+         f"    return {{}}\n"
+         f"  def raise_for_status(self):\n"
+         f"    pass\n"
+         f"  @property\n"
+         f"  def ok(self):\n"
+         f"    return True\n"
+         f"requests.get = lambda url, **kw: _MockResp()\n"
+         f"import src.knockout\n"
+         f"def _mock_sim(*args, **kwargs):\n"
+         f"    teams = args[0] if args else kwargs.get('teams', {{}})\n"
+         f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
+         f"src.knockout.run_full_simulation = _mock_sim\n"
+         f"import main\n"
+         f"main.run_full_simulation = _mock_sim\n"
+         f"main.main()\n"
     )
 
 
@@ -165,7 +167,8 @@ def test_hourly_resim_triggers(monkeypatch):
 
     monkeypatch.setattr(time_module, "time", mock_time)
 
-    def mock_sim(teams, groups, bracket, annex_c, played, iterations=50000, seed=None):
+    def mock_sim(*args, **kwargs):
+        teams = args[0] if args else kwargs.get("teams", {})
         return {name: {"qf": 0.5, "sf": 0.3, "final": 0.1, "champion": 0.05} for name in teams}
     import src.knockout
     monkeypatch.setattr(src.knockout, "run_full_simulation", mock_sim)
@@ -178,11 +181,12 @@ def test_hourly_resim_triggers(monkeypatch):
     ]
     annex_c = {"_meta": {"source": "test"}}
     played = {}
+    played_groups = {}
     last_sim_time = 1000.0  # 5000 - 1000 = 4000 > 3600, triggers hourly re-sim
     last_request_time = 100.0
 
     new_sim, new_req, new_probs = main_mod._run_iteration(
-        teams, groups, bracket, annex_c, played, "dummy_key", {},
+        teams, groups, bracket, annex_c, played, played_groups, "dummy_key", {},
         last_sim_time, last_request_time,
     )
 
@@ -197,8 +201,10 @@ def test_seed_propagates_through_run_iteration(monkeypatch):
 
     captured_seeds = []
 
-    def mock_sim(teams, groups, bracket, annex_c, played, iterations=50000, seed=None):
+    def mock_sim(*args, **kwargs):
+        seed = kwargs.get("seed")
         captured_seeds.append(seed)
+        teams = args[0] if args else kwargs.get("teams", {})
         return {name: {"qf": 0.5, "sf": 0.3, "final": 0.1, "champion": 0.05} for name in teams}
 
     monkeypatch.setattr(src.knockout, "run_full_simulation", mock_sim)
@@ -211,9 +217,10 @@ def test_seed_propagates_through_run_iteration(monkeypatch):
     ]
     annex_c = {"_meta": {"source": "test"}}
     played = {}
+    played_groups = {}
 
     new_sim, new_req, probs = main_mod._run_iteration(
-        teams, groups, bracket, annex_c, played, "dummy_key", {},
+        teams, groups, bracket, annex_c, played, played_groups, "dummy_key", {},
         last_sim_time=0.0, last_request_time=0.0,
         prev_probs=None, seed=42,
     )

@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 from src import elo, output, state
 from src.constants import API_TIMEOUT, POLL_INTERVAL
-from src.fetcher import fetch_raw_matches, process_matches
+from src.fetcher import fetch_raw_matches, process_group_matches, process_matches
 from src.knockout import run_full_simulation
 from src.simulation import run_simulation
 
@@ -79,7 +79,7 @@ def _next_poll_sleep(interval: float) -> None:
         time.sleep(0.5)
 
 
-def _run_iteration(teams, groups, bracket, annex_c, played, api_key, aliases, last_sim_time, last_request_time, prev_probs=None, seed=None):
+def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_key, aliases, last_sim_time, last_request_time, prev_probs=None, seed=None):
     """Run one fetch -> process -> simulate -> print cycle.
 
     Args:
@@ -87,7 +87,8 @@ def _run_iteration(teams, groups, bracket, annex_c, played, api_key, aliases, la
         groups: Group definitions dict (from groups.json).
         bracket: Bracket match list.
         annex_c: Annex C lookup table.
-        played: Dict of played matches.
+        played: Dict of played knockout matches.
+        played_groups: Dict of played group matches (from played_groups.json).
         api_key: Football-Data.org API key.
         aliases: Team alias mappings.
         last_sim_time: Timestamp of last simulation.
@@ -97,6 +98,8 @@ def _run_iteration(teams, groups, bracket, annex_c, played, api_key, aliases, la
 
     Returns (updated_last_sim_time, updated_last_request_time, probs).
     """
+    played_groups = played_groups or {}
+
     # Rate limiter: ensure minimum interval since last API call
     now = time.time()
     if last_request_time > 0 and now - last_request_time < POLL_INTERVAL:
@@ -107,7 +110,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, api_key, aliases, la
     # Hourly re-sim check: if >3600s since last sim with no new matches, refresh
     if last_sim_time > 0 and now - last_sim_time > 3600:
         output.print_auto_refresh()
-        probs = run_full_simulation(teams, groups, bracket, annex_c, played, iterations=50000, seed=seed)
+        probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=seed)
         output.print_probability_table(probs)
         return now, last_request_time, probs
 
@@ -143,9 +146,27 @@ def _run_iteration(teams, groups, bracket, annex_c, played, api_key, aliases, la
     else:
         output.print_heartbeat()
 
+    # Process new group matches (INTG-01)
+    new_group_matches = []
+    if raw:
+        try:
+            played_bsd_event_ids: set[str] = set()
+            new_group_matches = process_group_matches(
+                raw, teams, groups, aliases,
+                set(played_groups.keys()), played_bsd_event_ids,
+            )
+        except Exception as e:
+            print(f"Warning: Group fetcher error: {e}", file=sys.stderr)
+
+    if new_group_matches:
+        for m in new_group_matches:
+            output.print_match_alert(m)
+            played_groups[m["match_id"]] = m
+        state.save_played_groups(played_groups)
+
     # Simulate and print results
     sim_start = time.time()
-    probs = run_full_simulation(teams, groups, bracket, annex_c, played, iterations=50000, seed=seed)
+    probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=seed)
     sim_elapsed = time.time() - sim_start
     output.print_simulation_duration(sim_elapsed)
     output.print_probability_table(probs, prev_probs)
@@ -202,6 +223,7 @@ def main() -> None:
         teams = state.load_teams()
         bracket = state.load_bracket()
         played = state.load_played()
+        played_groups = state.load_played_groups()
         groups = state.load_groups()
         annex_c = state.load_annex_c()
         api_key = validate_api_key()
@@ -216,7 +238,7 @@ def main() -> None:
         # ── --once mode: single iteration, immediate exit (D-01, D-02) ──
         if args.once:
             _run_iteration(
-                teams, groups, bracket, annex_c, played, api_key, aliases,
+                teams, groups, bracket, annex_c, played, played_groups, api_key, aliases,
                 last_sim_time=0.0, last_request_time=0.0,
                 prev_probs=None, seed=args.seed,
             )
@@ -234,7 +256,7 @@ def main() -> None:
 
         # First poll fires immediately
         last_sim_time, last_request_time, prev_probs = _run_iteration(
-            teams, groups, bracket, annex_c, played, api_key, aliases,
+            teams, groups, bracket, annex_c, played, played_groups, api_key, aliases,
             last_sim_time, last_request_time, prev_probs,
             seed=args.seed,
         )
@@ -245,17 +267,18 @@ def main() -> None:
             if not _running:
                 break
             last_sim_time, last_request_time, prev_probs = _run_iteration(
-                teams, groups, bracket, annex_c, played, api_key, aliases,
+                teams, groups, bracket, annex_c, played, played_groups, api_key, aliases,
                 last_sim_time, last_request_time, prev_probs,
                 seed=args.seed,
             )
 
         # Shutdown path
-        final_probs = run_full_simulation(teams, groups, bracket, annex_c, played, iterations=50000, seed=args.seed)
+        final_probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=args.seed)
         output.print_shutdown_banner(final_probs)
 
         state.save_teams(teams)
         state.save_played(played)
+        state.save_played_groups(played_groups)
 
     except ValueError as e:
         output.print_error(f"Data error: {e}")
