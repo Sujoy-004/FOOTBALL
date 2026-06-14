@@ -14,6 +14,9 @@ from src.groups import (
     _simulate_single_match,
     compute_standings,
     expected_goals,
+    rank_third_placed,
+    resolve_r32_matchups,
+    select_advancers,
     simulate_group_matches,
 )
 
@@ -837,3 +840,447 @@ class TestTiebreakerFairPlay:
         assert standings[0]["elo"] > standings[1]["elo"], (
             "A has higher Elo so should win tiebreak"
         )
+
+
+# ─── Third-place ranking tests ──────────────────────────────────────────
+
+
+def _build_3rd_standings(
+    third_entries: list[dict],
+) -> dict[str, list[dict]]:
+    """Build a standings dict from a list of third-place entries.
+
+    Each entry must have: group, team, pts, gd, gs, conduct_score, elo.
+    Positions 1, 2, 4 are filled with dummy entries.
+    """
+    standings: dict[str, list[dict]] = {}
+    for entry in third_entries:
+        g = entry["group"]
+        standings[g] = [
+            {"team": f"{g}1"},  # position 1 (winner) — minimal
+            {"team": f"{g}2"},  # position 2 (runner-up) — minimal
+            {  # position 3 (third place) — the relevant entry
+                "team": entry["team"],
+                "pts": entry["pts"],
+                "gd": entry["gd"],
+                "gs": entry["gs"],
+                "conduct_score": entry["conduct_score"],
+                "elo": entry.get("elo", 1500.0),
+                "position": 3,
+            },
+            {"team": f"{g}4"},  # position 4 — minimal
+        ]
+    return standings
+
+
+class TestThirdPlaceRanking:
+    """Tests for rank_third_placed() — 5-step cross-group tiebreaker."""
+
+    def test_third_place_ranking_basic(self):
+        """12 third-placed teams with varying points: sorted by points desc."""
+        teams_data = []
+        for i, letter in enumerate("ABCDEFGHIJKL"):
+            teams_data.append({
+                "group": letter,
+                "team": f"Team_{letter}",
+                "pts": 6 - i,  # 6, 5, 4, ..., -5 (all different)
+                "gd": 0,
+                "gs": 0,
+                "conduct_score": 0,
+                "elo": 1500.0,
+            })
+        standings = _build_3rd_standings(teams_data)
+        third = rank_third_placed(standings)
+        assert len(third) == 12
+        # Verify descending points order
+        for i in range(11):
+            assert third[i]["pts"] >= third[i + 1]["pts"], (
+                f"Position {i}: {third[i]['pts']} should be >= {third[i+1]['pts']}"
+            )
+        assert third[0]["group"] == "A"  # A has 6 pts
+        assert third[11]["group"] == "L"  # L has -5 pts
+
+    def test_third_place_ranking_tiebreaker(self):
+        """Two teams with same points: sorted by GD descending."""
+        teams_data = [
+            {"group": "A", "team": "Team_A", "pts": 5, "gd": 2, "gs": 4,
+             "conduct_score": 0, "elo": 1500.0},
+            {"group": "B", "team": "Team_B", "pts": 5, "gd": 1, "gs": 3,
+             "conduct_score": 0, "elo": 1500.0},
+        ]
+        # Fill remaining 10 groups with lower-point teams
+        for letter in "CDEFGHIJKL":
+            teams_data.append({
+                "group": letter, "team": f"Team_{letter}",
+                "pts": 2, "gd": 0, "gs": 0,
+                "conduct_score": 0, "elo": 1500.0,
+            })
+        standings = _build_3rd_standings(teams_data)
+        third = rank_third_placed(standings)
+        assert len(third) == 12
+        # A (pts=5, gd=+2) should be above B (pts=5, gd=+1)
+        assert third[0]["group"] == "A", f"Expected A first, got {third[0]['group']}"
+        assert third[1]["group"] == "B", f"Expected B second, got {third[1]['group']}"
+        assert third[0]["pts"] == third[1]["pts"] == 5
+        assert third[0]["gd"] > third[1]["gd"]
+
+    def test_third_place_ranking_full_5step(self):
+        """Two teams tied on pts, GD, AND GS: conduct_score decides."""
+        teams_data = [
+            {"group": "A", "team": "Team_A", "pts": 4, "gd": 1, "gs": 3,
+             "conduct_score": 0, "elo": 1500.0},  # clean conduct
+            {"group": "B", "team": "Team_B", "pts": 4, "gd": 1, "gs": 3,
+             "conduct_score": 5, "elo": 1500.0},  # 5 penalty pts
+        ]
+        for letter in "CDEFGHIJKL":
+            teams_data.append({
+                "group": letter, "team": f"Team_{letter}",
+                "pts": 2, "gd": 0, "gs": 0,
+                "conduct_score": 0, "elo": 1500.0,
+            })
+        standings = _build_3rd_standings(teams_data)
+        third = rank_third_placed(standings)
+        assert len(third) == 12
+        # A (conduct=0) should be above B (conduct=5)
+        assert third[0]["group"] == "A", f"Expected A first, got {third[0]['group']}"
+        assert third[1]["group"] == "B", f"Expected B second, got {third[1]['group']}"
+        assert third[0]["conduct_score"] < third[1]["conduct_score"]
+
+    def test_third_place_ranking_exactly_8_selected(self):
+        """Verify [:8] returns exactly 8 and [8:] returns exactly 4."""
+        teams_data = []
+        for i, letter in enumerate("ABCDEFGHIJKL"):
+            teams_data.append({
+                "group": letter,
+                "team": f"Team_{letter}",
+                "pts": 6 - i,  # descending: A=6, B=5, ..., L=-5
+                "gd": 0,
+                "gs": 0,
+                "conduct_score": 0,
+                "elo": 1500.0,
+            })
+        standings = _build_3rd_standings(teams_data)
+        third = rank_third_placed(standings)
+        top8 = third[:8]
+        bottom4 = third[8:]
+        assert len(top8) == 8, f"Expected 8 advancing, got {len(top8)}"
+        assert len(bottom4) == 4, f"Expected 4 eliminated, got {len(bottom4)}"
+        # Top 8 should be groups A through H (pts 6 through -1)
+        top8_groups = {t["group"] for t in top8}
+        assert top8_groups == set("ABCDEFGH"), (
+            f"Expected A-H advancing, got {top8_groups}"
+        )
+
+
+class TestSelectAdvancers:
+    """Tests for select_advancers() — advancement selection."""
+
+    def _make_standings(self) -> dict[str, list[dict]]:
+        """Create standings for 3 groups with deterministic positions."""
+        s: dict[str, list[dict]] = {}
+        for g in "ABC":
+            s[g] = [
+                {"team": f"{g}W", "pts": 7, "gd": 3, "gs": 5,
+                 "conduct_score": 0, "elo": 1800.0, "position": 1},
+                {"team": f"{g}R", "pts": 5, "gd": 1, "gs": 3,
+                 "conduct_score": 2, "elo": 1700.0, "position": 2},
+                {"team": f"{g}T", "pts": 3, "gd": 0, "gs": 2,
+                 "conduct_score": 4, "elo": 1600.0, "position": 3},
+                {"team": f"{g}F", "pts": 1, "gd": -4, "gs": 1,
+                 "conduct_score": 8, "elo": 1500.0, "position": 4},
+            ]
+        # Remaining 9 groups (D-L) with same structure
+        for g in "DEFGHIJKL":
+            s[g] = [
+                {"team": f"{g}W", "pts": 9, "gd": 5, "gs": 7,
+                 "conduct_score": 0, "elo": 1900.0, "position": 1},
+                {"team": f"{g}R", "pts": 6, "gd": 2, "gs": 4,
+                 "conduct_score": 1, "elo": 1750.0, "position": 2},
+                {"team": f"{g}T", "pts": 3, "gd": 0, "gs": 2,
+                 "conduct_score": 4, "elo": 1600.0, "position": 3},
+                {"team": f"{g}F", "pts": 0, "gd": -7, "gs": 0,
+                 "conduct_score": 10, "elo": 1450.0, "position": 4},
+            ]
+        return s
+
+    def test_select_advancers_structure(self):
+        """Returns dict with 12 groups, each with keys 1, 2, 3."""
+        standings = self._make_standings()
+        # Create ranked third-placed where first 8 groups advance
+        third_data = []
+        for g in "ABCDEFGHIJKL":
+            third_data.append({
+                "group": g, "team": f"{g}T", "pts": 3, "gd": 0, "gs": 2,
+                "conduct_score": 4,
+            })
+        advancers = select_advancers(standings, third_data)
+        assert len(advancers) == 12
+        for g in "ABCDEFGHIJKL":
+            assert g in advancers, f"Missing group {g}"
+            assert 1 in advancers[g], f"Missing key 1 in {g}"
+            assert 2 in advancers[g], f"Missing key 2 in {g}"
+            assert 3 in advancers[g], f"Missing key 3 in {g}"
+
+    def test_select_advancers_top_2(self):
+        """Winner (pos 1) and runner-up (pos 2) correctly identified."""
+        standings = self._make_standings()
+        third_data = [
+            {"group": g, "team": f"{g}T", "pts": 3, "gd": 0, "gs": 2,
+             "conduct_score": 4}
+            for g in "ABCDEFGHIJKL"
+        ]
+        advancers = select_advancers(standings, third_data)
+        for g in "ABC":
+            assert advancers[g][1] == f"{g}W", f"Group {g} winner mismatch"
+            assert advancers[g][2] == f"{g}R", f"Group {g} runner-up mismatch"
+
+    def test_select_advancers_third_place(self):
+        """Top 8 third-placed get team name; bottom 4 get None."""
+        standings = self._make_standings()
+        # Third-placed ranked: A-F advance, G-L eliminated
+        # Only first 8 (A-H) should have team names in [3]
+        third_ranked = [
+            {"group": g, "team": f"{g}T", "pts": 6 - i, "gd": 0, "gs": 2,
+             "conduct_score": 4}
+            for i, g in enumerate("ABCDEFGHIJKL")
+        ]
+        advancers = select_advancers(standings, third_ranked)
+        # Groups A-H: third-placed is in top 8 -> should have team
+        for g in "ABCDEFGH":
+            assert advancers[g][3] == f"{g}T", (
+                f"Group {g} should have advancing third, got {advancers[g][3]}"
+            )
+        # Groups I,J,K,L: third-placed is NOT in top 8 -> should be None
+        for g in "IJKL":
+            assert advancers[g][3] is None, (
+                f"Group {g} should have None third, got {advancers[g][3]}"
+            )
+
+
+class TestResolveR32:
+    """Tests for resolve_r32_matchups() — Annex C lookup and R32 resolution."""
+
+    def _make_advancers(self, advancing_thirds: set[str]) -> dict:
+        """Create advancers dict for all 12 groups."""
+        advancers: dict = {}
+        for g in "ABCDEFGHIJKL":
+            advancers[g] = {
+                1: f"{g}W",  # group winner
+                2: f"{g}R",  # runner-up
+                3: f"{g}T" if g in advancing_thirds else None,
+            }
+        return advancers
+
+    def _make_third_ranked(self, advancing_thirds: set[str]) -> list[dict]:
+        """Create third_ranked where advancing_thirds are first 8."""
+        result = []
+        for g in "ABCDEFGHIJKL":
+            result.append({
+                "group": g,
+                "team": f"{g}T",
+                "pts": 6 if g in advancing_thirds else 1,
+                "gd": 0,
+                "gs": 2,
+                "conduct_score": 4,
+            })
+        # Sort so advancing groups come first
+        result.sort(key=lambda t: -t["pts"])
+        return result
+
+    def test_r32_matchups_16_matches(self):
+        """16 R32 matches with non-null teams."""
+        import json
+        from pathlib import Path
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+        groups = json.load(open(data_dir / "groups.json"))
+        teams = json.load(open(data_dir / "teams.json"))
+        annex_c = json.load(open(data_dir / "annex_c.json"))
+        elo = {n: v["elo"] for n, v in teams.items()}
+        rng = __import__("random").Random(42)
+        results = simulate_group_matches(groups, teams, elo, rng)
+        standings = compute_standings(results, elo)
+        third = rank_third_placed(standings)
+        advancers = select_advancers(standings, third)
+        r32 = resolve_r32_matchups(advancers, standings, third, annex_c)
+        assert len(r32) == 16, f"Expected 16 matches, got {len(r32)}"
+        for mid in [
+            "M73", "M74", "M75", "M76", "M77", "M78", "M79", "M80",
+            "M81", "M82", "M83", "M84", "M85", "M86", "M87", "M88",
+        ]:
+            assert mid in r32, f"Missing {mid}"
+            assert r32[mid]["team_a"] is not None, f"{mid} team_a is None"
+            assert r32[mid]["team_b"] is not None, f"{mid} team_b is None"
+
+    def test_r32_annex_c_key_construction(self):
+        """Annex C key built from sorted advancing group letters."""
+        import json
+        from pathlib import Path
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+        annex_c = json.load(open(data_dir / "annex_c.json"))
+        groups = json.load(open(data_dir / "groups.json"))
+        teams = json.load(open(data_dir / "teams.json"))
+        elo = {n: v["elo"] for n, v in teams.items()}
+        rng = __import__("random").Random(42)
+        results = simulate_group_matches(groups, teams, elo, rng)
+        standings = compute_standings(results, elo)
+        third = rank_third_placed(standings)
+        # Verify the key built from advancing groups
+        top8 = third[:8]
+        advancing_groups = sorted(t["group"] for t in top8)
+        expected_key = ",".join(advancing_groups)
+        # Resolve and check key is valid
+        advancers = select_advancers(standings, third)
+        r32 = resolve_r32_matchups(advancers, standings, third, annex_c)
+        assert len(r32) == 16
+        # The advancing groups should be a valid 8-element sorted list
+        assert len(advancing_groups) == 8
+        assert advancing_groups == sorted(advancing_groups)
+        assert expected_key in annex_c or f"_{expected_key}" in str(annex_c), (
+            f"Key {expected_key} should be in annex_c"
+        )
+
+    def test_r32_annex_c_missing_key(self):
+        """Missing Annex C key raises ValueError."""
+        bad_annex = {"B,C": {"1A": "3B"}}
+        advancers = self._make_advancers({"A", "B", "C", "D", "E", "F", "G", "H"})
+        third_ranked = self._make_third_ranked({"A", "B", "C", "D", "E", "F", "G", "H"})
+        try:
+            resolve_r32_matchups(advancers, {}, third_ranked, bad_annex)
+        except ValueError:
+            pass
+        else:
+            assert False, "Should have raised ValueError"
+
+    def test_r32_meta_key_filter(self):
+        """The _meta key is stripped from annex_c before lookup."""
+        # Build an annex_c where _meta exists and the needed key is present
+        clean_annex = {
+            "A,B,C,D,E,F,G,H": {
+                "1A": "3H", "1B": "3G", "1D": "3B", "1E": "3C",
+                "1G": "3A", "1I": "3F", "1K": "3D", "1L": "3E",
+            },
+        }
+        annex_with_meta = dict(clean_annex)
+        annex_with_meta["_meta"] = {"source": "test"}
+        advancers = self._make_advancers({"A", "B", "C", "D", "E", "F", "G", "H"})
+        third_ranked = self._make_third_ranked({"A", "B", "C", "D", "E", "F", "G", "H"})
+        # Should resolve without error even with _meta present
+        r32 = resolve_r32_matchups(advancers, {}, third_ranked, annex_with_meta)
+        assert len(r32) == 16
+        # Verify correct resolution: A1 vs 3H (third from H)
+        assert r32["M79"]["team_a"] == "AW", "M79 should have AW as team_a"
+        assert r32["M79"]["team_b"] == "HT", "M79 should have HT as third via Annex C"
+
+    def test_r32_winner_vs_third_matchups(self):
+        """8 Annex C matches have group winner as team_a."""
+        import json
+        from pathlib import Path
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+        groups = json.load(open(data_dir / "groups.json"))
+        teams = json.load(open(data_dir / "teams.json"))
+        annex_c = json.load(open(data_dir / "annex_c.json"))
+        elo = {n: v["elo"] for n, v in teams.items()}
+        rng = __import__("random").Random(42)
+        results = simulate_group_matches(groups, teams, elo, rng)
+        standings = compute_standings(results, elo)
+        third = rank_third_placed(standings)
+        advancers = select_advancers(standings, third)
+        r32 = resolve_r32_matchups(advancers, standings, third, annex_c)
+        # The 8 Annex C matches: M74(E1), M77(I1), M79(A1), M80(L1),
+        # M81(D1), M82(G1), M85(B1), M87(K1)
+        # In each, team_a should be the group winner
+        annex_c_matches = {
+            "M74": "E", "M77": "I", "M79": "A", "M80": "L",
+            "M81": "D", "M82": "G", "M85": "B", "M87": "K",
+        }
+        for mid, winner_group in annex_c_matches.items():
+            expected_winner = advancers[winner_group][1]
+            assert r32[mid]["team_a"] == expected_winner, (
+                f"{mid} team_a should be {winner_group} winner "
+                f"({expected_winner}), got {r32[mid]['team_a']}"
+            )
+
+    def test_r32_no_same_group(self):
+        """No R32 match has team_a and team_b from the same group."""
+        import json
+        from pathlib import Path
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+        groups = json.load(open(data_dir / "groups.json"))
+        teams = json.load(open(data_dir / "teams.json"))
+        annex_c = json.load(open(data_dir / "annex_c.json"))
+        elo = {n: v["elo"] for n, v in teams.items()}
+        rng = __import__("random").Random(42)
+        results = simulate_group_matches(groups, teams, elo, rng)
+        standings = compute_standings(results, elo)
+        third = rank_third_placed(standings)
+        advancers = select_advancers(standings, third)
+        r32 = resolve_r32_matchups(advancers, standings, third, annex_c)
+        # Build reverse mapping: team -> group
+        team_to_group: dict[str, str] = {}
+        for g in "ABCDEFGHIJKL":
+            for pos in range(4):
+                team = standings[g][pos]["team"]
+                team_to_group[team] = g
+        # Check no match has both teams from same group
+        for mid, match in r32.items():
+            group_a = team_to_group.get(match["team_a"])
+            group_b = team_to_group.get(match["team_b"])
+            if group_a is not None and group_b is not None:
+                assert group_a != group_b, (
+                    f"{mid}: {match['team_a']} (group {group_a}) and "
+                    f"{match['team_b']} (group {group_b}) are from the same group"
+                )
+
+    def test_full_pipeline_end_to_end(self):
+        """Full pipeline with deterministic seed: all invariants verified."""
+        import json
+        from pathlib import Path
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+        groups = json.load(open(data_dir / "groups.json"))
+        teams = json.load(open(data_dir / "teams.json"))
+        annex_c = json.load(open(data_dir / "annex_c.json"))
+        elo = {n: v["elo"] for n, v in teams.items()}
+        rng = __import__("random").Random(42)
+        results = simulate_group_matches(groups, teams, elo, rng)
+        # Invariant 1: 12 groups, 6 matches each
+        assert len(results) == 12, f"Expected 12 groups, got {len(results)}"
+        for g in "ABCDEFGHIJKL":
+            assert g in results, f"Missing group {g}"
+            assert len(results[g]) == 6, f"Group {g}: expected 6 matches, got {len(results[g])}"
+        standings = compute_standings(results, elo)
+        # Invariant 2: each group has 4 entries with positions 1-4
+        for g in "ABCDEFGHIJKL":
+            assert g in standings, f"Missing group {g} in standings"
+            assert len(standings[g]) == 4, f"Group {g}: expected 4 entries"
+            for i, team in enumerate(standings[g]):
+                assert team["position"] == i + 1, (
+                    f"Group {g} position mismatch: expected {i+1}, got {team['position']}"
+                )
+        third = rank_third_placed(standings)
+        # Invariant 3: 12 third-placed teams, top 8 selected
+        assert len(third) == 12, f"Expected 12 third, got {len(third)}"
+        top8 = third[:8]
+        bottom4 = third[8:]
+        assert len(top8) == 8
+        assert len(bottom4) == 4
+        advancers = select_advancers(standings, third)
+        # Invariant 4: 32 advancing teams (24 auto + 8 third)
+        advancing_count = 0
+        for g in "ABCDEFGHIJKL":
+            for pos in (1, 2):
+                team = advancers[g][pos]
+                assert team is not None, f"Group {g} pos {pos} should auto-advance"
+                advancing_count += 1
+            if advancers[g][3] is not None:
+                advancing_count += 1
+        assert advancing_count == 32, f"Expected 32 advancing teams, got {advancing_count}"
+        r32 = resolve_r32_matchups(advancers, standings, third, annex_c)
+        # Invariant 5: 16 R32 matches with all non-null teams
+        assert len(r32) == 16
+        for mid in [
+            "M73", "M74", "M75", "M76", "M77", "M78", "M79", "M80",
+            "M81", "M82", "M83", "M84", "M85", "M86", "M87", "M88",
+        ]:
+            assert mid in r32, f"Missing {mid}"
+            assert r32[mid]["team_a"] is not None, f"{mid} has None team_a"
+            assert r32[mid]["team_b"] is not None, f"{mid} has None team_b"
