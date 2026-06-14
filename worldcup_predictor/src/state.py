@@ -17,6 +17,24 @@ from src import constants
 # ─── Load functions ──────────────────────────────────────────────────────
 
 
+def load_aliases(data_dir: Path | str | None = None) -> dict[str, list[str]]:
+    """Load team aliases from team_aliases.json.
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        dict[str, list[str]]: Mapping of canonical team name to list of aliases.
+
+    Raises:
+        FileNotFoundError: If team_aliases.json does not exist.
+        json.JSONDecodeError: If team_aliases.json contains invalid JSON.
+    """
+    path = _resolve_data_dir(data_dir) / "team_aliases.json"
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
 def load_teams(data_dir: Path | str | None = None) -> dict[str, dict]:
     """Load teams from teams.json.
 

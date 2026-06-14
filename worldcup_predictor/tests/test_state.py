@@ -172,7 +172,7 @@ def test_main_runs_successfully():
     runner_code = (
         f"import os, sys\n"
         f"os.environ['POLL_INTERVAL'] = '1'\n"
-        f"os.environ['FOOTBALL_API_KEY'] = 'test_dummy_key'\n"
+        f"os.environ['BSD_API_KEY'] = 'test_dummy_key'\n"
         f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
         f"os.chdir({str(MAIN_DIR)!r})\n"
         f"import requests\n"

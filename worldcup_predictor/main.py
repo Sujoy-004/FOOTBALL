@@ -12,6 +12,8 @@ import signal
 import sys
 import time
 
+from dotenv import load_dotenv
+
 from src import elo, output, state
 from src.constants import API_TIMEOUT, POLL_INTERVAL
 from src.fetcher import fetch_raw_matches, process_matches
@@ -151,27 +153,27 @@ def _run_iteration(teams, bracket, played, api_key, aliases, last_sim_time, last
 
 
 def validate_api_key() -> str:
-    """Validate FOOTBALL_API_KEY env var is set and returns a non-403 status.
+    """Validate BSD_API_KEY env var is set and returns a non-401 status.
 
     Returns:
         str: The API key value.
 
-    Exits 1 if key is missing or returns HTTP 403.
+    Exits 1 if key is missing or returns HTTP 401.
     """
-    api_key = os.environ.get("FOOTBALL_API_KEY")
+    api_key = os.environ.get("BSD_API_KEY")
     if not api_key:
-        output.print_error("FOOTBALL_API_KEY not set. Get a free key at https://www.football-data.org/")
+        output.print_error("BSD_API_KEY not set. Get a free key at https://sports.bzzoiro.com/register/")
         sys.exit(1)
 
     import requests
     try:
         resp = requests.get(
-            "https://api.football-data.org/v4/competitions/WC",
-            headers={"X-Auth-Token": api_key},
+            "https://sports.bzzoiro.com/api/leagues/",
+            headers={"Authorization": f"Token {api_key}"},
             timeout=10,
         )
-        if resp.status_code == 403:
-            output.print_error("Invalid FOOTBALL_API_KEY (HTTP 403). Check your key at https://www.football-data.org/")
+        if resp.status_code == 401:
+            output.print_error("Invalid BSD_API_KEY (HTTP 401). Check your key at https://sports.bzzoiro.com/account/")
             sys.exit(1)
         if resp.status_code != 200:
             print(f"Warning: API availability check returned {resp.status_code}, continuing...", file=sys.stderr)
@@ -190,6 +192,8 @@ def main() -> None:
         os.system("")
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
+
+    load_dotenv()
 
     try:
         teams = state.load_teams()
