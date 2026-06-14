@@ -1,317 +1,137 @@
-# Technology Stack
+# Stack Research
 
-**Project:** World Cup Dynamic Prediction  
-**Researched:** 2026-06-13  
-**Mode:** Ecosystem research — live football tournament prediction with Elo + Monte Carlo simulation  
-**Overall confidence:** HIGH (all recommendations verified against current PyPI releases and official docs)
+**Domain:** FIFA World Cup 2026 Monte Carlo simulation (48-team, group stage + 32-team knockout)
+**Researched:** 2026-06-14
+**Confidence:** HIGH
 
----
+## Recommended Stack
 
-## Executive Stack Summary
+### Core Technologies (unchanged from v1.0)
 
-```
-Python 3.10+  |  requests  |  numpy  |  rich  |  pydantic-settings  |  pytest + hypothesis
-    │             │            │          │          │                     │
-    │             │            │          │          │                     └── Testing (Phase 2+)
-    │             │            │          │          └── Typed config, env vars, API model validation
-    │             │            │          └── Console output: tables, progress bars, colors, timestamps
-    │             │            └── Vectorized Monte Carlo simulation (50K+ iterations)
-    │             └── HTTP client for Football-Data.org API (sync only, rate-limited)
-    └── Runtime (CPython, cross-platform)
-```
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Python | 3.10+ | Runtime | Cross-platform, fast enough for 50K×104 simulation iterations, rich stdlib |
+| `random` (stdlib) | — | Monte Carlo PRNG | Sufficient for simulation; deterministic via `random.seed()`; no numpy dependency needed for 50K iterations |
+| `json` (stdlib) | — | State persistence | Human-readable, no database setup, already proven in v1.0 |
+| `requests` | >=2.31 | HTTP client for live match API | Battle-tested, simple API, exponential backoff support |
 
----
+### New / Modified Components for 48-Team Format
 
-## Core Dependencies (MVP)
+| Component | Version | Purpose | When to Use |
+|-----------|---------|---------|-------------|
+| `dataclasses` (stdlib) | — | Structured group/team/match models | Replace raw dicts for group standings, team records, simulation state |
+| `math` (stdlib) | — | Already used for `expected_score` | No additions needed; draw-probability modelling may extend usage |
+| `itertools` (stdlib) | — | Group round-robin pairings | `itertools.combinations(groups, 2)` generates 6 matches-per-group trivially |
+| `enum` (stdlib) | — | Round identifiers, group labels | Replace string constants like `"R16"` with proper `Enum` for type safety |
+| Annex C JSON file | — | 495-entry third-place routing table | Static data; stored as `data/annex_c.json`, loaded via existing `state.py` pattern |
 
-### 1. `requests` ~= 2.32.x — HTTP Client
+### Data Files (new/modified JSON schemas)
 
-| Attribute | Detail |
-|-----------|--------|
-| **Version** | 2.32.3 (latest stable, March 2026) |
-| **Purpose** | Poll Football-Data.org v4 API for live match results |
-| **Confidence** | **HIGH** — verified via PyPI |
-| **Why this** | The API is rate-limited to **10 requests/minute** on the free tier. There is zero benefit from async I/O here — every minute you make 1 synchronous request and sit idle. `requests` is the simplest, most battle-tested sync HTTP client in Python. The Football-Data.org official docs explicitly use `requests` in their Python examples. |
-| **Why NOT httpx** | httpx is the modern async-capable alternative, but async provides no advantage for a single-poll-per-minute loop. httpx adds ~1.5 MB to install size and an extra failure surface (HTTP/2 negotiation, optional dependencies). Use `requests` for MVP. If you later add multi-API polling, migrate to `httpx` then. |
-| **Why NOT aiohttp** | Async-only, steeper learning curve, no sync API. Overkill. |
+| File | Size (est.) | Purpose |
+|------|-------------|---------|
+| `data/groups.json` | NEW ~2 KB | 12 groups, each with 4 team references + initial draw seed info |
+| `data/teams.json` | EXTENDED ~8 KB | 48 teams (was 32) — add `group` field per team |
+| `data/bracket.json` | REPLACED ~3 KB | Full 104-match bracket (group + knockout), replacing 23-match bracket |
+| `data/played.json` | EXTENDED | Same schema; now tracking group results too |
+| `data/annex_c.json` | NEW ~50 KB | 495 entries mapping C(12,8) third-place group combinations → R32 matchups |
 
-**Usage pattern:**
-```python
-import requests
+### Development Tools (unchanged from v1.0)
 
-API_BASE = "https://api.football-data.org/v4"
-HEADERS = {"X-Auth-Token": os.environ["FOOTBALL_API_KEY"]}
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| `pytest>=9.0` | Test framework | 98 existing tests; will need ~40 more for group stage + tiebreakers |
+| `pytest-cov>=7.1` | Coverage | Target: keep >90% coverage |
+| `python-dotenv>=1.0` | Environment config | Already in use for `BSD_API_KEY` |
 
-response = requests.get(f"{API_BASE}/matches", headers=HEADERS, timeout=30)
-response.raise_for_status()
-data = response.json()
-```
+## Installation
 
-### 2. `numpy` ~= 2.4.x — Vectorized Monte Carlo Engine
+No new dependencies required. The existing `requirements.txt` covers everything:
 
-| Attribute | Detail |
-|-----------|--------|
-| **Version** | 2.4.6 (latest stable, May 2026; 2.4.x series recommended) |
-| **Purpose** | Run 50,000+ tournament simulations in < 1 second via vectorized array operations |
-| **Confidence** | **HIGH** — verified via PyPI (newreleases.io, sourceforge mirror) |
-| **Why this** | A knockout tournament with 15 matches simulated 50,000 times = **750,000 individual match simulations**. Pure Python `for` loops with `random.random()` per match take **8–15 seconds**. NumPy generates all random numbers as a single contiguous array and applies vectorized comparisons — **0.1–0.3 seconds**. This is not a nice-to-have; it's the difference between feeling instantaneous and watching a spinner. |
-| **Why NOT pure random** | `random.random()` in a loop is 50–100× slower than `numpy.random.uniform(size=N)`. At 50K sims, that's noticeable. At 100K+, it's painful. |
-| **Why NOT numba/cupy** | Overkill for 50K sims on a laptop. Numba adds compilation overhead and Windows compatibility issues (MSVC toolchain). CuPy requires an NVIDIA GPU. NumPy is just-right. |
-
-**Core vectorization pattern:**
-```python
-import numpy as np
-
-def simulate_tournament_bracket(matchups, team_strengths, n_sims=50_000):
-    """Vectorized Monte Carlo simulation of a knockout bracket."""
-    random_values = np.random.uniform(size=(n_sims, len(matchups)))
-    # For each match: team_0_wins = random_value < p_team0 (derived from Elo diff)
-    # Propagate winners through bracket rounds
-    # Return win counts per team
-    ...
+```bash
+# Existing — unchanged for v2.0
+pip install -r worldcup_predictor/requirements.txt
 ```
 
-### 3. `rich` ~= 15.0.x — Console Output
-
-| Attribute | Detail |
-|-----------|--------|
-| **Version** | 15.0.0 (latest, April 2026) |
-| **Purpose** | Formatted probability tables, colored deltas (±1.2%), live-updating output, progress bars |
-| **Confidence** | **HIGH** — verified via PyPI (pypistats, pepy.tech, GitHub releases) |
-| **Why this** | The MVP spec requires: (a) formatted percentage tables, (b) probability deltas with +/- signs, (c) timestamps, (d) progress indication during simulation. Rich provides all of this out of the box: `Table` for formatted output, `Live` for auto-refreshing displays, `Progress` for simulation progress, and cross-platform ANSI color (including Windows 10+). 56.5k GitHub stars, 150M+ weekly PyPI downloads. It is the **de facto standard** for Python CLI formatting. |
-| **Why NOT colorama** | Rich handles Windows ANSI natively (since v13+). No separate colorama needed. |
-| **Why NOT tabulate** | `tabulate` is for static table generation only — no colors, no live updates, no progress bars. |
-| **Why this shouldn't be post-MVP** | The original plan deferred `rich` to post-MVP. This is **incorrect**. Raw `print()` statements produce unreadable output when displaying 16+ team probabilities with deltas. Rich's `Table` and `Live` are the difference between "this looks like a student project" and "this looks like a real tool." Add it in Phase 1. |
-
-**Usage pattern:**
-```python
-from rich.console import Console
-from rich.table import Table
-from rich.live import Live
-from rich.progress import track
-
-console = Console()
-
-def display_probabilities(probs, deltas=None):
-    table = Table(title="Championship Probabilities")
-    table.add_column("Team", style="cyan")
-    table.add_column("Probability", justify="right")
-    table.add_column("Δ", justify="right")
-    # ... populate rows
-    console.print(table)
+Contents:
+```
+pytest>=9.0
+pytest-cov>=7.1
+python-dotenv>=1.0
 ```
 
-### 4. `pydantic` + `pydantic-settings` — Configuration & Data Models
+## Alternatives Considered
 
-| Attribute | Detail |
-|-----------|--------|
-| **Version** | pydantic ~= 2.10, pydantic-settings ~= 2.11 |
-| **Purpose** | API response validation, typed configuration class, env var loading |
-| **Confidence** | **HIGH** — verified via PyPI and pydantic.dev docs |
-| **Why this** | The Football-Data.org API returns JSON with nullable fields, nested objects, and type-sensitive values (score is `int`, not `str`). Without validation, a missing `"score"` field or a `None` where you expect an `int` crashes the script at 2 AM. Pydantic v2 (Rust-backed, 5–50× faster than v1) validates API responses at parse time, catches bad data early, and produces clean error messages. `pydantic-settings` reads `FOOTBALL_API_KEY` from the environment with type safety — no manual `os.environ.get()` with fragile defaults. |
-| **Why NOT dataclasses** | Python dataclasses provide zero validation. A `str` where an `int` belongs gets passed silently until something breaks. `pydantic.BaseModel` adds coercion + validation — "42" becomes `42`, `None` raises immediately. |
-| **Why NOT manual dict parsing** | Spread `if "score" in data and data["score"] is not None` checks throughout the codebase = bug magnet. One schema per API response, validated once. |
-
-**Config pattern:**
-```python
-from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    football_api_key: str          # reads from FOOTBALL_API_KEY env var
-    poll_interval_seconds: int = 60
-    elo_k_factor: float = 60.0
-    simulation_count: int = 50_000
-    starting_elo: int = 1500
-    home_advantage_elo: int = 53
-
-    model_config = {"env_prefix": ""}
-
-settings = Settings()  # auto-reads env vars
-```
-
-**API response model:**
-```python
-from pydantic import BaseModel
-from typing import Optional
-
-class MatchScore(BaseModel):
-    home: Optional[int] = None
-    away: Optional[int] = None
-
-class MatchData(BaseModel):
-    id: int
-    utc_date: str
-    status: str          # "FINISHED", "SCHEDULED", etc.
-    home_team: str
-    away_team: str
-    score: MatchScore
-```
-
----
-
-## Development & Testing Dependencies
-
-### `pytest` ~= 8.x — Test Framework
-
-| Attribute | Detail |
-|-----------|--------|
-| **Version** | 8.3.x (latest stable 2025—2026) |
-| **Purpose** | Unit tests, integration tests, fixtures |
-| **Confidence** | HIGH |
-| **Why this** | The undisputed standard. `unittest` requires boilerplate; pytest uses `assert` and gives you fixture injection, parameterization, and plugins. |
-| **Why NOT unittest** | More verbose, less ergonomic fixtures, no automatic test discovery. |
-
-### `hypothesis` ~= 6.x — Property-Based Testing
-
-| Attribute | Detail |
-|-----------|--------|
-| **Version** | 6.120+ |
-| **Purpose** | Generate random Elo update scenarios to verify mathematical invariants |
-| **Confidence** | MEDIUM (useful but not critical for MVP) |
-| **Why this** | The Elo formula has mathematical invariants: (a) total rating change = 0 across both teams, (b) expected score for A + expected score for B = 1.0. Hypothesis generates thousands of (rating_a, rating_b, actual_score) tuples and asserts these invariants hold. Catches edge cases that manual test cases miss. |
-| **Why NOT random manual tests** | Manual tests cover what you think of. Hypothesis covers what you didn't think of (division by zero at extremes, floating point drift at 5000+ iterations, etc.) |
-
----
-
-## Elo Rating — Custom Implementation (NOT a Library)
-
-| Approach | Recommendation |
-|----------|---------------|
-| **Custom function** | ✅ **USE THIS** — ~15 lines, zero dependencies, fully transparent |
-| **`openskill`** | ❌ — Designed for multiplayer games (N-player free-for-all), not 1v1 sports. Incorrect priors |
-| **`elo`** | ❌ — Abandoned package, last updated 2017, incompatible with Python 3.12+ |
-| **`player_ratings`** | ❌ — Focused on chess time controls, not football parameters |
-
-**The entire Elo system is two formulas:**
-
-```
-Expected score: E_A = 1 / (1 + 10 ^ ((R_B - R_A + HFA) / 400))
-Rating update:  R_new = R_old + K * (actual - expected) * margin_of_victory_mult
-```
-
-**HIGH confidence** — Wikipedia Elo formula × World Football Elo Ratings modifications (goal difference multiplier, K adjusted by tournament importance, home advantage = 53 Elo points per eloratings.net).
-
----
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| stdlib `random` | `numpy.random` | If simulation scales to 500K+ iterations where vectorisation matters (see v2.0 feature V2-07) |
+| stdlib `json` | `pickle`, `sqlite3` | If speed of load/save becomes a bottleneck (>200ms), or if relational queries needed |
+| Hardcoded Annex C table | Code-generated lookup | If you want compile-time verification of all 495 combinations (trade-off: bloats source) |
+| stdlib `dataclasses` | `pydantic`, `attrs` | If input validation/coercion becomes non-trivial (overkill for CLI tool) |
 
 ## What NOT to Use
 
-| Library | Reason to Avoid | Confidence |
-|---------|----------------|------------|
-| **`flask` / `fastapi`** | Out of scope — no web UI for MVP | HIGH (per PROJECT.md) |
-| **`sqlalchemy` / any ORM** | JSON files are the persistence layer; DB adds setup complexity | HIGH (per PROJECT.md) |
-| **`pandas`** | Overkill for 16 team records. `numpy` arrays + dicts are sufficient | HIGH |
-| **`tqdm`** | **Rich's `Progress`** replaces this completely with better formatting | HIGH |
-| **`colorama`** | **Rich handles Windows ANSI natively** since v13. Zero need | HIGH (verified via Rich compatibility docs) |
-| **`click`** | `typer` is strictly better — same author (tiangolo), less boilerplate | MEDIUM |
-| **`argparse`** | Adequate but verbose. `typer` generates --help and type coercion automatically | MEDIUM |
-| **`asyncio` + `aiohttp`** | No benefit for 1 request/60s. Adds cognitive overhead | HIGH |
-| **`xlrd` / `openpyxl`** | No spreadsheet I/O required | HIGH |
-| **`plotly` / `matplotlib`** | Console-only output; no charts for MVP | HIGH |
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `numpy` for 50K iterations | Overkill; import overhead ~200ms for ~0.5s speed gain at current scale; adds build complexity | Pure Python `random` + `math` |
+| Database (SQLite, PostgreSQL) | Adds setup burden, cross-platform issues, migration overhead; data fits in memory | JSON files + atomic writes |
+| `pandas` for standings | Massive dependency for simple sort/groupby operations | Python `sorted()` + `itertools.groupby()` |
+| ORM or data validation lib | CLI tool with ~2200 LOC doesn't need heavy abstractions | `dataclasses` + simple validation methods |
+| `cachetools` or external caching | No external caching needed; JSON files load in <10ms | Already done: in-memory dicts |
 
----
+## Stack Patterns by Variant
 
-## Dependency Installation
+**If target iteration count exceeds 200K per cycle:**
+- Consider `numpy.random` for vectorised Monte Carlo (~10× speedup)
+- Cost: adds numpy as a dependency (~40MB), complicates CI
+- Trade-off: not needed for 50K iterations; current impl runs ~1.3s for 23 matches, projected ~6s for 104 matches
 
-```bash
-# Core — install these in Phase 1
-pip install requests~=2.32 numpy~=2.4 rich~=15.0 pydantic~=2.10 pydantic-settings~=2.11
+**If adding web dashboard (feature V2-04):**
+- Flask + Chart.js as stack additions
+- These are additive, not replacements — core simulator stays dependency-free
 
-# Development — Phase 2+
-pip install pytest~=8.0 hypothesis~=6.120
+**If adding what-if mode (feature V2-05):**
+- No new dependencies needed
+- Only needs modified state input + re-run simulation
 
-# Freeze after testing
-pip freeze > requirements.txt
-```
+## Version Compatibility
 
----
-
-## Version Summary Table (Current as of June 2026)
-
-| Package | Version | Published | Python Support | Notes |
-|---------|---------|-----------|----------------|-------|
-| `requests` | 2.32.3 | Mar 2026 | 3.8+ | Final state; maintenance-only mode |
-| `numpy` | **2.4.6** | May 2026 | 3.11–3.14 | Pin `~=2.4` to avoid 2.5 breaking changes initially |
-| `rich` | **15.0.0** | Apr 2026 | 3.8+ | "The So Long 3.8 Release" |
-| `pydantic` | 2.10.x | 2026 | 3.8+ | Rust-backed (pydantic-core) |
-| `pydantic-settings` | 2.11.x | 2026 | 3.9+ | Separate package since v2 |
-| `pytest` | 8.3.x | 2026 | 3.8+ | — |
-| `hypothesis` | 6.120+ | 2026 | 3.9+ | — |
-
----
-
-## Dependency Size Budget
-
-| Dependency | Install Size | Key Files |
-|------------|-------------|-----------|
-| `requests` | ~1.1 MB | urllib3, certifi, charset-normalizer, idna |
-| `numpy` | ~20–40 MB | Compiled C extensions (largest dep by far) |
-| `rich` | ~1.5 MB | pygments, markdown-it-py |
-| `pydantic` | ~6 MB | pydantic-core (Rust binary) |
-| `pydantic-settings` | ~100 KB | Thin wrapper |
-| **Total** | **~30–50 MB** | Acceptable for a CLI tool |
-
----
-
-## Architecture Diagram (Data Flow × Stack Layer)
-
-```
-┌──────────────────────────────────────────────────────┐
-│                    main.py (loop)                     │
-│                                                        │
-│  ┌──────────┐    ┌──────────┐    ┌───────────────────┐ │
-│  │ fetcher   │───▶│ elo      │───▶│ simulator (numpy) │ │
-│  │ (requests)│    │ (custom) │    │ (vectorized MC)   │ │
-│  └─────┬────┘    └────┬─────┘    └─────────┬─────────┘ │
-│        │              │                    │           │
-│        ▼              ▼                    ▼           │
-│  ┌────────────────────────────────────────────────┐    │
-│  │           state.py (JSON persistence)          │    │
-│  │  teams.json │ bracket.json │ played.json       │    │
-│  └────────────────────────────────────────────────┘    │
-│        │              │                    │           │
-│        ▼              ▼                    ▼           │
-│  ┌────────────────────────────────────────────────┐    │
-│  │          output.py (rich)                      │    │
-│  │  Tables │ Live refresh │ Progress │ Colors     │    │
-│  └────────────────────────────────────────────────┘    │
-│                                                        │
-│  ┌────────────────────────────────────────────────┐    │
-│  │     constants.py (pydantic-settings)            │    │
-│  │  Type-safe config from env vars                 │    │
-│  └────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────┘
-
-External API:  api.football-data.org/v4  (10 req/min)
-```
-
----
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| Python 3.10+ | all deps | `dataclasses` built-in since 3.7; `enum` since 3.4; fine |
+| `requests>=2.31` | Python 3.10+ | Last version supporting Python 3.10; newer requires 3.11+ |
+| `pytest>=9.0` | Python 3.10+ | All good |
+| Windows + ANSI | Python 3.10+ | Current `os.system("")` workaround for Windows Console Host works |
 
 ## Sources
 
-| Source | What It Told Us | Confidence |
-|--------|----------------|------------|
-| [football-data.org Python docs](https://docs.football-data.org/general/v4/coding/python.html) | API v4 uses `requests` in official examples | HIGH |
-| [football-data.org policies](https://docs.football-data.org/general/v4/policies.html) | Free tier: 10 req/min | HIGH |
-| [PyPI — numpy 2.4.6](https://newreleases.io/project/pypi/numpy/release/2.4.6) | Current stable version | HIGH |
-| [PyPI — rich 15.0.0](https://pypi.org/project/rich/) | Latest version, cross-platform ANSI | HIGH |
-| [Rich compatibility](https://rich.readthedocs.io/en/stable/) | Native Windows support, no colorama needed | HIGH |
-| [PyPI — requests 2.32.3](https://pypi.org/project/requests/) | Current version | HIGH |
-| [PyPI — pydantic-settings 2.11](https://generalistprogrammer.com/tutorials/pydantic-settings-python-package-guide) | Version and usage guide | MEDIUM |
-| [Pydantic v2 docs](https://pydantic.dev/docs/validation/latest/) | Rust-backed validation, config patterns | HIGH |
-| [World Football Elo Ratings](https://www.eloratings.net/about) | K-factor by tournament, goal-difference multiplier, HFA value | HIGH |
-| [Wikipedia — World Football Elo Ratings](https://en.wikipedia.org/wiki/World_Football_Elo_Ratings) | Academic verification of Elo modifications | HIGH |
-| [HTTPX vs Requests comparison (2026)](https://decodo.com/blog/httpx-vs-requests-vs-aiohttp) | Sync vs async benchmarks, confirms no benefit for rate-limited polling | MEDIUM |
-| [GitHub — tiangolo/typer](https://github.com/fastapi/typer) | CLI library, 19.5k stars | HIGH |
-| [PyPI — football-api client](https://pypi.org/project/football-api/) | Third-party Python wrapper for football-data.org (alternative to raw requests) | MEDIUM |
+- **FIFA.com** — Official 2026 format: 12 groups of 4, 48 teams, 104 matches total, top 2 + 8 best 3rd places advance
+  - https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/groups-how-teams-qualify-tie-breakers — [HIGH confidence]
+- **FIFA Regulations PDF** — Page 26: tiebreaker order; Page 80+: Annex C with 495 combinations
+  - https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf — [HIGH confidence]
+- **Wikipedia** — 2026 FIFA World Cup knockout stage (match schedule 73-88 confirmed)
+  - https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_knockout_stage — [MEDIUM confidence; confirmed against multiple sources]
+- **DEV article by Mark** — Practical implementation of Annex C lookup as JSON mapping with `C(12,8)=495` combinations keyed by sorted group string
+  - https://dev.to/mark_b5f4ffdd8e7cd58/encoding-fifas-495-third-place-scenarios-for-the-2026-world-cup-4814 — [HIGH confidence; matches FIFA regulations]
+- **Sporting News** — Tiebreaker order confirmed: head-to-head points → head-to-head GD → head-to-head goals → overall GD → overall goals → fair play → FIFA ranking
+  - https://www.sportingnews.com/us/soccer/news/world-cup-group-tiebreakers-2026-teams-tied-points-goal-differential/606ca25a20c6167ef229d31c — [MEDIUM confidence; cites official PDF]
+- **Goal.com** — Same tiebreaker order confirmed, plus third-place ranking criteria
+  - https://www.goal.com/en-us/news/fifa-world-cup-group-stage-rules-explained/blt39e14c7602e0afb7 — [MEDIUM confidence; cross-referenced with Sporting News]
+- **Project codebase** — v1.0 analysis: 32 teams, 23 bracket matches, pure-Python simulation runs ~1.3s for 50K iterations
+  - `worldcup_predictor/src/simulation.py` — confirmation of existing architecture
+  - `worldcup_predictor/data/bracket.json` — current 23-match bracket structure
+  - `worldcup_predictor/src/state.py` — JSON load/save pattern with atomic writes
+
+## Confidence Assessment
+
+| Area | Confidence | Notes |
+|------|------------|-------|
+| Stack sufficiency | HIGH | Pure Python stdlib fully sufficient for group stage + 104-match simulation |
+| Tiebreaker rules | HIGH | Confirmed via 3 independent sources citing official FIFA PDF; 7-step order cross-verified |
+| Annex C structure | HIGH | C(12,8) = 495 combinations confirmed; lookup table approach validated by multiple implementations |
+| Performance estimate | MEDIUM | ~4.5× slowdown projected (23→104 matches); actual depends on draw-model complexity for group stage |
+| No new dependencies | HIGH | `dataclasses`, `enum`, `itertools` are all stdlib; no pip installs needed |
 
 ---
 
-## Open Questions / Phase-Specific Research
-
-1. **football-api PyPI wrapper** (v0.1.1, Feb 2026): Exists as a Pydantic-typed client for football-data.org v4. Evaluate in Phase 1 as a potential replacement for raw `requests` + manual Pydantic models. Risk: newly published, may have incomplete endpoint coverage.
-
-2. **NumPy version strategy**: 2.5.0rc1 drops Python 3.11 support. Pin `numpy~=2.4` in requirements, plan migration when 2.5 stable is assessed.
-
-3. **Typer integration**: If CLI arguments are needed (e.g., `--sim-count`, `--poll-interval`, `--competition-id`), add Typer as a Phase 1 enhancement. Skip if all config stays in constants.
-
-4. **Parallel simulation**: For >500K sims, investigate `multiprocessing` with NumPy (splitting sims across cores). Not needed for 50K, but flagged for post-MVP scaling.
+*Stack research for: FIFA World Cup 2026 48-team format migration*
+*Researched: 2026-06-14*
