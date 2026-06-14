@@ -1,0 +1,700 @@
+{
+  "groups": {
+    "A": {
+      "teams": [
+        "Mexico",
+        "South Africa",
+        "South Korea",
+        "Czech Republic"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_A_01",
+          "team_a": "Mexico",
+          "team_b": "South Africa",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_A_02",
+          "team_a": "Mexico",
+          "team_b": "South Korea",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_A_03",
+          "team_a": "Mexico",
+          "team_b": "Czech Republic",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_A_04",
+          "team_a": "South Africa",
+          "team_b": "South Korea",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_A_05",
+          "team_a": "South Africa",
+          "team_b": "Czech Republic",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_A_06",
+          "team_a": "South Korea",
+          "team_b": "Czech Republic",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "B": {
+      "teams": [
+        "Canada",
+        "Bosnia and Herzegovina",
+        "Qatar",
+        "Switzerland"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_B_01",
+          "team_a": "Canada",
+          "team_b": "Bosnia and Herzegovina",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_B_02",
+          "team_a": "Canada",
+          "team_b": "Qatar",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_B_03",
+          "team_a": "Canada",
+          "team_b": "Switzerland",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_B_04",
+          "team_a": "Bosnia and Herzegovina",
+          "team_b": "Qatar",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_B_05",
+          "team_a": "Bosnia and Herzegovina",
+          "team_b": "Switzerland",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_B_06",
+          "team_a": "Qatar",
+          "team_b": "Switzerland",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "C": {
+      "teams": [
+        "Brazil",
+        "Morocco",
+        "Haiti",
+        "Scotland"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_C_01",
+          "team_a": "Brazil",
+          "team_b": "Morocco",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_C_02",
+          "team_a": "Brazil",
+          "team_b": "Haiti",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_C_03",
+          "team_a": "Brazil",
+          "team_b": "Scotland",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_C_04",
+          "team_a": "Morocco",
+          "team_b": "Haiti",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_C_05",
+          "team_a": "Morocco",
+          "team_b": "Scotland",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_C_06",
+          "team_a": "Haiti",
+          "team_b": "Scotland",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "D": {
+      "teams": [
+        "United States",
+        "Paraguay",
+        "Australia",
+        "Türkiye"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_D_01",
+          "team_a": "United States",
+          "team_b": "Paraguay",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_D_02",
+          "team_a": "United States",
+          "team_b": "Australia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_D_03",
+          "team_a": "United States",
+          "team_b": "Türkiye",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_D_04",
+          "team_a": "Paraguay",
+          "team_b": "Australia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_D_05",
+          "team_a": "Paraguay",
+          "team_b": "Türkiye",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_D_06",
+          "team_a": "Australia",
+          "team_b": "Türkiye",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "E": {
+      "teams": [
+        "Germany",
+        "Curaçao",
+        "Ivory Coast",
+        "Ecuador"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_E_01",
+          "team_a": "Germany",
+          "team_b": "Curaçao",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_E_02",
+          "team_a": "Germany",
+          "team_b": "Ivory Coast",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_E_03",
+          "team_a": "Germany",
+          "team_b": "Ecuador",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_E_04",
+          "team_a": "Curaçao",
+          "team_b": "Ivory Coast",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_E_05",
+          "team_a": "Curaçao",
+          "team_b": "Ecuador",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_E_06",
+          "team_a": "Ivory Coast",
+          "team_b": "Ecuador",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "F": {
+      "teams": [
+        "Netherlands",
+        "Japan",
+        "Sweden",
+        "Tunisia"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_F_01",
+          "team_a": "Netherlands",
+          "team_b": "Japan",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_F_02",
+          "team_a": "Netherlands",
+          "team_b": "Sweden",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_F_03",
+          "team_a": "Netherlands",
+          "team_b": "Tunisia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_F_04",
+          "team_a": "Japan",
+          "team_b": "Sweden",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_F_05",
+          "team_a": "Japan",
+          "team_b": "Tunisia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_F_06",
+          "team_a": "Sweden",
+          "team_b": "Tunisia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "G": {
+      "teams": [
+        "Belgium",
+        "Egypt",
+        "Iran",
+        "New Zealand"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_G_01",
+          "team_a": "Belgium",
+          "team_b": "Egypt",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_G_02",
+          "team_a": "Belgium",
+          "team_b": "Iran",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_G_03",
+          "team_a": "Belgium",
+          "team_b": "New Zealand",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_G_04",
+          "team_a": "Egypt",
+          "team_b": "Iran",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_G_05",
+          "team_a": "Egypt",
+          "team_b": "New Zealand",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_G_06",
+          "team_a": "Iran",
+          "team_b": "New Zealand",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "H": {
+      "teams": [
+        "Spain",
+        "Cape Verde",
+        "Saudi Arabia",
+        "Uruguay"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_H_01",
+          "team_a": "Spain",
+          "team_b": "Cape Verde",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_H_02",
+          "team_a": "Spain",
+          "team_b": "Saudi Arabia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_H_03",
+          "team_a": "Spain",
+          "team_b": "Uruguay",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_H_04",
+          "team_a": "Cape Verde",
+          "team_b": "Saudi Arabia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_H_05",
+          "team_a": "Cape Verde",
+          "team_b": "Uruguay",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_H_06",
+          "team_a": "Saudi Arabia",
+          "team_b": "Uruguay",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "I": {
+      "teams": [
+        "France",
+        "Senegal",
+        "Iraq",
+        "Norway"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_I_01",
+          "team_a": "France",
+          "team_b": "Senegal",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_I_02",
+          "team_a": "France",
+          "team_b": "Iraq",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_I_03",
+          "team_a": "France",
+          "team_b": "Norway",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_I_04",
+          "team_a": "Senegal",
+          "team_b": "Iraq",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_I_05",
+          "team_a": "Senegal",
+          "team_b": "Norway",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_I_06",
+          "team_a": "Iraq",
+          "team_b": "Norway",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "J": {
+      "teams": [
+        "Argentina",
+        "Algeria",
+        "Austria",
+        "Jordan"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_J_01",
+          "team_a": "Argentina",
+          "team_b": "Algeria",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_J_02",
+          "team_a": "Argentina",
+          "team_b": "Austria",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_J_03",
+          "team_a": "Argentina",
+          "team_b": "Jordan",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_J_04",
+          "team_a": "Algeria",
+          "team_b": "Austria",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_J_05",
+          "team_a": "Algeria",
+          "team_b": "Jordan",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_J_06",
+          "team_a": "Austria",
+          "team_b": "Jordan",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "K": {
+      "teams": [
+        "Portugal",
+        "DR Congo",
+        "Uzbekistan",
+        "Colombia"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_K_01",
+          "team_a": "Portugal",
+          "team_b": "DR Congo",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_K_02",
+          "team_a": "Portugal",
+          "team_b": "Uzbekistan",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_K_03",
+          "team_a": "Portugal",
+          "team_b": "Colombia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_K_04",
+          "team_a": "DR Congo",
+          "team_b": "Uzbekistan",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_K_05",
+          "team_a": "DR Congo",
+          "team_b": "Colombia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_K_06",
+          "team_a": "Uzbekistan",
+          "team_b": "Colombia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    },
+    "L": {
+      "teams": [
+        "England",
+        "Croatia",
+        "Ghana",
+        "Panama"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_L_01",
+          "team_a": "England",
+          "team_b": "Croatia",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_L_02",
+          "team_a": "England",
+          "team_b": "Ghana",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_L_03",
+          "team_a": "England",
+          "team_b": "Panama",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_L_04",
+          "team_a": "Croatia",
+          "team_b": "Ghana",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_L_05",
+          "team_a": "Croatia",
+          "team_b": "Panama",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        },
+        {
+          "match_id": "GS_L_06",
+          "team_a": "Ghana",
+          "team_b": "Panama",
+          "winner": null,
+          "score_a": null,
+          "score_b": null
+        }
+      ]
+    }
+  }
+}
