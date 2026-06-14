@@ -133,3 +133,112 @@ def test_load_teams_corrupt_json(tmp_path):
     (tmp_path / "teams.json").write_text("{invalid json!!!", encoding="utf-8")
     with pytest.raises(json.JSONDecodeError):
         load_teams(data_dir=tmp_path)
+
+
+# ─── Annex C validation tests (RED phase for TDD Task 2) ─────────────────
+
+
+def test_validate_annex_c_empty_raises():
+    """validate_annex_c({}) should raise ValueError for 0 entries."""
+    from src.state import validate_annex_c
+    with pytest.raises(ValueError, match="495"):
+        validate_annex_c({})
+
+
+def test_validate_annex_c_valid_495_passes():
+    """validate_annex_c with 495 valid entries should pass without exception."""
+    from src import constants
+    from src.state import validate_annex_c
+    import itertools
+
+    all_groups = list('ABCDEFGHIJKL')
+    expected_keys = {'1A', '1B', '1D', '1E', '1G', '1I', '1K', '1L'}
+    valid_data = {}
+    for combo in itertools.combinations(all_groups, 8):
+        key = ','.join(combo)
+        winner_groups = ['A', 'B', 'D', 'E', 'G', 'I', 'K', 'L']
+        value = {}
+        for i, wg in enumerate(winner_groups):
+            target = combo[i % 8]
+            value[f'1{wg}'] = f'3{target}'
+        valid_data[key] = value
+
+    validate_annex_c(valid_data)
+
+
+def test_validate_annex_c_self_reference_raises():
+    """validate_annex_c with self-reference ('1A' -> '3A') should raise ValueError."""
+    from src.state import validate_annex_c
+    import itertools
+
+    all_groups = list('ABCDEFGHIJKL')
+    valid_data = {}
+    for combo in itertools.combinations(all_groups, 8):
+        key = ','.join(combo)
+        winner_groups = ['A', 'B', 'D', 'E', 'G', 'I', 'K', 'L']
+        value = {}
+        for i, wg in enumerate(winner_groups):
+            target = combo[i % 8]
+            value[f'1{wg}'] = f'3{target}'
+        valid_data[key] = value
+
+    # Inject a self-reference into the first entry
+    first_key = list(valid_data.keys())[0]
+    valid_data[first_key]['1A'] = '3A'
+
+    with pytest.raises(ValueError, match="self-reference"):
+        validate_annex_c(valid_data)
+
+
+def test_validate_annex_c_ref_outside_key_raises():
+    """validate_annex_c with reference to group not in key should raise ValueError."""
+    from src.state import validate_annex_c
+    import itertools
+
+    all_groups = list('ABCDEFGHIJKL')
+    valid_data = {}
+    for combo in itertools.combinations(all_groups, 8):
+        key = ','.join(combo)
+        winner_groups = ['A', 'B', 'D', 'E', 'G', 'I', 'K', 'L']
+        value = {}
+        for i, wg in enumerate(winner_groups):
+            target = combo[i % 8]
+            value[f'1{wg}'] = f'3{target}'
+        valid_data[key] = value
+
+    # Inject a reference to a group not in the key
+    first_key = list(valid_data.keys())[0]
+    valid_data[first_key]['1A'] = '3X'
+
+    with pytest.raises(ValueError):
+        validate_annex_c(valid_data)
+
+
+def test_load_annex_c_valid(tmp_path):
+    """load_annex_c with valid annex_c.json should return dict."""
+    from src.state import load_annex_c
+    import itertools
+
+    all_groups = list('ABCDEFGHIJKL')
+    valid_data = {'_meta': {'source': 'test'}}
+    for combo in itertools.combinations(all_groups, 8):
+        key = ','.join(combo)
+        winner_groups = ['A', 'B', 'D', 'E', 'G', 'I', 'K', 'L']
+        value = {}
+        for i, wg in enumerate(winner_groups):
+            target = combo[i % 8]
+            value[f'1{wg}'] = f'3{target}'
+        valid_data[key] = value
+
+    p = tmp_path / 'annex_c.json'
+    p.write_text(json.dumps(valid_data), encoding='utf-8')
+    loaded = load_annex_c(data_dir=tmp_path)
+    assert '_meta' in loaded
+    assert len(loaded) == 496  # 495 entries + _meta
+
+
+def test_load_annex_c_missing_file(tmp_path):
+    """load_annex_c with missing file should raise FileNotFoundError."""
+    from src.state import load_annex_c
+    with pytest.raises(FileNotFoundError):
+        load_annex_c(data_dir=tmp_path)
