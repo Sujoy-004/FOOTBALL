@@ -118,3 +118,35 @@ def test_hourly_resim_triggers(monkeypatch):
 
     assert new_req == last_request_time, "Should NOT make API call during hourly re-sim"
     assert new_sim == fake_time[0], "Should update last_sim_time to current time"
+
+
+def test_seed_propagates_through_run_iteration(monkeypatch):
+    """seed parameter is passed through to run_simulation()."""
+    import main as main_mod
+    import src.simulation
+
+    captured_seeds = []
+
+    def mock_sim(teams, bracket, played, iterations=50000, seed=None):
+        captured_seeds.append(seed)
+        return {name: {"qf": 0.5, "sf": 0.3, "final": 0.1, "champion": 0.05} for name in teams}
+
+    monkeypatch.setattr(src.simulation, "run_simulation", mock_sim)
+
+    teams = {"Arg": {"elo": 2000}, "Bra": {"elo": 2000}}
+    bracket = [
+        {"match_id": "F", "round": "FINAL", "team_a": "Arg", "team_b": "Bra",
+         "source_matches": None, "winner": None},
+    ]
+    played = {}
+
+    # Call _run_iteration with seed=42
+    new_sim, new_req, probs = main_mod._run_iteration(
+        teams, bracket, played, "dummy_key", {},
+        last_sim_time=0.0, last_request_time=0.0,
+        prev_probs=None, seed=42,
+    )
+
+    # run_simulation should have been called with seed=42
+    assert len(captured_seeds) >= 1, "run_simulation should have been called"
+    assert 42 in captured_seeds, f"seed=42 should be in captured_seeds: {captured_seeds}"
