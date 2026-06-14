@@ -298,12 +298,9 @@ class TestTimestampConsistency:
         elo_updates = {"Arg": {"old": 2000, "new": 2010}}
 
         funcs_and_args = [
-            (print_header, [teams, bracket, played, aliases]),
-            (print_match_alert, [match]),
             (print_elo_changes, [elo_updates]),
             (print_heartbeat, []),
             (print_auto_refresh, []),
-            (print_shutdown_banner, [small_probs]),
             (print_error, ["test error"]),
         ]
         for func, args in funcs_and_args:

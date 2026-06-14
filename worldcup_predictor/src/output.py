@@ -7,6 +7,8 @@ import sys
 import time
 from typing import Callable
 
+from src.constants import POLL_INTERVAL
+
 
 def _supports_color() -> bool:
     """Return True if stdout is a TTY (ANSI codes supported)."""
@@ -110,3 +112,85 @@ def print_delta_summary(probs: dict, prev_probs: dict | None) -> None:
 def print_simulation_duration(elapsed_seconds: float) -> None:
     """Print simulation duration in bold green."""
     print(f"{_timestamp()} {_bold_green(f'Re-simulating (50000 runs)... done in {elapsed_seconds:.1f}s')}")
+
+
+def print_header(
+    teams: dict[str, dict],
+    bracket: list[dict],
+    played: dict[str, dict],
+    aliases: dict[str, list[str]],
+) -> None:
+    """Print startup banner with team/bracket/played/alias counts."""
+    print()
+    print(_bold_cyan("=" * 60))
+    print(_bold_cyan("  WORLD CUP DYNAMIC PREDICTOR — MVP"))
+    print(_bold_cyan(f"  Polling API every {POLL_INTERVAL} seconds. Press Ctrl+C to stop."))
+    print(_bold_cyan(
+        f"  Loaded {len(teams)} teams, {len(bracket)} bracket matches, "
+        f"{len(played)} played matches, {len(aliases)} aliases."
+    ))
+    print(_bold_cyan("=" * 60))
+    print()
+
+
+def print_match_alert(match: dict) -> None:
+    """Print highlighted match result block with bold yellow banner."""
+    print()
+    print(_bold_yellow("=" * 60))
+    print(_bold_yellow("  NEW MATCH DETECTED!"))
+    team_a = _bold_white(match["team_a"])
+    team_b = _bold_white(match["team_b"])
+    print(f"  {team_a} {match['home_score']} - {match['away_score']} {team_b}")
+    print(f"  Winner: {match['winner']}")
+    print(_bold_yellow("=" * 60))
+
+
+def print_elo_changes(updates: dict[str, dict[str, float]]) -> None:
+    """Print Elo rating changes after a match.
+
+    Args:
+        updates: {team_name: {"old": float, "new": float}}
+    """
+    print(f"{_timestamp()} Updating Elo:")
+    for team_name in updates:
+        old = updates[team_name]["old"]
+        new_rating = updates[team_name]["new"]
+        delta = int(round(new_rating - old))
+        delta_str = f"({'+' if delta >= 0 else ''}{delta})"
+        colored_delta = _green(delta_str) if delta >= 0 else _red(delta_str)
+        arrow = "→"
+        print(f"   {team_name:<12} {int(old)} {arrow} {int(new_rating)}  {colored_delta}")
+
+
+def print_heartbeat() -> None:
+    """Print single-line heartbeat for poll cycles with no new matches."""
+    print(f"{_timestamp()} Polling... no new matches.")
+
+
+def print_auto_refresh() -> None:
+    """Print one-liner for hourly auto-refresh simulation."""
+    print(f"{_timestamp()} Auto-refresh simulation (no new matches in 1h)")
+
+
+def print_shutdown_banner(probs: dict[str, dict[str, float]]) -> None:
+    """Print final championship probabilities with ALL teams (full table)."""
+    print()
+    print(_bold_green("=" * 60))
+    print(_bold_green("  FINAL CHAMPIONSHIP PROBABILITIES"))
+    print(_bold_green("=" * 60))
+
+    sorted_teams = sorted(probs, key=lambda n: probs[n]["champion"], reverse=True)
+    print(f"{'':>3} {'Team':<18} {'QF':>6} {'SF':>6} {'FINAL':>8} {'CHAMPION':>8}")
+    print("-" * 51)
+
+    for rank, name in enumerate(sorted_teams, 1):
+        p = probs[name]
+        print(f"{rank:>2}. {name:<18} {p['qf']:.3f} {p['sf']:.3f} {p['final']:.3f} {p['champion']:.3f}")
+
+    print()
+    print(_bold_green("State saved. Goodbye."))
+
+
+def print_error(message: str) -> None:
+    """Print bold red error with warning prefix and timestamp."""
+    print(f"{_timestamp()} {_bold_red(f'⚠ {message}')}")
