@@ -12,7 +12,7 @@ DATA_DIR = MAIN_DIR / "data"
 
 
 def _runner_code() -> str:
-    """Inline Python that mocks requests.get, sets POLL_INTERVAL=1, then calls main.main()."""
+    """Inline Python that mocks requests.get + run_full_simulation, sets POLL_INTERVAL=1, then calls main.main()."""
     return (
         f"import os, sys\n"
         f"os.environ['POLL_INTERVAL'] = '1'\n"
@@ -32,13 +32,18 @@ def _runner_code() -> str:
         f"  def ok(self):\n"
         f"    return True\n"
         f"requests.get = lambda url, **kw: _MockResp()\n"
+        f"import src.knockout\n"
+        f"def _mock_sim(teams, groups, bracket, annex_c, played, iterations=50000, seed=None):\n"
+        f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
+        f"src.knockout.run_full_simulation = _mock_sim\n"
         f"import main\n"
+        f"main.run_full_simulation = _mock_sim\n"
         f"main.main()\n"
     )
 
 
 def _runner_code_with_flag(flag: str) -> str:
-    """Inline Python that mocks requests.get, passes `flag` as CLI arg, then calls main.main()."""
+    """Inline Python that mocks requests.get + run_full_simulation, passes `flag` as CLI arg, then calls main.main()."""
     return (
         f"import os, sys\n"
         f"os.environ['POLL_INTERVAL'] = '1'\n"
@@ -59,7 +64,12 @@ def _runner_code_with_flag(flag: str) -> str:
         f"  def ok(self):\n"
         f"    return True\n"
         f"requests.get = lambda url, **kw: _MockResp()\n"
+        f"import src.knockout\n"
+        f"def _mock_sim(teams, groups, bracket, annex_c, played, iterations=50000, seed=None):\n"
+        f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
+        f"src.knockout.run_full_simulation = _mock_sim\n"
         f"import main\n"
+        f"main.run_full_simulation = _mock_sim\n"
         f"main.main()\n"
     )
 
@@ -155,22 +165,24 @@ def test_hourly_resim_triggers(monkeypatch):
 
     monkeypatch.setattr(time_module, "time", mock_time)
 
-    def mock_sim(teams, bracket, played, iterations, seed=None):
+    def mock_sim(teams, groups, bracket, annex_c, played, iterations=50000, seed=None):
         return {name: {"qf": 0.5, "sf": 0.3, "final": 0.1, "champion": 0.05} for name in teams}
-    import src.simulation
-    monkeypatch.setattr(src.simulation, "run_simulation", mock_sim)
+    import src.knockout
+    monkeypatch.setattr(src.knockout, "run_full_simulation", mock_sim)
+    monkeypatch.setattr(main_mod, "run_full_simulation", mock_sim)
 
     teams = {"Arg": {"elo": 2000}, "Bra": {"elo": 2000}}
+    groups = {"groups": {"A": {"teams": ["Arg", "Bra"], "matches": []}}}
     bracket = [
-        {"match_id": "F", "round": "F", "team_a": "Arg", "team_b": "Bra",
-         "source_matches": None, "winner": None},
+        {"match_id": "F", "round": "FINAL", "source_matches": ["SF_1", "SF_2"], "winner": None},
     ]
+    annex_c = {"_meta": {"source": "test"}}
     played = {}
     last_sim_time = 1000.0  # 5000 - 1000 = 4000 > 3600, triggers hourly re-sim
     last_request_time = 100.0
 
     new_sim, new_req, new_probs = main_mod._run_iteration(
-        teams, bracket, played, "dummy_key", {},
+        teams, groups, bracket, annex_c, played, "dummy_key", {},
         last_sim_time, last_request_time,
     )
 
@@ -179,34 +191,32 @@ def test_hourly_resim_triggers(monkeypatch):
 
 
 def test_seed_propagates_through_run_iteration(monkeypatch):
-    """seed parameter is passed through to run_simulation()."""
+    """seed parameter is passed through to run_full_simulation()."""
     import main as main_mod
-    import src.simulation
+    import src.knockout
 
     captured_seeds = []
 
-    def mock_sim(teams, bracket, played, iterations=50000, seed=None):
+    def mock_sim(teams, groups, bracket, annex_c, played, iterations=50000, seed=None):
         captured_seeds.append(seed)
         return {name: {"qf": 0.5, "sf": 0.3, "final": 0.1, "champion": 0.05} for name in teams}
 
-    # Patch both module-level and local reference (main.py imports via `from ... import`)
-    monkeypatch.setattr(src.simulation, "run_simulation", mock_sim)
-    monkeypatch.setattr(main_mod, "run_simulation", mock_sim)
+    monkeypatch.setattr(src.knockout, "run_full_simulation", mock_sim)
+    monkeypatch.setattr(main_mod, "run_full_simulation", mock_sim)
 
     teams = {"Arg": {"elo": 2000}, "Bra": {"elo": 2000}}
+    groups = {"groups": {"A": {"teams": ["Arg", "Bra"], "matches": []}}}
     bracket = [
-        {"match_id": "F", "round": "FINAL", "team_a": "Arg", "team_b": "Bra",
-         "source_matches": None, "winner": None},
+        {"match_id": "F", "round": "FINAL", "source_matches": ["SF_1", "SF_2"], "winner": None},
     ]
+    annex_c = {"_meta": {"source": "test"}}
     played = {}
 
-    # Call _run_iteration with seed=42
     new_sim, new_req, probs = main_mod._run_iteration(
-        teams, bracket, played, "dummy_key", {},
+        teams, groups, bracket, annex_c, played, "dummy_key", {},
         last_sim_time=0.0, last_request_time=0.0,
         prev_probs=None, seed=42,
     )
 
-    # run_simulation should have been called with seed=42
-    assert len(captured_seeds) >= 1, "run_simulation should have been called"
+    assert len(captured_seeds) >= 1, "run_full_simulation should have been called"
     assert 42 in captured_seeds, f"seed=42 should be in captured_seeds: {captured_seeds}"

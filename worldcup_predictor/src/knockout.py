@@ -134,10 +134,7 @@ def run_full_simulation(
     iterations: int = 50000,
     seed: int | None = None,
 ) -> dict[str, dict[str, float]]:
-    if seed is not None:
-        random.seed(seed)
-
-    rng = random.Random()
+    rng = random.Random(seed)
     round_map = _build_round_map(bracket)
     elo_ratings = {name: data["elo"] for name, data in teams.items()}
 

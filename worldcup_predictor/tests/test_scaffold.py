@@ -30,17 +30,25 @@ def test_teams_json_exists_and_valid():
 
 
 def test_bracket_json_exists_and_valid():
-    """Test 3: data/bracket.json is valid JSON array with 23+ objects, each with required fields."""
+    """Test 3: data/bracket.json is valid JSON with 32 matches, R32 uses slot descriptors, R16+ uses source_matches."""
     bracket_path = Path(__file__).resolve().parent.parent / "data" / "bracket.json"
     assert bracket_path.exists(), f"bracket.json not found at {bracket_path}"
     with open(bracket_path, encoding="utf-8") as f:
         bracket = json.load(f)
     assert isinstance(bracket, list), "bracket.json must be a list"
-    assert len(bracket) >= 23, f"Expected at least 23 matches, got {len(bracket)}"
-    required_fields = {"match_id", "round", "team_a", "team_b", "source_matches", "winner"}
+    assert len(bracket) == 32, f"Expected 32 matches, got {len(bracket)}"
     for match in bracket:
-        missing = required_fields - set(match.keys())
-        assert not missing, f"Match {match.get('match_id', '?')} missing fields: {missing}"
+        assert "match_id" in match, "Match missing match_id"
+        assert "round" in match, f"Match {match.get('match_id')} missing round"
+        r = match["round"]
+        if r == "R32":
+            assert "home" in match, f"R32 match {match['match_id']} missing home slot"
+            assert "away" in match, f"R32 match {match['match_id']} missing away slot"
+            assert "kind" in match["home"], f"R32 match {match['match_id']} home missing kind"
+            assert "kind" in match["away"], f"R32 match {match['match_id']} away missing kind"
+        else:
+            assert "source_matches" in match, f"{r} match {match['match_id']} missing source_matches"
+            assert match["source_matches"] is None or isinstance(match["source_matches"], list)
 
 
 def test_conftest_has_fixtures():

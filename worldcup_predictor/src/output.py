@@ -127,15 +127,20 @@ def print_header(
     bracket: list[dict],
     played: dict[str, dict],
     aliases: dict[str, list[str]],
+    groups: dict | None = None,
+    annex_c: dict | None = None,
 ) -> None:
     """Print startup banner with team/bracket/played/alias counts."""
     print()
     print(_bold_cyan("=" * 60))
-    print(_bold_cyan("  WORLD CUP DYNAMIC PREDICTOR — MVP"))
+    print(_bold_cyan("  WORLD CUP DYNAMIC PREDICTOR — v1.1"))
     print(_bold_cyan(f"  Polling API every {POLL_INTERVAL} seconds. Press Ctrl+C to stop."))
+    group_count = len(groups.get("groups", groups)) if groups else 0
+    annex_count = len([k for k in (annex_c or {}) if k != "_meta"])
     print(_bold_cyan(
         f"  Loaded {len(teams)} teams, {len(bracket)} bracket matches, "
-        f"{len(played)} played matches, {len(aliases)} aliases."
+        f"{len(played)} played matches, {len(aliases)} aliases"
+        f"{f', {group_count} groups, {annex_count} Annex C scenarios' if groups else ''}."
     ))
     print(_bold_cyan("=" * 60))
     print()
