@@ -55,6 +55,14 @@ No web framework, no database, no frontend – keep it a single script.
 
 ## 5. Step‑by‑Step Build Plan
 
+### v1.1+ Enhancements (Beyond MVP)
+
+- ✅ **48-team format with group stage** — Shipped in v1.1 (Phase 7–10)
+- 📋 Replace simple Elo with a **Logistic Regression / XGBoost** model using features like xG, possession, injuries
+- 📋 Add a **web dashboard** (Flask + Chart.js) to show live probabilities
+- 📋 Store historical probabilities to see how predictions evolve
+- 📋 Add a **betting odds comparator** – compare your probabilities with bookmaker odds
+
 ### Step 0 – Setup
 - Create folder `worldcup_mvp/`
 - Create virtual environment
@@ -99,23 +107,22 @@ No web framework, no database, no frontend – keep it a single script.
 
 ## 6. MVP Acceptance Criteria
 
-- [ ] The script starts and prints initial championship probabilities.
-- [ ] When a real match finishes (test by manually setting a mock result), the script detects it within 120 seconds.
-- [ ] After detection, Elo ratings of the two teams change (print old vs new).
-- [ ] The next simulation output shows different probabilities (the winner’s chances increase).
-- [ ] Already finished matches are never simulated again (even if script restarts – use a small JSON file to persist `played_matches`).
-- [ ] The script runs without crashing for at least 24 hours (or during a match day).
+- [x] The script starts and prints initial championship probabilities.
+- [x] When a real match finishes (test by manually setting a mock result), the script detects it within 120 seconds.
+- [x] After detection, Elo ratings of the two teams change (print old vs new).
+- [x] The next simulation output shows different probabilities (the winner's chances increase).
+- [x] Already finished matches are never simulated again (even if script restarts – use a small JSON file to persist `played_matches`).
+- [x] The script runs without crashing for at least 24 hours (or during a match day).
 
----
+### v1.1 Additional Criteria (2026-06-14)
 
-## 7. Possible Enhancements (After MVP)
-
-- Replace simple Elo with a **Logistic Regression / XGBoost** model using features like xG, possession, injuries.
-- Add a **web dashboard** (Flask + Chart.js) to show live probabilities.
-- Store historical probabilities to see how predictions evolve.
-- Add a **betting odds comparator** – compare your probabilities with bookmaker odds.
-
-But **do not** add these until the MVP works perfectly. The MVP is your core engine.
+- [x] 48 teams, 12 groups (A–L) with validated structure.
+- [x] Group stage simulation: round-robin scoring, 7-step tiebreaker, Poisson match model.
+- [x] Annex C third-place routing: 495-entry lookup table with validated invariants.
+- [x] Full 104-match tournament pipeline: groups → R32 → R16 → QF → SF → TPP → FINAL.
+- [x] BSD API live-data ingestion for group matches with `played_groups.json` persistence.
+- [x] Console display: box-drawing group standings + third-place bubble indicator.
+- [x] 212 passing tests, 0 failures (full regression suite).
 
 ---
 

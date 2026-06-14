@@ -2,6 +2,8 @@
 
 Note: All numeric values (poll interval, simulation count, K‑factor, Elo ratings, etc.) are example defaults. In code, define them in constants.py or environment variables.
 
+> **v1.1 Update (2026-06-14):** Phase 10 complete — BSD API integration replaces Football-Data.org, group match ingestion with `played_groups.json` persistence, 12-group box-drawing standings display, third-place bubble indicator, 212 passing tests. Full 48-team format support shipped across 4 v1.1 phases.
+
 ## 1. Document Purpose
 
 This document defines the **product vision, user goals, feature scope, success metrics, and constraints** for the MVP described in `MVP.md`. It answers “what are we building and why” – separate from the technical details in `TRD.md`.
@@ -36,12 +38,12 @@ For the MVP, the primary persona is the **B.Tech student** building the project.
 ## 4. Feature Scope (MoSCoW)
 
 ### Must Have (Critical for MVP)
-- [ ] Fetch live match results from a free public API.
-- [ ] Update Elo ratings of teams based on real match outcomes.
-- [ ] Simulate the remaining knockout tournament 10,000+ times.
-- [ ] Output championship probabilities as percentages in the console.
-- [ ] Persist state (played matches, updated Elo) across script restarts.
-- [ ] Run continuously (poll every 60 seconds) without manual intervention.
+- [x] Fetch live match results from a free public API.
+- [x] Update Elo ratings of teams based on real match outcomes.
+- [x] Simulate the remaining tournament 10,000+ times (group stage + knockout).
+- [x] Output championship probabilities as percentages in the console.
+- [x] Persist state (played matches, updated Elo) across script restarts.
+- [x] Run continuously (poll every 60 seconds) without manual intervention.
 
 ### Should Have (High priority but not blocking MVP)
 - [ ] Display top 3‑5 teams with probabilities after each update.
@@ -170,7 +172,7 @@ All output is simple, readable, and timestamped.
 - API rate limit: 10 requests/minute. Our 1 request/minute is safe.
 - Free API only provides match results after ~30–60 seconds delay. We accept this.
 - No live ball‑by‑ball data; only final results.
-- Knockout stage only (group stage is out of scope for MVP; can be added later).
+- Group stage + knockout — full 104-match tournament tree.
 
 **Assumptions:**
 - User has a stable internet connection.
@@ -204,16 +206,17 @@ All output is simple, readable, and timestamped.
 
 ---
 
-## 13. Future Product Roadmap (Post‑MVP)
+## 13. Product Roadmap
 
-| Version | Feature                                                             |
-|---------|---------------------------------------------------------------------|
-| v1.1    | Add group stage simulation + group draw probabilities.              |
-| v1.2    | Simple web dashboard (Flask + bar chart).                           |
-| v1.3    | Replace Elo with XGBoost model using historical match features.     |
-| v2.0    | Real‑time push notifications (webhooks) for probability swings.     |
+| Version | Feature | Status |
+|---------|---------|--------|
+| v1.0    | Core MVP: Elo ratings, knockout simulation, API polling, colored console output | ✅ Shipped 2026-06-14 |
+| v1.1    | Full 48-team format: 12 groups, Annex C routing, BSD API integration, group standings | ✅ Shipped 2026-06-14 |
+| v1.2    | Simple web dashboard (Flask + bar chart) | 📋 Planned |
+| v1.3    | Replace Elo with XGBoost model using historical match features | 📋 Planned |
+| v2.0    | Real‑time push notifications (webhooks) for probability swings | 📋 Planned |
 
-But the MVP (v1.0) delivers the core promise: **a live, self‑updating tournament predictor in your terminal**.
+The MVP (v1.0) delivers the core promise: **a live, self‑updating tournament predictor in your terminal**. v1.1 extends it to the full 48-team format.
 
 ---
 

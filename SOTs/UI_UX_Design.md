@@ -27,19 +27,23 @@ All console output blocks below are illustrative — actual numbers will vary ba
 The console screen is **not interactive** – it’s a continuous scroll. Information appears in this order:
 
 ```
-1. Header (once at start)
-2. Periodic “no new matches” heartbeat
-3. Match detection + Elo update block
-4. New probabilities block
-5. Error messages (when they occur)
+1. Header (once at start) — updated for 48-team format
+2. Group standings block (12 groups, box-drawing tables)
+3. Third-place bubble (8th vs 9th cutoff)
+4. Periodic “no new matches” heartbeat
+5. Match detection + Elo update block
+6. Group match detection + group standings refresh
+7. New probabilities block
+8. Error messages (when they occur)
 ```
 
-### 3.1 Startup Screen
+### 3.1 Startup Screen (v1.1 48-Team Format)
 ```
 ============================================================
-   WORLD CUP DYNAMIC PREDICTOR – MVP
+   WORLD CUP DYNAMIC PREDICTOR — v1.1
    Polling API every 60 seconds. Press Ctrl+C to stop.
-   Initial Elo ratings loaded. Initial simulation complete.
+   48 teams, 12 groups (72 group matches, 40 bracket matches)
+   495 Annex C scenarios — Initial simulation complete.
 ============================================================
 [2026-06-15 22:00:00] Initial probabilities:
   1. Argentina    34.2%
@@ -49,13 +53,41 @@ The console screen is **not interactive** – it’s a continuous scroll. Inform
   5. England      10.5%
 ```
 
-### 3.2 Heartbeat (no new matches)
+### 3.2 Group Standings Display (v1.1)
+```
+[2026-06-15 22:00:01] GROUP STANDINGS — 12 groups, best 8 third-placed advance
+┌─────────┬────────────────────────────┬───┬───┬───┐
+│ P │ Team                      │ Pts │ GD  │ GS │
+┬───┼────────────────────────────┼───┼───┼───┬
+│ 1  │ Mexico                    │ 9   │ +5  │ 7  │
+│ 2  │ Italy                     │ 6   │ +2  │ 5  │
+│ 3  │ Chile                     │ 3   │ -2  │ 3  │
+│ 4  │ South Africa              │ 0   │ -5  │ 1  │
+└─────────┴────────────────────────────┴───┴───┴───┘
+```
+
+All 12 groups (A–L) displayed stacked vertically with horizontal separators.
+Columns: Position (P), Team (28-char width), Points (Pts), Goal Difference (GD), Goals Scored (GS).
+
+### 3.3 Third-Place Bubble Indicator (v1.1)
+```
+[2026-06-15 22:00:01] Third-place bubble:
+  8. Ghana  3 pts  GD +0  ADVANCES
+  9. Panama  3 pts  GD -2  OUT
+  Cutoff margin: GD = 2
+```
+- Ranks all 12 third-placed teams by Pts → GD → GS
+- Team 8 highlighted in green with ADVANCES label
+- Team 9 highlighted in red with OUT label
+- Shows the tiebreaker metric that separates the cutoff
+
+### 3.4 Heartbeat (no new matches)
 ```
 [2026-06-15 22:01:00] Polling... no new matches.
 [2026-06-15 22:02:00] Polling... no new matches.
 ```
 
-### 3.3 Match Detection & Elo Update (highlighted block)
+### 3.5 Match Detection & Elo Update (highlighted block)
 ```
 [2026-06-15 22:03:00] NEW MATCH DETECTED!
    Argentina 2 - 1 Nigeria
@@ -65,7 +97,7 @@ The console screen is **not interactive** – it’s a continuous scroll. Inform
    Nigeria:   1850 → 1838 (-12)
 ```
 
-### 3.4 Updated Probabilities
+### 3.6 Updated Probabilities
 ```
 [2026-06-15 22:03:02] Re‑simulating (50000 runs)...
 [2026-06-15 22:03:07] UPDATED PROBABILITIES:
@@ -76,7 +108,7 @@ The console screen is **not interactive** – it’s a continuous scroll. Inform
   5. England      10.7%  ▲ +0.2
 ```
 
-### 3.5 Error Message (temporary, does not spam)
+### 3.7 Error Message (temporary, does not spam)
 ```
 [2026-06-15 22:10:00] ⚠ API error: timeout. Retry in 60s. Using cached data.
 ```
@@ -206,12 +238,15 @@ Test the console UI with these scenarios:
 
 ## 10. Deliverables for UI/UX (MVP)
 
-- [ ] Console output follows the format described in section 3.
-- [ ] ANSI colors implemented (with fallback).
-- [ ] Symbols (▲, ▼, ⚠) used even when colors off.
-- [ ] `--no-color` flag available.
-- [ ] `--once` flag for single run.
-- [ ] Graceful shutdown on `Ctrl+C` with final probabilities.
+- [x] Console output follows the format described in section 3.
+- [x] ANSI colors implemented (with fallback).
+- [x] Symbols (▲, ▼, ⚠) used even when colors off.
+- [x] Box-drawing group standings table (12 groups, 4 columns).
+- [x] Third-place bubble indicator with ADVANCES/OUT color coding.
+- [x] Updated header for 48-team format.
+- [x] `--no-color` flag available.
+- [x] `--once` flag for single run.
+- [x] Graceful shutdown on `Ctrl+C` with final probabilities.
 
 These are **lightweight** to implement and dramatically improve perceived quality.
 
@@ -221,7 +256,7 @@ These are **lightweight** to implement and dramatically improve perceived qualit
 
 | Version | Enhancement                                         |
 |---------|-----------------------------------------------------|
-| v1.1    | Progress bar during Monte Carlo simulation (`tqdm` library). |
+| v1.2    | Progress bar during Monte Carlo simulation (`tqdm` library). |
 | v1.2    | Save output to a log file (`--log predictions.log`). |
 | v1.3    | Simple curses‑based live dashboard (refreshing in place). |
 | v2.0    | Full web dashboard as described in section 7.      |

@@ -12,18 +12,27 @@ The plan is designed for a **single B.Tech student** working 4–6 hours per day
 
 ## 2. Development Phases Overview
 
-| Phase | Name                          | Duration | Key Deliverable                          |
-|-------|-------------------------------|----------|------------------------------------------|
-| 0     | Environment Setup             | 0.5 day  | Working Python environment + API key     |
-| 1     | Data & State Layer            | 1 day    | JSON files + `state.py` module           |
-| 2     | Elo & Simulation Engine       | 1.5 days | `elo.py` + `simulator.py` (unit tested)  |
-| 3     | Live API Integration          | 1 day    | `fetcher.py` + mapping logic             |
-| 4     | Main Loop & Output            | 1 day    | `main.py` + `output.py` (colored console)|
-| 5     | Error Handling & Persistence  | 0.5 day  | Retries, graceful shutdown, state saves  |
-| 6     | Integration Testing & Debug   | 1 day    | End‑to‑end working script                |
-| 7     | Documentation & Polish        | 0.5 day  | README, comments, final demo             |
+| Phase | Name                          | Duration | Key Deliverable                          | Status |
+|-------|-------------------------------|----------|------------------------------------------|--------|
+| 0     | Environment Setup             | 0.5 day  | Working Python environment + API key     | ✅ Complete |
+| 1     | Data & State Layer            | 1 day    | JSON files + `state.py` module           | ✅ Complete |
+| 2     | Elo & Simulation Engine       | 1.5 days | `elo.py` + `simulator.py` (unit tested)  | ✅ Complete |
+| 3     | Live API Integration          | 1 day    | `fetcher.py` + mapping logic             | ✅ Complete |
+| 4     | Main Loop & Output            | 1 day    | `main.py` + `output.py` (colored console)| ✅ Complete |
+| 5     | Error Handling & Persistence  | 0.5 day  | Retries, graceful shutdown, state saves  | ✅ Complete |
+| 6     | Integration Testing & Debug   | 1 day    | End‑to‑end working script                | ✅ Complete |
+| 7     | Documentation & Polish        | 0.5 day  | README, comments, final demo             | ✅ Complete |
 
 **Buffer:** 1 day for unexpected issues → total ~8 days.
+
+### v1.1 Phases (48-Team Format) — All Complete 2026-06-14
+
+| Phase | Name | Key Deliverable | Status |
+|-------|------|-----------------|--------|
+| 7     | 48-Team Dataset & Group Definitions | teams.json (48 teams), groups.json, annex_c.json, team_aliases.json | ✅ Complete |
+| 8     | Group Stage Simulation Engine | Poisson scoring, 7-step tiebreaker, Annex C routing, performance benchmark | ✅ Complete |
+| 9     | Knockout Bracket & Full Pipeline | 104-match pipeline, R32 slot descriptors, run_full_simulation() | ✅ Complete |
+| 10    | Integration, Tests & BSD Verification | Group match ingestion, standings display, 212 tests, SOT batch update | ✅ Complete |
 
 ---
 
@@ -285,25 +294,33 @@ If extra day needed: use buffer.
 
 ---
 
-## 9. Definition of Done (for the entire MVP)
+## 9. Definition of Done (for the entire MVP + v1.1)
 
-- [ ] Running `python main.py` displays initial probabilities.
-- [ ] When a real match finishes, within 2 minutes the script detects it, updates Elo, and reprints probabilities with deltas.
-- [ ] The script can run for 24+ hours (or simulated match day) without crashing.
-- [ ] After restarting, previously played matches are not re‑processed.
-- [ ] All JSON files remain valid and human‑readable.
-- [ ] A `README.md` exists with setup and run instructions.
-- [ ] All code is committed to a GitHub repository with the documentation files (`MVP.md`, `PRD.md`, `TRD.md`, `UI_UX_Design.md`, `Appflow.md`, `Backend_Schema.md`, `Implementation_plan.md`).
+- [x] Running `python main.py` displays initial probabilities.
+- [x] When a real match finishes, within 2 minutes the script detects it, updates Elo, and reprints probabilities with deltas.
+- [x] The script can run for 24+ hours (or simulated match day) without crashing.
+- [x] After restarting, previously played matches are not re‑processed.
+- [x] All JSON files remain valid and human‑readable.
+- [x] A `README.md` exists with setup and run instructions.
+- [x] All code is committed to a GitHub repository with the documentation files.
+- [x] **v1.1**: 48-team format with group stage, Annex C routing, BSD API integration, group standings display, third-place bubble, 212 passing tests.
 
 ---
 
-## 10. Next Steps After MVP (Optional Enhancements)
+## 10. Next Steps After v1.1 (Future Enhancements)
 
-- Add group stage simulation.
-- Replace Elo with XGBoost.
-- Build a web dashboard (Flask + Chart.js).
-- Add unit tests with `pytest` for all modules (beyond basic tests).
-- Containerise with Docker for easy deployment.
+Completed in v1.1:
+- ✅ Group stage simulation (12 groups, Poisson scoring, 7-step tiebreaker)
+- ✅ Annex C third-place routing (495-entry lookup table)
+- ✅ BSD API integration (group match ingestion, played_groups.json)
+- ✅ Group standings console display + third-place bubble indicator
+- ✅ 212 passing pytest tests across 14 modules
+
+Planned for v2.0+:
+- 📋 Replace Elo with XGBoost.
+- 📋 Build a web dashboard (Flask + Chart.js).
+- 📋 Add historical probability logging.
+- 📋 Containerise with Docker for easy deployment.
 
 But for now – **focus on the plan above**. Build the MVP first.
 

@@ -12,8 +12,10 @@ This document defines the **technical architecture, data models, algorithms, API
 
 The system is a **console‑based Python application** that:
 - Polls a public football API at regular intervals.
-- Detects newly finished World Cup matches.
-- Updates team Elo ratings based on actual results.
+- Detects newly finished World Cup matches (both group and knockout).
+- Updates team Elo ratings based on actual knockout results.
+- Stores group match results separately in `played_groups.json`.
+- Displays 12 group standings tables with third-place bubble indicator.
 - Re‑runs a Monte Carlo simulation of the remaining tournament.
 - Outputs updated championship probabilities.
 
@@ -24,16 +26,26 @@ No graphical interface, no database – only JSON for state persistence.
 ## 3. High‑Level Architecture
 
 ```
-[External API] ──► [Fetcher Module] ──► [State Manager (JSON)]
-                                              │
-                                              ▼
-                                    [Elo Updater Module]
-                                              │
-                                              ▼
-                                    [Simulation Engine]
-                                              │
-                                              ▼
-                                    [Console Output]
+[BSD API] ──► [Fetcher Module]
+                  │
+          ┌───────┴────────┐
+          ▼                 ▼
+  [Group Matches]    [Knockout Matches]
+          │                 │
+          ▼                 ▼
+  [played_groups.json]  [played.json]
+          │                 │
+          ▼                 ▼
+  [Group Standings]   [Elo Updater]
+          │                 │
+          └───────┬─────────┘
+                  ▼
+        [Simulation Engine]
+          (groups → Annex C → bracket)
+                  │
+                  ▼
+        [Console Output]
+    (standings + probabilities)
 ```
 
 All modules are invoked by a main loop inside `main.py`.
@@ -94,19 +106,32 @@ Represents the knockout stage as a nested structure:
 
 ### 5.1 Fetcher Module (`fetcher.py`)
 
-**Responsibility:** Retrieve finished matches from the external API.
+**Responsibility:** Retrieve finished matches from the external API and route by match type.
 
-**Function:** `fetch_new_results(last_known_match_ids: set) -> list[MatchResult]`
+**Functions:**
+- `fetch_new_results(last_known_match_ids: set) -> list[MatchResult]` — Fetch and return new knockout matches
+- `process_group_matches(raw_matches, teams, groups, aliases, played_group_ids, played_bsd_event_ids) -> list[dict]` — Process group match responses from BSD API
 
-**API Choice:** Football-Data.org (free tier, API key required)  
-- Endpoint: `https://api.football-data.org/v4/matches?competition=WC&status=FINISHED`
+**API Choice:** Bzzoiro Sports Data (BSD, free tier, API key required)  
+- Endpoint: `https://sports.bzzoiro.com/api/events/?status=finished&league_id=27`
+- Auth: `Authorization: Token {api_key}` header
 - Rate limit: 10 requests per minute (free tier). Our polling interval will be 60 seconds → 1 request/min, well within limit.
 
 **Pseudo‑logic:**
-1. Send GET request with header `X-Auth-Token`.
+1. Send GET request with header `Authorization: Token <api_key>`.
 2. Parse JSON response.
-3. Filter matches where `status == "FINISHED"` and `match_id` not in `last_known_match_ids`.
-4. Return list of `MatchResult` objects.
+3. For each match: check `group_name` field.
+   - Non-null `group_name` → route to `process_group_matches()` (group stage)
+   - Null `group_name` → route to existing `process_matches()` (knockout)
+4. Filter matches where `id` not in `last_known_match_ids`.
+5. Return list of `MatchResult` objects.
+
+**`process_group_matches()` logic:**
+1. Extract group letter from `group_name` field (e.g., "Group A" → "A")
+2. Normalize team names via alias lookup (including all group team names from `groups.json`)
+3. Resolve match slot via team pair + group letter against `groups.json` match slots
+4. Dedup via BSD event `id` (in-memory set) and `match_id` (persisted `played_groups.json`)
+5. Return processed group match dicts for persistence in `played_groups.json`
 
 **MatchResult schema:**
 ```python
@@ -176,6 +201,8 @@ Returns a new dictionary with updated Elo values for the two teams.
 - `load_played_matches() -> dict` – reads `played.json`
 - `save_played_matches(played_matches)` – writes to `played.json` after each update
 - `save_teams(teams_data)` – writes updated Elo ratings
+- `load_played_groups() -> dict` – reads `played_groups.json` (group match results)
+- `save_played_groups(played_groups)` – writes to `played_groups.json` atomically
 
 **File format:** JSON (human‑readable, easy to debug).
 
@@ -214,30 +241,56 @@ while True:
 
 ---
 
-## 6. API Contract (Football-Data.org)
+## 6. API Contract (BSD — Bzzoiro Sports Data)
 
 **Request:**
 ```
-GET https://api.football-data.org/v4/matches?competition=WC&status=FINISHED
-Headers: X-Auth-Token: <your_api_key>
+GET https://sports.bzzoiro.com/api/events/?status=finished&league_id=27
+Headers: Authorization: Token <your_api_key>
 ```
 
 **Response snippet (relevant fields):**
 ```json
 {
-  "matches": [
+  "count": 200,
+  "next": "https://sports.bzzoiro.com/api/events/?page=2&status=finished&league_id=27",
+  "previous": null,
+  "results": [
     {
       "id": 123456,
-      "homeTeam": {"name": "Argentina"},
-      "awayTeam": {"name": "Nigeria"},
-      "score": {"fullTime": {"home": 2, "away": 1}},
-      "status": "FINISHED"
+      "status": "finished",
+      "home_team": "Argentina",
+      "away_team": "Nigeria",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2026-06-15T22:00:00Z",
+      "group_name": null,
+      "round_number": 1,
+      "round_name": "Round of 16"
+    },
+    {
+      "id": 123457,
+      "status": "finished",
+      "home_team": "Mexico",
+      "away_team": "South Africa",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2026-06-14T17:00:00Z",
+      "group_name": "Group A",
+      "round_number": 1,
+      "round_name": "Group Stage"
     }
   ]
 }
 ```
 
-**Match ID mapping:** We convert API’s `id` to our internal `match_id` (e.g., `R16_1`) using a static mapping file `api_id_to_bracket.json`.
+**Route discrimination:** The `group_name` field determines match type:
+- `group_name` is non-null → group match → routed to `process_group_matches()`
+- `group_name` is null → knockout match → routed to existing `process_matches()`
+
+**Match ID mapping for knockout:** We convert API’s `id` to our internal `match_id` (e.g., `R16_1`) using a static mapping file `api_id_to_bracket.json`.
+
+**Group match slot resolution:** Team pair + group letter matched against `groups.json` match slot definitions via set equality of normalized team names.
 
 ---
 
@@ -272,7 +325,7 @@ Use `pytest` for unit/integration tests.
 **Requirements:**
 - Python 3.10+
 - Internet connection for API calls
-- API key from [Football-Data.org](https://www.football-data.org/) (free)
+- API key from [BSD Sports](https://sports.bzzoiro.com/account/) (free)
 
 **Run command:**
 ```bash
@@ -297,7 +350,8 @@ python main.py
 | Risk                                      | Mitigation                                                               |
 |-------------------------------------------|--------------------------------------------------------------------------|
 | API rate limit exceeded                   | Poll every 60 seconds; free tier allows 10/min → safe.                   |
-| API returns inconsistent team names       | Use a team name mapping table (e.g., "USA" vs "United States").          |
+| API returns inconsistent team names       | Use a team name mapping table (`team_aliases.json`) covering all 48 teams. |
+| Group match team names unmatchable        | Include all group team names from `groups.json` in alias lookup (Pitfall 2 guard). |
 | Simulation too slow                       | Use efficient data structures (no deep copies of large dicts each run).  |
 | Real match goes to penalties (draw after 120 min) | Treat as win/loss based on penalty shootout winner. API provides winner. |
 | Script crashes at 3 AM                    | Wrap main loop in `try/except`, log error, and continue.                 |

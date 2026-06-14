@@ -116,16 +116,50 @@ Example Elo values shown below — actual values will differ based on live match
 
 **Why needed:** The external API uses numeric IDs. Our bracket uses human‑readable IDs. This mapping bridges them.
 
-### 2.5 `constants.py` – Hardcoded parameters (no JSON)
+### 2.5 `played_groups.json` – Record of completed group stage matches
+
+```json
+{
+  "GS_A_01": {
+    "match_id": "GS_A_01",
+    "team_a": "Mexico",
+    "team_b": "South Africa",
+    "winner": "Mexico",
+    "home_score": 2,
+    "away_score": 1,
+    "completed_at": "2026-06-14T17:00:00Z"
+  },
+  "GS_A_02": {
+    "match_id": "GS_A_02",
+    "team_a": "Italy",
+    "team_b": "Chile",
+    "winner": null,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-06-14T17:00:00Z"
+  }
+}
+```
+
+**Schema rules:**
+- Key = `match_id` from `groups.json` (e.g., `GS_A_01`, `GS_L_06`).
+- `winner`: string or null (null for draws — group matches can end in draws).
+- `home_score`, `away_score`: integers.
+- `completed_at`: ISO 8601 UTC timestamp.
+- Initial state: empty `{}` on first run (graceful bootstrap).
+
+### 2.6 `constants.py` – Hardcoded parameters (no JSON)
 
 ```python
 # constants.py — example defaults, override as needed
 K_FACTOR = 60          # typical range 20–100
 POLL_INTERVAL_SECONDS = 60
 SIMULATION_COUNT = 50000
-API_URL = "https://api.football-data.org/v4/matches?competition=WC&status=FINISHED"
-API_KEY_ENV_VAR = "FOOTBALL_API_KEY"
+API_URL = "https://sports.bzzoiro.com/api/events/?status=finished&league_id=27"
+API_KEY_ENV_VAR = "BSD_API_KEY"
 DEFAULT_ELO_START = 2000  # default for new teams
+GROUP_COUNT = 12
+MATCHES_PER_GROUP = 6
 ```
 
 ---
@@ -173,35 +207,54 @@ probabilities: dict[str, float] = {
 ## 4. API Contract (External)
 
 **Endpoint:**  
-`GET https://api.football-data.org/v4/matches?competition=WC&status=FINISHED`
+`GET https://sports.bzzoiro.com/api/events/?status=finished&league_id=27`
 
 **Headers:**
 ```
-X-Auth-Token: <your_api_key>
+Authorization: Token <your_api_key>
 ```
 
 **Response schema (relevant subset):**
 ```json
 {
-  "matches": [
+  "count": 200,
+  "next": "https://sports.bzzoiro.com/api/events/?page=2&status=finished&league_id=27",
+  "previous": null,
+  "results": [
     {
       "id": 123456,
-      "status": "FINISHED",
-      "homeTeam": { "name": "Argentina" },
-      "awayTeam": { "name": "Nigeria" },
-      "score": {
-        "fullTime": { "home": 2, "away": 1 }
-      },
-      "winner": "HOME_TEAM"   // or "AWAY_TEAM" or "DRAW" (but knockout has winner)
+      "status": "finished",
+      "home_team": "Argentina",
+      "away_team": "Nigeria",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2026-06-15T22:00:00Z",
+      "group_name": null,
+      "round_number": 1,
+      "round_name": "Round of 16"
+    },
+    {
+      "id": 123457,
+      "status": "finished",
+      "home_team": "Mexico",
+      "away_team": "South Africa",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2026-06-14T17:00:00Z",
+      "group_name": "Group A",
+      "round_number": 1,
+      "round_name": "Group Stage"
     }
   ]
 }
 ```
 
 **Field mapping:**
-- API `id` → mapped via `api_id_mapping.json` to our `match_id`.
-- `homeTeam.name` and `awayTeam.name` → may need manual cleaning (e.g., "USA" vs "United States").
-- `winner` → "HOME_TEAM" means `homeTeam` won; "AWAY_TEAM" means `awayTeam` won.
+- `group_name` discrimination:
+  - Non-null (e.g., `"Group A"`) → group match → routed to `process_group_matches()`
+  - Null → knockout match → mapped via `api_id_mapping.json` to `match_id` (e.g., `R16_1`)
+- `home_team` and `away_team` → normalized via `team_aliases.json` lookup
+- `winner` → not directly provided by BSD; determined from `home_score` vs `away_score`
 
 ---
 
@@ -212,7 +265,7 @@ X-Auth-Token: <your_api_key>
 ```python
 def fetch_new_results(last_known_ids: set[str]) -> list[dict]:
     """
-    Poll API and return list of newly finished matches.
+    Poll API and return list of newly finished knockout matches.
     Each match dict: {
         "match_id": str,
         "team_a": str,
@@ -220,6 +273,24 @@ def fetch_new_results(last_known_ids: set[str]) -> list[dict]:
         "winner": str,   # team name
         "home_score": int,
         "away_score": int
+    }
+    """
+
+def process_group_matches(raw_matches: list[dict], teams: dict, groups: dict,
+                           aliases: dict, played_group_ids: set[str],
+                           played_bsd_event_ids: set[int]) -> list[dict]:
+    """
+    Process BSD API response entries with non-null group_name.
+    Routes each match to the correct group slot in groups.json.
+    Returns list of group match dicts for played_groups.json.
+    Each entry: {
+        "match_id": str,     # e.g. "GS_A_01"
+        "team_a": str,
+        "team_b": str,
+        "winner": str|None,  # None for draws
+        "home_score": int,
+        "away_score": int,
+        "completed_at": str  # ISO 8601
     }
     """
 ```
@@ -269,6 +340,12 @@ def save_played_matches(played_details: dict) -> None:
 
 def load_api_id_mapping() -> dict:
     """Loads api_id_mapping.json."""
+
+def load_played_groups() -> dict:
+    """Loads played_groups.json. Returns empty dict if not found."""
+
+def save_played_groups(played_groups: dict) -> None:
+    """Writes to played_groups.json atomically."""
 ```
 
 ### 5.5 `output.py`
@@ -305,12 +382,16 @@ def print_error(msg: str) -> None:
 
 ## 7. Schema Evolution Plan (Post‑MVP)
 
-If later we add:
-- **Group stage** → new file `groups.json` with group tables and standings.
+Already implemented:
+- ✅ **Group stage** (`groups.json`, `annex_c.json`, `team_aliases.json`, `played_groups.json`)
+- ✅ **48-team dataset** with Elo ratings, group assignments
+- ✅ **BSD API integration** replacing Football-Data.org
+
+If we later add:
 - **Player data** → `players.json` with individual Elo (advanced).
 - **Historical logs** → `history/` folder with timestamped snapshots of probabilities.
 
-For MVP, these schemas are frozen.
+These schemas remain frozen for future versions.
 
 ---
 
@@ -353,13 +434,13 @@ For MVP, these schemas are frozen.
 ## 9. Security & Secrets
 
 - API key **never** stored in JSON files.  
-- Read from environment variable `FOOTBALL_API_KEY`.  
+- Read from environment variable `BSD_API_KEY`.  
 - Example in `main.py`:
   ```python
   import os
-  API_KEY = os.environ.get("FOOTBALL_API_KEY")
+  API_KEY = os.environ.get("BSD_API_KEY")
   if not API_KEY:
-      raise ValueError("Set FOOTBALL_API_KEY environment variable")
+      raise ValueError("Set BSD_API_KEY environment variable")
   ```
 
 ---
@@ -367,33 +448,34 @@ For MVP, these schemas are frozen.
 ## 10. Backend Schema Diagram (Textual)
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   teams.json    │     │  bracket.json   │     │  played.json    │
-│ ┌─────────────┐ │     │ ┌─────────────┐ │     │ ┌─────────────┐ │
-│ │Argentina:   │ │     │ │R16_1:       │ │     │ │R16_1:       │ │
-│ │  elo: 2112  │ │     │ │  Arg vs Nig │ │     │ │  winner: Arg│ │
-│ │  eliminated:│ │     │ │  winner:null│ │     │ │  scores     │ │
-│ │  false      │ │     │ └─────────────┘ │     │ └─────────────┘ │
-│ └─────────────┘ │     │ ┌─────────────┐ │     │                 │
-│ ┌─────────────┐ │     │ │QF_1:        │ │     │                 │
-│ │France:      │ │     │ │  src:R16_1, │ │     │                 │
-│ │  elo: 2075  │ │     │ │  R16_2      │ │     │                 │
-│ └─────────────┘ │     │ └─────────────┘ │     │                 │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-         ▲                       ▲                       ▲
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                         ┌───────┴───────┐
-                         │   main.py     │
-                         │ (in‑memory    │
-                         │  structures)  │
-                         └───────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌───────────────────┐
+│   teams.json    │     │  bracket.json   │     │  played.json    │     │ played_groups.json│
+│ ┌─────────────┐ │     │ ┌─────────────┐ │     │ ┌─────────────┐ │     │ ┌───────────────┐ │
+│ │Argentina:   │ │     │ │R16_1:       │ │     │ │R16_1:       │ │     │ │GS_A_01:      │ │
+│ │  elo: 2112  │ │     │ │  Arg vs Nig │ │     │ │  winner: Arg│ │     │ │  Mexico 2-1  │ │
+│ │  eliminated:│ │     │ │  winner:null│ │     │ │  scores     │ │     │ │  S.Africa     │ │
+│ │  false      │ │     │ └─────────────┘ │     │ └─────────────┘ │     │ └───────────────┘ │
+│ └─────────────┘ │     │ ┌─────────────┐ │     │                 │     │                   │
+│ ┌─────────────┐ │     │ │QF_1:        │ │     │                 │     │ ┌───────────────┐ │
+│ │France:      │ │     │ │  src:R16_1, │ │     │                 │     │ │GS_A_02:      │ │
+│ │  elo: 2075  │ │     │ │  R16_2      │ │     │                 │     │ │  Italy 1-1   │ │
+│ └─────────────┘ │     │ └─────────────┘ │     │                 │     │ │  Chile       │ │
+└─────────────────┘     └─────────────────┘     └─────────────────┘     └───────────────────┘
+         ▲                       ▲                       ▲                       ▲
+         │                       │                       │                       │
+         └───────────────────────┼───────────────────────┼───────────────────────┘
+                                 │                       │
+                         ┌───────┴───────────────────────┴───────┐
+                         │            main.py                     │
+                         │    groups → Annex C → bracket          │
+                         │    (in‑memory structures)               │
+                         └────────────────────────────────────────┘
                                  │
                                  ▼
                          ┌───────────────┐
                          │  console      │
                          │  output       │
+                         │  + standings  │
                          └───────────────┘
 ```
 

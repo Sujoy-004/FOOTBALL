@@ -14,48 +14,58 @@ This document describes the **end‑to‑end application flow** of the MVP: how 
 START
   │
   ▼
-Load initial state (Elo ratings, bracket, played matches from JSON)
+Load initial state (Elo, bracket, groups, annex C, played matches from JSON)
   │
   ▼
-Run initial Monte Carlo simulation → print first probabilities
+Run initial Monte Carlo simulation (groups → Annex C → bracket) → print first probabilities + group standings
   │
   ▼
 ┌─────────────────────────────────────────┐
 │          MAIN LOOP (infinite)           │
 │  ┌─────────────────────────────────┐    │
-│  │ 1. Poll API for finished matches │    │
+│  │ 1. Poll BSD API for finished    │    │
+│  │    matches (single endpoint)    │    │
 │  └─────────────┬───────────────────┘    │
 │                ▼                         │
 │  ┌─────────────────────────────────┐    │
-│  │ 2. Any new matches?              │    │
+│  │ 2. Split by group_name field    │    │
+│  │    - non-null → group match     │    │
+│  │    - null → knockout match      │    │
+│  └──────┬──────────────┬───────────┘    │
+│         ▼              ▼                │
+│  ┌────────────┐  ┌──────────────┐       │
+│  │ process_   │  │ process_     │       │
+│  │ group_     │  │ matches()    │       │
+│  │ matches()  │  │ (knockout)   │       │
+│  └─────┬──────┘  └──────┬───────┘       │
+│        ▼                ▼               │
+│  ┌────────────────┐  ┌──────────────┐   │
+│  │ Save to        │  │ Update Elo   │   │
+│  │ played_groups  │  │ + save to    │   │
+│  │ .json          │  │ played.json  │   │
+│  └───────┬────────┘  └──────┬───────┘   │
+│          ▼                  │           │
+│  ┌──────────────────────┐   │           │
+│  │ Print/refresh group  │   │           │
+│  │ standings (12 groups)│   │           │
+│  │ + third-place bubble │   │           │
+│  └───────┬──────────────┘   │           │
+│          └──────┬───────────┘           │
+│                 ▼                        │
+│  ┌─────────────────────────────────┐    │
+│  │ 3. Re‑run Monte Carlo           │    │
+│  │    simulation (50,000 iters)    │    │
+│  │    using full pipeline:         │    │
+│  │    groups→Annex C→R32→bracket   │    │
 │  └─────────────┬───────────────────┘    │
-│         Yes ──┴── No                    │
-│           ▼        ▼                    │
-│  ┌────────────┐ ┌──────────────┐        │
-│  │ Process    │ │ Skip update  │        │
-│  │ new matches│ │ (use cached) │        │
-│  └─────┬──────┘ └──────┬───────┘        │
-│        ▼               │                │
-│  ┌─────────────────────────┐            │
-│  │ 3. Update Elo ratings    │            │
-│  │    for each new match    │            │
-│  └─────────────┬───────────┘            │
 │                ▼                         │
 │  ┌─────────────────────────────────┐    │
-│  │ 4. Save state to JSON            │    │
+│  │ 4. Print updated championship   │    │
+│  │    probabilities + deltas       │    │
 │  └─────────────┬───────────────────┘    │
 │                ▼                         │
 │  ┌─────────────────────────────────┐    │
-│  │ 5. Re‑run Monte Carlo simulation│    │
-│  │    (N iterations, e.g., 50,000)  │    │
-│  └─────────────┬───────────────────┘    │
-│                ▼                         │
-│  ┌─────────────────────────────────┐    │
-│  │ 6. Print updated probabilities   │    │
-│  └─────────────┬───────────────────┘    │
-│                ▼                         │
-│  ┌─────────────────────────────────┐    │
-│  │ 7. Sleep N seconds (e.g., 60)    │    │
+│  │ 5. Sleep N seconds (e.g., 60)    │    │
 │  └─────────────────────────────────┘    │
 │                │                         │
 │                └──────────┐              │
@@ -69,27 +79,37 @@ Run initial Monte Carlo simulation → print first probabilities
 ## 3. Detailed Sequence Diagram (Module Interactions)
 
 ```
-User          main.py         fetcher       state_mgr       elo_updater    simulator
-  │               │              │              │               │             │
-  │──python main.py─────────────▶│              │               │             │
-  │               │──load_state()─────────────▶│               │             │
-  │               │◀───────────────────────────│               │             │
-  │               │──initial_simulate()─────────────────────────────────────▶│
+User          main.py         fetcher       state_mgr       groups_display   simulator
+  │               │              │              │               │               │
+  │──python main.py─────────────▶│              │               │               │
+  │               │──load_state()─────────────▶│               │               │
+  │               │  (teams, bracket, groups,  │               │               │
+  │               │   annex_c, played,         │               │               │
+  │               │   played_groups)           │               │               │
+  │               │◀───────────────────────────│               │               │
+  │               │──initial_simulate()──────────────────────────────────────▶│
   │               │◀─────────────────────────────────────────────────────────│
+  │               │──print_group_standings()────────────────▶ (console)      │
   │               │──print_probs()▶ (console)                                 │
   │               │              │              │               │             │
   │               │◀─────LOOP─────────────────────────────────────────────────│
   │               │──poll_api()──▶│              │               │             │
   │               │◀──results────│              │               │             │
   │               │              │              │               │             │
-  │               │──for each new match:────────▶│               │             │
+  │               │──split by group_name────────▶                              │
+  │               │  non-null → process_group_matches()                        │
+  │               │  null → process_matches()                                  │
   │               │              │              │               │             │
-  │               │──update_elo(match)──────────────────────────▶│             │
-  │               │◀──────────────────────────────────────────────│             │
+  │               │──for each new group match:──▶                              │
+  │               │  save to played_groups.json  │                            │
+  │               │  --print_group_standings()──▶ (console)                   │
   │               │              │              │               │             │
-  │               │──save_state()───────────────▶│               │             │
+  │               │──for each new knockout match:─▶                            │
+  │               │──update_elo(match)───────────────────────────────────────▶│
+  │               │  save to played.json         │                            │
   │               │              │              │               │             │
-  │               │──run_simulation()────────────────────────────────────────▶│
+  │               │──run_full_simulation()───────────────────────────────────▶│
+  │               │  (groups→Annex C→bracket)                                 │
   │               │◀─────────────────────────────────────────────────────────│
   │               │──print_probs()▶ (console)                                 │
   │               │              │              │               │             │
@@ -137,12 +157,15 @@ Each match in the bracket transitions through states as the real tournament prog
 
 | Stage                    | Input                            | Output                                    | Storage               |
 |--------------------------|----------------------------------|-------------------------------------------|-----------------------|
-| **Initialisation**       | Hardcoded Elo, bracket, empty played.json | Initialised `teams` dict, `bracket` tree | `teams.json`, `bracket.json` |
-| **API polling**          | HTTP GET request                 | List of finished matches (JSON)           | None (volatile)       |
-| **Match processing**     | New match result                 | Updated Elo ratings for two teams         | `teams.json` (rewritten) |
+| **Initialisation**       | Hardcoded Elo, bracket, groups, annex_c, empty played.json/played_groups.json | Initialised `teams` dict, `bracket` tree, groups data | `teams.json`, `bracket.json`, `groups.json`, `annex_c.json` |
+| **API polling**          | HTTP GET `sports.bzzoiro.com/api/events/` | List of finished matches (JSON) with `group_name` field | None (volatile)       |
+| **Match routing**        | `group_name` field               | Group match → `process_group_matches()`; null → `process_matches()` | None (runtime decision) |
+| **Group match processing** | `group_name` non-null match     | New entry in `played_groups.json`, group standings refresh | `played_groups.json` |
+| **Knockout match processing** | `group_name` null match       | Updated Elo ratings for two teams          | `teams.json` (rewritten), `played.json` |
 | **State saving**         | Updated Elo + new match result   | Updated `teams.json` + `played.json`      | Disk (JSON files)     |
-| **Simulation**           | Current Elo + bracket + played matches | Probabilities per team              | Memory (printed)      |
-| **Output**               | Probabilities                    | Formatted console output                   | Console               |
+| **Simulation**           | Current Elo + bracket + groups + played + played_groups | Probabilities per team via full pipeline | Memory (printed)      |
+| **Group standings**      | `compute_standings()` + `played_groups` | 12-group box-drawing table + third-place bubble | Console               |
+| **Output**               | Probabilities                    | Formatted console output (header + standings + probs) | Console               |
 
 **No database** – all persistence via JSON files.
 
