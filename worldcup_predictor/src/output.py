@@ -10,6 +10,11 @@ from typing import Callable
 from src.constants import POLL_INTERVAL
 
 
+# Ensure stdout uses UTF-8 for Unicode symbols (▲, ▼, ⚠, →) on Windows
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+
 def _supports_color() -> bool:
     """Return True if stdout is a TTY (ANSI codes supported)."""
     return sys.stdout.isatty()
@@ -192,5 +197,5 @@ def print_shutdown_banner(probs: dict[str, dict[str, float]]) -> None:
 
 
 def print_error(message: str) -> None:
-    """Print bold red error with warning prefix and timestamp."""
-    print(f"{_timestamp()} {_bold_red(f'⚠ {message}')}")
+    """Print bold red error with warning prefix and timestamp to stderr."""
+    print(f"{_timestamp()} {_bold_red(f'⚠ {message}')}", file=sys.stderr)

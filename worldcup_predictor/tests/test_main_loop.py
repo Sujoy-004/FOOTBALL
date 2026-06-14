@@ -80,7 +80,7 @@ def test_main_loop_clean_shutdown():
     except subprocess.TimeoutExpired:
         proc.kill()
         stdout, _ = proc.communicate()
-    assert "Final Championship Probabilities" in stdout, (
+    assert "FINAL CHAMPIONSHIP PROBABILITIES" in stdout, (
         f"Missing shutdown banner: {stdout!r}"
     )
 

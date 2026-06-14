@@ -279,7 +279,14 @@ class TestError:
     """Tests for print_error()."""
 
     def test_error_format(self):
-        output = _capture(print_error, "API error. Timeout. Retry in 60s. Using cached data.")
+        buf = io.StringIO()
+        real = sys.stderr
+        sys.stderr = buf
+        try:
+            print_error("API error. Timeout. Retry in 60s. Using cached data.")
+        finally:
+            sys.stderr = real
+        output = buf.getvalue()
         assert "⚠" in output
         if _supports_color():
             assert "\033[1;31m" in output, "Bold red for errors"
@@ -301,8 +308,16 @@ class TestTimestampConsistency:
             (print_elo_changes, [elo_updates]),
             (print_heartbeat, []),
             (print_auto_refresh, []),
-            (print_error, ["test error"]),
         ]
         for func, args in funcs_and_args:
             output = _capture(func, *args)
             assert "[20" in output, f"{func.__name__} should have timestamp"
+
+        buf = io.StringIO()
+        real = sys.stderr
+        sys.stderr = buf
+        try:
+            print_error("test error")
+        finally:
+            sys.stderr = real
+        assert "[20" in buf.getvalue(), "print_error should have timestamp"

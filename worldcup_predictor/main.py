@@ -49,16 +49,14 @@ def _run_iteration(teams, bracket, played, api_key, aliases, last_sim_time, last
 
     # Hourly re-sim check: if >3600s since last sim with no new matches, refresh
     if last_sim_time > 0 and now - last_sim_time > 3600:
-        print("\nAuto-refresh simulation (no new matches)")
+        output.print_auto_refresh()
         probs = run_simulation(teams, bracket, played, iterations=50000)
         output.print_probability_table(probs)
         return now, last_request_time, probs
 
     # Fetch matches from API
     last_request_time = time.time()
-    print(f"\n[{time.strftime('%H:%M:%S')}] Polling for new matches...")
     raw = fetch_raw_matches(api_key)
-    print(f"Fetched {len(raw)} matches from API")
 
     # Process new matches
     new_matches = []
@@ -70,24 +68,23 @@ def _run_iteration(teams, bracket, played, api_key, aliases, last_sim_time, last
 
     # Update Elo and state for new matches
     if new_matches:
-        print(f"New matches processed: {len(new_matches)}")
         for m in new_matches:
+            output.print_match_alert(m)
             current_elos = {name: data["elo"] for name, data in teams.items()}
             ratings_update = elo.update_ratings(
                 m["team_a"], m["team_b"], m["winner"], current_elos
             )
+            elo_updates = {}
             for team_name, new_rating in ratings_update.items():
+                old_rating = current_elos[team_name]
+                elo_updates[team_name] = {"old": old_rating, "new": new_rating}
                 teams[team_name]["elo"] = new_rating
+            output.print_elo_changes(elo_updates)
             played[m["match_id"]] = m
-            print(f"  New result: {m['team_a']} {m['home_score']}-{m['away_score']} {m['team_b']}")
-
-        state.save_teams(teams)
-        state.save_played(played)
+            state.save_teams(teams)
+            state.save_played(played)
     else:
-        if raw:
-            print("No new matches from API")
-        else:
-            print("No new matches from API (cached data will be used)")
+        output.print_heartbeat()
 
     # Simulate and print results
     sim_start = time.time()
@@ -111,8 +108,7 @@ def validate_api_key() -> str:
     """
     api_key = os.environ.get("FOOTBALL_API_KEY")
     if not api_key:
-        print("Error: FOOTBALL_API_KEY environment variable not set.", file=sys.stderr)
-        print("Get a free API key at https://www.football-data.org/", file=sys.stderr)
+        output.print_error("FOOTBALL_API_KEY not set. Get a free key at https://www.football-data.org/")
         sys.exit(1)
 
     import requests
@@ -123,7 +119,7 @@ def validate_api_key() -> str:
             timeout=10,
         )
         if resp.status_code == 403:
-            print("Error: Invalid FOOTBALL_API_KEY (HTTP 403).", file=sys.stderr)
+            output.print_error("Invalid FOOTBALL_API_KEY (HTTP 403). Check your key at https://www.football-data.org/")
             sys.exit(1)
         if resp.status_code != 200:
             print(f"Warning: API availability check returned {resp.status_code}, continuing...", file=sys.stderr)
@@ -138,23 +134,17 @@ def main() -> None:
     # Windows Console Host ANSI initialization (Python 3.10/3.11 quirk)
     if sys.platform == "win32":
         os.system("")
-    print("=== World Cup Dynamic Predictor ===")
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 
     try:
         teams = state.load_teams()
-        print(f"Loaded {len(teams)} teams")
-
         bracket = state.load_bracket()
-        print(f"Validated bracket: {len(bracket)} matches")
-
         played = state.load_played()
-        print(f"Played matches: {len(played)}")
-
         api_key = validate_api_key()
         aliases = state.load_aliases()
-        print(f"Loaded team aliases: {len(aliases)} entries")
+
+        output.print_header(teams, bracket, played, aliases)
 
         # Register signal handlers
         signal.signal(signal.SIGINT, _signal_handler)
@@ -184,20 +174,19 @@ def main() -> None:
 
         # Shutdown path
         final_probs = run_simulation(teams, bracket, played, iterations=50000)
-        output.print_probability_table(final_probs)
+        output.print_shutdown_banner(final_probs)
 
         state.save_teams(teams)
         state.save_played(played)
-        print("\nState saved. Goodbye.")
 
     except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        output.print_error(f"Data error: {e}")
         sys.exit(1)
     except FileNotFoundError as e:
-        print(f"Error: File not found: {e}", file=sys.stderr)
+        output.print_error(f"File not found: {e}. Run with valid state files.")
         sys.exit(1)
     except json.JSONDecodeError as e:
-        print(f"Error: Corrupt JSON file: {e}", file=sys.stderr)
+        output.print_error(f"Corrupt JSON file: {e}. Check data/ directory.")
         sys.exit(1)
 
 
