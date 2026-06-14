@@ -321,3 +321,39 @@ class TestTimestampConsistency:
         finally:
             sys.stderr = real
         assert "[20" in buf.getvalue(), "print_error should have timestamp"
+
+
+class TestNoColorFlag:
+    """Tests for --no-color integration with output module (Phase 6)."""
+
+    def test_no_color_true_disables_ansi(self):
+        """Setting output.NO_COLOR = True disables ANSI codes."""
+        import src.output as output_mod
+        output_mod.NO_COLOR = True
+        try:
+            assert output_mod._supports_color() is False, (
+                "NO_COLOR=True should force _supports_color() to False"
+            )
+        finally:
+            output_mod.NO_COLOR = False  # restore for other tests
+
+    def test_no_color_false_defers_to_tty(self):
+        """When NO_COLOR=False, _supports_color() defers to isatty()."""
+        import src.output as output_mod
+        saved = output_mod.NO_COLOR
+        output_mod.NO_COLOR = False
+        try:
+            # Mock isatty to return True — _supports_color should also return True
+            original_isatty = sys.stdout.isatty
+            sys.stdout.isatty = lambda: True
+            try:
+                assert output_mod._supports_color() is True
+            finally:
+                sys.stdout.isatty = original_isatty
+        finally:
+            output_mod.NO_COLOR = saved
+
+    def test_default_is_false(self):
+        """NO_COLOR is False by default on fresh import."""
+        import src.output as output_mod
+        assert output_mod.NO_COLOR is False, "Default NO_COLOR should be False"
