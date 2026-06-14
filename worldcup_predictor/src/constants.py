@@ -35,3 +35,7 @@ ANNEX_C_ENTRIES: int = 495
 
 ANNEX_C_WINNER_GROUPS: tuple[str, ...] = ("A", "B", "D", "E", "G", "I", "K", "L")
 """Group winners that host third-place teams in R32 (derivable from Annex C structure; hardcoded for convenience)."""
+
+EXPECTED_GOALS_BASE_RATE: float = 1.25
+"""Base expected goals per team per match at Elo-neutral conditions (Elo=1500 vs Elo=1500).
+Used by groups.py Poisson model. Historical World Cup group stage average."""
