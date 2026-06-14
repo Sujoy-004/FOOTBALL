@@ -599,3 +599,114 @@ def select_advancers(
         }
 
     return advancers
+
+
+# ─── Annex C R32 match resolution ──────────────────────────────────────
+
+
+def resolve_r32_matchups(
+    advancers: dict[str, dict[int, str | None]],
+    standings: dict[str, list[dict]],
+    third_ranked: list[dict],
+    annex_c: dict,
+) -> dict[str, dict]:
+    """Resolve all 16 Round of 32 matches via group_position and Annex C lookup.
+
+    Per ARCHITECTURE §3.1 algorithm:
+    1. Select top 8 third-placed teams from third_ranked
+    2. Build Annex C key from sorted advancing group letters
+    3. Strip _meta key from annex_c and look up assignment
+    4. Resolve 8 winner-vs-third matches via Annex C assignment
+    5. Resolve 8 fixed matches via group_position slots
+
+    Anti-Pattern 4 guard: winner groups that face third-place teams are
+    derived from the R32 match structure (not hardcoded as a separate list).
+
+    Args:
+        advancers: Output of select_advancers() — {group: {1: winner, 2: ru, 3: 3rd}}.
+        standings: Output of compute_standings() — for full team data per group.
+        third_ranked: Output of rank_third_placed() — sorted best-to-worst.
+        annex_c: Raw Annex C dict from anneex_c.json (may contain _meta key).
+
+    Returns:
+        Dict of 16 match entries: {match_id: {match_id, team_a, team_b}}.
+        Keys are M73 through M88 (inclusive).
+
+    Raises:
+        ValueError: If the Annex C combination key is not found in the table.
+    """
+    # Step 1: Determine advancing third-place groups
+    top8 = third_ranked[:8]
+    advancing_groups = sorted(t["group"] for t in top8)
+
+    # Step 2: Build Annex C key (sorted, comma-separated)
+    key = ",".join(advancing_groups)
+
+    # Step 3: Clean _meta and look up
+    clean_annex: dict = {k: v for k, v in annex_c.items() if k != "_meta"}
+    if key not in clean_annex:
+        raise ValueError(
+            f"Annex C key not found: {key}. "
+            f"This is a data integrity error — all 495 combinations "
+            f"should be present."
+        )
+    assignment: dict[str, str] = clean_annex[key]
+
+    # Build winner_group -> third_group mapping from assignment
+    # e.g. "1A" -> "3H" means Winner A faces third-place from Group H
+    winner_to_third: dict[str, str] = {}
+    for slot_key, third_ref in assignment.items():
+        winner_group = slot_key[1:]  # "1A" -> "A"
+        third_group = third_ref[1:]  # "3H" -> "H"
+        winner_to_third[winner_group] = third_group
+
+    # R32 structure: (match_id, team_a (group, pos), team_b_spec)
+    # team_b_spec is either (group, pos) for fixed matches, or None for Annex C
+    R32_DEFS: list[tuple[str, tuple[str, int], tuple[str, int] | None]] = [
+        ("M73", ("A", 2), ("B", 2)),          # A2 vs B2
+        ("M74", ("E", 1), None),               # E1 vs 3rd(E)
+        ("M75", ("F", 1), ("C", 2)),           # F1 vs C2
+        ("M76", ("C", 1), ("F", 2)),           # C1 vs F2
+        ("M77", ("I", 1), None),               # I1 vs 3rd(I)
+        ("M78", ("E", 2), ("I", 2)),           # E2 vs I2
+        ("M79", ("A", 1), None),               # A1 vs 3rd(A)
+        ("M80", ("L", 1), None),               # L1 vs 3rd(L)
+        ("M81", ("D", 1), None),               # D1 vs 3rd(D)
+        ("M82", ("G", 1), None),               # G1 vs 3rd(G)
+        ("M83", ("K", 2), ("L", 2)),           # K2 vs L2
+        ("M84", ("H", 1), ("J", 2)),           # H1 vs J2
+        ("M85", ("B", 1), None),               # B1 vs 3rd(B)
+        ("M86", ("J", 1), ("H", 2)),           # J1 vs H2
+        ("M87", ("K", 1), None),               # K1 vs 3rd(K)
+        ("M88", ("D", 2), ("G", 2)),           # D2 vs G2
+    ]
+
+    matchups: dict[str, dict] = {}
+
+    for mid, team_a_spec, team_b_spec in R32_DEFS:
+        team_a_group, team_a_pos = team_a_spec
+        team_a = advancers[team_a_group][team_a_pos]
+
+        if team_b_spec is not None:
+            # Fixed match: resolve via advancers[group][position]
+            team_b_group, team_b_pos = team_b_spec
+            team_b = advancers[team_b_group][team_b_pos]
+        else:
+            # Annex C match: resolve third-place team via assignment
+            winner_group = team_a_spec[0]
+            third_group = winner_to_third[winner_group]
+            team_b = advancers[third_group][3]
+            # Safety check: third_group should have an advancing third-placed team
+            if team_b is None:
+                raise ValueError(
+                    f"Group {third_group}'s third-placed team is None in advancers "
+                    f"but Annex C assignment expects it for match {mid}."
+                )
+
+        matchups[mid] = {
+            "match_id": mid,
+            "team_a": team_a,
+            "team_b": team_b,
+        }
+
+    return matchups
