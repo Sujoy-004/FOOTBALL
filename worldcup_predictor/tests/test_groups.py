@@ -219,8 +219,8 @@ class TestSimulateGroupMatches:
         import json
         from pathlib import Path
         data_dir = Path(__file__).resolve().parent.parent / "data"
-        groups = json.load(open(data_dir / "groups.json"))
-        teams = json.load(open(data_dir / "teams.json"))
+        groups = json.load(open(data_dir / "groups.json", encoding="utf-8"))
+        teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = random.Random(42)
         results = simulate_group_matches(groups, teams, elo, rng)
@@ -282,8 +282,8 @@ class TestSimulateGroupMatches:
         import json
         from pathlib import Path
         data_dir = Path(__file__).resolve().parent.parent / "data"
-        groups = json.load(open(data_dir / "groups.json"))
-        teams = json.load(open(data_dir / "teams.json"))
+        groups = json.load(open(data_dir / "groups.json", encoding="utf-8"))
+        teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         r1 = simulate_group_matches(groups, teams, elo, random.Random(42))
         r2 = simulate_group_matches(groups, teams, elo, random.Random(42))
@@ -301,8 +301,8 @@ class TestFairPlayCards:
         import json
         from pathlib import Path
         data_dir = Path(__file__).resolve().parent.parent / "data"
-        groups = json.load(open(data_dir / "groups.json"))
-        teams = json.load(open(data_dir / "teams.json"))
+        groups = json.load(open(data_dir / "groups.json", encoding="utf-8"))
+        teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
 
         total_yc = 0
@@ -1092,9 +1092,9 @@ class TestResolveR32:
         import json
         from pathlib import Path
         data_dir = Path(__file__).resolve().parent.parent / "data"
-        groups = json.load(open(data_dir / "groups.json"))
-        teams = json.load(open(data_dir / "teams.json"))
-        annex_c = json.load(open(data_dir / "annex_c.json"))
+        groups = json.load(open(data_dir / "groups.json", encoding="utf-8"))
+        teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
+        annex_c = json.load(open(data_dir / "annex_c.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
         results = simulate_group_matches(groups, teams, elo, rng)
@@ -1116,9 +1116,9 @@ class TestResolveR32:
         import json
         from pathlib import Path
         data_dir = Path(__file__).resolve().parent.parent / "data"
-        annex_c = json.load(open(data_dir / "annex_c.json"))
-        groups = json.load(open(data_dir / "groups.json"))
-        teams = json.load(open(data_dir / "teams.json"))
+        annex_c = json.load(open(data_dir / "annex_c.json", encoding="utf-8"))
+        groups = json.load(open(data_dir / "groups.json", encoding="utf-8"))
+        teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
         results = simulate_group_matches(groups, teams, elo, rng)
@@ -1176,9 +1176,9 @@ class TestResolveR32:
         import json
         from pathlib import Path
         data_dir = Path(__file__).resolve().parent.parent / "data"
-        groups = json.load(open(data_dir / "groups.json"))
-        teams = json.load(open(data_dir / "teams.json"))
-        annex_c = json.load(open(data_dir / "annex_c.json"))
+        groups = json.load(open(data_dir / "groups.json", encoding="utf-8"))
+        teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
+        annex_c = json.load(open(data_dir / "annex_c.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
         results = simulate_group_matches(groups, teams, elo, rng)
@@ -1205,9 +1205,9 @@ class TestResolveR32:
         import json
         from pathlib import Path
         data_dir = Path(__file__).resolve().parent.parent / "data"
-        groups = json.load(open(data_dir / "groups.json"))
-        teams = json.load(open(data_dir / "teams.json"))
-        annex_c = json.load(open(data_dir / "annex_c.json"))
+        groups = json.load(open(data_dir / "groups.json", encoding="utf-8"))
+        teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
+        annex_c = json.load(open(data_dir / "annex_c.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
         results = simulate_group_matches(groups, teams, elo, rng)
@@ -1236,9 +1236,9 @@ class TestResolveR32:
         import json
         from pathlib import Path
         data_dir = Path(__file__).resolve().parent.parent / "data"
-        groups = json.load(open(data_dir / "groups.json"))
-        teams = json.load(open(data_dir / "teams.json"))
-        annex_c = json.load(open(data_dir / "annex_c.json"))
+        groups = json.load(open(data_dir / "groups.json", encoding="utf-8"))
+        teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
+        annex_c = json.load(open(data_dir / "annex_c.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
         results = simulate_group_matches(groups, teams, elo, rng)
