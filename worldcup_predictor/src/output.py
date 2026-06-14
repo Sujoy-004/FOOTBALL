@@ -7,7 +7,7 @@ import sys
 import time
 from typing import Callable
 
-from src.constants import POLL_INTERVAL
+from src.constants import GROUP_COUNT, MATCHES_PER_GROUP, POLL_INTERVAL
 
 
 # Ensure stdout uses UTF-8 for Unicode symbols (▲, ▼, ⚠, →) on Windows
@@ -122,6 +122,125 @@ def print_simulation_duration(elapsed_seconds: float) -> None:
     print(f"{_timestamp()} {_bold_green(f'Re-simulating (50000 runs)... done in {elapsed_seconds:.1f}s')}")
 
 
+# ─── Group standings display ──────────────────────────────────────────
+# Column widths for box-drawing table (content between │ separators)
+_STANDINGS_COLS = {
+    "group": 9,   # " Group A "
+    "team": 28,   # " Team Name 1" padded
+    "pts": 6,     # "     7"
+    "gd": 7,      # "    +3"
+    "gs": 6,      # "     5"
+}
+
+
+def _standings_top_border() -> str:
+    """Build the top border of the group standings table."""
+    c = _STANDINGS_COLS
+    return "┌" + "┬".join(["─" * c[k] for k in ("group", "team", "pts", "gd", "gs")]) + "┐"
+
+
+def _standings_mid_border() -> str:
+    """Build the separator border between groups."""
+    c = _STANDINGS_COLS
+    return "├" + "┼".join(["─" * c[k] for k in ("group", "team", "pts", "gd", "gs")]) + "┤"
+
+
+def _standings_bot_border() -> str:
+    """Build the bottom border of the group standings table."""
+    c = _STANDINGS_COLS
+    return "└" + "┴".join(["─" * c[k] for k in ("group", "team", "pts", "gd", "gs")]) + "┘"
+
+
+def _standings_row(group_label: str, team_field: str, pts: str, gd: str, gs: str) -> str:
+    """Build a single data row for the group standings table."""
+    c = _STANDINGS_COLS
+    cells = [
+        f" {group_label:^{c['group'] - 2}} ",
+        f" {team_field:<{c['team'] - 2}} ",
+        f"{pts:>{c['pts']}}",
+        f"{gd:>{c['gd']}}",
+        f"{gs:>{c['gs']}}",
+    ]
+    return "│" + "│".join(cells) + "│"
+
+
+def _gd_str(gd: int) -> str:
+    """Format goal difference: + prefix for positive, raw for non-positive."""
+    return f"+{gd}" if gd > 0 else str(gd)
+
+
+def print_group_standings(standings: dict, third_place_rankings: list) -> None:
+    """Print box-drawing group standings table for all 12 groups.
+
+    Args:
+        standings: Dict mapping group letter -> list of team standings dicts
+                   (output of compute_standings()). Each entry has keys:
+                   team, position, pts, gd, gs.
+        third_place_rankings: Ranked list of third-placed teams (unused here,
+                              kept for interface consistency).
+    """
+    # Check for empty/no-data case (D-15: first startup placeholder)
+    if not standings or all(len(v) == 0 for v in standings.values()):
+        print(f"{_timestamp()} {_bold_cyan('Group Standings:')}")
+        print("  (no group matches played yet)")
+        print()
+        return
+
+    print(f"{_timestamp()} {_bold_cyan(f'GROUP STANDINGS — {GROUP_COUNT} groups, best 8 third-placed advance')}")
+    print(_standings_top_border())
+
+    for i, group_letter in enumerate("ABCDEFGHIJKL"):
+        if i > 0:
+            print(_standings_mid_border())
+
+        group_data = standings.get(group_letter, [])
+
+        if not group_data:
+            # Empty group (unlikely but handle gracefully)
+            print(_standings_row(f"Group {group_letter}", "(no data)", "", "", ""))
+            continue
+
+        for row_idx, team_data in enumerate(group_data):
+            group_label = f"Group {group_letter}" if row_idx == 0 else ""
+            team_field = f"{team_data['team']} {team_data['position']}"
+            pts_str = str(team_data["pts"])
+            gd_str = _gd_str(team_data["gd"])
+            gs_str = str(team_data["gs"])
+            print(_standings_row(group_label, team_field, pts_str, gd_str, gs_str))
+
+    print(_standings_bot_border())
+    print()
+
+
+def print_third_place_bubble(third_place_rankings: list) -> None:
+    """Print third-place advancement bubble: 8th vs 9th cutoff (D-14).
+
+    Args:
+        third_place_rankings: Ranked list of 12 third-placed team dicts,
+                              sorted best-to-worst. Each entry has keys:
+                              group, team, pts, gd, gs, conduct_score.
+    """
+    if not third_place_rankings or len(third_place_rankings) < 9:
+        return
+
+    eighth = third_place_rankings[7]  # index 7 = 8th best
+    ninth = third_place_rankings[8]   # index 8 = 9th best
+
+    # Determine cutoff margin metric (D-14)
+    if eighth["pts"] != ninth["pts"]:
+        margin = f"Pts = {eighth['pts'] - ninth['pts']}"
+    elif eighth["gd"] != ninth["gd"]:
+        margin = f"GD = {eighth['gd'] - ninth['gd']}"
+    else:
+        margin = f"GS = {eighth['gs'] - ninth['gs']}"
+
+    print(f"{_timestamp()} Third-place bubble:")
+    print(f"  8. {eighth['team']}  {eighth['pts']} pts  GD {_gd_str(eighth['gd'])}  {_green('ADVANCES')}")
+    print(f"  9. {ninth['team']}  {ninth['pts']} pts  GD {_gd_str(ninth['gd'])}  {_red('OUT')}")
+    print(f"  Cutoff margin: {margin}")
+    print()
+
+
 def print_header(
     teams: dict[str, dict],
     bracket: list[dict],
@@ -140,7 +259,7 @@ def print_header(
     print(_bold_cyan(
         f"  Loaded {len(teams)} teams, {len(bracket)} bracket matches, "
         f"{len(played)} played matches, {len(aliases)} aliases"
-        f"{f', {group_count} groups, {annex_count} Annex C scenarios' if groups else ''}."
+        f"{f', {group_count} groups ({group_count * MATCHES_PER_GROUP} group matches), {annex_count} Annex C scenarios' if groups else ''}."
     ))
     print(_bold_cyan("=" * 60))
     print()
