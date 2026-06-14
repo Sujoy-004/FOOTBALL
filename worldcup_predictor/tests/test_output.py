@@ -82,7 +82,7 @@ class TestProbabilityTable:
         prev = full_probs.copy()
         cur = {k: dict(v) for k, v in full_probs.items()}
         cur["Argentina"]["champion"] += 0.01
-        cur["Brazil"]["champion"] -= 0.005
+        cur["Spain"]["champion"] -= 0.0003
         output = _capture(print_probability_table, cur, prev)
         assert "▲" in output, "Should show ▲ for increased probability"
         assert "▼" in output, "Should show ▼ for decreased probability"
@@ -138,7 +138,11 @@ class TestAnsiFallback:
 
     @patch("src.output._supports_color", return_value=False)
     def test_symbols_preserved(self, mock_color, full_probs):
-        output = _capture(print_probability_table, full_probs, full_probs)
+        prev = full_probs.copy()
+        cur = {k: dict(v) for k, v in full_probs.items()}
+        cur["Argentina"]["champion"] += 0.0005
+        cur["Spain"]["champion"] -= 0.0003
+        output = _capture(print_probability_table, cur, prev)
         assert "▲" in output or "▼" in output, "Symbols ▲▼ preserved without color"
 
 
