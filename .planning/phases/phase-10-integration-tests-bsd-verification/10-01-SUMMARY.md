@@ -141,6 +141,13 @@ None - no external service configuration required. played_groups.json bootstraps
 - All acceptance criteria for INTG-01 and INTG-02 satisfied
 - 190/192 tests pass (2 known failures deferred to Plan 03)
 
+## Self-Check: PASSED
+
+- All 6 modified source files exist on disk ✓
+- SUMMARY.md exists at expected path ✓
+- 4 commits found (3 feat + 1 docs) ✓
+- 190 tests pass (2 known failures deferred to Plan 03) ✓
+
 ---
 
 *Phase: 10-integration-tests-bsd-verification*
