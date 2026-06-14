@@ -164,6 +164,149 @@ def save_played(played: dict[str, dict], data_dir: Path | str | None = None) -> 
     _atomic_write_json(played, path)
 
 
+def validate_groups(groups: dict, teams: dict[str, dict] | None = None) -> None:
+    """Validate groups.json structure. Raises ValueError on failure.
+
+    Validates:
+    1. 'groups' key exists and has exactly GROUP_COUNT entries (A-L).
+    2. Each group has exactly TEAMS_PER_GROUP teams and MATCHES_PER_GROUP matches.
+    3. Match IDs follow pattern GS_{letter}_{NN} and are unique.
+    4. No duplicate teams across groups.
+    5. All team names exist in teams dict if provided.
+
+    Args:
+        groups: The groups object loaded from groups.json.
+        teams: Optional dict of valid teams for cross-reference validation.
+
+    Raises:
+        ValueError: If any validation check fails, with a descriptive message.
+    """
+    # Step 1: Check 'groups' key exists
+    if not isinstance(groups, dict) or "groups" not in groups:
+        raise ValueError("groups data must contain 'groups' key")
+
+    group_data = groups["groups"]
+
+    # Step 2: Check group count
+    if len(group_data) != constants.GROUP_COUNT:
+        raise ValueError(
+            f"Expected {constants.GROUP_COUNT} groups, got {len(group_data)}"
+        )
+
+    # Step 3: Check group keys are exactly A-L
+    expected_keys: set[str] = set("ABCDEFGHIJKL")
+    actual_keys: set[str] = set(group_data.keys())
+    if actual_keys != expected_keys:
+        missing = expected_keys - actual_keys
+        extra = actual_keys - expected_keys
+        parts: list[str] = []
+        if missing:
+            parts.append(f"missing: {''.join(sorted(missing))}")
+        if extra:
+            parts.append(f"extra: {''.join(sorted(extra))}")
+        raise ValueError(f"Invalid group keys: {'; '.join(parts)}")
+
+    seen_teams: set[str] = set()
+    seen_match_ids: set[str] = set()
+
+    # Step 4: Validate each group (deterministic order)
+    for letter in sorted(group_data.keys()):
+        group = group_data[letter]
+
+        # 4a: Check teams/matches keys exist
+        if "teams" not in group or "matches" not in group:
+            raise ValueError(f"Group {letter}: missing 'teams' or 'matches' key")
+
+        # 4b: Check team count
+        if len(group["teams"]) != constants.TEAMS_PER_GROUP:
+            raise ValueError(
+                f"Group {letter}: expected {constants.TEAMS_PER_GROUP} teams, "
+                f"got {len(group['teams'])}"
+            )
+
+        # 4c: Check match count
+        if len(group["matches"]) != constants.MATCHES_PER_GROUP:
+            raise ValueError(
+                f"Group {letter}: expected {constants.MATCHES_PER_GROUP} matches, "
+                f"got {len(group['matches'])}"
+            )
+
+        # 4d: Check team names are non-empty strings
+        for team in group["teams"]:
+            if not isinstance(team, str) or not team:
+                raise ValueError(f"Group {letter}: invalid team name: '{team}'")
+
+        # 4e: Check match structure
+        for match in group["matches"]:
+            for key in ("match_id", "team_a", "team_b"):
+                if key not in match:
+                    raise ValueError(
+                        f"Group {letter}: match missing '{key}' key"
+                    )
+            for key in ("winner", "score_a", "score_b"):
+                if key not in match:
+                    raise ValueError(
+                        f"Group {letter}: match missing '{key}' key"
+                    )
+
+        # 4f: Check match_id prefix
+        for match in group["matches"]:
+            mid = match["match_id"]
+            if not mid.startswith(f"GS_{letter}_"):
+                raise ValueError(
+                    f"Group {letter}: match_id '{mid}' does not start with "
+                    f"'GS_{letter}_'"
+                )
+
+        # Step 5: Check no duplicate teams across groups
+        for team in group["teams"]:
+            if team in seen_teams:
+                raise ValueError(f"Team '{team}' appears in multiple groups")
+            seen_teams.add(team)
+
+        # Step 6: Check no duplicate match_ids across groups
+        for match in group["matches"]:
+            mid = match["match_id"]
+            if mid in seen_match_ids:
+                raise ValueError(f"Duplicate match_id across groups: {mid}")
+            seen_match_ids.add(mid)
+
+    # Step 7: Cross-reference team names with teams dict if provided
+    if teams is not None:
+        for letter in sorted(group_data.keys()):
+            for team in group_data[letter]["teams"]:
+                if team not in teams:
+                    raise ValueError(
+                        f"Team '{team}' not found in teams data"
+                    )
+
+
+def load_groups(
+    data_dir: Path | str | None = None,
+    teams: dict[str, dict] | None = None,
+) -> dict:
+    """Load group definitions from groups.json and validate structure.
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to
+            constants.DATA_DIR.
+        teams: Optional teams dict for cross-reference validation.
+
+    Returns:
+        dict: The groups object with 'groups' key mapping to A-L entries.
+
+    Raises:
+        FileNotFoundError: If groups.json does not exist.
+        json.JSONDecodeError: If groups.json contains invalid JSON.
+        ValueError: If group validation fails.
+    """
+    path = _resolve_data_dir(data_dir) / "groups.json"
+    with open(path, encoding="utf-8") as f:
+        groups: dict = json.load(f)
+    validate_groups(groups, teams=teams)
+    return groups
+
+
 # ─── Validation ──────────────────────────────────────────────────────────
 
 
