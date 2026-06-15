@@ -97,6 +97,19 @@ class TestUpdateRatings:
         assert round(result["A"], 1) == round(expected_a, 1)
         assert round(result["B"], 1) == round(expected_b, 1)
 
+    def test_pk_split(self):
+        """PK win: pk_winner receives 0.75 result, loser 0.25."""
+        elos = {"A": 2000, "B": 2000}
+        result = update_ratings("A", "B", "A", elos, K=60, pk_winner="A")
+        assert result["A"] == 2015.0  # 2000 + 60*(0.75-0.5)
+        assert result["B"] == 1985.0  # 2000 + 60*(0.25-0.5)
+
+    def test_pk_winner_invalid(self):
+        """Invalid pk_winner should raise ValueError with descriptive message."""
+        elos = {"A": 2000, "B": 1900}
+        with pytest.raises(ValueError, match="pk_winner"):
+            update_ratings("A", "B", None, elos, K=60, pk_winner="C")
+
     def test_apply_elo_update_mutates_teams(self):
         """apply_elo_update mutates teams dict in-place and returns changes."""
         teams = {"Arg": {"elo": 2100}, "Nig": {"elo": 1800}}
