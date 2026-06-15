@@ -584,3 +584,105 @@ class TestHistoricalCatchUp:
             {}, {}, elo_applied={first_mid},
         )
         assert team_copies[slot["team_a"]]["elo"] == before_a
+
+
+class TestDrawBackfillIntegration:
+    """Integration tests for draw backfill + baseline flow."""
+
+    @pytest.fixture
+    def sample_teams(self):
+        return {"A": {"elo": 2000}, "B": {"elo": 1900}, "C": {"elo": 1800}}
+
+    def test_backfill_populates_elo_applied(self, monkeypatch, sample_teams):
+        """2 draw matches both backfilled, Elo changed."""
+        from main import _run_draw_backfill
+
+        monkeypatch.setattr("main.state.save_elo_applied", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.save_teams", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.save_elo_update_log", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.load_elo_update_log", lambda *a, **kw: [])
+
+        teams = dict(sample_teams)
+        played = {
+            "M01": {"match_id": "M01", "team_a": "A", "team_b": "B",
+                    "winner": None, "home_score": 1, "away_score": 1,
+                    "completed_at": "2026-06-11T20:00:00Z"},
+            "M02": {"match_id": "M02", "team_a": "A", "team_b": "C",
+                    "winner": None, "home_score": 2, "away_score": 2,
+                    "completed_at": "2026-06-12T20:00:00Z"},
+        }
+        elo_applied = set()
+        result = _run_draw_backfill(teams, played, {}, elo_applied)
+        assert "M01" in result
+        assert "M02" in result
+        # Elo changed for both teams
+        assert teams["A"]["elo"] != 2000
+        assert teams["B"]["elo"] != 1900
+
+    def test_backfill_includes_group_matches(self, monkeypatch, sample_teams):
+        """Group draw match in played_groups is backfilled."""
+        from main import _run_draw_backfill
+
+        monkeypatch.setattr("main.state.save_elo_applied", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.save_teams", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.save_elo_update_log", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.load_elo_update_log", lambda *a, **kw: [])
+
+        teams = dict(sample_teams)
+        played_groups = {
+            "GS_A_01": {"match_id": "GS_A_01", "team_a": "A", "team_b": "B",
+                        "winner": None, "home_score": 1, "away_score": 1,
+                        "completed_at": "2026-06-10T20:00:00Z"},
+        }
+        elo_applied = set()
+        result = _run_draw_backfill(teams, {}, played_groups, elo_applied)
+        assert "GS_A_01" in result
+        assert teams["A"]["elo"] != 2000
+
+    def test_backfill_skips_non_draw_matches(self, monkeypatch, sample_teams):
+        """Only draws are backfilled, non-draws are skipped."""
+        from main import _run_draw_backfill
+
+        monkeypatch.setattr("main.state.save_elo_applied", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.save_teams", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.save_elo_update_log", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.load_elo_update_log", lambda *a, **kw: [])
+
+        teams = dict(sample_teams)
+        played = {
+            "M01": {"match_id": "M01", "team_a": "A", "team_b": "B",
+                    "winner": "A", "home_score": 3, "away_score": 1,
+                    "completed_at": "2026-06-11T20:00:00Z"},
+        }
+        elo_applied = set()
+        result = _run_draw_backfill(teams, played, {}, elo_applied)
+        assert "M01" not in result
+        assert teams["A"]["elo"] == 2000  # unchanged
+
+    def test_baseline_records_brier(self, monkeypatch, tmp_path):
+        """eval_baseline.json created with correct Brier for fixture matches."""
+        import json
+        from pathlib import Path
+        from src import constants
+        from main import _record_eval_baseline
+
+        # Override DATA_DIR to tmp_path
+        monkeypatch.setattr(constants, "DATA_DIR", tmp_path)
+
+        teams = {"Arg": {"elo": 2100}, "Bra": {"elo": 2000}}
+        played = {
+            "M01": {"match_id": "M01", "team_a": "Arg", "team_b": "Bra",
+                    "winner": "Arg", "home_score": 2, "away_score": 0,
+                    "completed_at": "2026-06-11T20:00:00Z"},
+        }
+        _record_eval_baseline(teams, played, {})
+
+        path = tmp_path / "eval_baseline.json"
+        assert path.exists(), "eval_baseline.json should exist"
+        d = json.loads(path.read_text(encoding="utf-8"))
+        assert "brier" in d
+        assert "log_loss" in d
+        assert "n_matches" in d
+        assert d["n_matches"] == 1  # one match processed
+        assert 0 <= d["brier"] <= 1
+        assert d["brier"] > 0  # prediction not perfect
