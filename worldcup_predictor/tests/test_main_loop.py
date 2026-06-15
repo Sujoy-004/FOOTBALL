@@ -3,6 +3,8 @@
 import os
 import signal
 import subprocess
+
+import pytest
 import sys
 import time
 from pathlib import Path
@@ -24,6 +26,7 @@ def _runner_code() -> str:
         f"src.constants.API_TIMEOUT = 1\n"
         f"class _MockResp:\n"
         f"  status_code=200\n"
+        f"  text = ''  # eloratings TSV: empty/mock is fine — sync handles gracefully\n"
         f"  def json(self):\n"
         f"    return {{}}\n"
         f"  def raise_for_status(self):\n"
@@ -33,13 +36,13 @@ def _runner_code() -> str:
         f"    return True\n"
         f"requests.get = lambda url, **kw: _MockResp()\n"
         f"import src.knockout\n"
-         f"def _mock_sim(*args, **kwargs):\n"
-         f"    teams = args[0] if args else kwargs.get('teams', {{}})\n"
-         f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
-         f"src.knockout.run_full_simulation = _mock_sim\n"
-         f"import main\n"
-         f"main.run_full_simulation = _mock_sim\n"
-         f"main.main()\n"
+        f"def _mock_sim(*args, **kwargs):\n"
+        f"    teams = args[0] if args else kwargs.get('teams', {{}})\n"
+        f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
+        f"src.knockout.run_full_simulation = _mock_sim\n"
+        f"import main\n"
+        f"main.run_full_simulation = _mock_sim\n"
+        f"main.main()\n"
      )
 
 
@@ -55,24 +58,25 @@ def _runner_code_with_flag(flag: str) -> str:
          f"import requests\n"
          f"import src.constants\n"
          f"src.constants.API_TIMEOUT = 1\n"
-         f"class _MockResp:\n"
-         f"  status_code=200\n"
-         f"  def json(self):\n"
-         f"    return {{}}\n"
-         f"  def raise_for_status(self):\n"
-         f"    pass\n"
-         f"  @property\n"
-         f"  def ok(self):\n"
-         f"    return True\n"
-         f"requests.get = lambda url, **kw: _MockResp()\n"
-         f"import src.knockout\n"
-         f"def _mock_sim(*args, **kwargs):\n"
-         f"    teams = args[0] if args else kwargs.get('teams', {{}})\n"
-         f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
-         f"src.knockout.run_full_simulation = _mock_sim\n"
-         f"import main\n"
-         f"main.run_full_simulation = _mock_sim\n"
-         f"main.main()\n"
+        f"class _MockResp:\n"
+        f"  status_code=200\n"
+        f"  text = ''  # eloratings TSV: empty/mock is fine — sync handles gracefully\n"
+        f"  def json(self):\n"
+        f"    return {{}}\n"
+        f"  def raise_for_status(self):\n"
+        f"    pass\n"
+        f"  @property\n"
+        f"  def ok(self):\n"
+        f"    return True\n"
+        f"requests.get = lambda url, **kw: _MockResp()\n"
+        f"import src.knockout\n"
+        f"def _mock_sim(*args, **kwargs):\n"
+        f"    teams = args[0] if args else kwargs.get('teams', {{}})\n"
+        f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
+        f"src.knockout.run_full_simulation = _mock_sim\n"
+        f"import main\n"
+        f"main.run_full_simulation = _mock_sim\n"
+        f"main.main()\n"
     )
 
 
@@ -227,3 +231,305 @@ def test_seed_propagates_through_run_iteration(monkeypatch):
 
     assert len(captured_seeds) >= 1, "run_full_simulation should have been called"
     assert 42 in captured_seeds, f"seed=42 should be in captured_seeds: {captured_seeds}"
+
+
+class TestHistoricalCatchUp:
+    """Tests for _run_historical_catch_up in main.py."""
+
+    @pytest.fixture
+    def full_data(self):
+        """Load production data for integration tests."""
+        import json
+        with open(f"{DATA_DIR}/teams.json", encoding="utf-8") as f:
+            teams = json.load(f)
+        with open(f"{DATA_DIR}/groups.json", encoding="utf-8") as f:
+            groups = json.load(f)
+        with open(f"{DATA_DIR}/bracket.json", encoding="utf-8") as f:
+            bracket = json.load(f)
+        with open(f"{DATA_DIR}/annex_c.json", encoding="utf-8") as f:
+            annex_c = json.load(f)
+        return teams, groups, bracket, annex_c
+
+    def test_empty_raw_is_noop(self, monkeypatch):
+        """When fetch_raw_matches returns [], catch-up returns inputs unchanged."""
+        import main as main_mod
+
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: [])
+
+        played_groups_in = {"GS_A_01": {"match_id": "GS_A_01", "winner": "Mexico"}}
+        played_in = {"M73": {"match_id": "M73", "winner": "Argentina"}}
+        rg, rp, _ea = main_mod._run_historical_catch_up(
+            "dummy_key", {}, {"groups": {}}, [], {}, {},
+            played_groups_in, played_in,
+        )
+        assert rg == played_groups_in
+        assert rp == played_in
+        assert id(rg) == id(played_groups_in)
+
+    def test_knockout_event_matched_to_r32_slot(self, monkeypatch, full_data):
+        """A single finished knockout BSD event is matched to the correct R32 slot and persisted."""
+        import main as main_mod
+        from src.knockout import resolve_knockout_slot_teams
+
+        teams, groups, bracket, annex_c = full_data
+
+        slot_teams = resolve_knockout_slot_teams(
+            groups, teams, {}, bracket, annex_c, {},
+        )
+        first_mid = sorted(slot_teams.keys())[0]
+        slot = slot_teams[first_mid]
+        aliases = {slot["team_a"]: [], slot["team_b"]: []}
+
+        mock_event = [{
+            "id": 99999,
+            "status": "finished",
+            "home_team": slot["team_a"],
+            "away_team": slot["team_b"],
+            "home_score": 3,
+            "away_score": 1,
+            "event_date": "2026-06-15T22:00:00Z",
+            "league": {"id": 27},
+            "group_name": None,
+        }]
+
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: mock_event)
+        monkeypatch.setattr(main_mod.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_teams", lambda *a, **kw: None)
+
+        played = {}
+        team_copies = {n: dict(d) for n, d in teams.items()}
+        rg, rp, _ea = main_mod._run_historical_catch_up(
+            "dummy_key", team_copies, groups, bracket, annex_c, aliases,
+            {}, played,
+        )
+        assert first_mid in rp
+        assert rp[first_mid]["team_a"] == slot["team_a"]
+        assert rp[first_mid]["team_b"] == slot["team_b"]
+        assert rp[first_mid]["winner"] == slot["team_a"]
+        assert rp[first_mid]["home_score"] == 3
+        assert rp[first_mid]["away_score"] == 1
+        elo_a = team_copies[slot["team_a"]]["elo"]
+        elo_b = team_copies[slot["team_b"]]["elo"]
+        assert elo_a > teams[slot["team_a"]]["elo"]  # winner gained Elo
+        assert elo_b < teams[slot["team_b"]]["elo"]  # loser lost Elo
+
+    def test_draw_skipped(self, monkeypatch, full_data):
+        """Draw events are skipped (no winner)."""
+        import main as main_mod
+        from src.knockout import resolve_knockout_slot_teams
+
+        teams, groups, bracket, annex_c = full_data
+        slot_teams = resolve_knockout_slot_teams(
+            groups, teams, {}, bracket, annex_c, {},
+        )
+        first_mid = sorted(slot_teams.keys())[0]
+        slot = slot_teams[first_mid]
+        aliases = {slot["team_a"]: [], slot["team_b"]: []}
+
+        mock_event = [{
+            "id": 99999,
+            "status": "finished",
+            "home_team": slot["team_a"],
+            "away_team": slot["team_b"],
+            "home_score": 1,
+            "away_score": 1,
+            "event_date": "2026-06-15T22:00:00Z",
+            "league": {"id": 27},
+            "group_name": None,
+        }]
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: mock_event)
+        monkeypatch.setattr(main_mod.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_teams", lambda *a, **kw: None)
+
+        rg, rp, _ea = main_mod._run_historical_catch_up(
+            "dummy_key", teams, groups, bracket, annex_c, aliases,
+            {}, {},
+        )
+        assert first_mid not in rp
+
+    def test_restart_dedup(self, monkeypatch, full_data):
+        """Event already in played is not re-processed on restart."""
+        import main as main_mod
+        from src.knockout import resolve_knockout_slot_teams
+
+        teams, groups, bracket, annex_c = full_data
+        slot_teams = resolve_knockout_slot_teams(
+            groups, teams, {}, bracket, annex_c, {},
+        )
+        first_mid = sorted(slot_teams.keys())[0]
+        slot = slot_teams[first_mid]
+        aliases = {slot["team_a"]: [], slot["team_b"]: []}
+
+        mock_event = [{
+            "id": 99999,
+            "status": "finished",
+            "home_team": slot["team_a"],
+            "away_team": slot["team_b"],
+            "home_score": 2,
+            "away_score": 0,
+            "event_date": "2026-06-15T22:00:00Z",
+            "league": {"id": 27},
+            "group_name": None,
+        }]
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: mock_event)
+        monkeypatch.setattr(main_mod.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_teams", lambda *a, **kw: None)
+
+        played_before = {first_mid: {"match_id": first_mid, "winner": slot["team_a"]}}
+        rg, rp, _ea = main_mod._run_historical_catch_up(
+            "dummy_key", teams, groups, bracket, annex_c, aliases,
+            {}, played_before,
+        )
+        assert rp[first_mid]["winner"] == slot["team_a"]
+        assert len(rp) == 1
+
+    def test_unmatchable_team_skipped(self, monkeypatch, full_data):
+        """Event with unmatchable team names is skipped gracefully."""
+        import main as main_mod
+
+        teams, groups, bracket, annex_c = full_data
+
+        mock_event = [{
+            "id": 99999,
+            "status": "finished",
+            "home_team": "Unknown FC",
+            "away_team": "Nowhere United",
+            "home_score": 2,
+            "away_score": 0,
+            "event_date": "2026-06-15T22:00:00Z",
+            "league": {"id": 27},
+            "group_name": None,
+        }]
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: mock_event)
+        monkeypatch.setattr(main_mod.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_teams", lambda *a, **kw: None)
+
+        rg, rp, _ea = main_mod._run_historical_catch_up(
+            "dummy_key", teams, groups, bracket, annex_c, {},
+            {}, {},
+        )
+        assert rp == {}
+
+    def test_catch_up_applies_elo_to_knockout(self, monkeypatch, full_data):
+        """Catch-up applies Elo to ingested knockout matches in chronological order."""
+        import main as main_mod
+        from src.knockout import resolve_knockout_slot_teams
+
+        teams, groups, bracket, annex_c = full_data
+        slot_teams = resolve_knockout_slot_teams(
+            groups, teams, {}, bracket, annex_c, {},
+        )
+        first_mid = sorted(slot_teams.keys())[0]
+        slot = slot_teams[first_mid]
+
+        mock_event = [{
+            "id": 99999,
+            "status": "finished",
+            "home_team": slot["team_a"],
+            "away_team": slot["team_b"],
+            "home_score": 2,
+            "away_score": 0,
+            "event_date": "2026-06-15T22:00:00Z",
+            "league": {"id": 27},
+            "group_name": None,
+        }]
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: mock_event)
+        monkeypatch.setattr(main_mod.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_teams", lambda *a, **kw: None)
+
+        team_copies = {n: dict(d) for n, d in teams.items()}
+        before_a = team_copies[slot["team_a"]]["elo"]
+        before_b = team_copies[slot["team_b"]]["elo"]
+        _rg, _rp, _ea = main_mod._run_historical_catch_up(
+            "dummy_key", team_copies, groups, bracket, annex_c,
+            {slot["team_a"]: [], slot["team_b"]: []},
+            {}, {},
+        )
+        assert team_copies[slot["team_a"]]["elo"] > before_a
+        assert team_copies[slot["team_b"]]["elo"] < before_b
+
+    def test_catch_up_elo_deterministic(self, monkeypatch, full_data):
+        """Same ingested matches produce same Elo across runs."""
+        import main as main_mod
+        from src.knockout import resolve_knockout_slot_teams
+
+        teams, groups, bracket, annex_c = full_data
+        slot_teams = resolve_knockout_slot_teams(
+            groups, teams, {}, bracket, annex_c, {},
+        )
+        first_mid = sorted(slot_teams.keys())[0]
+        slot = slot_teams[first_mid]
+
+        mock_event = [{
+            "id": 99999,
+            "status": "finished",
+            "home_team": slot["team_a"],
+            "away_team": slot["team_b"],
+            "home_score": 3,
+            "away_score": 1,
+            "event_date": "2026-06-15T22:00:00Z",
+            "league": {"id": 27},
+            "group_name": None,
+        }]
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: mock_event)
+        monkeypatch.setattr(main_mod.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_teams", lambda *a, **kw: None)
+
+        aliases = {slot["team_a"]: [], slot["team_b"]: []}
+
+        def run_catchup():
+            tc = {n: dict(d) for n, d in teams.items()}
+            _rg, _rp, _ea = main_mod._run_historical_catch_up(
+                "dummy_key", tc, groups, bracket, annex_c, aliases,
+                {}, {},
+            )
+            return tc
+
+        elo1 = run_catchup()
+        elo2 = run_catchup()
+        for name in teams:
+            assert elo1[name]["elo"] == elo2[name]["elo"]
+
+    def test_elo_applied_prevents_reapplication(self, monkeypatch, full_data):
+        """Passing elo_applied with match_id skips that match's Elo update."""
+        import main as main_mod
+        from src.knockout import resolve_knockout_slot_teams
+
+        teams, groups, bracket, annex_c = full_data
+        slot_teams = resolve_knockout_slot_teams(
+            groups, teams, {}, bracket, annex_c, {},
+        )
+        first_mid = sorted(slot_teams.keys())[0]
+        slot = slot_teams[first_mid]
+
+        aliases = {slot["team_a"]: [], slot["team_b"]: []}
+
+        mock_event = [{
+            "id": 99999,
+            "status": "finished",
+            "home_team": slot["team_a"],
+            "away_team": slot["team_b"],
+            "home_score": 2,
+            "away_score": 0,
+            "event_date": "2026-06-15T22:00:00Z",
+            "league": {"id": 27},
+            "group_name": None,
+        }]
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: mock_event)
+        monkeypatch.setattr(main_mod.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_teams", lambda *a, **kw: None)
+
+        team_copies = {n: dict(d) for n, d in teams.items()}
+        before_a = team_copies[slot["team_a"]]["elo"]
+        _rg, _rp, _ea = main_mod._run_historical_catch_up(
+            "dummy_key", team_copies, groups, bracket, annex_c, aliases,
+            {}, {}, elo_applied={first_mid},
+        )
+        assert team_copies[slot["team_a"]]["elo"] == before_a

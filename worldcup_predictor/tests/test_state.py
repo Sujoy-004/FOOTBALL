@@ -185,6 +185,7 @@ def test_main_runs_successfully():
         f"src.constants.API_TIMEOUT = 1\n"
         f"class _MockResp:\n"
         f"  status_code=200\n"
+        f"  text = ''\n"
         f"  def json(self): return {{}}\n"
         f"  def raise_for_status(self): pass\n"
         f"  @property\n"
