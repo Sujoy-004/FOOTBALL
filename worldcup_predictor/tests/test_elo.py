@@ -123,11 +123,40 @@ class TestUpdateRatings:
     def test_apply_elo_update_draw(self):
         """apply_elo_update works with winner=None (draw)."""
         teams = {"Arg": {"elo": 2100}, "Nig": {"elo": 1800}}
-        match = {"team_a": "Arg", "team_b": "Nig", "winner": None}
+        match = {"team_a": "Arg", "team_b": "Nig", "winner": None, "home_score": 1, "away_score": 1}
         e_a = expected_score(2100, 1800)
         apply_elo_update(match, teams)
         expected = 2100 + 60 * (0.5 - e_a)
         assert round(teams["Arg"]["elo"], 1) == round(expected, 1)
+
+    def test_apply_elo_update_k_multiplier(self):
+        """GD=2 should use K=90 (1.5 * 60) instead of default K=60."""
+        teams = {"A": {"elo": 2000}, "B": {"elo": 1900}}
+        match = {"team_a": "A", "team_b": "B", "winner": "A",
+                 "home_score": 3, "away_score": 1}
+        e_a = expected_score(2000, 1900)
+        expected_new_a = 2000 + 90 * (1.0 - e_a)  # K=90, not K=60
+        apply_elo_update(match, teams)
+        assert round(teams["A"]["elo"], 1) == round(expected_new_a, 1)
+
+    def test_apply_elo_update_pk(self):
+        """PK mode: winner set, GD=0, is_draw=False → 0.75/0.25 split with K=60."""
+        teams = {"A": {"elo": 2000}, "B": {"elo": 2000}}
+        match = {"team_a": "A", "team_b": "B", "winner": "A",
+                 "is_draw": False, "home_score": 1, "away_score": 1}
+        apply_elo_update(match, teams)
+        assert round(teams["A"]["elo"], 1) == 2015.0  # 2000 + 60*(0.75-0.5)
+        assert round(teams["B"]["elo"], 1) == 1985.0  # 2000 + 60*(0.25-0.5)
+
+    def test_apply_elo_update_draw_gd0(self):
+        """True draw (winner=None) with GD=0 → K=60, unchanged from previous behavior."""
+        teams = {"A": {"elo": 2100}, "B": {"elo": 1800}}
+        match = {"team_a": "A", "team_b": "B", "winner": None,
+                 "home_score": 1, "away_score": 1}
+        e_a = expected_score(2100, 1800)
+        apply_elo_update(match, teams)
+        expected_a = 2100 + 60 * (0.5 - e_a)
+        assert round(teams["A"]["elo"], 1) == round(expected_a, 1)
 
 
 # ─── compute_k_factor tests ────────────────────────────────────────────────
