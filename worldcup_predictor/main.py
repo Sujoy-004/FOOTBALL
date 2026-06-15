@@ -5,13 +5,16 @@ and handles graceful shutdown via SIGINT/SIGTERM.
 """
 
 import argparse
+import copy
 import json
 import logging
+import math
 import os
 import random
 import signal
 import sys
 import time
+from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -306,6 +309,158 @@ def _run_historical_catch_up(
     return played_groups, played, elo_applied
 
 
+def _run_draw_backfill(
+    teams: dict[str, dict],
+    played: dict[str, dict],
+    played_groups: dict[str, dict],
+    elo_applied: set[str],
+) -> set[str]:
+    """One-shot backfill: replay all historical draws through fixed Elo pipeline.
+
+    Scans played.json and played_groups.json for matches where home_score == away_score
+    that are NOT already in elo_applied. Replays them chronologically through
+    apply_elo_update(), logs to elo_update_log.json, and returns updated elo_applied.
+
+    Args:
+        teams: Team data dict (mutated in-place with Elo updates).
+        played: Played knockout matches dict.
+        played_groups: Played group matches dict.
+        elo_applied: Set of match_ids that already have Elo applied.
+
+    Returns:
+        Updated elo_applied set with backfilled match_ids added.
+    """
+    from src import elo, state
+
+    candidates: list[dict] = []
+
+    for match_dict in [played, played_groups]:
+        for mid, m in match_dict.items():
+            if m.get("home_score", 0) == m.get("away_score", 0):
+                if mid not in elo_applied:
+                    if m.get("is_draw", True):
+                        entry = dict(m)
+                        entry["winner"] = None
+                        candidates.append(entry)
+                    else:
+                        candidates.append(dict(m))
+
+    if not candidates:
+        return elo_applied
+
+    candidates.sort(key=lambda x: (x.get("completed_at", ""), x.get("match_id", "")))
+
+    log = state.load_elo_update_log()
+    backfilled: set[str] = set()
+
+    for m in candidates:
+        mid = m["match_id"]
+        if mid in elo_applied:
+            continue
+        elo_updates = elo.apply_elo_update(m, teams)
+        for team_name, change in elo_updates.items():
+            log.append({
+                "timestamp": datetime.now().isoformat(),
+                "team": team_name,
+                "old_value": change["old"],
+                "new_value": change["new"],
+                "source": "elo_engine",
+                "reason": "historical draw backfill",
+                "drift_magnitude": round(abs(change["new"] - change["old"]), 1),
+            })
+        elo_applied.add(mid)
+        backfilled.add(mid)
+
+    state.save_elo_applied(elo_applied)
+    state.save_teams(teams)
+    state.save_elo_update_log(log)
+
+    if backfilled:
+        print(f"Draw backfill: applied Elo to {len(backfilled)} historical draw(s)")
+
+    return elo_applied
+
+
+def _record_eval_baseline(
+    teams: dict[str, dict],
+    played: dict[str, dict],
+    played_groups: dict[str, dict],
+) -> None:
+    """Record baseline Brier score and log loss by replaying all matches.
+
+    Uses the current (draw-fixed) Elo ratings to compute predicted probabilities
+    before each match, then compares against actual outcomes to compute Brier
+    and log loss. Writes to data/eval_baseline.json for Phase 12b comparison.
+
+    This is a one-shot measurement, not the full evaluation framework.
+    Phase 12b builds the proper infrastructure (V2-18, V2-19).
+
+    Args:
+        teams: Team data dict with current Elo ratings (deep-copied for replay).
+    """
+    from pathlib import Path
+    from src import constants
+    from src.elo import apply_elo_update, expected_score
+    from src.state import _atomic_write_json
+
+    all_matches: list[dict] = []
+    for match_dict in [played, played_groups]:
+        for m in match_dict.values():
+            all_matches.append(dict(m))
+
+    all_matches.sort(key=lambda x: (x.get("completed_at", ""), x.get("match_id", "")))
+
+    replay_teams = copy.deepcopy(teams)
+    brier_scores: list[float] = []
+    log_losses: list[float] = []
+
+    for m in all_matches:
+        t_a, t_b = m["team_a"], m["team_b"]
+        if t_a not in replay_teams or t_b not in replay_teams:
+            continue
+
+        p_a = expected_score(replay_teams[t_a]["elo"], replay_teams[t_b]["elo"])
+
+        winner = m.get("winner")
+        if winner is None:
+            actual_a = 0.5
+        elif winner == t_a:
+            actual_a = 1.0
+        elif winner == t_b:
+            actual_a = 0.0
+        else:
+            continue
+
+        brier_scores.append((p_a - actual_a) ** 2)
+
+        eps = 1e-15
+        p_a_clamped = max(eps, min(1 - eps, p_a))
+        if actual_a == 0.5:
+            ll = -0.5 * (math.log(p_a_clamped) + math.log(1 - p_a_clamped))
+        else:
+            ll = -(actual_a * math.log(p_a_clamped) + (1 - actual_a) * math.log(1 - p_a_clamped))
+        log_losses.append(ll)
+
+        try:
+            apply_elo_update(m, replay_teams)
+        except Exception:
+            pass
+
+    if not brier_scores:
+        return
+
+    baseline = {
+        "brier": sum(brier_scores) / len(brier_scores),
+        "log_loss": sum(log_losses) / len(log_losses),
+        "n_matches": len(brier_scores),
+        "generated_at": datetime.now().isoformat(),
+    }
+
+    path = constants.DATA_DIR / "eval_baseline.json"
+    _atomic_write_json(baseline, path)
+    print(f"Baseline: Brier={baseline['brier']:.4f}, LogLoss={baseline['log_loss']:.4f} ({baseline['n_matches']} matches)")
+
+
 def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_key, aliases, last_sim_time, last_request_time, prev_probs=None, seed=None):
     """Run one fetch -> process -> simulate -> print cycle.
 
@@ -492,6 +647,14 @@ def main() -> None:
             played_groups, played, elo_applied=__elo_applied,
         )
         state.save_elo_applied(__elo_applied)
+
+        # ── Historical draw backfill ──
+        # One-shot: replays all historical draws through fixed Elo pipeline (D-14, D-15)
+        __elo_applied = _run_draw_backfill(teams, played, played_groups, __elo_applied)
+
+        # ── Baseline metrics ──
+        # Record one-shot Brier/log-loss baseline for Phase 12b (D-18)
+        _record_eval_baseline(teams, played, played_groups)
 
         # ── Startup Elo sync per D-01, D-18 ──
         # Runs after historical catch-up (Pitfall 7: catch-up first, then sync)
