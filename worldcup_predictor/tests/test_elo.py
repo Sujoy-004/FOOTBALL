@@ -7,7 +7,7 @@ custom K, large gap, invalid winner, and no-mutation contract.
 
 import pytest
 
-from src.elo import expected_score, update_ratings
+from src.elo import apply_elo_update, compute_k_factor, expected_score, update_ratings
 
 
 # ─── expected_score tests ────────────────────────────────────────────────
@@ -77,3 +77,72 @@ class TestUpdateRatings:
         before_a = elos["A"]
         update_ratings("A", "B", "A", elos, K=60)
         assert elos["A"] == before_a  # unchanged
+
+    def test_draw_equal_ratings(self):
+        """Draw with equal ratings → both change by same amount toward 0.5."""
+        elos = {"A": 2000, "B": 2000}
+        result = update_ratings("A", "B", None, elos, K=60)
+        assert result["A"] == result["B"]  # symmetric
+        assert result["A"] == 2000.0       # 2000 + 60*(0.5-0.5) = 2000
+
+    def test_draw_favored_team_loses_elo(self):
+        """Draw when A is heavily favored → A loses Elo, B gains."""
+        elos = {"A": 2200, "B": 1800}
+        result = update_ratings("A", "B", None, elos, K=60)
+        e_a = expected_score(2200, 1800)
+        assert result["A"] < 2200  # A underperformed
+        assert result["B"] > 1800  # B overperformed
+        expected_a = 2200 + 60 * (0.5 - e_a)
+        expected_b = 1800 + 60 * (0.5 - (1 - e_a))
+        assert round(result["A"], 1) == round(expected_a, 1)
+        assert round(result["B"], 1) == round(expected_b, 1)
+
+    def test_apply_elo_update_mutates_teams(self):
+        """apply_elo_update mutates teams dict in-place and returns changes."""
+        teams = {"Arg": {"elo": 2100}, "Nig": {"elo": 1800}}
+        match = {"team_a": "Arg", "team_b": "Nig", "winner": "Arg"}
+        updates = apply_elo_update(match, teams)
+        assert teams["Arg"]["elo"] > 2100
+        assert teams["Nig"]["elo"] < 1800
+        assert updates["Arg"]["old"] == 2100
+        assert updates["Arg"]["new"] == teams["Arg"]["elo"]
+
+    def test_apply_elo_update_draw(self):
+        """apply_elo_update works with winner=None (draw)."""
+        teams = {"Arg": {"elo": 2100}, "Nig": {"elo": 1800}}
+        match = {"team_a": "Arg", "team_b": "Nig", "winner": None}
+        e_a = expected_score(2100, 1800)
+        apply_elo_update(match, teams)
+        expected = 2100 + 60 * (0.5 - e_a)
+        assert round(teams["Arg"]["elo"], 1) == round(expected, 1)
+
+
+# ─── compute_k_factor tests ────────────────────────────────────────────────
+
+
+class TestComputeKFactor:
+    """Tests for the compute_k_factor function."""
+
+    def test_gd_0(self):
+        """GD=0 (draw) → G=1.0, returns base_K unchanged."""
+        assert compute_k_factor(0, 60) == 60.0
+
+    def test_gd_1(self):
+        """GD=1 (one-goal win) → G=1.0, returns base_K unchanged."""
+        assert compute_k_factor(1, 60) == 60.0
+
+    def test_gd_2(self):
+        """GD=2 → G=1.5, returns 1.5 * base_K."""
+        assert compute_k_factor(2, 60) == 90.0
+
+    def test_gd_3(self):
+        """GD=3 → G=(11+3)/8 = 1.75, returns 1.75 * 60 = 105.0."""
+        assert compute_k_factor(3, 60) == 105.0
+
+    def test_gd_7(self):
+        """GD=7 → G=(11+7)/8 = 2.25, returns 2.25 * 60 = 135.0."""
+        assert compute_k_factor(7, 60) == 135.0
+
+    def test_custom_base_k(self):
+        """Custom base_K=40, GD=2 → G=1.5, returns 1.5 * 40 = 60.0."""
+        assert compute_k_factor(2, 40) == 60.0
