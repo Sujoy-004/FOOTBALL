@@ -3,12 +3,20 @@
 import json
 import logging
 import time
+from datetime import datetime
 
 import requests
 
 from src import constants
 
 logger = logging.getLogger(__name__)
+
+
+def build_historic_url() -> str:
+    """Build events URL with date range for historical catch-up from WC start to today."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    base = "https://sports.bzzoiro.com/api/events/"
+    return f"{base}?league_id=27&date_from={constants.WC_START_DATE}&date_to={today}&limit=200"
 
 
 def fetch_raw_matches(api_key: str, api_url: str = "", timeout: int = 10) -> list[dict]:
@@ -40,6 +48,11 @@ def fetch_raw_matches(api_key: str, api_url: str = "", timeout: int = 10) -> lis
                 all_events.extend(data.get("results", []))
                 next_url = data.get("next")
 
+            all_events = [
+                e for e in all_events
+                if isinstance(e.get("league"), dict)
+                and e["league"].get("id") == 27
+            ]
             return all_events
 
         except requests.exceptions.Timeout:
@@ -108,16 +121,36 @@ def process_matches(
 
         if home_score > away_score:
             winner = home_norm
+            is_draw = False
         elif away_score > home_score:
             winner = away_norm
+            is_draw = False
         else:
-            continue
+            # Draw or PK shootout (D-01, D-06)
+            bsd_winner = match.get("winner")
+            if bsd_winner:
+                # PK shootout — scores equal but match has winner
+                bsd_winner_lower = bsd_winner.strip().lower()
+                home_lower = home_name.strip().lower()
+                away_lower = away_name.strip().lower()
+                if bsd_winner_lower == home_lower:
+                    winner = home_norm
+                elif bsd_winner_lower == away_lower:
+                    winner = away_norm
+                else:
+                    # BSD winner doesn't match either team — fallback to draw
+                    winner = None
+                is_draw = False
+            else:
+                winner = None
+                is_draw = True
 
         results.append({
             "match_id": bracket_id,
             "team_a": home_norm,
             "team_b": away_norm,
             "winner": winner,
+            "is_draw": is_draw,
             "home_score": home_score,
             "away_score": away_score,
             "completed_at": match.get("event_date", ""),
