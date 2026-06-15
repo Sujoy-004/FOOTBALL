@@ -3,11 +3,13 @@
 Pure display functions using raw ANSI escape codes. No external dependencies.
 """
 
+import logging
 import sys
 import time
 from typing import Callable
 
 from src.constants import GROUP_COUNT, MATCHES_PER_GROUP, POLL_INTERVAL
+from src.elo_sync import get_staleness_level
 
 
 # Ensure stdout uses UTF-8 for Unicode symbols (▲, ▼, ⚠, →) on Windows
@@ -16,6 +18,8 @@ if hasattr(sys.stdout, "reconfigure"):
 
 NO_COLOR = False
 """Module-level flag: set to True to disable ANSI color output. Set from main.py after arg parsing (D-05)."""
+
+logger = logging.getLogger(__name__)
 
 
 def _supports_color() -> bool:
@@ -292,6 +296,87 @@ def print_elo_changes(updates: dict[str, dict[str, float]]) -> None:
         colored_delta = _green(delta_str) if delta >= 0 else _red(delta_str)
         arrow = "→"
         print(f"   {team_name:<12} {int(old)} {arrow} {int(new_rating)}  {colored_delta}")
+
+
+def print_sync_results(corrections: list[dict], elapsed: float) -> None:
+    """Print a single-line Elo sync summary with drift flag count.
+
+    Args:
+        corrections: List of correction log entries from sync_elo_from_eloratings().
+            Empty list = sync succeeded with no drift.
+        elapsed: Time in seconds the sync pipeline took.
+    """
+    if not corrections:
+        print(f"{_timestamp()} Elo sync: no corrections needed ({elapsed:.1f}s)")
+        return
+
+    flagged = sum(1 for c in corrections if c.get("reason") == "overwrite_drift_gt_30")
+    blended = sum(1 for c in corrections if c.get("reason") == "blended_50pct")
+    print(
+        f"{_timestamp()} Elo sync: corrected {_bold_cyan(str(len(corrections)))} ratings "
+        f"({_bold_cyan(str(flagged))} flagged >30pt drift) "
+        f"in {elapsed:.1f}s"
+    )
+
+
+def print_staleness_warning(hours_since_sync: float) -> None:
+    """Print graduated staleness warning for Elo cache age per D-16.
+
+    Level 0 (< 24h): no output (green/silent).
+    Level 1 (< 48h): logger.info() — systemic, not user-visible.
+    Level 2 (< 72h): yellow warning to stderr.
+    Level 3 (< 168h): red warning to stderr.
+    Level 4 (>= 168h): critical red warning to stderr.
+
+    Args:
+        hours_since_sync: Hours since the last successful Elo sync.
+    """
+    level, label = get_staleness_level(hours_since_sync)
+    hours_int = int(hours_since_sync)
+
+    if level == 0:
+        return  # green — silent
+
+    if level == 1:
+        logger.info("Elo cache age: %d hours", hours_int)
+        return
+
+    if level == 2:
+        print(
+            f"{_timestamp()} {_bold_yellow(f'⚠ Elo data age: {hours_int} hours — next refresh overdue')}",
+            file=sys.stderr,
+        )
+        return
+
+    # Level 3+ (red / critical)
+    print(
+        f"{_timestamp()} {_bold_red(f'🚨 Elo data age: {hours_int} hours — refresh critically overdue')}",
+        file=sys.stderr,
+    )
+
+
+def print_drift_flags(flags: list[dict]) -> None:
+    """Print drift flag details for corrections > 30 pt overwrite.
+
+    Args:
+        flags: List of correction entries with reason='overwrite_drift_gt_30'.
+            Each entry has keys: team, old_value, new_value, drift_magnitude.
+            Empty list produces no output.
+    """
+    if not flags:
+        return
+
+    flagged = [f for f in flags if f.get("reason") == "overwrite_drift_gt_30"]
+    if not flagged:
+        return
+
+    print(f"{_timestamp()} {_bold_yellow('Drift flags for investigation:')}")
+    for entry in flagged:
+        team = _bold_yellow(entry.get("team", "???"))
+        old_v = entry.get("old_value", "?")
+        new_v = entry.get("new_value", "?")
+        drift = entry.get("drift_magnitude", "?")
+        print(f"  {team}: {old_v} -> {new_v} (drift: {drift})")
 
 
 def print_heartbeat() -> None:
