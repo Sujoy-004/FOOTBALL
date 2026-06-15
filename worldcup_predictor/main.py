@@ -248,15 +248,31 @@ def _run_historical_catch_up(
                     continue
                 home_score = event.get("home_score", 0)
                 away_score = event.get("away_score", 0)
-                if home_score == away_score:
-                    played_bsd_event_ids.add(bsd_id)
-                    continue
-                winner = home_norm if home_score > away_score else away_norm
+                if home_score > away_score:
+                    winner = home_norm
+                elif away_score > home_score:
+                    winner = away_norm
+                else:
+                    # Draw or PK shootout (D-01, D-06)
+                    bsd_winner = event.get("winner")
+                    if bsd_winner:
+                        # PK shootout — equal scores but BSD has winner
+                        bsd_winner_lower = bsd_winner.strip().lower()
+                        home_lower = event.get("home_team", "").strip().lower()
+                        away_lower = event.get("away_team", "").strip().lower()
+                        if bsd_winner_lower == home_lower:
+                            winner = home_norm
+                        else:
+                            winner = away_norm
+                    else:
+                        # True draw
+                        winner = None
                 match_entry = {
                     "match_id": match_id,
                     "team_a": home_norm,
                     "team_b": away_norm,
                     "winner": winner,
+                    "is_draw": (winner is None),
                     "home_score": home_score,
                     "away_score": away_score,
                     "completed_at": event.get("event_date", ""),

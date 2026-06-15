@@ -314,10 +314,11 @@ class TestHistoricalCatchUp:
         assert elo_a > teams[slot["team_a"]]["elo"]  # winner gained Elo
         assert elo_b < teams[slot["team_b"]]["elo"]  # loser lost Elo
 
-    def test_draw_skipped(self, monkeypatch, full_data):
-        """Draw events are skipped (no winner)."""
+    def test_draw_included(self, monkeypatch, full_data):
+        """Draw events produce entry with winner=None, is_draw=True, and Elo is adjusted."""
         import main as main_mod
         from src.knockout import resolve_knockout_slot_teams
+        from src.elo import expected_score
 
         teams, groups, bracket, annex_c = full_data
         slot_teams = resolve_knockout_slot_teams(
@@ -343,11 +344,61 @@ class TestHistoricalCatchUp:
         monkeypatch.setattr(main_mod.state, "save_played_groups", lambda *a, **kw: None)
         monkeypatch.setattr(main_mod.state, "save_teams", lambda *a, **kw: None)
 
+        team_copies = {n: dict(d) for n, d in teams.items()}
         rg, rp, _ea = main_mod._run_historical_catch_up(
-            "dummy_key", teams, groups, bracket, annex_c, aliases,
+            "dummy_key", team_copies, groups, bracket, annex_c, aliases,
             {}, {},
         )
-        assert first_mid not in rp
+        assert first_mid in rp
+        assert rp[first_mid]["winner"] is None
+        assert rp[first_mid]["is_draw"] is True
+        assert rp[first_mid]["home_score"] == 1
+        assert rp[first_mid]["away_score"] == 1
+        # Elo should be adjusted for draw
+        e_a = expected_score(teams[slot["team_a"]]["elo"], teams[slot["team_b"]]["elo"])
+        if e_a > 0.5:
+            assert team_copies[slot["team_a"]]["elo"] < teams[slot["team_a"]]["elo"]
+        else:
+            assert team_copies[slot["team_b"]]["elo"] < teams[slot["team_b"]]["elo"]
+
+    def test_knockout_pk_catch_up(self, monkeypatch, full_data):
+        """PK shootout (equal scores + BSD winner) produces PK entry with winner set, is_draw=False."""
+        import main as main_mod
+        from src.knockout import resolve_knockout_slot_teams
+
+        teams, groups, bracket, annex_c = full_data
+        slot_teams = resolve_knockout_slot_teams(
+            groups, teams, {}, bracket, annex_c, {},
+        )
+        first_mid = sorted(slot_teams.keys())[0]
+        slot = slot_teams[first_mid]
+        aliases = {slot["team_a"]: [], slot["team_b"]: []}
+
+        mock_event = [{
+            "id": 99998,
+            "status": "finished",
+            "home_team": slot["team_a"],
+            "away_team": slot["team_b"],
+            "home_score": 1,
+            "away_score": 1,
+            "winner": slot["team_a"],
+            "event_date": "2026-06-15T22:00:00Z",
+            "league": {"id": 27},
+            "group_name": None,
+        }]
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: mock_event)
+        monkeypatch.setattr(main_mod.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(main_mod.state, "save_teams", lambda *a, **kw: None)
+
+        team_copies = {n: dict(d) for n, d in teams.items()}
+        rg, rp, _ea = main_mod._run_historical_catch_up(
+            "dummy_key", team_copies, groups, bracket, annex_c, aliases,
+            {}, {},
+        )
+        assert first_mid in rp
+        assert rp[first_mid]["winner"] == slot["team_a"]
+        assert rp[first_mid]["is_draw"] is False
 
     def test_restart_dedup(self, monkeypatch, full_data):
         """Event already in played is not re-processed on restart."""
