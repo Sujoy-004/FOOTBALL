@@ -199,6 +199,122 @@ def save_played_groups(played_groups: dict[str, dict], data_dir: Path | str | No
     _atomic_write_json(played_groups, path)
 
 
+def load_elo_applied(data_dir: Path | str | None = None) -> set[str]:
+    """Load the set of match_ids that have had Elo updates applied.
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        set[str]: Match IDs that have already had Elo applied.
+    """
+    path = _resolve_data_dir(data_dir) / "elo_applied.json"
+    if not path.exists():
+        return set()
+    with open(path, encoding="utf-8") as f:
+        data: list[str] = json.load(f)
+    return set(data)
+
+
+def save_elo_applied(elo_applied: set[str], data_dir: Path | str | None = None) -> None:
+    """Save the set of match_ids that have had Elo updates applied.
+
+    Args:
+        elo_applied: Set of match IDs.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "elo_applied.json"
+    _atomic_write_json(sorted(elo_applied), path)
+
+
+def load_state_meta(data_dir: Path | str | None = None) -> dict:
+    """Load state metadata (e.g. elo_version).
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        dict: Metadata dict, empty if file does not exist.
+    """
+    path = _resolve_data_dir(data_dir) / "state_meta.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_state_meta(meta: dict, data_dir: Path | str | None = None) -> None:
+    """Save state metadata (e.g. elo_version).
+
+    Args:
+        meta: Dict of metadata key/value pairs.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "state_meta.json"
+    _atomic_write_json(meta, path)
+
+
+def load_eloratings_cache(data_dir: Path | str | None = None) -> dict:
+    """Load last-known-good Elo cache from eloratings_cache.json.
+
+    Returns empty dict if no cache exists (graceful bootstrap per D-14).
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        dict: Cached eloratings data with keys like 'fetched_at' and 'values',
+        or empty dict if the file does not yet exist.
+    """
+    path = _resolve_data_dir(data_dir) / "eloratings_cache.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return dict(json.load(f))
+
+
+def save_eloratings_cache(cache: dict, data_dir: Path | str | None = None) -> None:
+    """Save last-known-good Elo cache to eloratings_cache.json atomically.
+
+    Args:
+        cache: Dict with fetched_at timestamp and values mapping team names to ratings.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "eloratings_cache.json"
+    _atomic_write_json(cache, path)
+
+
+def load_elo_update_log(data_dir: Path | str | None = None) -> list[dict]:
+    """Load structured audit trail of Elo corrections from elo_update_log.json.
+
+    Returns empty list on first run (D-12: audit log starts empty).
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        list[dict]: List of correction log entries, or empty list if the file
+        does not yet exist.
+    """
+    path = _resolve_data_dir(data_dir) / "elo_update_log.json"
+    if not path.exists():
+        return []
+    with open(path, encoding="utf-8") as f:
+        return list(json.load(f))
+
+
+def save_elo_update_log(log: list[dict], data_dir: Path | str | None = None) -> None:
+    """Save structured audit trail of Elo corrections to elo_update_log.json atomically.
+
+    Args:
+        log: List of correction entry dicts with keys: timestamp, team,
+            old_value, new_value, source, reason, drift_magnitude.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "elo_update_log.json"
+    _atomic_write_json(log, path)
+
+
 def validate_groups(groups: dict, teams: dict[str, dict] | None = None) -> None:
     """Validate groups.json structure. Raises ValueError on failure.
 
