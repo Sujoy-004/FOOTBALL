@@ -324,15 +324,19 @@ def process_group_matches(
         if match_id in played_group_ids:
             continue
 
-        # Check for winner (D-06: skip draws)
+        # Determine winner (D-01, D-06, Pitfall 4: no PK detection in group path)
         home_score = match.get("home_score", 0)
         away_score = match.get("away_score", 0)
         if home_score > away_score:
             winner = home_norm
+            is_draw = False
         elif away_score > home_score:
             winner = away_norm
+            is_draw = False
         else:
-            continue  # Draw — skip
+            # True draw — group stage never goes to PKs (Pitfall 4)
+            winner = None
+            is_draw = True
 
         # Append entry per D-04 structure
         results.append({
@@ -340,6 +344,7 @@ def process_group_matches(
             "team_a": home_norm,
             "team_b": away_norm,
             "winner": winner,
+            "is_draw": is_draw,
             "home_score": home_score,
             "away_score": away_score,
             "completed_at": match.get("event_date", ""),

@@ -185,8 +185,8 @@ class TestProcessGroupMatches:
         )
         assert result == [], f"Expected empty for unknown team, got {result}"
 
-    def test_process_group_matches_draw_skipped(self, group_a_fixture):
-        """Draw match (equal scores) is skipped — no winner."""
+    def test_process_group_matches_draw_included(self, group_a_fixture):
+        """Draw match (equal scores) produces entry with winner=None, is_draw=True."""
         draw_events = [
             {
                 "id": 2001,
@@ -204,7 +204,14 @@ class TestProcessGroupMatches:
             draw_events, {}, group_a_fixture, {},
             set(), set(),
         )
-        assert result == [], f"Expected empty for draw, got {result}"
+        assert len(result) == 1, f"Expected 1 result for draw, got {len(result)}"
+        assert result[0]["winner"] is None
+        assert result[0]["is_draw"] is True
+        assert result[0]["match_id"] == "GS_A_01"
+        assert result[0]["home_score"] == 1
+        assert result[0]["away_score"] == 1
+        assert result[0]["team_a"] == "Mexico"
+        assert result[0]["team_b"] == "South Africa"
 
     def test_process_group_matches_invalid_group_name(self, group_a_fixture):
         """Event with invalid group_name (not A-L) is skipped."""
