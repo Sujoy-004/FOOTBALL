@@ -72,25 +72,33 @@ def update_ratings(
     winner: str | None,
     current_elos: dict[str, float],
     K: int = 60,
+    pk_winner: str | None = None,
 ) -> dict[str, float]:
     """Update Elo ratings after a match result.
 
     Computes new ratings for both teams based on the match outcome.
+    Supports penalty shootout (PK) mode via pk_winner parameter — when
+    set, uses a 0.75/0.25 result split per eloratings.net PK rule.
+
     Does NOT modify the input `current_elos` dict.
 
     Args:
         team_a: Name of the first team.
         team_b: Name of the second team.
         winner: Name of the winning team (must be team_a or team_b),
-                or None for a draw.
+                or None for a draw. For PK-decided matches, winner
+                holds the team that won on penalties.
         current_elos: Dict mapping team names to their current Elo ratings.
         K: K-factor controlling rating change magnitude (default 60).
+        pk_winner: If set, overrides result_a with 0.75/0.25 PK split
+                   (must be team_a or team_b). Default None.
 
     Returns:
         Dict with only the two changed teams and their new ratings.
 
     Raises:
         ValueError: If winner is not None, team_a, or team_b.
+        ValueError: If pk_winner is not None, team_a, or team_b.
     """
     elo_a = current_elos[team_a]
     elo_b = current_elos[team_b]
@@ -98,7 +106,16 @@ def update_ratings(
     expected_a = expected_score(elo_a, elo_b)
     expected_b = 1.0 - expected_a
 
-    if winner is None:
+    if pk_winner is not None:
+        if pk_winner == team_a:
+            result_a = 0.75
+        elif pk_winner == team_b:
+            result_a = 0.25
+        else:
+            raise ValueError(
+                f"pk_winner '{pk_winner}' must be '{team_a}' or '{team_b}'"
+            )
+    elif winner is None:
         result_a = 0.5
     elif winner == team_a:
         result_a = 1.0
