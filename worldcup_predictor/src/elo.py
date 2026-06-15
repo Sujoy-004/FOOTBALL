@@ -13,6 +13,8 @@ Where K=60 is the default for World Cup finals matches.
 
 import math
 
+from src import constants
+
 
 def expected_score(rating_a: float, rating_b: float, home_advantage: int = 0) -> float:
     """Calculate expected score (win probability) for team A against team B.
@@ -136,13 +138,17 @@ def update_ratings(
 
 
 def apply_elo_update(match: dict, teams: dict[str, dict]) -> dict[str, dict[str, float]]:
-    """Apply Elo rating update for a single match result.
+    """Apply Elo rating update for a single match result with K-multiplier.
 
-    Handles both winner-decided and draw matches (winner=None).
-    Mutates teams dict in-place.
+    Computes goal-difference K-multiplier via compute_k_factor() per
+    eloratings.net step-function spec (D-10). Detects PK-decided matches
+    (is_draw=False + winner set + GD=0) and passes pk_winner for the
+    0.75/0.25 result split (D-06, D-07). Mutates teams dict in-place.
 
     Args:
-        match: Match dict with keys: team_a, team_b, winner (may be None).
+        match: Match dict with keys: team_a, team_b, winner (may be None),
+               home_score, away_score. For PK shootouts: winner holds the
+               PK winner and is_draw=False. For true draws: winner=None.
         teams: Dict mapping team name to team data (mutated in-place).
 
     Returns:
@@ -150,8 +156,23 @@ def apply_elo_update(match: dict, teams: dict[str, dict]) -> dict[str, dict[str,
         for the two teams involved.
     """
     current_elos = {name: data["elo"] for name, data in teams.items()}
+
+    # Compute goal-difference K-multiplier (D-10, D-13)
+    goal_diff = abs(match.get("home_score", 0) - match.get("away_score", 0))
+    adjusted_K = compute_k_factor(goal_diff, constants.K_FACTOR)
+
+    # Detect PK mode (D-06, D-07)
+    pk_winner = None
+    if not match.get("is_draw", True) and match.get("winner") is not None:
+        pk_winner = match["winner"]
+
     ratings_update = update_ratings(
-        match["team_a"], match["team_b"], match.get("winner"), current_elos,
+        match["team_a"],
+        match["team_b"],
+        match.get("winner"),
+        current_elos,
+        K=int(round(adjusted_K)),
+        pk_winner=pk_winner,
     )
     elo_updates: dict[str, dict[str, float]] = {}
     for team_name, new_rating in ratings_update.items():
@@ -159,6 +180,3 @@ def apply_elo_update(match: dict, teams: dict[str, dict]) -> dict[str, dict[str,
         elo_updates[team_name] = {"old": old_rating, "new": new_rating}
         teams[team_name]["elo"] = new_rating
     return elo_updates
-
-
-# TODO: Add goal-difference K multiplier (eloratings.net adjustment) post-MVP
