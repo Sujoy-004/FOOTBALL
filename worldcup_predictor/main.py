@@ -20,15 +20,54 @@ from dotenv import load_dotenv
 
 from src import elo, elo_sync, output, state
 from src.constants import API_TIMEOUT, ELO_SYNC_INTERVAL_HOURS, POLL_INTERVAL
+from src.constants import ODDS_CACHE_TTL_HOURS, CATBOOST_CACHE_TTL_HOURS, ODDS_CACHE_FILE, CATBOOST_CACHE_FILE
 from src.fetcher import build_historic_url, fetch_raw_matches, process_group_matches, process_matches
 from src.knockout import resolve_knockout_slot_teams, run_full_simulation
 from src.simulation import run_simulation
 from src.output import print_sync_results, print_staleness_warning, print_drift_flags
+from src.predictors.odds import fetch_and_cache_odds
+from src.predictors.catboost import fetch_and_cache_catboost
 
 
 _running = True
 _elo_last_sync_time: float = 0.0
 """Tracks when Elo sync last completed. 0.0 = never synced. Used for 24h interval checks and wake-from-sleep detection (D-02, D-03)."""
+
+
+def _merge_signals_into_history() -> None:
+    """Read signal caches and inject probabilities into prediction_history entries.
+
+    CRITICAL DATA FLOW: Without this, evaluate_all_matches(signal_name="market_odds")
+    returns n_matches=0 because prediction_history only has elo signals.
+
+    For each prediction_history entry that lacks market_odds or catboost signals,
+    looks up the match_id in the respective cache.
+    If a signal is available for that match, adds it to the entry's signals dict.
+    Saves updated history atomically via save_prediction_history().
+    """
+    history = state.load_prediction_history()
+    if not history:
+        return
+    odds_cache = state.load_signal_cache(ODDS_CACHE_FILE)
+    cb_cache = state.load_signal_cache(CATBOOST_CACHE_FILE)
+    odds_matches = odds_cache.get("matches", {})
+    cb_matches = cb_cache.get("matches", {})
+    if not odds_matches and not cb_matches:
+        return
+    changed = False
+    for entry in history:
+        signals = entry.get("signals", {})
+        if not isinstance(signals, dict):
+            continue
+        mid = entry.get("match_id", "")
+        if mid in odds_matches and "market_odds" not in signals:
+            signals["market_odds"] = dict(odds_matches[mid])
+            changed = True
+        if mid in cb_matches and "catboost" not in signals:
+            signals["catboost"] = dict(cb_matches[mid])
+            changed = True
+    if changed:
+        state.save_prediction_history(history)
 
 
 def _run_elo_sync(teams: dict[str, dict]) -> None:
@@ -503,6 +542,60 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             state.save_played_groups(played_groups)
         state.save_teams(teams)
 
+    # ── Signal cache refresh, merge into prediction_history ──
+    signal_warnings: list[str] = []
+
+    # Refresh odds from existing events (no extra API call — reuses raw data)
+    odds_cache = state.load_signal_cache(ODDS_CACHE_FILE)
+    if raw and not state.is_cache_valid(odds_cache, ODDS_CACHE_TTL_HOURS):
+        try:
+            odds_cache = fetch_and_cache_odds(
+                api_key, raw, aliases, groups, ODDS_CACHE_TTL_HOURS
+            )
+            state.save_signal_cache(odds_cache, ODDS_CACHE_FILE)
+        except Exception as e:
+            print(f"Warning: Odds fetch failed: {e}", file=sys.stderr)
+            if not odds_cache or not odds_cache.get("matches"):
+                signal_warnings.append("Market odds unavailable — no cached data")
+
+    # Refresh CatBoost (dedicated API call only if cache expired)
+    cb_cache = state.load_signal_cache(CATBOOST_CACHE_FILE)
+    if not state.is_cache_valid(cb_cache, CATBOOST_CACHE_TTL_HOURS):
+        try:
+            cb_cache = fetch_and_cache_catboost(
+                api_key, aliases, groups, bracket, CATBOOST_CACHE_TTL_HOURS
+            )
+            state.save_signal_cache(cb_cache, CATBOOST_CACHE_FILE)
+        except Exception as e:
+            print(f"Warning: CatBoost fetch failed: {e}", file=sys.stderr)
+            if not cb_cache or not cb_cache.get("matches"):
+                signal_warnings.append("CatBoost predictions unavailable — no cached data")
+
+    # Merge signal cache data into prediction_history entries
+    _merge_signals_into_history()
+
+    # Count unavailable matches per signal for aggregated warnings (D-09)
+    odds_matches = odds_cache.get("matches", {}) if odds_cache else {}
+    odds_unavailable = sum(
+        1 for m in odds_matches.values() if not m.get("available", False)
+    )
+    if odds_unavailable:
+        signal_warnings.append(
+            f"⚠ Market odds unavailable for {odds_unavailable} match(es)"
+        )
+    cb_matches = cb_cache.get("matches", {}) if cb_cache else {}
+    cb_unavailable = sum(
+        1 for m in cb_matches.values() if not m.get("available", False)
+    )
+    if cb_unavailable:
+        signal_warnings.append(
+            f"⚠ CatBoost predictions unavailable for {cb_unavailable} match(es)"
+        )
+
+    # Print aggregated warnings once per poll cycle (D-09)
+    for warning in signal_warnings:
+        print(warning)
+
     # D-15: group standings display behavior
     #   - New group match ingested → show
     #   - Hourly refresh → show (handled above in hourly block)
@@ -600,6 +693,23 @@ def main() -> None:
         # ── Baseline metrics ──
         # Record one-shot Brier/log-loss baseline for Phase 12b (D-18)
         _record_eval_baseline(teams, played, played_groups)
+
+        # ── Prediction history migration (one-shot, before signal fetch) ──
+        n_migrated = state.migrate_prediction_history()
+        if n_migrated:
+            print(f"Prediction history migrated: {n_migrated} entries to compound format")
+
+        # ── Seed CatBoost cache at startup (dedicated API call) ──
+        try:
+            cb_cache = fetch_and_cache_catboost(
+                api_key, aliases, groups, bracket, CATBOOST_CACHE_TTL_HOURS
+            )
+            state.save_signal_cache(cb_cache, CATBOOST_CACHE_FILE)
+        except Exception as e:
+            print(f"Warning: initial CatBoost fetch failed: {e}", file=sys.stderr)
+
+        # ── Merge CatBoost into prediction_history — even if cache is partial ──
+        _merge_signals_into_history()
 
         # ── Startup Elo sync per D-01, D-18 ──
         # Runs after historical catch-up (Pitfall 7: catch-up first, then sync)
