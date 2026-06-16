@@ -772,6 +772,72 @@ def save_prediction_history(history: list[dict], data_dir: Path | str | None = N
     _atomic_write_json(history, path)
 
 
+def migrate_prediction_history(data_dir: Path | str | None = None) -> int:
+    """Migrate prediction_history from flat format to compound format.
+
+    Phase 13+ uses compound entries with a nested ``signals`` dict (D-01).
+    Phase 12b used flat entries with top-level ``prediction`` and ``signal`` keys.
+
+    Detection: if an entry has a top-level ``signal`` key → flat format.
+    If all entries have ``signals`` key → already compound → skip.
+
+    Idempotent: already-compound entries are left untouched. Flat entries are
+    converted in-place and the full list is written atomically via
+    save_prediction_history().
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        int: Number of entries migrated (0 if none needed).
+    """
+    history = load_prediction_history(data_dir)
+    if not history:
+        return 0
+
+    # Check if any entry is in flat format
+    has_flat = any("signal" in entry for entry in history)
+    if not has_flat:
+        return 0  # Already all compound — idempotent
+
+    n_migrated = 0
+    migrated: list[dict] = []
+    for entry in history:
+        if "signal" in entry:
+            # Flat entry — convert to compound
+            signal_name = entry.get("signal", "elo")
+            signals = {
+                signal_name: {
+                    "probability": entry.get("prediction"),
+                    "version": "v1",
+                    "timestamp": entry.get("timestamp"),
+                    "available": True,
+                }
+            }
+            # Preserve team_a_elo, team_b_elo inside the signal dict
+            if "team_a_elo" in entry:
+                signals[signal_name]["team_a_elo"] = entry["team_a_elo"]
+            if "team_b_elo" in entry:
+                signals[signal_name]["team_b_elo"] = entry["team_b_elo"]
+
+            new_entry = {
+                "match_id": entry.get("match_id", ""),
+                "timestamp": entry.get("timestamp"),
+                "team_a": entry.get("team_a", ""),
+                "team_b": entry.get("team_b", ""),
+                "actual": entry.get("actual"),
+                "signals": signals,
+            }
+            migrated.append(new_entry)
+            n_migrated += 1
+        else:
+            # Already compound — leave untouched
+            migrated.append(entry)
+
+    save_prediction_history(migrated, data_dir)
+    return n_migrated
+
+
 def load_eval_baseline_report(data_dir: Path | str | None = None) -> dict | None:
     """Load evaluation baseline report.
 

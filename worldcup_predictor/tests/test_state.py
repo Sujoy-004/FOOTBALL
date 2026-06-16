@@ -21,6 +21,7 @@ from src.state import (
     load_prediction_history,
     load_signal_cache,
     load_teams,
+    migrate_prediction_history,
     save_bracket,
     save_played,
     save_signal_cache,
