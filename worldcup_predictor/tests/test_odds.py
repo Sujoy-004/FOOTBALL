@@ -16,9 +16,9 @@ class TestVigRemoval:
     """remove_vig: convert decimal odds to normalized probabilities."""
 
     def test_remove_vig_basic(self):
-        """[1.85, 3.40, 4.50] → normalized probs summing to 1.0, home ~0.498."""
+        """[1.85, 3.40, 4.50] → normalized probs summing to 1.0, home ~0.511."""
         result = remove_vig(1.85, 3.40, 4.50)
-        assert abs(result["home"] - 0.498) < 0.01
+        assert abs(result["home"] - 0.511) < 0.01
         assert abs(sum(result.values()) - 1.0) < 1e-10
 
     def test_remove_vig_all_three(self):
