@@ -13,14 +13,19 @@ from pathlib import Path
 import pytest
 
 from src.state import (
+    is_cache_valid,
     load_annex_c,
     load_bracket,
     load_groups,
     load_played,
+    load_prediction_history,
+    load_signal_cache,
     load_teams,
     save_bracket,
     save_played,
+    save_signal_cache,
     save_teams,
+    save_prediction_history,
     validate_annex_c,
     validate_bracket,
     validate_groups,
@@ -545,3 +550,79 @@ def test_production_annex_c_validates():
         annex_c = json.load(f)
     # Should not raise
     validate_annex_c(annex_c)
+
+
+# ─── Signal cache tests (Phase 13) ──────────────────────────────────
+
+
+def test_is_cache_valid_valid():
+    """A cache with a future expires_at should return True."""
+    cache = {"expires_at": "2099-01-01T00:00:00+00:00"}
+    assert is_cache_valid(cache, ttl_hours=12) is True
+
+
+def test_is_cache_valid_expired():
+    """A cache with a past expires_at should return False."""
+    cache = {"expires_at": "2020-01-01T00:00:00+00:00"}
+    assert is_cache_valid(cache, ttl_hours=12) is False
+
+
+def test_is_cache_valid_empty():
+    """An empty dict should return False."""
+    assert is_cache_valid({}, ttl_hours=12) is False
+
+
+def test_is_cache_valid_no_expires():
+    """A cache without an expires_at key should return False."""
+    cache = {"fetched_at": "2026-06-16T12:00:00+00:00"}
+    assert is_cache_valid(cache, ttl_hours=12) is False
+
+
+def test_is_cache_valid_malformed():
+    """A cache with an invalid date string should return False."""
+    cache = {"expires_at": "not-a-date"}
+    assert is_cache_valid(cache, ttl_hours=12) is False
+
+
+def test_save_load_signal_cache(tmp_path):
+    """Save then load a signal cache should return identical content."""
+    cache = {
+        "fetched_at": "2026-06-16T12:00:00+00:00",
+        "expires_at": "2026-06-17T00:00:00+00:00",
+        "matches": {"GS_A_01": {"probability": 0.54, "available": True}},
+    }
+    save_signal_cache(cache, "test_cache.json", data_dir=tmp_path)
+    loaded = load_signal_cache("test_cache.json", data_dir=tmp_path)
+    assert loaded == cache
+
+
+def test_signal_cache_not_exists(tmp_path):
+    """load_signal_cache should return empty dict if file doesn't exist."""
+    loaded = load_signal_cache("nonexistent.json", data_dir=tmp_path)
+    assert loaded == {}
+
+
+def test_save_prediction_history(tmp_path):
+    """save_prediction_history persists a complete history list."""
+    history = [
+        {"match_id": "GS_A_01", "actual": 1, "signals": {}},
+        {"match_id": "GS_A_02", "actual": 0, "signals": {}},
+        {"match_id": "GS_B_01", "actual": 1, "signals": {}},
+    ]
+    save_prediction_history(history, data_dir=tmp_path)
+    loaded = load_prediction_history(data_dir=tmp_path)
+    assert loaded == history
+
+
+def test_save_prediction_history_overwrite(tmp_path):
+    """save_prediction_history replaces the entire history (not append)."""
+    history_a = [
+        {"match_id": "GS_A_01", "actual": 1, "signals": {}},
+    ]
+    history_b = [
+        {"match_id": "GS_B_01", "actual": 0, "signals": {}},
+    ]
+    save_prediction_history(history_a, data_dir=tmp_path)
+    save_prediction_history(history_b, data_dir=tmp_path)
+    loaded = load_prediction_history(data_dir=tmp_path)
+    assert loaded == history_b, "Expected second save to replace, not append"
