@@ -377,11 +377,12 @@ Plans:
 - Base rate integrated as a prior that anchors blended probabilities in data-sparse regimes
 - Blender degrades gracefully when signals are missing (re-normalizes weights)
 
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
 
-- *(to be planned via /gsd-plan-phase 14)*
+- [ ] 14-01-PLAN.md — Blender Core Module (Wave 1): Platt scaling, blending functions, LOO-CV, Poisson base rate function, test_blender.py
+- [ ] 14-02-PLAN.md — Simulation & Pipeline Integration (Wave 2): knockout.py blend_params, main.py calibration pipeline, Poisson rate wiring, state.py persistence
 
 ---
 
@@ -535,7 +536,7 @@ Plans:
 | 12. Draw Handling & Elo Math | v2.0 | 3/3 | Complete | 2026-06-15 |
 | 12b. Evaluation Infrastructure | v2.0 | 1/1 | Complete | 2026-06-15 |
 | 13. Signal Ingestion | v2.0 | 3/3 | Complete   | 2026-06-16 |
-| 14. Signal Blending | v2.0 | 0/0 | Planned | — |
+| 14. Signal Blending | v2.0 | 0/2 | Planned | — |
 | 15. Context Signals | v2.0 | 0/0 | Planned | — |
 | 16. Model Governance | v2.0 | 0/0 | Planned | — |
 | 17. Output Enhancement | v2.0 | 0/0 | Planned | — |
