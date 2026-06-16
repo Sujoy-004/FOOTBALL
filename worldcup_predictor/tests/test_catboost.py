@@ -1,0 +1,315 @@
+"""Tests for catboost.py — prediction parsing, missing predictions, cache TTL.
+
+All file I/O tests use tmp_path to avoid modifying real data files.
+"""
+from datetime import datetime, timezone
+
+import pytest
+
+from src.predictors.catboost import (
+    fetch_and_cache_catboost,
+    parse_catboost_response,
+)
+from src.state import load_signal_cache, save_signal_cache
+
+
+# ─── Prediction Parsing Tests ───────────────────────────────────────
+
+
+class TestParsePredictions:
+    """parse_catboost_response: parse BSD predictions into canonical format."""
+
+    def _make_alias_lookup(self):
+        return {
+            "argentina": "Argentina",
+            "algeria": "Algeria",
+            "brazil": "Brazil",
+            "japan": "Japan",
+        }
+
+    def _make_groups(self):
+        return {
+            "groups": {
+                "B": {
+                    "teams": ["Argentina", "Algeria"],
+                    "matches": [
+                        {"match_id": "GS_B_01", "team_a": "Argentina", "team_b": "Algeria"},
+                    ],
+                },
+                "C": {
+                    "teams": ["Brazil", "Japan"],
+                    "matches": [
+                        {"match_id": "GS_C_01", "team_a": "Brazil", "team_b": "Japan"},
+                    ],
+                },
+            }
+        }
+
+    def _make_valid_prediction(self, overrides: dict | None = None) -> dict:
+        pred = {
+            "event_id": 12345,
+            "home_team": "Argentina",
+            "away_team": "Algeria",
+            "event_date": "2026-06-17T05:00:00+00:00",
+            "predictions": {
+                "home_probability": 0.64,
+                "draw_probability": 0.20,
+                "away_probability": 0.17,
+                "confidence": 0.88,
+                "model_version": "catboost-v5.0",
+            },
+            "updated_at": "2026-06-16T12:00:00+00:00",
+        }
+        if overrides:
+            self._deep_update(pred, overrides)
+        return pred
+
+    def _deep_update(self, target: dict, updates: dict) -> None:
+        for k, v in updates.items():
+            if isinstance(v, dict) and isinstance(target.get(k), dict):
+                target[k].update(v)
+            else:
+                target[k] = v
+
+    def test_parse_valid_prediction(self):
+        """BSD prediction dict → entry with probability, available=True."""
+        result = parse_catboost_response(
+            [self._make_valid_prediction()],
+            self._make_alias_lookup(),
+            self._make_groups(),
+            [],
+        )
+        assert "GS_B_01" in result
+        entry = result["GS_B_01"]
+        assert entry["probability"] == 0.64
+        assert entry["available"] is True
+
+    def test_parse_all_fields(self):
+        """confidence, model_version, timestamp stored in cache entry."""
+        result = parse_catboost_response(
+            [self._make_valid_prediction()],
+            self._make_alias_lookup(),
+            self._make_groups(),
+            [],
+        )
+        entry = result["GS_B_01"]
+        assert entry["confidence"] == 0.88
+        assert entry["model_version"] == "catboost-v5.0"
+        assert "timestamp" in entry
+        assert entry["timestamp"] == "2026-06-16T12:00:00+00:00"
+
+    def test_parse_null_predictions(self):
+        """predictions field is None → available=False, reason='predictions_not_available'."""
+        pred = self._make_valid_prediction({"predictions": None})
+        result = parse_catboost_response(
+            [pred], self._make_alias_lookup(), self._make_groups(), [],
+        )
+        assert "GS_B_01" in result
+        entry = result["GS_B_01"]
+        assert entry["available"] is False
+        assert entry["reason"] == "predictions_not_available"
+
+    def test_parse_missing_event_id(self):
+        """No event_id → skip gracefully (not in matches)."""
+        pred = self._make_valid_prediction({"event_id": None})
+        result = parse_catboost_response(
+            [pred], self._make_alias_lookup(), self._make_groups(), [],
+        )
+        assert len(result) == 0
+
+    def test_parse_negative_probability(self):
+        """Negative probability → available=False, reason='invalid_probability'."""
+        pred = self._make_valid_prediction({
+            "predictions": {"home_probability": -0.5},
+        })
+        result = parse_catboost_response(
+            [pred], self._make_alias_lookup(), self._make_groups(), [],
+        )
+        assert "GS_B_01" in result
+        entry = result["GS_B_01"]
+        assert entry["available"] is False
+        assert entry["reason"] == "invalid_probability"
+
+    def test_parse_probabilities_not_sum_one(self):
+        """Non-normalized probs stored as-is (normalization happens in Phase 14)."""
+        pred = self._make_valid_prediction({
+            "predictions": {
+                "home_probability": 0.8,
+                "draw_probability": 0.3,
+                "away_probability": 0.2,
+            },
+        })
+        result = parse_catboost_response(
+            [pred], self._make_alias_lookup(), self._make_groups(), [],
+        )
+        entry = result["GS_B_01"]
+        assert entry["probability"] == 0.8
+        assert entry["available"] is True
+
+    def test_parse_different_field_names(self):
+        """Alternative field names via fallback chain (home_win → probability_home)."""
+        alias = {"brazil": "Brazil", "japan": "Japan"}
+        groups = {
+            "groups": {
+                "C": {
+                    "teams": ["Brazil", "Japan"],
+                    "matches": [{"match_id": "GS_C_01", "team_a": "Brazil", "team_b": "Japan"}],
+                },
+            },
+        }
+        # Fallback 1: home_win, draw, away_win
+        pred1 = {
+            "event_id": 200,
+            "home_team": "Brazil",
+            "away_team": "Japan",
+            "event_date": "2026-06-18T05:00:00+00:00",
+            "predictions": {
+                "home_win": 0.55,
+                "draw": 0.25,
+                "away_win": 0.20,
+                "confidence": 0.75,
+                "model_version": "catboost-v5.0",
+            },
+            "updated_at": "2026-06-17T12:00:00+00:00",
+        }
+        result = parse_catboost_response([pred1], alias, groups, [])
+        entry = result["GS_C_01"]
+        assert entry["probability"] == 0.55
+        assert entry["confidence"] == 0.75
+
+        # Fallback 2: probability_home, probability_draw, probability_away
+        pred2 = {
+            "event_id": 201,
+            "home_team": "Brazil",
+            "away_team": "Japan",
+            "event_date": "2026-06-18T05:00:00+00:00",
+            "predictions": {
+                "probability_home": 0.60,
+                "probability_draw": 0.22,
+                "probability_away": 0.18,
+                "confidence": 0.80,
+                "model_version": "catboost-v5.0",
+            },
+            "updated_at": "2026-06-17T12:00:00+00:00",
+        }
+        result = parse_catboost_response([pred2], alias, groups, [])
+        entry = result["GS_C_01"]
+        assert entry["probability"] == 0.60
+        assert entry["confidence"] == 0.80
+
+
+# ─── Missing Predictions Tests ──────────────────────────────────────
+
+
+class TestMissingPredictions:
+    """parse_catboost_response: handle mixed availability."""
+
+    def test_all_missing(self):
+        """All predictions null → all entries available=False."""
+        alias_lookup = {
+            "argentina": "Argentina", "algeria": "Algeria",
+            "brazil": "Brazil", "japan": "Japan",
+        }
+        groups = {
+            "groups": {
+                "B": {
+                    "teams": ["Argentina", "Algeria"],
+                    "matches": [{"match_id": "GS_B_01", "team_a": "Argentina", "team_b": "Algeria"}],
+                },
+                "C": {
+                    "teams": ["Brazil", "Japan"],
+                    "matches": [{"match_id": "GS_C_01", "team_a": "Brazil", "team_b": "Japan"}],
+                },
+            },
+        }
+        predictions = [
+            {"event_id": 100, "home_team": "Argentina", "away_team": "Algeria",
+             "predictions": None, "updated_at": "2026-06-16T12:00:00+00:00"},
+            {"event_id": 200, "home_team": "Brazil", "away_team": "Japan",
+             "predictions": None, "updated_at": "2026-06-16T12:00:00+00:00"},
+        ]
+        result = parse_catboost_response(predictions, alias_lookup, groups, [])
+        assert result["GS_B_01"]["available"] is False
+        assert result["GS_C_01"]["available"] is False
+        assert len(result) == 2
+
+    def test_partial_missing(self):
+        """Some have predictions, some don't → mixed available flags."""
+        alias_lookup = {
+            "argentina": "Argentina", "algeria": "Algeria",
+            "brazil": "Brazil", "japan": "Japan",
+        }
+        groups = {
+            "groups": {
+                "B": {
+                    "teams": ["Argentina", "Algeria"],
+                    "matches": [{"match_id": "GS_B_01", "team_a": "Argentina", "team_b": "Algeria"}],
+                },
+                "C": {
+                    "teams": ["Brazil", "Japan"],
+                    "matches": [{"match_id": "GS_C_01", "team_a": "Brazil", "team_b": "Japan"}],
+                },
+            },
+        }
+        predictions = [
+            {
+                "event_id": 100, "home_team": "Argentina", "away_team": "Algeria",
+                "event_date": "2026-06-17T05:00:00+00:00",
+                "predictions": {
+                    "home_probability": 0.64, "draw_probability": 0.20,
+                    "away_probability": 0.17, "confidence": 0.88,
+                    "model_version": "catboost-v5.0",
+                },
+                "updated_at": "2026-06-16T12:00:00+00:00",
+            },
+            {
+                "event_id": 200, "home_team": "Brazil", "away_team": "Japan",
+                "predictions": None, "updated_at": "2026-06-16T12:00:00+00:00",
+            },
+        ]
+        result = parse_catboost_response(predictions, alias_lookup, groups, [])
+        assert result["GS_B_01"]["available"] is True
+        assert result["GS_B_01"]["probability"] == 0.64
+        assert result["GS_C_01"]["available"] is False
+        assert result["GS_C_01"]["reason"] == "predictions_not_available"
+        assert len(result) == 2
+
+
+# ─── Cache Schema Tests ─────────────────────────────────────────────
+
+
+class TestCatboostCache:
+    """fetch_and_cache_catboost: cache dict schema validation."""
+
+    def _mock_empty_response(self, monkeypatch):
+        """Monkeypatch requests.get to return empty results list."""
+        def mock_get(*args, **kwargs):
+            class MockResponse:
+                status_code = 200
+                def json(self):
+                    return {"count": 0, "results": []}
+                def raise_for_status(self):
+                    pass
+            return MockResponse()
+        monkeypatch.setattr("requests.get", mock_get)
+
+    def test_cache_schema_valid(self, monkeypatch):
+        """fetch_and_cache_catboost returns dict with fetched_at, expires_at, matches."""
+        self._mock_empty_response(monkeypatch)
+        cache = fetch_and_cache_catboost(
+            "test_key", {}, {"groups": {}}, [], cache_ttl_hours=24,
+        )
+        assert "fetched_at" in cache
+        assert "expires_at" in cache
+        assert "matches" in cache
+
+    def test_cache_produces_24h_ttl(self, monkeypatch):
+        """expires_at is ~24h from fetched_at."""
+        self._mock_empty_response(monkeypatch)
+        cache = fetch_and_cache_catboost(
+            "test_key", {}, {"groups": {}}, [], cache_ttl_hours=24,
+        )
+        fetched = datetime.fromisoformat(cache["fetched_at"])
+        expires = datetime.fromisoformat(cache["expires_at"])
+        diff = (expires - fetched).total_seconds()
+        assert 23 * 3600 < diff < 25 * 3600
