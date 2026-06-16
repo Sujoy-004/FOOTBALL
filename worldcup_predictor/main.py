@@ -386,79 +386,24 @@ def _record_eval_baseline(
     played: dict[str, dict],
     played_groups: dict[str, dict],
 ) -> None:
-    """Record baseline Brier score and log loss by replaying all matches.
+    """Record baseline evaluation report using the evaluation framework.
 
-    Uses the current (draw-fixed) Elo ratings to compute predicted probabilities
-    before each match, then compares against actual outcomes to compute Brier
-    and log loss. Writes to data/eval_baseline.json for Phase 12b comparison.
-
-    This is a one-shot measurement, not the full evaluation framework.
-    Phase 12b builds the proper infrastructure (V2-18, V2-19).
-
-    Args:
-        teams: Team data dict with current Elo ratings (deep-copied for replay).
+    Delegates to evaluation.evaluate_all_matches() and persists the report.
+    Replaces the ad-hoc Brier/log-loss computation from Phase 12.
     """
-    from pathlib import Path
-    from src import constants
-    from src.elo import apply_elo_update, expected_score
-    from src.state import _atomic_write_json
+    from src.evaluation import evaluate_all_matches
+    from src.state import save_eval_baseline_report
 
-    all_matches: list[dict] = []
-    for match_dict in [played, played_groups]:
-        for m in match_dict.values():
-            all_matches.append(dict(m))
+    report = evaluate_all_matches(teams, played, played_groups, signal_name="elo")
+    save_eval_baseline_report(report)
 
-    all_matches.sort(key=lambda x: (x.get("completed_at", ""), x.get("match_id", "")))
-
-    replay_teams = copy.deepcopy(teams)
-    brier_scores: list[float] = []
-    log_losses: list[float] = []
-
-    for m in all_matches:
-        t_a, t_b = m["team_a"], m["team_b"]
-        if t_a not in replay_teams or t_b not in replay_teams:
-            continue
-
-        p_a = expected_score(replay_teams[t_a]["elo"], replay_teams[t_b]["elo"])
-
-        winner = m.get("winner")
-        if winner is None:
-            actual_a = 0.5
-        elif winner == t_a:
-            actual_a = 1.0
-        elif winner == t_b:
-            actual_a = 0.0
-        else:
-            continue
-
-        brier_scores.append((p_a - actual_a) ** 2)
-
-        eps = 1e-15
-        p_a_clamped = max(eps, min(1 - eps, p_a))
-        if actual_a == 0.5:
-            ll = -0.5 * (math.log(p_a_clamped) + math.log(1 - p_a_clamped))
-        else:
-            ll = -(actual_a * math.log(p_a_clamped) + (1 - actual_a) * math.log(1 - p_a_clamped))
-        log_losses.append(ll)
-
-        try:
-            apply_elo_update(m, replay_teams)
-        except Exception:
-            pass
-
-    if not brier_scores:
-        return
-
-    baseline = {
-        "brier": sum(brier_scores) / len(brier_scores),
-        "log_loss": sum(log_losses) / len(log_losses),
-        "n_matches": len(brier_scores),
-        "generated_at": datetime.now().isoformat(),
-    }
-
-    path = constants.DATA_DIR / "eval_baseline.json"
-    _atomic_write_json(baseline, path)
-    print(f"Baseline: Brier={baseline['brier']:.4f}, LogLoss={baseline['log_loss']:.4f} ({baseline['n_matches']} matches)")
+    if report["n_matches"] > 0:
+        m = report["metrics"]
+        print(f"Baseline: Brier={m['brier']:.4f}, LogLoss={m['log_loss']:.4f}, "
+              f"Acc={m['accuracy']:.3f}, ECE={report['calibration']['ece']:.4f} "
+              f"({report['n_matches']} matches)")
+    else:
+        print("Baseline: no matches to evaluate")
 
 
 def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_key, aliases, last_sim_time, last_request_time, prev_probs=None, seed=None):

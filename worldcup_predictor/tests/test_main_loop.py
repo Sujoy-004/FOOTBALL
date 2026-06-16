@@ -660,14 +660,14 @@ class TestDrawBackfillIntegration:
         assert teams["A"]["elo"] == 2000  # unchanged
 
     def test_baseline_records_brier(self, monkeypatch, tmp_path):
-        """eval_baseline.json created with correct Brier for fixture matches."""
+        """eval_baseline_report.json created with correct Brier for fixture matches."""
         import json
         from pathlib import Path
         from src import constants
         from main import _record_eval_baseline
 
-        # Override DATA_DIR to tmp_path
         monkeypatch.setattr(constants, "DATA_DIR", tmp_path)
+        monkeypatch.setattr("main.state.save_teams", lambda *a, **kw: None)
 
         teams = {"Arg": {"elo": 2100}, "Bra": {"elo": 2000}}
         played = {
@@ -677,12 +677,21 @@ class TestDrawBackfillIntegration:
         }
         _record_eval_baseline(teams, played, {})
 
-        path = tmp_path / "eval_baseline.json"
-        assert path.exists(), "eval_baseline.json should exist"
+        path = tmp_path / "eval_baseline_report.json"
+        assert path.exists(), "eval_baseline_report.json should exist"
         d = json.loads(path.read_text(encoding="utf-8"))
-        assert "brier" in d
-        assert "log_loss" in d
-        assert "n_matches" in d
-        assert d["n_matches"] == 1  # one match processed
-        assert 0 <= d["brier"] <= 1
-        assert d["brier"] > 0  # prediction not perfect
+        assert d["n_matches"] == 1
+        assert 0 <= d["metrics"]["brier"] <= 1
+        assert d["metrics"]["brier"] > 0
+
+        hist_path = tmp_path / "prediction_history.json"
+        assert hist_path.exists()
+        hist = json.loads(hist_path.read_text(encoding="utf-8"))
+        assert len(hist) == 1
+        assert hist[0]["match_id"] == "M01"
+        # Compound format (Phase 13)
+        assert "signals" in hist[0], "Entry should have signals dict"
+        assert "prediction" not in hist[0], "No flat prediction key"
+        assert hist[0]["signals"]["elo"]["available"] is True
+        assert hist[0]["signals"]["elo"]["team_a_elo"] == 2100
+        assert hist[0]["signals"]["elo"]["team_b_elo"] == 2000

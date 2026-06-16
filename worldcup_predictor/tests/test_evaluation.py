@@ -124,20 +124,20 @@ class TestEvaluateAllMatches:
         teams = {"A": {"elo": 2000}, "B": {"elo": 1900}}
         played = {"M01": {"match_id": "M01", "team_a": "A", "team_b": "B", "winner": "A", "home_score": 2, "away_score": 0, "completed_at": "2026-06-15T20:00:00Z"}}
         played_groups = {}
-        result = evaluate_all_matches(teams, played, played_groups)
+        result = evaluate_all_matches(teams, played, played_groups, signal_name="elo")
         assert result["n_matches"] == 1
         assert 0 < result["metrics"]["brier"] < 1
         assert result["metrics"]["n"] == 1
 
     def test_empty_played(self, tmp_path):
         teams = {"A": {"elo": 2000}, "B": {"elo": 1900}}
-        result = evaluate_all_matches(teams, {}, {})
+        result = evaluate_all_matches(teams, {}, {}, signal_name="elo")
         assert result["n_matches"] == 0
 
     def test_report_shape(self, tmp_path):
         teams = {"A": {"elo": 2000}, "B": {"elo": 1900}}
         played = {"M01": {"match_id": "M01", "team_a": "A", "team_b": "B", "winner": "A", "home_score": 2, "away_score": 0, "completed_at": "2026-06-15T20:00:00Z"}}
-        result = evaluate_all_matches(teams, played, {})
+        result = evaluate_all_matches(teams, played, {}, signal_name="elo")
         assert "model" in result
         assert "metrics" in result
         assert "calibration" in result
@@ -149,7 +149,7 @@ class TestEvaluateAllMatches:
     def test_skips_unknown_teams(self, tmp_path):
         teams = {"A": {"elo": 2000}}
         played = {"M01": {"match_id": "M01", "team_a": "A", "team_b": "UNKNOWN", "winner": "A", "home_score": 2, "away_score": 0, "completed_at": "2026-06-15T20:00:00Z"}}
-        result = evaluate_all_matches(teams, played, {})
+        result = evaluate_all_matches(teams, played, {}, signal_name="elo")
         assert result["n_matches"] == 0
 
 
