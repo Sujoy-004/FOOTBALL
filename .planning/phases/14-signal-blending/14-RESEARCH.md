@@ -287,15 +287,15 @@ def compute_poisson_base_rate(
     """Compute expected goals per team per match from historical WC data."""
 ```
 
-Called in `_run_iteration()` during startup:
+Called during startup or lazily by `groups.py::expected_goals()`:
+
 ```python
 from src.blender import compute_poisson_base_rate
 computed_rate = compute_poisson_base_rate()
-if computed_rate:
-    constants.EXPECTED_GOALS_BASE_RATE = computed_rate
 ```
 
-Or more cleanly, groups.py's `expected_goals()` checks a configurable base rate source.
+The computed rate is cached in `groups.py._POISSON_BASE_RATE_CACHE` (not in a compiled constant).
+`groups.py::expected_goals()` uses the fallback chain: explicit `base_rate` param → `_POISSON_BASE_RATE_CACHE` → `constants.EXPECTED_GOALS_BASE_RATE`.
 
 ### What NOT to Do (re: D-09, D-10)
 
