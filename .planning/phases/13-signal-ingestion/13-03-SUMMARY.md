@@ -133,6 +133,20 @@ None
 - `evaluate_all_matches(signal_name=None)` provides multi-signal reports for blender weight computation
 - Ready for Phase 14: Signal Blending
 
+## Self-Check: PASSED
+
+- ✅ `src/state.py` — exists with `migrate_prediction_history()`
+- ✅ `src/evaluation.py` — exists with `evaluate_all_matches(signal_name=None)`
+- ✅ `main.py` — exists with `_merge_signals_into_history()` and signal wiring
+- ✅ `data/prediction_history.json` — exists, migrated to compound format
+- ✅ `13-03-SUMMARY.md` — exists
+- ✅ `2d2e105` — test(13-03): add failing migration tests
+- ✅ `e384a27` — feat(13-03): implement migrate_prediction_history
+- ✅ `91de3a2` — test(13-03): add failing signal_name tests
+- ✅ `ad906b1` — feat(13-03): implement evaluate_all_matches signal_name
+- ✅ `11d1021` — feat(13-03): wire signal fetch, merge, and warnings
+- ✅ `f65354f` — docs(13-03): add summary for wiring plan
+
 ---
 
 *Phase: 13-signal-ingestion*
