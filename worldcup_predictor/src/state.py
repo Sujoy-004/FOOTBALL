@@ -8,6 +8,7 @@ structure is valid before simulation.
 import json
 import os
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -652,6 +653,153 @@ def load_annex_c(data_dir: Path | str | None = None) -> dict:
         annex_c: dict = json.load(f)
     validate_annex_c(annex_c)
     return annex_c
+
+
+# ─── Prediction History ─────────────────────────────────────────────────────
+
+
+def load_prediction_history(data_dir: Path | str | None = None) -> list[dict]:
+    """Load prediction history entries.
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        List of prediction history entries, empty list if file doesn't exist.
+    """
+    path = _resolve_data_dir(data_dir) / "prediction_history.json"
+    if not path.exists():
+        return []
+    with open(path, encoding="utf-8") as f:
+        data: list[dict] = json.load(f)
+    return data
+
+
+def append_prediction_history(
+    entry: dict,
+    data_dir: Path | str | None = None,
+) -> None:
+    """Append a single prediction history entry.
+
+    Loads existing history, appends new entry, saves all. Atomic write.
+
+    Args:
+        entry: Prediction history entry dict.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    history = load_prediction_history(data_dir)
+    history.append(entry)
+    path = _resolve_data_dir(data_dir) / "prediction_history.json"
+    _atomic_write_json(history, path)
+
+
+# ─── Signal Cache Helpers (Phase 13) ────────────────────────────────────────
+
+
+def load_signal_cache(cache_filename: str, data_dir: Path | str | None = None) -> dict:
+    """Load a signal cache file from the data directory.
+
+    Returns empty dict if the file does not exist (graceful bootstrap,
+    same pattern as load_eloratings_cache).
+
+    Args:
+        cache_filename: Name of the cache file (e.g. 'odds_cache.json').
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        dict: Cache contents with keys like 'fetched_at', 'expires_at', 'matches',
+        or empty dict if the file does not exist.
+    """
+    path = _resolve_data_dir(data_dir) / cache_filename
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return dict(json.load(f))
+
+
+def save_signal_cache(cache: dict, cache_filename: str, data_dir: Path | str | None = None) -> None:
+    """Save a signal cache file atomically.
+
+    Delegates to _atomic_write_json for Windows-safe atomic writes.
+
+    Args:
+        cache: Dict with fetched_at, expires_at, matches keys.
+        cache_filename: Name of the cache file (e.g. 'odds_cache.json').
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / cache_filename
+    _atomic_write_json(cache, path)
+
+
+def is_cache_valid(cache: dict, ttl_hours: int = 12) -> bool:
+    """Check if a signal cache is still valid.
+
+    Returns False if cache is empty, has no 'expires_at' key, or has expired.
+    Uses timezone-aware UTC comparisons. Catches malformed date strings.
+
+    Args:
+        cache: Cache dict with 'expires_at' key (ISO format datetime string).
+        ttl_hours: Fallback TTL in hours (used for logging, not expiry
+                   computation — expiry is read from the cache itself).
+
+    Returns:
+        bool: True if cache exists and has not expired.
+    """
+    if not cache:
+        return False
+    expires_at = cache.get("expires_at")
+    if not expires_at:
+        return False
+    try:
+        expiry = datetime.fromisoformat(expires_at)
+        return datetime.now(timezone.utc) < expiry
+    except (ValueError, TypeError):
+        return False
+
+
+def save_prediction_history(history: list[dict], data_dir: Path | str | None = None) -> None:
+    """Save the full prediction history, replacing any existing content.
+
+    Unlike append_prediction_history() which appends a single entry,
+    this function overwrites the entire file. Used by _merge_signals_into_history()
+    in Plan 03 to inject signal data into existing prediction history entries.
+
+    Args:
+        history: Complete list of prediction history entry dicts.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "prediction_history.json"
+    _atomic_write_json(history, path)
+
+
+def load_eval_baseline_report(data_dir: Path | str | None = None) -> dict | None:
+    """Load evaluation baseline report.
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        Baseline report dict, or None if file doesn't exist.
+    """
+    path = _resolve_data_dir(data_dir) / "eval_baseline_report.json"
+    if not path.exists():
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_eval_baseline_report(
+    report: dict,
+    data_dir: Path | str | None = None,
+) -> None:
+    """Save evaluation baseline report.
+
+    Args:
+        report: Baseline report dict.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "eval_baseline_report.json"
+    _atomic_write_json(report, path)
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────

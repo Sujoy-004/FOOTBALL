@@ -124,3 +124,20 @@ ELORATINGS_TEAM_CODES: dict[str, str] = {
 }
 """Mapping of eloratings.net 2-letter team codes (World.tsv col 2) to canonical project team names.
 All 48 World Cup 2026 teams. Codes in alphabetical order."""
+
+# ─── Signal Ingestion Constants (Phase 13) ────────────────────────────
+
+ODDS_CACHE_TTL_HOURS: int = 12
+"""How long odds cache is valid in hours (D-06: resolved to 12h per research)."""
+
+CATBOOST_CACHE_TTL_HOURS: int = 24
+"""How long CatBoost cache is valid in hours (D-06: resolved to 24h per research)."""
+
+ODDS_CACHE_FILE: str = "odds_cache.json"
+"""Filename for market odds cache in data/ directory (D-04)."""
+
+CATBOOST_CACHE_FILE: str = "catboost_cache.json"
+"""Filename for CatBoost prediction cache in data/ directory (D-04)."""
+
+PREDICTION_HISTORY_SCHEMA_VERSION: int = 2
+"""Schema version for prediction_history.json. v1=flat (Phase 12b), v2=compound (Phase 13+)."""
