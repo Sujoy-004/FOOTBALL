@@ -49,7 +49,7 @@ This phase does NOT add new signals (Phase 15), build governance infrastructure 
 
 ### Held-Out Evaluation
 - **D-11:** Leave-one-out cross-validation (LOO-CV). Not train/test split (too little data), not time-series split (same reason). LOO-CV maximizes data usage and provides the most stable Brier estimate with the current ~30-match sample.
-- **D-12:** Compare blended Brier vs best single-signal Brier using LOO-CV. Target: ≥0.02 improvement (from ROADMAP success criteria).
+- **D-12:** Compare blended Brier vs best single-signal Brier using LOO-CV. Success criterion: `blended_Brier < best_single_signal_Brier` (directional only). No arbitrary threshold — with ~30 matches (SE≈0.06), a fixed number like 0.02 is noise-level and unreliable. Phase 16 introduces significance testing and minimum effect-size when sufficient data exists.
 
 ### the agent's Discretion
 - Exact implementation of Platt logistic fit (Newton-Raphson vs gradient descent — both pure Python)
