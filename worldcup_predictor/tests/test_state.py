@@ -626,3 +626,118 @@ def test_save_prediction_history_overwrite(tmp_path):
     save_prediction_history(history_b, data_dir=tmp_path)
     loaded = load_prediction_history(data_dir=tmp_path)
     assert loaded == history_b, "Expected second save to replace, not append"
+
+
+# ─── migrate_prediction_history tests (Phase 13, Plan 03) ──────────────
+
+
+class TestMigratePredictionHistory:
+    """Tests for migrate_prediction_history() flat→compound schema migration."""
+
+    FLAT_ENTRY = {
+        "match_id": "M01",
+        "timestamp": "2026-06-15T09:29:22.355352+00:00",
+        "team_a": "A",
+        "team_b": "B",
+        "prediction": 0.6401,
+        "actual": 1.0,
+        "signal": "elo",
+        "team_a_elo": 2000,
+        "team_b_elo": 1900,
+    }
+
+    COMPOUND_ENTRY = {
+        "match_id": "M01",
+        "timestamp": "2026-06-15T09:29:22.355352+00:00",
+        "team_a": "A",
+        "team_b": "B",
+        "actual": 1.0,
+        "signals": {
+            "elo": {
+                "probability": 0.6401,
+                "version": "v1",
+                "timestamp": "2026-06-15T09:29:22.355352+00:00",
+                "available": True,
+                "team_a_elo": 2000,
+                "team_b_elo": 1900,
+            }
+        },
+    }
+
+    def test_migrate_flat_to_compound(self, tmp_path):
+        """Flat entry becomes compound with signals.elo.probability, no top-level prediction/signal."""
+        from src.state import migrate_prediction_history
+        save_prediction_history([dict(self.FLAT_ENTRY)], data_dir=tmp_path)
+        n = migrate_prediction_history(data_dir=tmp_path)
+        assert n == 1, "Should migrate 1 entry"
+        history = load_prediction_history(data_dir=tmp_path)
+        entry = history[0]
+        assert "signals" in entry, "Migrated entry must have 'signals' key"
+        assert "prediction" not in entry, "Migrated entry must not have top-level 'prediction'"
+        assert "signal" not in entry, "Migrated entry must not have top-level 'signal'"
+        assert entry["signals"]["elo"]["probability"] == 0.6401
+        assert entry["signals"]["elo"]["available"] is True
+        assert entry["signals"]["elo"]["team_a_elo"] == 2000
+        assert entry["signals"]["elo"]["team_b_elo"] == 1900
+        assert entry["actual"] == 1.0
+
+    def test_migrate_multiple_entries(self, tmp_path):
+        """Multiple flat entries all migrated correctly."""
+        from src.state import migrate_prediction_history
+        entries = [
+            {"match_id": f"M{i:02d}", "signal": "elo", "prediction": 0.5 + i * 0.1,
+             "actual": 1.0, "team_a": "A", "team_b": "B",
+             "timestamp": "2026-06-15T12:00:00+00:00", "team_a_elo": 2000, "team_b_elo": 1900}
+            for i in range(3)
+        ]
+        save_prediction_history(entries, data_dir=tmp_path)
+        n = migrate_prediction_history(data_dir=tmp_path)
+        assert n == 3, f"Expected 3 migrated, got {n}"
+        history = load_prediction_history(data_dir=tmp_path)
+        assert len(history) == 3
+        for entry in history:
+            assert "signals" in entry
+            assert "signal" not in entry
+
+    def test_migrate_idempotent(self, tmp_path):
+        """Already-compound entry unchanged after migration (idempotent)."""
+        from src.state import migrate_prediction_history
+        entry = dict(self.COMPOUND_ENTRY)
+        save_prediction_history([entry], data_dir=tmp_path)
+        n = migrate_prediction_history(data_dir=tmp_path)
+        assert n == 0, "Should not migrate already-compound entries"
+        history = load_prediction_history(data_dir=tmp_path)
+        assert history[0] == entry
+
+    def test_migrate_mixed(self, tmp_path):
+        """Flat and compound entries in same list → both handled correctly."""
+        from src.state import migrate_prediction_history
+        flat = dict(self.FLAT_ENTRY)
+        compound = dict(self.COMPOUND_ENTRY)
+        save_prediction_history([flat, compound], data_dir=tmp_path)
+        n = migrate_prediction_history(data_dir=tmp_path)
+        assert n == 1, "Should migrate exactly 1 flat entry"
+        history = load_prediction_history(data_dir=tmp_path)
+        assert len(history) == 2
+        assert "signals" in history[0]
+        assert "signals" in history[1]
+
+    def test_migrate_empty(self, tmp_path):
+        """Empty list → empty list."""
+        from src.state import migrate_prediction_history
+        save_prediction_history([], data_dir=tmp_path)
+        n = migrate_prediction_history(data_dir=tmp_path)
+        assert n == 0
+        history = load_prediction_history(data_dir=tmp_path)
+        assert history == []
+
+    def test_migrate_preserves_actual(self, tmp_path):
+        """actual field preserved in compound entry."""
+        from src.state import migrate_prediction_history
+        entry = dict(self.FLAT_ENTRY)
+        entry["actual"] = 0.0
+        save_prediction_history([entry], data_dir=tmp_path)
+        n = migrate_prediction_history(data_dir=tmp_path)
+        assert n == 1
+        history = load_prediction_history(data_dir=tmp_path)
+        assert history[0]["actual"] == 0.0
