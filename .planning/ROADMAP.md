@@ -17,8 +17,8 @@ The v2.0 milestone modernizes the prediction engine. The audit revealed that the
 - [x] **Phase 9: Knockout Bracket with Annex C Routing** — Full 104-match simulation pipeline
 - [x] **Phase 10: Integration, Tests & BSD Verification** — Live data, console display, E2E testing
 - [x] **Phase 11: Data Integrity & Elo Foundation** — Fix Elo ratings, auto-sync from eloratings.net
-- [ ] **Phase 12: Draw Handling & Elo Math** — Fix draw pipeline, implement K-multiplier
-- [ ] **Phase 12b: Evaluation Infrastructure** — Brier, log loss, calibration, prediction history storage
+- [x] **Phase 12: Draw Handling & Elo Math** — Fix draw pipeline, implement K-multiplier
+- [x] **Phase 12b: Evaluation Infrastructure** — Brier, log loss, calibration, prediction history storage
 - [ ] **Phase 13: Signal Ingestion** — Market odds API, CatBoost predictions API
 - [ ] **Phase 14: Signal Blending** — Calibration layer, dynamic blender, simulation integration
 - [ ] **Phase 15: Context Signals** — Team form, lineup strength, player availability
@@ -262,8 +262,8 @@ Plans:
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-03 | Draw results are ingested and Elo-updated correctly | 🔲 |
-| V2-04 | Goal-difference K multiplier implemented per eloratings.net formula | 🔲 |
+| V2-03 | Draw results are ingested and Elo-updated correctly | ✅ |
+| V2-04 | Goal-difference K multiplier implemented per eloratings.net formula | ✅ |
 
 **Success Criteria** (what must be TRUE):
 1. Draw matches in `played.json` and `played_groups.json` trigger Elo updates instead of being skipped
@@ -277,9 +277,9 @@ Plans:
 
 Plans:
 
-- [ ] 12-01-PLAN.md — Elo Engine Extensions: K-multiplier & PK Mode (Wave 1)
-- [ ] 12-02-PLAN.md — Draw Pipeline Fix: Three Code Sites (Wave 1)
-- [ ] 12-03-PLAN.md — Historical Backfill & Baseline Metrics (Wave 2)
+- [x] 12-01-PLAN.md — Elo Engine Extensions: K-multiplier & PK Mode (Wave 1)
+- [x] 12-02-PLAN.md — Draw Pipeline Fix: Three Code Sites (Wave 1)
+- [x] 12-03-PLAN.md — Historical Backfill & Baseline Metrics (Wave 2)
 
 ---
 
@@ -295,23 +295,23 @@ Plans:
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-18 | Baseline prediction evaluation framework (Brier, log loss, calibration) computed per match | 🔲 |
-| V2-19 | Match-level prediction history stored persistently for analysis | 🔲 |
+| V2-18 | Baseline prediction evaluation framework (Brier, log loss, calibration) computed per match | ✅ |
+| V2-19 | Match-level prediction history stored persistently for analysis | ✅ |
 
 **Success Criteria** (what must be TRUE):
-1. `BrierScore` computed for each match prediction: (p - outcome)² where outcome ∈ {0, 0.5, 1}
-2. Log loss computed: -[y·log(p) + (1-y)·log(1-p)]
-3. Calibration curve bins available (decile-based, ECE computed)
-4. Prediction history persisted to JSON (match_id, timestamp, probabilities per outcome, actual outcome, signal breakdown)
-5. Historical replay can walk through all completed matches and produce aggregate Brier/log-loss
-6. Baseline measurements recorded after Phase 12 (draw-fixed Elo only) for future A/B comparison
-7. All evaluation functions tested
+1. ✅ `BrierScore` computed for each match prediction: (p - outcome)² where outcome ∈ {0, 0.5, 1}
+2. ✅ Log loss computed: -[y·log(p) + (1-y)·log(1-p)]
+3. ✅ Calibration curve bins available (decile-based, ECE computed)
+4. ✅ Prediction history persisted to JSON (match_id, probabilities per outcome, actual outcome, signal breakdown)
+5. ✅ Historical replay can walk through all completed matches and produce aggregate Brier/log-loss
+6. ✅ Baseline measurements recorded after Phase 12 (draw-fixed Elo only) for future A/B comparison
+7. ✅ All evaluation functions tested (28 tests)
 
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 
-- *(to be planned via /gsd-plan-phase 12b)*
+- [x] 12b-01-PLAN.md — Evaluation Infrastructure (State, evaluate, baseline, tests)
 
 ---
 
@@ -339,11 +339,13 @@ Plans:
 6. Graceful degradation: if odds unavailable for a match, flag as missing rather than crashing
 7. Per-signal Brier computed (using Phase 12b framework) to establish individual signal accuracy
 
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
 
-- *(to be planned via /gsd-plan-phase 13)*
+- [ ] 13-01-PLAN.md — Foundation & Market Odds Signal (Wave 1): constants, state.py cache helpers, predictors package, odds.py with vig removal, tests
+- [ ] 13-02-PLAN.md — CatBoost ML Predictions (Wave 2): catboost.py with BSD predictions API fetch, parse, cache; tests
+- [ ] 13-03-PLAN.md — Migration, Evaluation Extension & Main.py Wiring (Wave 3): prediction_history migration, per-signal Brier via evaluate_all_matches(signal_name=), signal fetch/refresh in main.py
 
 ---
 
@@ -523,8 +525,8 @@ Plans:
 | 9. Knockout Bracket with Annex C Routing | v1.1 | 3/3 | Complete | 2026-06-14 |
 | 10. Integration, Tests & BSD Verification | v1.1 | 4/4 | Complete | 2026-06-14 |
 | 11. Data Integrity & Elo Foundation | v2.0 | 3/3 | Complete | 2026-06-15 |
-| 12. Draw Handling & Elo Math | v2.0 | 0/0 | Planned | — |
-| 12b. Evaluation Infrastructure | v2.0 | 0/0 | Planned | — |
+| 12. Draw Handling & Elo Math | v2.0 | 3/3 | Complete | 2026-06-15 |
+| 12b. Evaluation Infrastructure | v2.0 | 1/1 | Complete | 2026-06-15 |
 | 13. Signal Ingestion | v2.0 | 0/0 | Planned | — |
 | 14. Signal Blending | v2.0 | 0/0 | Planned | — |
 | 15. Context Signals | v2.0 | 0/0 | Planned | — |
