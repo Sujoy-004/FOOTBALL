@@ -313,3 +313,238 @@ class TestCatboostCache:
         expires = datetime.fromisoformat(cache["expires_at"])
         diff = (expires - fetched).total_seconds()
         assert 23 * 3600 < diff < 25 * 3600
+
+
+# ─── Fetch Integration Tests ─────────────────────────────────────────
+
+
+class TestCatboostFetch:
+    """fetch_and_cache_catboost: HTTP fetch and error handling."""
+
+    def _make_mock_response(self, status_code: int = 200, json_data: dict | None = None):
+        """Create a mock requests.Response-like object."""
+        if json_data is None:
+            json_data = {"count": 0, "results": []}
+
+        class MockResponse:
+            def __init__(self):
+                self.status_code = status_code
+                self._json = json_data
+
+            def json(self):
+                return self._json
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    import requests as req
+                    raise req.exceptions.HTTPError(
+                        f"HTTP {self.status_code}", response=self
+                    )
+
+        return MockResponse()
+
+    def test_fetch_returns_cache_dict(self, monkeypatch):
+        """fetch_and_cache_catboost returns dict with fetched_at, expires_at, matches."""
+        mock_resp = self._make_mock_response()
+        monkeypatch.setattr("requests.get", lambda *a, **kw: mock_resp)
+
+        cache = fetch_and_cache_catboost(
+            "test_key", {}, {"groups": {}}, [], cache_ttl_hours=24,
+        )
+        assert "fetched_at" in cache
+        assert "expires_at" in cache
+        assert "matches" in cache
+        assert isinstance(cache["matches"], dict)
+
+    def test_fetch_handles_api_error(self, monkeypatch):
+        """When requests.get raises exception, returns empty matches dict gracefully."""
+        def mock_get_error(*args, **kwargs):
+            import requests as req
+            raise req.exceptions.ConnectionError("Connection refused")
+        monkeypatch.setattr("requests.get", mock_get_error)
+
+        cache = fetch_and_cache_catboost(
+            "test_key", {}, {"groups": {}}, [], cache_ttl_hours=24,
+        )
+        assert "fetched_at" in cache
+        assert "expires_at" in cache
+        assert cache["matches"] == {}
+
+    def test_fetch_uses_token_header(self, monkeypatch):
+        """Requests use Authorization: Token header."""
+        captured_kwargs = {}
+
+        def mock_get(*args, **kwargs):
+            captured_kwargs.update(kwargs)
+            return self._make_mock_response()
+
+        monkeypatch.setattr("requests.get", mock_get)
+        fetch_and_cache_catboost(
+            "my_secret_key", {}, {"groups": {}}, [], cache_ttl_hours=24,
+        )
+        headers = captured_kwargs.get("headers", {})
+        assert headers.get("Authorization") == "Token my_secret_key"
+
+    def test_fetch_with_predictions(self, monkeypatch):
+        """When API returns predictions, they are parsed into matches."""
+        alias_lookup = {"argentina": "Argentina", "algeria": "Algeria"}
+        groups = {
+            "groups": {
+                "B": {
+                    "teams": ["Argentina", "Algeria"],
+                    "matches": [{"match_id": "GS_B_01", "team_a": "Argentina", "team_b": "Algeria"}],
+                },
+            },
+        }
+        json_data = {
+            "count": 1,
+            "results": [
+                {
+                    "event_id": 12345,
+                    "home_team": "Argentina",
+                    "away_team": "Algeria",
+                    "event_date": "2026-06-17T05:00:00+00:00",
+                    "predictions": {
+                        "home_probability": 0.64,
+                        "draw_probability": 0.20,
+                        "away_probability": 0.17,
+                        "confidence": 0.88,
+                        "model_version": "catboost-v5.0",
+                    },
+                    "updated_at": "2026-06-16T12:00:00+00:00",
+                },
+            ],
+        }
+        mock_resp = self._make_mock_response(json_data=json_data)
+        monkeypatch.setattr("requests.get", lambda *a, **kw: mock_resp)
+
+        cache = fetch_and_cache_catboost(
+            "test_key", alias_lookup, groups, [], cache_ttl_hours=24,
+        )
+        assert "GS_B_01" in cache["matches"]
+        assert cache["matches"]["GS_B_01"]["probability"] == 0.64
+        assert cache["matches"]["GS_B_01"]["available"] is True
+
+
+# ─── Edge Case Tests ─────────────────────────────────────────────────
+
+
+class TestParsePredictionsEdgeCases:
+    """parse_catboost_response: edge cases for team resolution."""
+
+    def test_no_results(self):
+        """Empty predictions list → empty matches dict."""
+        result = parse_catboost_response([], {}, {"groups": {}}, [])
+        assert result == {}
+
+    def test_unmatchable_team(self):
+        """Team not in alias lookup → entry skipped (not in matches)."""
+        alias_lookup = {"argentina": "Argentina"}  # No "algeria"
+        groups = {
+            "groups": {
+                "B": {
+                    "teams": ["Argentina", "Algeria"],
+                    "matches": [{"match_id": "GS_B_01", "team_a": "Argentina", "team_b": "Algeria"}],
+                },
+            },
+        }
+        predictions = [
+            {
+                "event_id": 100,
+                "home_team": "Argentina",
+                "away_team": "Algeria",  # Not in alias_lookup
+                "predictions": {
+                    "home_probability": 0.64, "draw_probability": 0.20,
+                    "away_probability": 0.17,
+                },
+                "updated_at": "2026-06-16T12:00:00+00:00",
+            },
+        ]
+        result = parse_catboost_response(predictions, alias_lookup, groups, [])
+        assert len(result) == 0
+
+    def test_bracket_match_resolution(self):
+        """Prediction for knockout match uses _find_bracket_match path."""
+        alias_lookup = {"brazil": "Brazil", "germany": "Germany"}
+        bracket = [
+            {"match_id": "R16_1", "team_a": "Brazil", "team_b": "Germany"},
+        ]
+        predictions = [
+            {
+                "event_id": 300,
+                "home_team": "Brazil",
+                "away_team": "Germany",
+                "event_date": "2026-06-28T17:00:00+00:00",
+                "predictions": {
+                    "home_probability": 0.55,
+                    "draw_probability": 0.25,
+                    "away_probability": 0.20,
+                    "confidence": 0.82,
+                    "model_version": "catboost-v5.0",
+                },
+                "updated_at": "2026-06-27T12:00:00+00:00",
+            },
+        ]
+        result = parse_catboost_response(
+            predictions, alias_lookup, {"groups": {}}, bracket,
+        )
+        assert "R16_1" in result
+        assert result["R16_1"]["probability"] == 0.55
+        assert result["R16_1"]["available"] is True
+
+    def test_group_match_resolution(self):
+        """Prediction for group match resolves via group team pair matching."""
+        alias_lookup = {"france": "France", "netherlands": "Netherlands"}
+        groups = {
+            "groups": {
+                "A": {
+                    "teams": ["France", "Netherlands"],
+                    "matches": [{"match_id": "GS_A_01", "team_a": "France", "team_b": "Netherlands"}],
+                },
+            },
+        }
+        predictions = [
+            {
+                "event_id": 400,
+                "home_team": "France",
+                "away_team": "Netherlands",
+                "event_date": "2026-06-13T21:00:00+00:00",
+                "predictions": {
+                    "home_probability": 0.48,
+                    "draw_probability": 0.27,
+                    "away_probability": 0.25,
+                    "confidence": 0.80,
+                    "model_version": "catboost-v5.0",
+                },
+                "updated_at": "2026-06-12T12:00:00+00:00",
+            },
+        ]
+        result = parse_catboost_response(
+            predictions, alias_lookup, groups, [],
+        )
+        assert "GS_A_01" in result
+        assert result["GS_A_01"]["probability"] == 0.48
+        assert result["GS_A_01"]["available"] is True
+
+    def test_non_dict_in_list(self):
+        """Non-dict items in predictions list are skipped gracefully."""
+        predictions = [
+            {"event_id": 100, "home_team": "Argentina", "away_team": "Algeria",
+             "predictions": None, "updated_at": "2026-06-16T12:00:00+00:00"},
+            "not a dict",
+            42,
+            None,
+        ]
+        alias_lookup = {"argentina": "Argentina", "algeria": "Algeria"}
+        groups = {
+            "groups": {
+                "B": {
+                    "teams": ["Argentina", "Algeria"],
+                    "matches": [{"match_id": "GS_B_01", "team_a": "Argentina", "team_b": "Algeria"}],
+                },
+            },
+        }
+        # Should not raise; non-dict items are filtered, valid entry still parsed
+        result = parse_catboost_response(predictions, alias_lookup, groups, [])
+        assert "GS_B_01" in result
+        assert result["GS_B_01"]["available"] is False
