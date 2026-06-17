@@ -139,6 +139,11 @@ ODDS_CACHE_FILE: str = "odds_cache.json"
 CATBOOST_CACHE_FILE: str = "catboost_cache.json"
 """Filename for CatBoost prediction cache in data/ directory (D-04)."""
 
+PREDICTION_LEDGER_FILE: str = "predictions_ledger.json"
+"""Filename for permanent prediction ledger in data/ directory (Phase 14a).
+Unlike TTL caches, the ledger accumulates all predictions ever fetched,
+keyed by match_id, and is never deleted."""
+
 PREDICTION_HISTORY_SCHEMA_VERSION: int = 2
 """Schema version for prediction_history.json. v1=flat (Phase 12b), v2=compound (Phase 13+)."""
 
@@ -155,3 +160,61 @@ Below this, identity calibration (p_calibrated = p_raw) is used."""
 BRIER_WINDOW_SIZE: int = 50
 """Rolling window for per-signal Brier computation used in blend weights (D-08).
 All recorded matches used when history < window size."""
+
+# ─── Context Signal Constants (Phase 15) ───────────────────────────────────
+
+FORM_WINDOW_SIZE: int = 5
+"""Default rolling window size for form residual computation (Phase 15, D-02).
+Number of most-recent matches per team used to compute average form residual.
+If a team has fewer than this, use whatever is available. If 0, signal unavailable."""
+
+TEAM_VALUES_FILE: str = "team_values.json"
+"""Filename for squad market values data file in data/ directory (Phase 15).
+Static file with per-team aggregate squad market values in EUR. NOT from BSD API
+per user decision (BSD API key expired, 832 API calls, live dependency ruled out)."""
+
+DEFAULT_FORM_K: float = 1.0
+"""Default sigmoid steepness for form signal — TUNING PARAMETER (D-05).
+
+Empirically validated from 19 played matches (2026-06-17):
+- Every team has exactly 1 match (cold tournament)
+- Observed form_delta range: [-1.01, +1.01], 95th percentile ±0.78
+- Theoretical max (full 5-match window): [-2, +2]
+
+k=1.0 gives:
+- form_delta=0.78 (95th %ile): sigmoid(0.78) = 0.686 (±0.186 from 0.50)
+- form_delta=1.01 (observed max): sigmoid(1.01) = 0.733
+
+NOTE: Planner originally proposed k=0.6 based on incorrect assumption
+that form_delta ∈ [-5, +5] (used sum instead of mean). Actual range is
+[-2, +2] theoretical, [-1, +1] empirical. k=1.0 chosen after audit to
+avoid suppressing an already-small signal.
+
+This is a calibration constant, not an architecture decision.
+Expected to change once real multi-signal accumulation data is available.
+Platt scaling refines this as entries accumulate (>=30 threshold)."""
+
+DEFAULT_LINEUP_K: float = 0.35
+"""Default sigmoid steepness for lineup strength signal — TUNING PARAMETER (D-10).
+
+Squad market values range from €7.5M (Panama) to €1.52B (France),
+producing ln ratios in [-5.31, +5.31].
+
+k=0.35 gives:
+- Panama@France (203x, delta=-5.31): p=0.135
+- USA@England (0.28x, delta=-1.26): p=0.392
+- Brazil@Argentina (1.15x, delta=+0.14): p=0.512
+- Extreme mismatch (200x): p=0.865 (no saturation)
+
+Avoids saturation at boundary values. Differentiates strong mismatches
+without extreme probabilities.
+
+This is a calibration constant, not an architecture decision.
+Expected to change once real data accumulates."""
+
+FORM_CACHE_FILE: str = "form_cache.json"
+"""Filename for form signal cache in data/ directory. Form is computed locally
+(no API call) but follows same cache-dict schema as odds/catboost for consistency."""
+
+LINEUP_CACHE_FILE: str = "lineup_cache.json"
+"""Filename for lineup strength signal cache in data/ directory."""
