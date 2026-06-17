@@ -64,9 +64,10 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 | V2-04 | Goal-difference K multiplier implemented per eloratings.net formula | 12 |
 | V2-05 | Market odds fetched and converted to vig-removed probabilities | 13 ✅ |
 | V2-06 | CatBoost predictions fetched for every match | 13 ✅ |
-| V2-07 | Signal calibration layer (Platt scaling) implemented per signal | 14 |
-| V2-08 | Dynamic signal blender (Brier-weighted) integrated into simulation | 14 |
-| V2-09 | Calibrated Poisson base rate from historical World Cup data | 14 |
+| V2-07 | Signal calibration layer (Platt scaling) implemented per signal | 14 ✅ |
+| V2-08 | Dynamic signal blender (Brier-weighted) integrated into simulation | 14 ✅ |
+| V2-09 | Calibrated Poisson base rate from historical World Cup data | 14 ✅ |
+| V2-20 | Pre-match predictions retained permanently for historical Brier computation | 14a ✅ |
 | V2-10 | Team form signal (last 5 matches) computed and integrated | 15 |
 | V2-11 | Lineup strength factor (market value proxy) computed | 15 |
 | V2-12 | Model version, data version, and run version tracked | 16 |
@@ -136,11 +137,12 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 | V2-04 | 12 | Complete |
 | V2-05 | 13 | Complete |
 | V2-06 | 13 | Complete |
-| V2-07 | 14 | Planned |
-| V2-08 | 14 | Planned |
-| V2-09 | 14 | Planned |
-| V2-10 | 15 | Planned |
-| V2-11 | 15 | Planned |
+| V2-07 | 14 | Complete |
+| V2-08 | 14 | Complete |
+| V2-09 | 14 | Complete |
+| V2-20 | 14a | Complete |
+| V2-10 | 15 | In Progress |
+| V2-11 | 15 | In Progress |
 | V2-12 | 16 | Planned |
 | V2-13 | 16 | Planned |
 | V2-14 | 16 | Planned |
@@ -152,10 +154,10 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 
 **Coverage:**
 - v1.1 requirements: 31 total, 31 mapped ✅
-- v2.0 requirements: 19 total, 19 mapped ✅
+- v2.0 requirements: 20 total, 20 mapped ✅
 - Unmapped (any): 0 ✅
 
 ---
 
 *Requirements defined: 2026-06-14*
-*Last updated: 2026-06-16 — Phase 13 complete (V2-05, V2-06: market odds + CatBoost predictions)*
+*Last updated: 2026-06-17 — Phase 14a complete (V2-20: prediction retention architecture fix)*

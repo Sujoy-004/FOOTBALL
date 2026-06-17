@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: World Cup 2026 Support
-status: Executing Phase null
-last_updated: "2026-06-17T10:00:00.000Z"
+status: Phase 15 Planned
+last_updated: "2026-06-17T11:00:00.000Z"
 progress:
   total_phases: 15
   completed_phases: 14
@@ -71,7 +71,7 @@ progress:
 - Full test suite: 212 passed, 1 skipped, 0 failures
 - All 7 SOTs batch-updated for 48-team format
 
-### v2.0 Foundation — Phases 11-12b
+### v2.0 Prediction Engine Modernization — Phases 11-18
 
 **Phase 11: Data Integrity & Elo Foundation** — 3 plans, 2 waves, 12 commits
 
@@ -159,27 +159,27 @@ Implementation:
 
 ## Current Position
 
-Phase: 15 — CONTEXT SIGNALS — 🔶 PLANNED
-Plans: 3/3 planned, 0/3 executed
-Status: Planned, ready for execution
+Phase: 15 — CONTEXT SIGNALS — 🔶 IN PROGRESS
+Plans: 3/3 planned, 1/3 executed
+Status: Plan 15-01 executed, ready for Plan 15-02
 
-- **Next:** Execute via `/gsd-execute-phase 15`
+- **Next:** Execute Plan 15-02 via `/gsd-execute-phase 15` or direct plan execution
 
 ## Phase 15 Plans
 
-| Plan | File | Wave | Objective |
-|------|------|------|-----------|
-| 01 | 15-01-PLAN.md | 1 | Data Layer: constants + team_values.json + state.py load_team_values |
-| 02 | 15-02-PLAN.md | 2 | Signal Modules: form.py + lineup.py + __init__.py |
-| 03 | 15-03-PLAN.md | 3 | Integration: main.py wiring + test_form.py + test_lineup.py |
+| Plan | File | Wave | Objective | Status |
+|------|------|------|-----------|--------|
+| 01 | 15-01-PLAN.md | 1 | Data Layer: constants + team_values.json + state.py load_team_values | ✅ Complete |
+| 02 | 15-02-PLAN.md | 2 | Signal Modules: form.py + lineup.py + __init__.py | 🔲 Pending |
+| 03 | 15-03-PLAN.md | 3 | Integration: main.py wiring + test_form.py + test_lineup.py | 🔲 Pending |
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 38 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a)
+- Total plans completed: 39 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 1 P15)
 - Average duration: ~10 min per plan (Phases 11-14)
-- Total commits: 86 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a)
+- Total commits: 89 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 3 P15)
 
 **By Phase:**
 | Phase | Plans | Duration | Avg/Plan |
@@ -187,6 +187,7 @@ Status: Planned, ready for execution
 | 7 | 4 | 48 min | 12 min |
 | 8 | 4 | 39 min | 10 min |
 | 9 | 3 | 26 min | 9 min |
+| 15 | 1 | 12 min | 12 min |
 | 10 | 4 | ~38 min | ~10 min |
 | 11 | 3 | ~28 min | ~9 min |
 | 12 | 3 | ~25 min | ~8 min |
@@ -211,6 +212,8 @@ Status: Planned, ready for execution
 - Phase ordering enforced by data dependencies: Dataset → Group Engine → Knockout Bracket → Integration
 - Requirements map cleanly: DATA2→P7, GROUPS→P8, BRKT→P9, INTG→P10
 - No UI/frontend work in v1.1 — purely console CLI
+- DEFAULT_FORM_K=1.0 (not 0.6) — empirically validated from 19 matches, form_delta range [-1.01, +1.01]
+- DEFAULT_LINEUP_K=0.35 — ln ratio range [-5.31, +5.31] from €7.5M to €1.52B squad values
 
 ### Resolved in Phase 10
 
@@ -230,6 +233,7 @@ Status: Planned, ready for execution
 | verification | End-to-end with real Football-Data.org API key (superseded by BSD) | v1.0 close |
 | smoke | Live BSD smoke test requires manual BSD_API_KEY | Phase 10 |
 | utf8 | JSON encoding on Windows must use `encoding='utf-8'` (default cp1252) | Phase 9 close |
+| test | test_scaffold.py::test_teams_json_exists_and_valid asserts isinstance(int) but teams.json has floats | Pre-existing, found P15-01 |
 
 ### Research Flags (resolved)
 
@@ -244,5 +248,5 @@ Status: Planned, ready for execution
 
 - Last session: 2026-06-17
 - Phase 14a executed: 1 plan, 5 files, permanent prediction ledger (PI retentions fix)
-- Phase 15 context gathered: form + lineup strength as independent signals
-- Next: Phase 15 — Context Signals (plan via /gsd-plan-phase 15)
+- Phase 15-01 executed: 3 commits, data layer (constants, team_values.json, load_team_values())
+- Next: Phase 15-02 — Signal Modules (form.py, lineup.py)
