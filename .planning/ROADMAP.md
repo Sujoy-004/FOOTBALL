@@ -20,7 +20,8 @@ The v2.0 milestone modernizes the prediction engine. The audit revealed that the
 - [x] **Phase 12: Draw Handling & Elo Math** — Fix draw pipeline, implement K-multiplier
 - [x] **Phase 12b: Evaluation Infrastructure** — Brier, log loss, calibration, prediction history storage
 - [ ] **Phase 13: Signal Ingestion** — Market odds API, CatBoost predictions API
-- [ ] **Phase 14: Signal Blending** — Calibration layer, dynamic blender, simulation integration
+- [x] **Phase 14: Signal Blending** — Calibration layer, dynamic blender, simulation integration
+- [x] **Phase 14a: Prediction Retention Architecture Fix** — Permanent prediction ledger for pre-match signal archival
 - [ ] **Phase 15: Context Signals** — Team form, lineup strength, player availability
 - [ ] **Phase 16: Model Governance** — Versioning, Brier monitoring, backtesting, alerts
 - [ ] **Phase 17: Output Enhancement** — Signal contribution display, confidence intervals, delta tracking v2
@@ -363,9 +364,9 @@ Plans:
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-07 | Signal calibration layer (Platt scaling) implemented per signal | 🔲 |
-| V2-08 | Dynamic signal blender (Brier-weighted) integrated into simulation | 🔲 |
-| V2-09 | Calibrated Poisson base rate from historical World Cup data | 🔲 |
+| V2-07 | Signal calibration layer (Platt scaling) implemented per signal | ✅ |
+| V2-08 | Dynamic signal blender (Brier-weighted) integrated into simulation | ✅ |
+| V2-09 | Calibrated Poisson base rate from historical World Cup data | ✅ |
 
 **Success Criteria** (what must be TRUE):
 
@@ -381,8 +382,41 @@ Plans:
 
 Plans:
 
-- [ ] 14-01-PLAN.md — Blender Core Module (Wave 1): Platt scaling, blending functions, LOO-CV, Poisson base rate function, test_blender.py
-- [ ] 14-02-PLAN.md — Simulation & Pipeline Integration (Wave 2): knockout.py blend_params, main.py calibration pipeline, Poisson rate wiring, state.py persistence
+- [x] 14-01-PLAN.md — Blender Core Module (Wave 1): Platt scaling, blending functions, LOO-CV, Poisson base rate function, test_blender.py
+- [x] 14-02-PLAN.md — Simulation & Pipeline Integration (Wave 2): knockout.py blend_params, main.py calibration pipeline, Poisson rate wiring, state.py persistence
+
+---
+
+### Phase 14a: Prediction Retention Architecture Fix
+
+**Goal:** Bridge the architectural gap between signal ingestion (Phase 13) and evaluation (Phase 12b) — pre-match predictions must persist beyond TTL expiry so that multi-signal Brier and calibration can be computed for finished matches.
+
+**Discovery:** Design flaw found during operational validation of Phases 13-14. The TTL-based cache architecture loses predictions for every match once it finishes, making `_merge_signals_into_history()` find zero overlap. Without this fix, market_odds and catboost Brier can never be computed, and blending has no calibration data.
+
+**Depends on:** Phase 14
+
+**Requirements**: V2-20
+
+**Requirements Traceability:**
+
+| ID | Requirement | Status |
+|----|------------|--------|
+| V2-20 | Pre-match predictions retained permanently for historical Brier computation | ✅ |
+
+**Success Criteria** (what must be TRUE):
+
+- `data/predictions_ledger.json` exists and accumulates predictions across TTL refreshes
+- Every odds fetch upserts its entries into the ledger (never deletes)
+- Every CatBoost fetch upserts its entries into the ledger (never deletes)
+- `_merge_signals_into_history()` reads from the ledger (not TTL caches), matching by `match_id`
+- Predictions for matches that have finished are still present in the ledger
+- TTL caches unchanged — continue serving live freshness for dashboard
+
+**Plans:** 1 plan
+
+Plans:
+
+- [x] 14a-01-PLAN.md — Permanent prediction ledger: constants, state, odds/catboost wiring, merge source change
 
 ---
 
@@ -398,24 +432,27 @@ Plans:
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-10 | Team form signal (last 5 matches) computed and integrated | 🔲 |
-| V2-11 | Lineup strength factor (market value proxy) computed | 🔲 |
+| V2-10 | Team form signal (last 5 matches) computed and integrated | 🔶 Planned |
+| V2-11 | Lineup strength factor (market value proxy) computed | 🔶 Planned |
 
 **Success Criteria** (what must be TRUE):
 
-- Form signal: rolling average of last 5 match results (W/D/L with weighted scoring)
-- Form signal integrated as modifier to Elo-based expected score
-- Lineup strength: total squad market value retrieved from Transfermarkt/BsdApi
-- Market value converted to multiplicative strength proxy normalized across teams
-- Player availability (red cards, injuries) checked from match-day squad data
-- Context signals improve Brier by ≥0.01 over Phase 14 baseline
+- Form signal computed via Elo-based residual sum over configurable rolling window (default 5)
+- Form signal as independent 4th signal (key: "form"), NOT an Elo modifier
+- Lineup strength: total squad market value from static `data/team_values.json` (not BSD API)
+- Market value converted via log-ratio: `p = sigmoid(k * ln(home / away))`
+- Both signals persist to permanent prediction ledger (Phase 14a pattern)
+- Both signals go through Platt calibration + Brier blending alongside odds/catboost/Elo
+- Both signals use `available: false` with `reason` for graceful degradation when data missing
 - Model degrades gracefully when context data unavailable (skips signal, uses base blend)
 
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
 
-- *(to be planned via /gsd-plan-phase 15)*
+- [ ] 15-01-PLAN.md — Data Layer & Constants (Wave 1): constants, team_values.json, load_team_values()
+- [ ] 15-02-PLAN.md — Signal Modules (Wave 2): form.py, lineup.py, __init__.py update
+- [ ] 15-03-PLAN.md — Integration & Tests (Wave 3): main.py wiring, test_form.py, test_lineup.py
 
 ---
 
@@ -518,7 +555,7 @@ Plans:
 
 ## Progress
 
-**Execution Order:** 7 → 8 → 9 → 10 → 11 → 12 → 12b → 13 → 14 → 15 → 16 → 17 → 18
+**Execution Order:** 7 → 8 → 9 → 10 → 11 → 12 → 12b → 13 → 14 → 14a → 15 → 16 → 17 → 18
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -536,7 +573,8 @@ Plans:
 | 12. Draw Handling & Elo Math | v2.0 | 3/3 | Complete | 2026-06-15 |
 | 12b. Evaluation Infrastructure | v2.0 | 1/1 | Complete | 2026-06-15 |
 | 13. Signal Ingestion | v2.0 | 3/3 | Complete   | 2026-06-16 |
-| 14. Signal Blending | v2.0 | 0/2 | Planned | — |
+| 14. Signal Blending | v2.0 | 2/2 | Complete | 2026-06-17 |
+| 14a. Prediction Retention Fix | v2.0 | 1/1 | Complete | 2026-06-17 |
 | 15. Context Signals | v2.0 | 0/0 | Planned | — |
 | 16. Model Governance | v2.0 | 0/0 | Planned | — |
 | 17. Output Enhancement | v2.0 | 0/0 | Planned | — |

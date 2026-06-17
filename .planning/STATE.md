@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: World Cup 2026 Support
-status: complete
-last_updated: "2026-06-16T19:00:00.000Z"
-last_activity: 2026-06-16 -- Phase 14 planned (2 plans, 2 waves, RESEARCH+VALIDATION+PLAN complete, 3 checker blockers fixed)
+status: Executing Phase null
+last_updated: "2026-06-17T10:00:00.000Z"
 progress:
-  total_phases: 14
-  completed_phases: 8
-  total_plans: 37
-  completed_plans: 35
-  percent: 95
+  total_phases: 15
+  completed_phases: 14
+  planned_phases: 1
+  total_plans: 41
+  completed_plans: 38
+  percent: 93
 ---
 
 # Project State
@@ -19,10 +19,10 @@ progress:
 
 - See: `.planning/PROJECT.md` (updated 2026-06-14)
 - Core value: A live, self-updating tournament predictor in your terminal — when a match ends, within seconds the script detects it, updates Elo, re-simulates, and shows how every team's odds changed
-- Current focus: Phase 14 — Signal Blending (next)
+- Current focus: Phase 14a — Prediction Retention Architecture Fix (active)
 - 6 canonical docs generated on 2026-06-16 (README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, CONFIGURATION)
 - Phase 13 executed: 3 plans, 16 commits, 387 tests, 17/17 must-haves VERIFICATION PASSED
-- Test suite: 16 test modules, 387 passed, 1 skipped (live smoke needs BSD_API_KEY)
+- Test suite: 16 test modules, 427 passed (post-Phase 14), 1 skipped (live smoke needs BSD_API_KEY)
 
 ## Milestones & Completed Phases
 
@@ -123,6 +123,30 @@ progress:
 - Data: `data/prediction_history.json` (7 per-match entries)
 - Full suite: 328 passed, 1 skipped
 
+**Phase 14: Signal Blending** — 2 plans, 2 waves, 2 commits
+
+- `src/blender.py`: 8 exports — Platt calibration, Brier blending, LOO-CV, rolling Brier, Poisson base rate, full `calibrate_and_blend()` pipeline
+- `src/knockout.py`: `_get_blended_prob()` helper, `blend_params` wired through all 4 simulation helpers + `run_full_simulation`
+- `src/groups.py`: `_POISSON_BASE_RATE_CACHE` + auto-warming in `expected_goals()`
+- `main.py`: `_run_calibrate_and_blend()` orchestrator, Poisson base rate warmup, shutdown blend path
+- 40 blender tests (1 integration), 427 total passing
+- Cold start: identity calibration until ≥30 matches, rolling Brier window 50
+
+**Phase 14a: Prediction Retention Architecture Fix** — 1 plan
+
+Design flaw discovered during operational validation:
+
+Phase 13 caches predictions in TTL-based files (12h odds, 24h CatBoost) that are evicted after expiry. By the time a match finishes and enters `prediction_history`, its pre-match predictions have already been discarded. This prevents multi-signal Brier computation and calibration for Phase 14.
+
+Fix: Permanent prediction ledger (`data/predictions_ledger.json`). Every prediction is written once at fetch time, keyed by `match_id`. Never deleted. TTL caches continue serving live freshness; the ledger serves as the historical archive.
+
+Implementation:
+- `src/constants.py`: Added `PREDICTION_LEDGER_FILE`
+- `src/state.py`: Added `load_prediction_ledger()`, `save_prediction_ledger()`, `ledger_upsert()`
+- `src/predictors/odds.py`: Upsert into ledger after each fetch
+- `src/predictors/catboost.py`: Upsert into ledger after each fetch
+- `src/main.py`: `_merge_signals_into_history()` reads from ledger instead of TTL caches
+
 **Key decisions (D-01 through D-08 in CONTEXT.md):**
 
 - Prediction history as append-only log (never overwritten)
@@ -135,19 +159,27 @@ progress:
 
 ## Current Position
 
-- Phase: 13 — Complete
-- Plans: 3/3 executed (odds, catboost, wiring) across 3 waves, 16 commits
-- Status: VERIFICATION PASSED — 17/17 must-haves, 387 tests
-- Progress: [████████████████] 100%
-- Next: Phase 14 — Signal Blending (Platt scaling, Brier-weighted blender)
+Phase: 15 — CONTEXT SIGNALS — 🔶 PLANNED
+Plans: 3/3 planned, 0/3 executed
+Status: Planned, ready for execution
+
+- **Next:** Execute via `/gsd-execute-phase 15`
+
+## Phase 15 Plans
+
+| Plan | File | Wave | Objective |
+|------|------|------|-----------|
+| 01 | 15-01-PLAN.md | 1 | Data Layer: constants + team_values.json + state.py load_team_values |
+| 02 | 15-02-PLAN.md | 2 | Signal Modules: form.py + lineup.py + __init__.py |
+| 03 | 15-03-PLAN.md | 3 | Integration: main.py wiring + test_form.py + test_lineup.py |
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 35 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13)
-- Average duration: ~10 min per plan (Phase 11-13)
-- Total commits: 79 (63 pre-P13 + 16 P13 commits)
+- Total plans completed: 38 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a)
+- Average duration: ~10 min per plan (Phases 11-14)
+- Total commits: 86 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a)
 
 **By Phase:**
 | Phase | Plans | Duration | Avg/Plan |
@@ -160,7 +192,8 @@ progress:
 | 12 | 3 | ~25 min | ~8 min |
 | 12b | 1 | ~15 min | ~15 min |
 | 13 | 3 | ~40 min | ~13 min |
-| 14-18 | — | — | — |
+| 14 | 2 | ~20 min | ~10 min |
+| 14a | 1 | ~X min | ~X min |
 
 **Performance (Phase 8 GROUPS-07):**
 | Metric | Value | Status |
@@ -209,6 +242,7 @@ progress:
 
 ## Session Continuity
 
-- Last session: 2026-06-16
-- Phase 13 executed: 3 plans, 16 commits, 387 tests, 17/17 must-haves VERIFICATION PASSED
-- Next: Phase 14 — Signal Blending (Platt scaling per signal, Brier-weighted dynamic blender, Poisson base rate)
+- Last session: 2026-06-17
+- Phase 14a executed: 1 plan, 5 files, permanent prediction ledger (PI retentions fix)
+- Phase 15 context gathered: form + lineup strength as independent signals
+- Next: Phase 15 — Context Signals (plan via /gsd-plan-phase 15)
