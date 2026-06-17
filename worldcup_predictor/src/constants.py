@@ -141,3 +141,17 @@ CATBOOST_CACHE_FILE: str = "catboost_cache.json"
 
 PREDICTION_HISTORY_SCHEMA_VERSION: int = 2
 """Schema version for prediction_history.json. v1=flat (Phase 12b), v2=compound (Phase 13+)."""
+
+# ─── Blender Constants (Phase 14) ──────────────────────────────────────────
+
+CALIBRATION_PARAMS_FILE: str = "calibration_params.json"
+"""Filename for fitted Platt scaling parameters (Phase 14).
+Stored as {signal_key: {A: float, B: float, n_matches: int, brier: float, fitted_at: str}}."""
+
+COLD_START_THRESHOLD: int = 30
+"""Minimum matches before Platt scaling fitting activates (D-03/D-04).
+Below this, identity calibration (p_calibrated = p_raw) is used."""
+
+BRIER_WINDOW_SIZE: int = 50
+"""Rolling window for per-signal Brier computation used in blend weights (D-08).
+All recorded matches used when history < window size."""

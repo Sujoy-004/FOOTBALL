@@ -13,6 +13,15 @@ from src import constants
 
 MAX_EXPECTED_GOALS = 8.0
 
+_POISSON_BASE_RATE_CACHE: float | None = None
+"""Cached Poisson base rate computed from historical data to avoid re-reading file every call."""
+
+
+def _reset_poisson_base_rate_cache() -> None:
+    """Reset cached Poisson base rate. Used in tests between test cases."""
+    global _POISSON_BASE_RATE_CACHE
+    _POISSON_BASE_RATE_CACHE = None
+
 
 def expected_goals(
     rating_a: float, rating_b: float, base_rate: float | None = None
@@ -35,7 +44,19 @@ def expected_goals(
         Float >= 0 representing team A's expected goals (Poisson lambda),
         capped at MAX_EXPECTED_GOALS.
     """
-    adj_base = (base_rate if base_rate is not None else constants.EXPECTED_GOALS_BASE_RATE) * 1.05
+    global _POISSON_BASE_RATE_CACHE
+    if _POISSON_BASE_RATE_CACHE is None:
+        try:
+            from src.blender import compute_poisson_base_rate
+            rate = compute_poisson_base_rate()
+            if rate != constants.EXPECTED_GOALS_BASE_RATE:
+                _POISSON_BASE_RATE_CACHE = rate
+        except Exception:
+            pass
+    effective_base = base_rate
+    if effective_base is None:
+        effective_base = _POISSON_BASE_RATE_CACHE if _POISSON_BASE_RATE_CACHE is not None else constants.EXPECTED_GOALS_BASE_RATE
+    adj_base = effective_base * 1.05
     return min(adj_base * (10.0 ** ((rating_a - rating_b) / 400.0)), MAX_EXPECTED_GOALS)
 
 

@@ -868,6 +868,41 @@ def save_eval_baseline_report(
     _atomic_write_json(report, path)
 
 
+# ─── Calibration Params (Phase 14) ───────────────────────────────────────────
+
+
+def load_calibration_params(data_dir: Path | str | None = None) -> dict:
+    """Load fitted calibration parameters from calibration_params.json.
+
+    Returns empty dict if the file does not exist (graceful bootstrap per D-22).
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        dict: Calibration params per signal, or empty dict if no file exists.
+    """
+    path = _resolve_data_dir(data_dir) / constants.CALIBRATION_PARAMS_FILE
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return dict(json.load(f))
+
+
+def save_calibration_params(params: dict, data_dir: Path | str | None = None) -> None:
+    """Save fitted calibration parameters atomically.
+
+    Follows the same atomic write pattern as save_signal_cache() using
+    _atomic_write_json() (tempfile.mkstemp + os.replace).
+
+    Args:
+        params: Dict of signal_key -> {A, B, n_matches, brier, fitted_at}.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / constants.CALIBRATION_PARAMS_FILE
+    _atomic_write_json(params, path)
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────
 
 

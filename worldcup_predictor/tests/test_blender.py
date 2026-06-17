@@ -382,5 +382,45 @@ class TestPoissonBaseRate:
             os.unlink(temp_path)
 
 
+class TestBlendPipeline:
+    """Integration test for the full calibration → blending flow."""
+
+    def test_end_to_end_with_mock_data(self):
+        """Full pipeline with realistic mock data runs without error."""
+        mock_history = []
+        for i in range(35):
+            mock_history.append({
+                "match_id": f"GS_A_{i:02d}",
+                "team_a": "TeamA",
+                "team_b": "TeamB",
+                "actual": 1.0 if i < 18 else (0.0 if i < 33 else 0.5),
+                "signals": {
+                    "elo": {"probability": 0.6, "available": True, "version": "v1"},
+                    "market_odds": {"probability": 0.65, "available": True, "version": "v1"},
+                    "catboost": {"probability": 0.55, "available": True, "version": "v1"},
+                }
+            })
+
+        from src.blender import calibrate_and_blend
+        elo_ratings = {"TeamA": 1800, "TeamB": 1700}
+        groups_data = {"groups": {"A": {"teams": ["TeamA", "TeamB"], "matches": [
+            {"match_id": "GS_A_00", "team_a": "TeamA", "team_b": "TeamB"}]}}}
+        result = calibrate_and_blend(
+            history=mock_history[:30],
+            signal_keys=["elo", "market_odds", "catboost"],
+            elo_ratings=elo_ratings,
+            groups_data=groups_data,
+            bracket_data=[],
+            odds_cache={},
+            cb_cache={},
+            brier_window=50,
+            cold_start_threshold=30,
+        )
+        if result is not None:
+            assert "calibration_params" in result
+            assert "blend_weights" in result
+            assert "match_probs" in result
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

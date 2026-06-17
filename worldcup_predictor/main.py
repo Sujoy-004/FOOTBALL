@@ -70,6 +70,51 @@ def _merge_signals_into_history() -> None:
         state.save_prediction_history(history)
 
 
+def _run_calibrate_and_blend(
+    teams: dict[str, dict],
+    groups: dict,
+    bracket: list[dict],
+    odds_cache: dict,
+    cb_cache: dict,
+) -> dict | None:
+    """Orchestrate calibration + blending via blender.calibrate_and_blend().
+
+    Loads data from disk, delegates to pure-function pipeline in blender.py,
+    persists calibration params.
+
+    Returns blend_params dict (for simulation) or None (graceful degradation).
+    """
+    try:
+        from src.blender import calibrate_and_blend
+        from src.state import load_prediction_history, save_calibration_params
+
+        history = load_prediction_history()
+        if not history:
+            return None
+
+        elo_ratings = {name: data["elo"] for name, data in teams.items()}
+        blend_params = calibrate_and_blend(
+            history=history,
+            signal_keys=["elo", "market_odds", "catboost"],
+            elo_ratings=elo_ratings,
+            groups_data=groups,
+            bracket_data=bracket,
+            odds_cache=odds_cache or {},
+            cb_cache=cb_cache or {},
+        )
+        if blend_params and blend_params.get("calibration_params"):
+            save_calibration_params(blend_params["calibration_params"])
+        n_matches = len(blend_params.get("match_probs", {})) if blend_params else 0
+        n_signals = len(blend_params.get("blend_weights", {})) if blend_params else 0
+        if blend_params:
+            print(f"Blending active: {n_matches} matches, {n_signals} signals")
+        else:
+            print("Blending inactive (insufficient data)")
+        return blend_params
+    except Exception:
+        return None
+
+
 def _run_elo_sync(teams: dict[str, dict]) -> None:
     """Run Elo sync from eloratings.net with cache fallback per D-15/D-19/D-20.
 
@@ -574,6 +619,9 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     # Merge signal cache data into prediction_history entries
     _merge_signals_into_history()
 
+    # ── Calibrate, blend, inject into simulation (Phase 14) ──
+    blend_params = _run_calibrate_and_blend(teams, groups, bracket, odds_cache, cb_cache)
+
     # Count unavailable matches per signal for aggregated warnings (D-09)
     odds_matches = odds_cache.get("matches", {}) if odds_cache else {}
     odds_unavailable = sum(
@@ -604,7 +652,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
 
     # Simulate and print results
     sim_start = time.time()
-    probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=seed)
+    probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=seed, blend_params=blend_params)
     sim_elapsed = time.time() - sim_start
     output.print_simulation_duration(sim_elapsed)
 
@@ -711,6 +759,17 @@ def main() -> None:
         # ── Merge CatBoost into prediction_history — even if cache is partial ──
         _merge_signals_into_history()
 
+        # ── Warm Poisson base rate cache (V2-09) ──
+        try:
+            from src.blender import compute_poisson_base_rate
+            rate = compute_poisson_base_rate()
+            if rate != constants.EXPECTED_GOALS_BASE_RATE:
+                print(f"Poisson base rate: {rate:.4f} (from historical data)")
+            else:
+                print(f"Poisson base rate: {constants.EXPECTED_GOALS_BASE_RATE:.2f} (default)")
+        except Exception:
+            pass
+
         # ── Startup Elo sync per D-01, D-18 ──
         # Runs after historical catch-up (Pitfall 7: catch-up first, then sync)
         # and before the first simulation. Always fetches fresh Elo values.
@@ -760,7 +819,10 @@ def main() -> None:
             )
 
         # Shutdown path
-        final_probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=args.seed)
+        shutdown_odds = state.load_signal_cache(ODDS_CACHE_FILE)
+        shutdown_cb = state.load_signal_cache(CATBOOST_CACHE_FILE)
+        shutdown_blend = _run_calibrate_and_blend(teams, groups, bracket, shutdown_odds, shutdown_cb)
+        final_probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=args.seed, blend_params=shutdown_blend)
         output.print_shutdown_banner(final_probs)
 
         state.save_teams(teams)
