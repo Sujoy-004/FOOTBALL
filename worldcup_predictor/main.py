@@ -27,6 +27,9 @@ from src.simulation import run_simulation
 from src.output import print_sync_results, print_staleness_warning, print_drift_flags
 from src.predictors.odds import fetch_and_cache_odds
 from src.predictors.catboost import fetch_and_cache_catboost
+from src.predictors.form import compute_form_signal
+from src.predictors.lineup import compute_lineup_signal
+from src.constants import FORM_CACHE_FILE, LINEUP_CACHE_FILE
 
 
 _running = True
@@ -35,24 +38,21 @@ _elo_last_sync_time: float = 0.0
 
 
 def _merge_signals_into_history() -> None:
-    """Read signal caches and inject probabilities into prediction_history entries.
+    """Merge retained signal data into prediction_history entries.
 
     CRITICAL DATA FLOW: Without this, evaluate_all_matches(signal_name="market_odds")
     returns n_matches=0 because prediction_history only has elo signals.
 
     For each prediction_history entry that lacks market_odds or catboost signals,
-    looks up the match_id in the respective cache.
+    looks up the match_id in the permanent prediction ledger (Phase 14a).
     If a signal is available for that match, adds it to the entry's signals dict.
     Saves updated history atomically via save_prediction_history().
     """
     history = state.load_prediction_history()
     if not history:
         return
-    odds_cache = state.load_signal_cache(ODDS_CACHE_FILE)
-    cb_cache = state.load_signal_cache(CATBOOST_CACHE_FILE)
-    odds_matches = odds_cache.get("matches", {})
-    cb_matches = cb_cache.get("matches", {})
-    if not odds_matches and not cb_matches:
+    ledger = state.load_prediction_ledger()
+    if not ledger:
         return
     changed = False
     for entry in history:
@@ -60,11 +60,18 @@ def _merge_signals_into_history() -> None:
         if not isinstance(signals, dict):
             continue
         mid = entry.get("match_id", "")
-        if mid in odds_matches and "market_odds" not in signals:
-            signals["market_odds"] = dict(odds_matches[mid])
+        match_signals = ledger.get(mid, {})
+        if "market_odds" in match_signals and "market_odds" not in signals:
+            signals["market_odds"] = dict(match_signals["market_odds"])
             changed = True
-        if mid in cb_matches and "catboost" not in signals:
-            signals["catboost"] = dict(cb_matches[mid])
+        if "catboost" in match_signals and "catboost" not in signals:
+            signals["catboost"] = dict(match_signals["catboost"])
+            changed = True
+        if "form" in match_signals and "form" not in signals:
+            signals["form"] = dict(match_signals["form"])
+            changed = True
+        if "lineup_strength" in match_signals and "lineup_strength" not in signals:
+            signals["lineup_strength"] = dict(match_signals["lineup_strength"])
             changed = True
     if changed:
         state.save_prediction_history(history)
@@ -95,7 +102,7 @@ def _run_calibrate_and_blend(
         elo_ratings = {name: data["elo"] for name, data in teams.items()}
         blend_params = calibrate_and_blend(
             history=history,
-            signal_keys=["elo", "market_odds", "catboost"],
+            signal_keys=["elo", "market_odds", "catboost", "form", "lineup_strength"],
             elo_ratings=elo_ratings,
             groups_data=groups,
             bracket_data=bracket,
@@ -616,6 +623,28 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             if not cb_cache or not cb_cache.get("matches"):
                 signal_warnings.append("CatBoost predictions unavailable — no cached data")
 
+    # ── Context signal computation: form + lineup (Phase 15) ──
+    form_cache = {}
+    try:
+        form_cache = compute_form_signal(
+            teams, groups, bracket=bracket,
+            played=played, played_groups=played_groups,
+        )
+        state.save_signal_cache(form_cache, FORM_CACHE_FILE)
+    except Exception as e:
+        print(f"Warning: Form signal computation failed: {e}", file=sys.stderr)
+        if not form_cache or not form_cache.get("matches"):
+            signal_warnings.append("Form signal unavailable — no cached data")
+
+    lineup_cache = {}
+    try:
+        lineup_cache = compute_lineup_signal(groups, bracket=bracket)
+        state.save_signal_cache(lineup_cache, LINEUP_CACHE_FILE)
+    except Exception as e:
+        print(f"Warning: Lineup signal computation failed: {e}", file=sys.stderr)
+        if not lineup_cache or not lineup_cache.get("matches"):
+            signal_warnings.append("Lineup strength unavailable — no cached data")
+
     # Merge signal cache data into prediction_history entries
     _merge_signals_into_history()
 
@@ -638,6 +667,23 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     if cb_unavailable:
         signal_warnings.append(
             f"⚠ CatBoost predictions unavailable for {cb_unavailable} match(es)"
+        )
+
+    form_matches = form_cache.get("matches", {}) if form_cache else {}
+    form_unavailable = sum(
+        1 for m in form_matches.values() if not m.get("available", False)
+    )
+    if form_unavailable:
+        signal_warnings.append(
+            f"⚠ Form signal unavailable for {form_unavailable} match(es)"
+        )
+    lineup_matches = lineup_cache.get("matches", {}) if lineup_cache else {}
+    lineup_unavailable = sum(
+        1 for m in lineup_matches.values() if not m.get("available", False)
+    )
+    if lineup_unavailable:
+        signal_warnings.append(
+            f"⚠ Lineup strength unavailable for {lineup_unavailable} match(es)"
         )
 
     # Print aggregated warnings once per poll cycle (D-09)
