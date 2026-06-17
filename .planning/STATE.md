@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: World Cup 2026 Support
 status: Phase 15 Planned
-last_updated: "2026-06-17T11:00:00.000Z"
+last_updated: "2026-06-17T11:20:00.000Z"
 progress:
   total_phases: 15
   completed_phases: 14
   planned_phases: 1
   total_plans: 41
-  completed_plans: 38
-  percent: 93
+  completed_plans: 39
+  percent: 95
 ---
 
 # Project State
@@ -249,4 +249,5 @@ Status: Plan 15-01 executed, ready for Plan 15-02
 - Last session: 2026-06-17
 - Phase 14a executed: 1 plan, 5 files, permanent prediction ledger (PI retentions fix)
 - Phase 15-01 executed: 3 commits, data layer (constants, team_values.json, load_team_values())
-- Next: Phase 15-02 — Signal Modules (form.py, lineup.py)
+- Phase 15-02 executed: 3 commits, form.py (Elo residual), lineup.py (market value log-ratio)
+- Next: Phase 15-03 — Signal Ingest & Verification Loop (ingest all signals with TTL, track Brier)

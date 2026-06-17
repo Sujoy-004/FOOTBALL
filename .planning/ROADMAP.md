@@ -432,8 +432,8 @@ Plans:
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-10 | Team form signal (last 5 matches) computed and integrated | 🔶 In Progress (constants, data done) |
-| V2-11 | Lineup strength factor (market value proxy) computed | 🔶 In Progress (constants, data done) |
+| V2-10 | Team form signal (last 5 matches) computed and integrated | 🔶 In Progress (form.py complete) |
+| V2-11 | Lineup strength factor (market value proxy) computed | 🔶 In Progress (lineup.py complete) |
 
 **Success Criteria** (what must be TRUE):
 
@@ -451,7 +451,7 @@ Plans:
 Plans:
 
 - [x] 15-01-PLAN.md — Data Layer & Constants (Wave 1): constants, team_values.json, load_team_values()
-- [ ] 15-02-PLAN.md — Signal Modules (Wave 2): form.py, lineup.py, __init__.py update
+- [x] 15-02-PLAN.md — Signal Modules (Wave 2): form.py, lineup.py, __init__.py update
 - [ ] 15-03-PLAN.md — Integration & Tests (Wave 3): main.py wiring, test_form.py, test_lineup.py
 
 ---
@@ -575,7 +575,7 @@ Plans:
 | 13. Signal Ingestion | v2.0 | 3/3 | Complete   | 2026-06-16 |
 | 14. Signal Blending | v2.0 | 2/2 | Complete | 2026-06-17 |
 | 14a. Prediction Retention Fix | v2.0 | 1/1 | Complete | 2026-06-17 |
-| 15. Context Signals | v2.0 | 1/3 | In Progress | — |
+| 15. Context Signals | v2.0 | 2/3 | In Progress | — |
 | 16. Model Governance | v2.0 | 0/0 | Planned | — |
 | 17. Output Enhancement | v2.0 | 0/0 | Planned | — |
 | 18. Historical Tracking & Dark Horse Detection | v2.0 | 0/0 | Planned | — |
