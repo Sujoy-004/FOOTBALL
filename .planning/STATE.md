@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: World Cup 2026 Support
-status: Phase 15 Planned
-last_updated: "2026-06-17T11:20:00.000Z"
+status: Phase 16 Planned
+last_updated: "2026-06-17T22:00:00.000Z"
 progress:
-  total_phases: 15
-  completed_phases: 14
+  total_phases: 16
+  completed_phases: 15
   planned_phases: 1
-  total_plans: 41
-  completed_plans: 39
-  percent: 95
+  total_plans: 44
+  completed_plans: 41
+  percent: 93
 ---
 
 # Project State
@@ -159,27 +159,20 @@ Implementation:
 
 ## Current Position
 
-Phase: 15 — CONTEXT SIGNALS — 🔶 IN PROGRESS
-Plans: 3/3 planned, 1/3 executed
-Status: Plan 15-01 executed, ready for Plan 15-02
+Phase: 16 — MODEL GOVERNANCE — ◆ Planned
+Plans: 3/3 planned (3 waves), context + research + validation complete
+Status: Plans verified by gsd-plan-checker (0 blockers, 1 cosmetic warning resolved). Ready for execution.
 
-- **Next:** Execute Plan 15-02 via `/gsd-execute-phase 15` or direct plan execution
-
-## Phase 15 Plans
-
-| Plan | File | Wave | Objective | Status |
-|------|------|------|-----------|--------|
-| 01 | 15-01-PLAN.md | 1 | Data Layer: constants + team_values.json + state.py load_team_values | ✅ Complete |
-| 02 | 15-02-PLAN.md | 2 | Signal Modules: form.py + lineup.py + __init__.py | 🔲 Pending |
-| 03 | 15-03-PLAN.md | 3 | Integration: main.py wiring + test_form.py + test_lineup.py | 🔲 Pending |
+- **Next:** Execute Phase 16 via `/gsd-execute-phase 16`
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 39 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 1 P15)
-- Average duration: ~10 min per plan (Phases 11-14)
-- Total commits: 89 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 3 P15)
+- Total plans completed: 41 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15)
+- Total plans planned: 44 (all above + 3 P16)
+- Average duration: ~10 min per plan (Phases 11-15)
+- Total commits: 92 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15)
 
 **By Phase:**
 | Phase | Plans | Duration | Avg/Plan |
@@ -187,7 +180,6 @@ Status: Plan 15-01 executed, ready for Plan 15-02
 | 7 | 4 | 48 min | 12 min |
 | 8 | 4 | 39 min | 10 min |
 | 9 | 3 | 26 min | 9 min |
-| 15 | 1 | 12 min | 12 min |
 | 10 | 4 | ~38 min | ~10 min |
 | 11 | 3 | ~28 min | ~9 min |
 | 12 | 3 | ~25 min | ~8 min |
@@ -195,6 +187,8 @@ Status: Plan 15-01 executed, ready for Plan 15-02
 | 13 | 3 | ~40 min | ~13 min |
 | 14 | 2 | ~20 min | ~10 min |
 | 14a | 1 | ~X min | ~X min |
+| 15 | 3 | ~35 min | ~12 min |
+| 16 | 3 | planned | planned |
 
 **Performance (Phase 8 GROUPS-07):**
 | Metric | Value | Status |
@@ -234,6 +228,10 @@ Status: Plan 15-01 executed, ready for Plan 15-02
 | smoke | Live BSD smoke test requires manual BSD_API_KEY | Phase 10 |
 | utf8 | JSON encoding on Windows must use `encoding='utf-8'` (default cp1252) | Phase 9 close |
 | test | test_scaffold.py::test_teams_json_exists_and_valid asserts isinstance(int) but teams.json has floats | Pre-existing, found P15-01 |
+| governance | Per-match backtest history belongs in Phase 18 | Phase 16 |
+| governance | BSD API as backtest data source violates offline constraint | Phase 16 |
+| governance | Auto-recalibrate on drift deferred — alert-only for Phase 16 | Phase 16 |
+| governance | Full state dump per run deferred — lean snapshots only | Phase 16 |
 
 ### Research Flags (resolved)
 
@@ -248,6 +246,9 @@ Status: Plan 15-01 executed, ready for Plan 15-02
 
 - Last session: 2026-06-17
 - Phase 14a executed: 1 plan, 5 files, permanent prediction ledger (PI retentions fix)
-- Phase 15-01 executed: 3 commits, data layer (constants, team_values.json, load_team_values())
-- Phase 15-02 executed: 3 commits, form.py (Elo residual), lineup.py (market value log-ratio)
-- Next: Phase 15-03 — Signal Ingest & Verification Loop (ingest all signals with TTL, track Brier)
+- Phase 15 fully executed: 3 plans (15-01: data layer, 15-02: form.py + lineup.py, 15-03: main.py wiring + 51 new tests). 477 tests passing (0 regressions). k_form=1.0, k_lineup=0.35.
+- Phase 16 context discussion complete: 4 areas covered (Versioning, Backtesting, Drift Detection, Governance Output). CONTEXT.md + DISCUSSION-LOG.md written.
+- Phase 16 research complete: 10 integration points analyzed (evaluation.py, blender.py, state.py, prediction_history, calibration_params, main.py flow), 8 pitfalls catalogued, validation architecture mapped.
+- Phase 16 planned: 3 plans in 3 waves (16-01: Version Tracking, 16-02: Governance Orchestrator + Drift Detection + Dashlet, 16-03: Backtesting Framework). All 25 decisions covered. 0 blockers in plan-check. 1 cosmetic RESEARCH.md warning resolved.
+- **Phase 17 context discussion complete: 4 areas covered (Per-match display, Confidence intervals, --signals flag, Per-signal source). CONTEXT.md + DISCUSSION-LOG.md written. Terminal layout and delta presentation deferred.**
+- Next: `/gsd-plan-phase 17` — Plan Output Enhancement, then `/gsd-execute-phase 16` — Execute Model Governance (then Phase 17).
