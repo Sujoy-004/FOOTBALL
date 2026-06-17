@@ -274,6 +274,27 @@ def load_eloratings_cache(data_dir: Path | str | None = None) -> dict:
         return dict(json.load(f))
 
 
+def load_team_values(data_dir: Path | str | None = None) -> dict[str, int]:
+    """Load squad market values from team_values.json.
+
+    Returns empty dict if the file does not exist (graceful bootstrap per
+    Phase 15 D-16). Market values are static aggregate squad values in EUR.
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        dict[str, int]: Mapping of team name to market value in EUR, or
+        empty dict if the file does not yet exist.
+    """
+    from src.constants import TEAM_VALUES_FILE
+    path = _resolve_data_dir(data_dir) / TEAM_VALUES_FILE
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return dict(json.load(f))
+
+
 def save_eloratings_cache(cache: dict, data_dir: Path | str | None = None) -> None:
     """Save last-known-good Elo cache to eloratings_cache.json atomically.
 
@@ -729,6 +750,62 @@ def save_signal_cache(cache: dict, cache_filename: str, data_dir: Path | str | N
     """
     path = _resolve_data_dir(data_dir) / cache_filename
     _atomic_write_json(cache, path)
+
+
+# ─── Prediction Ledger (Phase 14a) ─────────────────────────────────────────
+
+
+def load_prediction_ledger(data_dir: Path | str | None = None) -> dict[str, dict]:
+    """Load the permanent prediction ledger.
+
+    Returns dict mapping match_id → {signal_name → {probability, timestamp, ...}}.
+    Empty dict if file does not exist.
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+    """
+    from src.constants import PREDICTION_LEDGER_FILE
+    path = _resolve_data_dir(data_dir) / PREDICTION_LEDGER_FILE
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return dict(json.load(f))
+
+
+def save_prediction_ledger(ledger: dict, data_dir: Path | str | None = None) -> None:
+    """Save the prediction ledger atomically.
+
+    Args:
+        ledger: Dict mapping match_id → {signal_name → entry}.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    from src.constants import PREDICTION_LEDGER_FILE
+    path = _resolve_data_dir(data_dir) / PREDICTION_LEDGER_FILE
+    _atomic_write_json(ledger, path)
+
+
+def ledger_upsert(
+    match_id: str,
+    signal_name: str,
+    entry: dict,
+    data_dir: Path | str | None = None,
+) -> None:
+    """Upsert a signal entry into the prediction ledger.
+
+    Loads existing ledger, sets ledger[match_id][signal_name] = entry,
+    saves atomically. Creates the match_id dict if it does not exist.
+
+    Args:
+        match_id: Canonical match identifier (e.g. 'GS_A_01').
+        signal_name: Signal key (e.g. 'market_odds', 'catboost').
+        entry: Signal entry dict with probability, timestamp, available, etc.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    ledger = load_prediction_ledger(data_dir)
+    if match_id not in ledger:
+        ledger[match_id] = {}
+    ledger[match_id][signal_name] = entry
+    save_prediction_ledger(ledger, data_dir)
 
 
 def is_cache_valid(cache: dict, ttl_hours: int = 12) -> bool:
