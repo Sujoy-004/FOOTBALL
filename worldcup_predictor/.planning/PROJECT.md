@@ -36,7 +36,7 @@ A live, self-updating tournament predictor in your terminal — when a match end
 |-----------|--------|---------|
 | v1.0 MVP | ✅ Complete | 2026-06-14 |
 | v1.1 World Cup 2026 Support | ✅ Complete | 2026-06-14 |
-| v2.0 Prediction Engine Modernization | 🚧 Phases 11–15 complete, Phase 16 planned | — |
+| v2.0 Prediction Engine Modernization | 🚧 Phases 11–15 complete, Phases 16–20 planned | — |
 
 **v1.0 core capabilities:**
 1. Load state from JSON (32 teams, 23 bracket matches)
@@ -71,24 +71,24 @@ A live, self-updating tournament predictor in your terminal — when a match end
 
 | Doc | Path | Covers |
 |-----|------|--------|
-| README | [README.md](../worldcup_predictor/README.md) | Install, quick start, usage examples, license |
-| Architecture | [docs/ARCHITECTURE.md](../worldcup_predictor/docs/ARCHITECTURE.md) | System overview, component diagram, data flow, key abstractions |
-| Getting Started | [docs/GETTING-STARTED.md](../worldcup_predictor/docs/GETTING-STARTED.md) | Prerequisites, install steps, first run, common issues |
-| Development | [docs/DEVELOPMENT.md](../worldcup_predictor/docs/DEVELOPMENT.md) | Build commands, code style, branch conventions, PR process |
-| Testing | [docs/TESTING.md](../worldcup_predictor/docs/TESTING.md) | Test framework, running tests, writing tests, coverage, CI |
-| Configuration | [docs/CONFIGURATION.md](../worldcup_predictor/docs/CONFIGURATION.md) | Environment variables, config files, defaults, per-env overrides |
+| README | [README.md](../README.md) | Install, quick start, usage examples, license |
+| Architecture | [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) | System overview, component diagram, data flow, key abstractions |
+| Getting Started | [docs/GETTING-STARTED.md](../docs/GETTING-STARTED.md) | Prerequisites, install steps, first run, common issues |
+| Development | [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) | Build commands, code style, branch conventions, PR process |
+| Testing | [docs/TESTING.md](../docs/TESTING.md) | Test framework, running tests, writing tests, coverage, CI |
+| Configuration | [docs/CONFIGURATION.md](../docs/CONFIGURATION.md) | Environment variables, config files, defaults, per-env overrides |
 
 ## Current Milestone: v2.0 Prediction Engine Modernization
 
-**Goal:** Fix the Elo foundation (63% wrong ratings, missing draws, missing K-multiplier), add multi-signal blending (market odds + CatBoost), and establish model governance. See [`MODERNIZATION-PROPOSAL.md`](../worldcup_predictor/MODERNIZATION-PROPOSAL.md) for full architecture.
+**Goal:** Fix the Elo foundation (63% wrong ratings, missing draws, missing K-multiplier), add multi-signal blending (market odds + CatBoost), establish model governance, and expand BSD API coverage to 85%. See [`MODERNIZATION-PROPOSAL.md`](../MODERNIZATION-PROPOSAL.md) for full architecture.
 
 **Phase progress:**
 
 ```
  v1.0 MVP     v1.1 48-team          v2.0 Modernization
  ─────────────────────────────────────────────────────────►
- [████████]  [████████████]  [████████████████░░░░░░░░░░░░]
-  Phases 1-6    Phases 7-10  11 12 12b 13 14 15 16 17 18
+ [████████]  [████████████]  [███████████████████░░░░░░░░░]
+   Phases 1-6    Phases 7-10  11 12 12b 13 14 15 16 17 18 19 20
                                 ▲       ▲
                           Complete    Planned
 ```
@@ -102,9 +102,11 @@ A live, self-updating tournament predictor in your terminal — when a match end
 | ✅ 14. Signal Blending | Complete | 2/2 | Platt scaling, Brier-weighted ensemble |
 | ✅ 14a. Prediction Retention Fix | Complete | 1/1 | Permanent prediction ledger |
 | ✅ 15. Context Signals | Complete | 3/3 | Team form, lineup strength |
-| 🔲 16. Model Governance | Planned | 3/3 | Versioning, drift monitoring, backtesting |
-| 🔲 17. Output Enhancement | Planned | — | Signal breakdown, confidence intervals |
-| 🔲 18. Historical Tracking | Planned | — | Probability log, dark horse detection |
+| 🔲 16. Model Governance | In Progress | 1/3 | Version tracking complete, drift + backtesting pending |
+| 🔲 17. Enriched Match Context | Defined | — | Live event fields, coach/venue/ref/weather |
+| 🔲 18. xG & AI Prediction Signals | Defined | — | xG predictions, AI preview ingestion |
+| 🔲 19. Multi-League Framework | Defined | — | All 65 BSD leagues, --league flag |
+| 🔲 20. Output Enhancement & Coverage Seal | Defined | — | Signal breakdown, CI, probability log, 85% API coverage |
 
 ## Requirements
 
@@ -142,9 +144,16 @@ A live, self-updating tournament predictor in your terminal — when a match end
 - [ ] **V2-12**: Model/data/run version tracking
 - [ ] **V2-13**: Per-signal Brier with drift detection
 - [ ] **V2-14**: Backtesting framework against historical World Cups
-- [ ] **V2-15**: Probability delta display with signal breakdown
-- [ ] **V2-16**: Historical probability log across tournament duration
-- [ ] **V2-17**: Dark horse detection
+- [ ] **V2-21**: Live match event fields (goals, cards, subs, possession, shots, corners, fouls) ingested from BSD
+- [ ] **V2-22**: Coach, venue, referee, and weather data ingested and accessible
+- [ ] **V2-23**: BSD xG predictions ingested as independent prediction signal
+- [ ] **V2-24**: BSD AI preview / pre-match analysis ingested and displayed
+- [ ] **V2-25**: League selection via CLI flag (--league) and config, supporting all 65 BSD leagues
+- [ ] **V2-26**: Multi-league data isolation (separate state files per league)
+- [ ] **V2-27**: Per-match signal breakdown display (blended + per-signal) in console
+- [ ] **V2-28**: Confidence intervals (Clopper-Pearson) alongside probabilities
+- [ ] **V2-29**: Historical probability log with trend tracking
+- [ ] **V2-30**: 85% BSD API field coverage (monitored and reported)
 
 ### Future (v2.x+)
 
@@ -178,8 +187,8 @@ A live, self-updating tournament predictor in your terminal — when a match end
 - **Group simulation:** Poisson scoring model (goal difference needed for tiebreakers)
 - **Knockout simulation:** Binary Elo win/loss (including PK resolution for draws)
 - **R32 routing:** 495-entry Annex C lookup table
-- **Codebase:** ~3,200 LOC Python, 11 source modules, 16 test modules
-- **Test suite:** 328 passing, 1 skipped (live smoke), 0 failures
+- **Codebase:** ~4,200 LOC Python, 14 source modules, 16 test modules
+- **Test suite:** 475 passing, 1 skipped (live smoke), 2 pre-existing regressions
 
 ## Constraints
 
@@ -236,4 +245,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-06-16 — v2.0: Phases 11–12b complete, Phase 13 planned*
+*Last updated: 2026-06-18 — v2.0: Phases 11–15 complete, Phase 16 planned, Phases 17–20 defined*

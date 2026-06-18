@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Prediction Engine Modernization
-status: Phase 16 Planned
-last_updated: "2026-06-17T22:00:00.000Z"
+status: Phase 16 In Progress (1/3 plans), Phases 17-20 Defined
+last_updated: "2026-06-18T23:43:00.000Z"
 progress:
-  total_phases: 16
+  total_phases: 20
   completed_phases: 15
-  planned_phases: 1
+  planned_phases: 5
   total_plans: 44
-  completed_plans: 41
-  percent: 93
+  completed_plans: 42
+  percent: 76
 ---
 
 # Project State
@@ -74,7 +74,7 @@ progress:
 - Full test suite: 212 passed, 1 skipped, 0 failures
 - All 7 SOTs batch-updated for 48-team format
 
-### v2.0 Prediction Engine Modernization — Phases 11-18
+### v2.0 Prediction Engine Modernization — Phases 11-20
 
 **Phase 11: Data Integrity & Elo Foundation** — 3 plans, 2 waves, 12 commits
 
@@ -162,20 +162,21 @@ Implementation:
 
 ## Current Position
 
-Phase: 16 — MODEL GOVERNANCE — ◆ Planned
-Plans: 3/3 planned (3 waves), context + research + validation complete
-Status: Plans verified by gsd-plan-checker (0 blockers, 1 cosmetic warning resolved). Ready for execution.
+Phase: 16 — MODEL GOVERNANCE — ▼ In Progress
+Plans: 1/3 complete (Plan 01: Version Tracking — done), Plans 02-03 remaining
+Status: Plan 01 executed — 4 commits, 4 files modified, 16 governance tests passing
 
-- **Next:** Execute Phase 16 via `/gsd-execute-phase 16` (then Phase 17 → 18)
+- **Next:** Execute Plan 16-02 (Governance Orchestrator + Drift Detection + Dashlet)
+- **Plan:** `/gsd-execute-phase 16` (then Phase 17 → 18 → 19 → 20)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 41 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15)
-- Total plans planned: 44 (all above + 3 P16)
+- Total plans completed: 42 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 1 P16)
+- Total plans planned: 44 (all above + 3 P16); P17-20 TBD
 - Average duration: ~10 min per plan (Phases 11-15)
-- Total commits: 92 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15)
+- Total commits: 96 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15 + 4 P16)
 
 **By Phase:**
 | Phase | Plans | Duration | Avg/Plan |
@@ -191,7 +192,11 @@ Status: Plans verified by gsd-plan-checker (0 blockers, 1 cosmetic warning resol
 | 14 | 2 | ~20 min | ~10 min |
 | 14a | 1 | ~X min | ~X min |
 | 15 | 3 | ~35 min | ~12 min |
-| 16 | 3 | planned | planned |
+| 16 | 1/3 | 6 min (so far) | 6 min (Plan 01) |
+| 17 | TBD | defined | — |
+| 18 | TBD | defined | — |
+| 19 | TBD | defined | — |
+| 20 | TBD | defined | — |
 
 **Performance (Phase 8 GROUPS-07):**
 | Metric | Value | Status |
@@ -211,6 +216,7 @@ Status: Plans verified by gsd-plan-checker (0 blockers, 1 cosmetic warning resol
 - No UI/frontend work in v1.1 — purely console CLI
 - DEFAULT_FORM_K=1.0 (not 0.6) — empirically validated from 19 matches, form_delta range [-1.01, +1.01]
 - DEFAULT_LINEUP_K=0.35 — ln ratio range [-5.31, +5.31] from €7.5M to €1.52B squad values
+- D-01 through D-07 (Phase 16): Three-version tracking — data_version increments per D-02 (new match OR new signal), model_version per D-03 (signal change OR calibration refit), run_version per D-04 (ISO 8601). Version IDs stored at entry and file level per D-05. Run snapshots stored in data/runs/ per D-06 with retention enforcement. versions.json at data/versions.json per D-07.
 
 ### Resolved in Phase 10
 
@@ -247,11 +253,17 @@ Status: Plans verified by gsd-plan-checker (0 blockers, 1 cosmetic warning resol
 
 ## Session Continuity
 
-- Last session: 2026-06-17
-- Phase 14a executed: 1 plan, 5 files, permanent prediction ledger (PI retentions fix)
-- Phase 15 fully executed: 3 plans (15-01: data layer, 15-02: form.py + lineup.py, 15-03: main.py wiring + 51 new tests). 477 tests passing (0 regressions). k_form=1.0, k_lineup=0.35.
+- Last session: 2026-06-18
+- Phase 16 Plan 01 executed: 4 commits, 4 files, version tracking foundation complete
+  - Added 6 governance constants to constants.py
+  - Added 6 governance persistence functions to state.py
+  - Created src/governance.py with 4 pure version computation functions
+  - Created tests/test_governance.py with 16 passing tests
+  - V2-12 satisfaction: D-01 through D-07 fully implemented
+  - 0 regressions on 469+ passing tests
+- Phase 15 fully executed: 3 plans (15-01: data layer, 15-02: form.py + lineup.py, 15-03: main.py wiring + 51 new tests). 477 tests passing. k_form=1.0, k_lineup=0.35.
 - Phase 16 context discussion complete: 4 areas covered (Versioning, Backtesting, Drift Detection, Governance Output). CONTEXT.md + DISCUSSION-LOG.md written.
-- Phase 16 research complete: 10 integration points analyzed (evaluation.py, blender.py, state.py, prediction_history, calibration_params, main.py flow), 8 pitfalls catalogued, validation architecture mapped.
-- Phase 16 planned: 3 plans in 3 waves (16-01: Version Tracking, 16-02: Governance Orchestrator + Drift Detection + Dashlet, 16-03: Backtesting Framework). All 25 decisions covered. 0 blockers in plan-check. 1 cosmetic RESEARCH.md warning resolved.
-- **Phase 17 context discussion complete: 4 areas covered (Per-match display, Confidence intervals, --signals flag, Per-signal source). CONTEXT.md + DISCUSSION-LOG.md written. Terminal layout and delta presentation deferred.**
-- Next: `/gsd-execute-phase 16` — Execute Model Governance (then Phase 17 → 18).
+- Phase 16 research complete: 10 integration points analyzed, 8 pitfalls catalogued, validation architecture mapped.
+- Phase 16 planned: 3 plans (16-01 complete, 16-02 and 16-03 remaining).
+- **Phase 17-20 redesigned to target 85% API coverage: P17 Enriched Match Context, P18 xG & AI Signals, P19 Multi-League Framework, P20 Output & Coverage Seal**
+- Next: Execute Plan 16-02 (Governance Orchestrator + Drift Detection + Dashlet).

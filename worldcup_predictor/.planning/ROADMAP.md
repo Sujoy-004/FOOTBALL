@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 MVP** — Phases 1–6 (shipped 2026-06-14)
 - ✅ **v1.1 World Cup 2026 Support** — Phases 7–10 (shipped 2026-06-14)
-- 📋 **v2.0 Prediction Engine Modernization** — Phases 11–18 (active)
+- 📋 **v2.0 Prediction Engine Modernization** — Phases 11–20 (active)
 
 ## Overview
 
@@ -23,9 +23,11 @@ The v2.0 milestone modernizes the prediction engine. The audit revealed that the
 - [x] **Phase 14: Signal Blending** — Calibration layer, dynamic blender, simulation integration
 - [x] **Phase 14a: Prediction Retention Architecture Fix** — Permanent prediction ledger for pre-match signal archival
 - [x] **Phase 15: Context Signals** — Team form, lineup strength, player availability
-- [ ] **Phase 16: Model Governance** — Versioning, Brier monitoring, backtesting, alerts
-- [ ] **Phase 17: Output Enhancement** — Signal contribution display, confidence intervals, delta tracking v2
-- [ ] **Phase 18: Historical Tracking** — Probability log, dark horse detection, trend analysis
+- [~] **Phase 16: Model Governance** — Versioning, Brier monitoring, backtesting, alerts (1/3 plans)
+- [ ] **Phase 17: Enriched Match Context** — Live event fields (goals, cards, subs, possession, shots, corners, fouls), coach/venue/referee/weather data
+- [ ] **Phase 18: xG & AI Prediction Signals** — xG predictions, AI preview/pre-match analysis ingestion
+- [ ] **Phase 19: Multi-League Framework** — All 65 BSD leagues, --league CLI flag, per-league state isolation
+- [ ] **Phase 20: Output Enhancement & Coverage Seal** — Signal breakdown, confidence intervals, probability log, 85% API coverage
 
 ## Phase Details
 
@@ -468,7 +470,7 @@ Plans:
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-12 | Model version, data version, and run version tracked | 🔲 |
+| V2-12 | Model version, data version, and run version tracked | ✅ |
 | V2-13 | Per-signal Brier scoring with drift detection | 🔲 |
 | V2-14 | Backtesting framework against historical World Cups | 🔲 |
 
@@ -482,36 +484,39 @@ Plans:
 - Backtest report: aggregate Brier, log loss, calibration ECE across historical tournaments
 - Governance dashlet in CLI shows: versions, per-signal Brier trend, last drift check timestamp
 
-**Plans:** TBD
+**Plans:** 3 plans (1 complete, 2 remaining)
 
 Plans:
 
-- *(to be planned via /gsd-plan-phase 16)*
+- [x] 16-01: Version Tracking Foundation (governance constants, state persistence, pure version computation, 16 tests) — Complete 2026-06-18
+- [ ] 16-02: Governance Orchestrator + Drift Detection + Dashlet
+- [ ] 16-03: Backtesting Framework
 
 ---
 
-### Phase 17: Output Enhancement
+### Phase 17: Enriched Match Context
 
-**Goal:** Surface signal-level prediction details in the console output — show how each signal contributed, how probabilities changed since last run, and confidence intervals.
+**Goal:** Expand BSD event field coverage from ~10 to 40+ fields — live match stats (goals, cards, subs, possession, shots, corners, fouls), plus coach, venue, referee, and weather data.
 
 **Depends on:** Phase 16
 
-**Requirements**: V2-15
+**Requirements**: V2-21, V2-22
 
 **Requirements Traceability:**
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-15 | Probability delta since last run displayed with signal breakdown | 🔲 |
+| V2-21 | Live match event fields (goals, cards, subs, possession, shots, corners, fouls) ingested from BSD for each match | 🔲 |
+| V2-22 | Coach, venue, referee, and weather data ingested and accessible for match context | 🔲 |
 
 **Success Criteria** (what must be TRUE):
 
-- Per-match prediction shows: blended probability + Elo-only probability + market odds + CatBoost (when available)
-- Δ column shows change in each probability since last run
-- Confidence interval (Clopper-Pearson) displayed alongside blended probability
-- Console output fits within terminal width (no wrapping)
-- Signal contribution breakdown toggleable via CLI flag (--signals, -s)
-- Historical deltas not shown on first run (no baseline to diff against)
+- BSD event feed parsed for all major event types (goals, yellow/red cards, substitutions, possession %, shots on/off target, corners, fouls)
+- Coach name, venue name, referee name, and weather conditions extracted per match
+- All enriched fields stored in `played.json` / `played_groups.json` per match
+- Graceful degradation when fields are missing from API response
+- Console optionally displays match context summary (--context flag)
+- Zero regression on existing test suite
 
 **Plans:** TBD
 
@@ -521,29 +526,30 @@ Plans:
 
 ---
 
-### Phase 18: Historical Tracking & Dark Horse Detection
+### Phase 18: xG & AI Prediction Signals
 
-**Goal:** Build the tournament-spanning probability log and dark horse detection — the final layer that surfaces actionable insights from the prediction history.
+**Goal:** Integrate BSD's xG predictions and AI-powered pre-match analysis as additional prediction signals feeding into the blender.
 
 **Depends on:** Phase 17
 
-**Requirements**: V2-16, V2-17
+**Requirements**: V2-23, V2-24
 
 **Requirements Traceability:**
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-16 | Historical probability log across tournament duration | 🔲 |
-| V2-17 | Dark horse detection (highest Δ between average probability and champion probability) | 🔲 |
+| V2-23 | BSD xG predictions ingested as independent prediction signal | 🔲 |
+| V2-24 | BSD AI preview / pre-match analysis ingested and displayed | 🔲 |
 
 **Success Criteria** (what must be TRUE):
 
-- Full probability snapshot persisted after every run (all teams, all stages, blended probability)
-- Time-series accessible: query probability of Team X on Date Y
-- Dark horse metric: champion_probability - average_probability over tournament duration
-- Top 5 dark horses displayed in console output sorted by Δ
-- Trend arrows (↑ ↓ →) for each team's champion probability vs. last snapshot
-- Probability log exportable to JSON for external analysis
+- xG data points (home_xg, away_xg) extracted from BSD match predictions endpoint
+- xG converted to match outcome probabilities via Poisson-based xG model
+- AI preview text ingested and stored per match
+- xG registered as a 5th signal in the blender alongside Elo/odds/catboost/form/lineup
+- AI preview displayed in console output when available
+- Missing xG or AI preview degrades gracefully (signal marked unavailable)
+- Zero regression on existing test suite
 
 **Plans:** TBD
 
@@ -553,9 +559,79 @@ Plans:
 
 ---
 
+### Phase 19: Multi-League Framework
+
+**Goal:** Refactor from single-league lock (league_id=27) to support all 65 BSD leagues — users select any league via CLI flag or config, with per-league state isolation.
+
+**Depends on:** Phase 18
+
+**Requirements**: V2-25, V2-26
+
+**Requirements Traceability:**
+
+| ID | Requirement | Status |
+|----|------------|--------|
+| V2-25 | League selection via CLI flag (--league) and config, supporting all 65 BSD leagues | 🔲 |
+| V2-26 | Multi-league data isolation (separate state files per league namespace) | 🔲 |
+
+**Success Criteria** (what must be TRUE):
+
+- `--league` CLI flag accepts any league ID from BSD's 65-league catalog
+- League ID removed from hardcoded constants; configurable via flag or `config.json`
+- State files namespaced per league (e.g. `data/27/played.json`, `data/65/played.json`)
+- League catalog displayed via `--list-leagues` flag (name + ID)
+- Elo sync scoped to teams within the selected league
+- All existing functionality continues to work with default league (27 = World Cup)
+- Zero regression on existing test suite
+
+**Plans:** TBD
+
+Plans:
+
+- *(to be planned via /gsd-plan-phase 19)*
+
+---
+
+### Phase 20: Output Enhancement & Coverage Seal
+
+**Goal:** Surface signal-level prediction details in console output, add confidence intervals, persist historical probability log, and reach 85% BSD API field coverage.
+
+**Depends on:** Phase 19
+
+**Requirements**: V2-27, V2-28, V2-29, V2-30
+
+**Requirements Traceability:**
+
+| ID | Requirement | Status |
+|----|------------|--------|
+| V2-27 | Per-match signal breakdown display (blended + per-signal) in console | 🔲 |
+| V2-28 | Confidence intervals (Clopper-Pearson) alongside probabilities | 🔲 |
+| V2-29 | Historical probability log across tournament duration with trend tracking | 🔲 |
+| V2-30 | 85% BSD API field coverage (monitored and reported) | 🔲 |
+
+**Success Criteria** (what must be TRUE):
+
+- Per-match prediction shows: blended + Elo + odds + CatBoost + form + lineup + xG (when available)
+- Confidence interval (Clopper-Pearson, 95%) displayed alongside blended probability
+- Δ column shows change in each probability since last run
+- Full probability snapshot persisted after every run (all teams, all stages)
+- Trend arrows (↑ ↓ →) for champion probability vs. last snapshot
+- Coverage auditor script reports % of BSD API fields utilized; target ≥85%
+- Console output fits within terminal width (no wrapping)
+- Historical deltas not shown on first run (no baseline to diff against)
+- Zero regression on existing test suite
+
+**Plans:** TBD
+
+Plans:
+
+- *(to be planned via /gsd-plan-phase 20)*
+
+---
+
 ## Progress
 
-**Execution Order:** 7 → 8 → 9 → 10 → 11 → 12 → 12b → 13 → 14 → 14a → 15 → 16 → 17 → 18
+**Execution Order:** 7 → 8 → 9 → 10 → 11 → 12 → 12b → 13 → 14 → 14a → 15 → 16 → 17 → 18 → 19 → 20
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -577,5 +653,7 @@ Plans:
 | 14a. Prediction Retention Fix | v2.0 | 1/1 | Complete | 2026-06-17 |
 | 15. Context Signals | v2.0 | 3/3 | Complete | 2026-06-17 |
 | 16. Model Governance | v2.0 | 0/0 | Planned | — |
-| 17. Output Enhancement | v2.0 | 0/0 | Planned | — |
-| 18. Historical Tracking & Dark Horse Detection | v2.0 | 0/0 | Planned | — |
+| 17. Enriched Match Context | v2.0 | 0/0 | Defined | — |
+| 18. xG & AI Prediction Signals | v2.0 | 0/0 | Defined | — |
+| 19. Multi-League Framework | v2.0 | 0/0 | Defined | — |
+| 20. Output Enhancement & Coverage Seal | v2.0 | 0/0 | Defined | — |
