@@ -547,3 +547,120 @@ class TestComputeReferenceBaselines:
         assert "odds" in baselines
         assert isinstance(baselines["elo"], float)
         assert baselines["elo"] > 0
+
+
+# ─── Governance Orchestrator Tests (Plan 16-02) ──────────────────────────
+
+
+class TestRunGovernance:
+    """Tests for governance._run_governance()."""
+
+    def _make_entries(self, n: int = 5, signal_key: str = "elo") -> list[dict]:
+        """Helper: build mock prediction_history entries."""
+        entries = []
+        for i in range(n):
+            entries.append({
+                "match_id": f"M{i}",
+                "signals": {signal_key: {"probability": 0.5, "available": True}},
+                "actual": 0.5,
+            })
+        return entries
+
+    def test_run_governance_snapshot_shape(self, monkeypatch):
+        """_run_governance() returns snapshot with D-06 schema keys."""
+        monkeypatch.setattr("src.state.save_run_snapshot", lambda s, data_dir=None: None)
+        monkeypatch.setattr("src.output.print_governance_dashlet", lambda *a, **kw: None)
+
+        from src.governance import _run_governance
+
+        entries = self._make_entries(35)
+        versions = {
+            "data_version": "D3",
+            "model_version": "M2",
+            "run_version": "R47",
+            "last_data_change": None,
+            "last_model_change": None,
+            "last_run_timestamp": None,
+        }
+        snapshot = _run_governance(
+            entries=entries,
+            versions=versions,
+            signal_keys=["elo"],
+            blend_weights={"elo": 1.0},
+        )
+        # D-06 required keys
+        assert "run_version" in snapshot
+        assert "data_version" in snapshot
+        assert "model_version" in snapshot
+        assert "timestamp" in snapshot
+        assert "signal_counts" in snapshot
+        assert "blend_weights" in snapshot
+        assert "per_signal_brier" in snapshot
+        assert "blended_brier" in snapshot
+        assert "drift_status" in snapshot
+        assert snapshot["data_version"] == "D3"
+        assert snapshot["model_version"] == "M2"
+
+    def test_run_governance_cold_start(self, monkeypatch):
+        """< 30 entries -> drift_status == COLD_START."""
+        monkeypatch.setattr("src.state.save_run_snapshot", lambda s, data_dir=None: None)
+        monkeypatch.setattr("src.output.print_governance_dashlet", lambda *a, **kw: None)
+
+        from src.governance import _run_governance
+
+        entries = self._make_entries(20)
+        versions = {
+            "data_version": "D0", "model_version": "M0", "run_version": "R0",
+            "last_data_change": None, "last_model_change": None, "last_run_timestamp": None,
+        }
+        snapshot = _run_governance(
+            entries=entries,
+            versions=versions,
+            signal_keys=["elo"],
+            blend_weights={},
+        )
+        assert snapshot["drift_status"] == "COLD_START"
+
+    def test_run_governance_healthy(self, monkeypatch):
+        """>= 30 entries, no drift -> drift_status == HEALTHY."""
+        monkeypatch.setattr("src.state.save_run_snapshot", lambda s, data_dir=None: None)
+        monkeypatch.setattr("src.output.print_governance_dashlet", lambda *a, **kw: None)
+
+        from src.governance import _run_governance
+
+        entries = self._make_entries(50)
+        versions = {
+            "data_version": "D0", "model_version": "M0", "run_version": "R0",
+            "last_data_change": None, "last_model_change": None, "last_run_timestamp": None,
+        }
+        snapshot = _run_governance(
+            entries=entries,
+            versions=versions,
+            signal_keys=["elo"],
+            blend_weights={"elo": 1.0},
+        )
+        assert snapshot["drift_status"] == "HEALTHY"
+
+
+class TestShouldRunGov:
+    """Tests for _should_run_gov() timing logic."""
+
+    def test_startup_returns_true(self):
+        """When _last_gov_time == 0.0, should return True."""
+        import main as main_mod
+        main_mod._last_gov_time = 0.0
+        assert main_mod._should_run_gov() is True
+
+    def test_hourly_trigger(self):
+        """After 3600s, should return True."""
+        import main as main_mod
+        import time
+        main_mod._last_gov_time = time.time() - 3601  # 1s over hourly
+        assert main_mod._should_run_gov() is True
+
+    def test_within_hour_returns_false(self):
+        """Within 3600s of last run, should return False."""
+        import main as main_mod
+        import time
+        main_mod._last_gov_time = time.time() - 1800  # 30 min ago
+        assert main_mod._should_run_gov() is False

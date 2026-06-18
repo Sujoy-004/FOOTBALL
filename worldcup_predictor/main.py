@@ -23,7 +23,6 @@ from src.constants import API_TIMEOUT, ELO_SYNC_INTERVAL_HOURS, POLL_INTERVAL
 from src.constants import ODDS_CACHE_TTL_HOURS, CATBOOST_CACHE_TTL_HOURS, ODDS_CACHE_FILE, CATBOOST_CACHE_FILE
 from src.fetcher import build_historic_url, fetch_raw_matches, process_group_matches, process_matches
 from src.knockout import resolve_knockout_slot_teams, run_full_simulation
-from src.simulation import run_simulation
 from src.output import print_sync_results, print_staleness_warning, print_drift_flags
 from src.predictors.odds import fetch_and_cache_odds
 from src.predictors.catboost import fetch_and_cache_catboost
@@ -35,6 +34,33 @@ from src.constants import FORM_CACHE_FILE, LINEUP_CACHE_FILE
 _running = True
 _elo_last_sync_time: float = 0.0
 """Tracks when Elo sync last completed. 0.0 = never synced. Used for 24h interval checks and wake-from-sleep detection (D-02, D-03)."""
+
+_last_gov_time: float = 0.0
+"""Tracks when governance last ran. 0.0 = never. Used for hourly check (D-16)."""
+
+_prev_history: list[dict] | None = None
+"""Snapshot of prediction_history BEFORE merge. Captured for data_version detection (Architecture Q4)."""
+
+_prev_cal_params: dict | None = None
+"""Snapshot of calibration_params BEFORE calibrate_and_blend. Captured for model_version detection (Architecture Q5)."""
+
+
+def _should_run_gov() -> bool:
+    """Check if governance should run this cycle.
+
+    Governance runs at startup (when _last_gov_time == 0.0) and
+    hourly thereafter (D-16).
+
+    Returns:
+        True if governance should run, False otherwise.
+    """
+    global _last_gov_time
+    now = time.time()
+    if _last_gov_time == 0.0:
+        return True
+    if now - _last_gov_time >= 3600:  # hourly
+        return True
+    return False
 
 
 def _merge_signals_into_history() -> None:
@@ -645,11 +671,65 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
         if not lineup_cache or not lineup_cache.get("matches"):
             signal_warnings.append("Lineup strength unavailable — no cached data")
 
+    # ══ Architecture Q4+Q5: Capture pre-mutation state ══
+    # Capture prev_history for data_version change detection.
+    # Must happen BEFORE _merge_signals_into_history().
+    _prev_history = state.load_prediction_history()
+    _prev_cal_params = state.load_calibration_params()
+
     # Merge signal cache data into prediction_history entries
     _merge_signals_into_history()
 
     # ── Calibrate, blend, inject into simulation (Phase 14) ──
     blend_params = _run_calibrate_and_blend(teams, groups, bracket, odds_cache, cb_cache)
+
+    # ── Attach version IDs to prediction_history entries (D-05) ──
+    # Tracks which data/model/run produced each entry's state.
+    # Only sets version on entries that don't yet have it (Pitfall 2: avoid bloat).
+    # Version IDs are entry-level attributes, not signal-level (Pitfall 1).
+    try:
+        from src.governance import _maybe_update_versions
+        from src.state import load_versions, save_versions, load_prediction_history, save_prediction_history, load_calibration_params
+
+        current_versions = load_versions()
+        new_cal_params = load_calibration_params()
+        calibration_changed = _prev_cal_params != new_cal_params  # Architecture Q5
+
+        # Determine signal keys from current prediction_history
+        ph = load_prediction_history()
+        ph_signal_keys = sorted(
+            k for entry in ph
+            if isinstance(entry.get("signals"), dict)
+            for k in entry["signals"]
+        ) if ph else []
+
+        updated_versions = _maybe_update_versions(
+            old_versions=current_versions,
+            prev_history=_prev_history or [],
+            new_history=ph,
+            prev_signal_keys=list(set(
+                k for entry in (_prev_history or [])
+                if isinstance(entry.get("signals"), dict)
+                for k in entry["signals"]
+            )),
+            new_signal_keys=list(set(ph_signal_keys)),
+            calibration_changed=calibration_changed,
+        )
+        save_versions(updated_versions)
+
+        # Attach version IDs to entries that don't have them yet
+        devices = load_prediction_history()
+        modified = False
+        for entry in devices:
+            if "data_version" not in entry:
+                entry["data_version"] = updated_versions.get("data_version", "D0")
+                entry["model_version"] = updated_versions.get("model_version", "M0")
+                entry["run_version"] = updated_versions.get("run_version", "R0")
+                modified = True
+        if modified:
+            save_prediction_history(devices)
+    except Exception as e:
+        print(f"Version tracking failed: {e}", file=sys.stderr)
 
     # Count unavailable matches per signal for aggregated warnings (D-09)
     odds_matches = odds_cache.get("matches", {}) if odds_cache else {}
@@ -689,6 +769,30 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     # Print aggregated warnings once per poll cycle (D-09)
     for warning in signal_warnings:
         print(warning)
+
+    # ── Model Governance (Phase 16) ──
+    if _should_run_gov():
+        try:
+            from src.governance import _run_governance
+            from src.state import load_versions, load_prediction_history
+
+            gov_entries = load_prediction_history()
+            gov_versions = load_versions()
+            gov_signal_keys = sorted(
+                k for entry in gov_entries
+                if isinstance(entry.get("signals"), dict)
+                for k in entry["signals"]
+            ) if gov_entries else ["elo", "market_odds", "catboost", "form", "lineup_strength"]
+
+            _run_governance(
+                entries=gov_entries,
+                versions=gov_versions,
+                signal_keys=list(set(gov_signal_keys)),
+                blend_weights=blend_params.get("blend_weights", {}) if blend_params else {},
+            )
+            _last_gov_time = time.time()
+        except Exception as e:
+            print(f"Governance check failed: {e}", file=sys.stderr)
 
     # D-15: group standings display behavior
     #   - New group match ingested → show
@@ -826,6 +930,21 @@ def main() -> None:
             output.NO_COLOR = True
 
         output.print_header(teams, bracket, played, aliases, groups, annex_c)
+
+        # ── Governance startup ──
+        from src.state import load_versions, load_prediction_history
+        from src.governance import _run_governance
+
+        gov_entries = load_prediction_history()
+        gov_versions = load_versions()
+        _run_governance(
+            entries=gov_entries,
+            versions=gov_versions,
+            signal_keys=["elo", "market_odds", "catboost", "form", "lineup_strength"],
+            blend_weights={},
+            startup=True,
+        )
+        _last_gov_time = time.time()
 
         # ── --once mode: single iteration, immediate exit (D-01, D-02) ──
         if args.once:

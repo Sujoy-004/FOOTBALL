@@ -308,3 +308,118 @@ def compute_reference_baselines(entries: list[dict], signal_keys: list[str]) -> 
         else:
             baselines[key] = 1.0  # worst case for no data
     return baselines
+
+
+# ─── Governance Orchestrator (Plan 16-02) ─────────────────────────────────
+
+
+def _run_governance(
+    entries: list[dict],
+    versions: dict,
+    signal_keys: list[str],
+    blend_weights: dict[str, float],
+    startup: bool = False,
+) -> dict:
+    """Run one governance cycle: compute metrics, check drift, build snapshot.
+
+    Args:
+        entries: Deduplicated prediction_history entries.
+        versions: Current version state from load_versions().
+        signal_keys: Ordered list of active signal keys.
+        blend_weights: Current blend weights from calibrate_and_blend().
+        startup: True if called during startup (triggers reference baseline init).
+
+    Returns:
+        dict: Run snapshot per D-06 schema.
+    """
+    from src.constants import COLD_START_THRESHOLD
+
+    # 1. Deduplicate entries
+    deduped = _deduplicate_history(entries)
+    n_matches = len(deduped)
+
+    # 2. Compute per-signal rolling Brier
+    per_signal_brier: dict[str, float] = {}
+    from src.blender import compute_rolling_brier
+
+    for key in signal_keys:
+        brier = compute_rolling_brier(deduped, key, window=50)
+        per_signal_brier[key] = brier
+
+    # 3. Compute/blend blended Brier
+    blended_brier = 0.0
+    if "blended" in signal_keys:
+        blended_brier = per_signal_brier.get("blended", 0.0)
+    elif per_signal_brier and blend_weights:
+        # Weighted average of per-signal briers
+        total_weight = sum(blend_weights.values()) or 1.0
+        blended_brier = sum(
+            per_signal_brier.get(k, 0.0) * w / total_weight
+            for k, w in blend_weights.items()
+            if k in per_signal_brier
+        )
+
+    # 4. Compute or load reference baselines
+    reference_baselines = compute_reference_baselines(deduped, signal_keys)
+
+    # 5. Check drift per signal
+    drift_details: list[dict] = []
+    for key in signal_keys:
+        baseline = reference_baselines.get(key, 1.0)
+        result = check_drift(deduped, key, baseline, window=50, sigma_threshold=2.0)
+        if result is not None and result.get("drifted", False):
+            drift_details.append(result)
+
+    # 6. Determine drift_status
+    if n_matches < COLD_START_THRESHOLD:
+        drift_status = "COLD_START"
+    elif drift_details:
+        drift_status = "DRIFT"
+    else:
+        drift_status = "HEALTHY"
+
+    # 7. Signal counts
+    signal_counts: dict[str, int] = {}
+    for key in signal_keys:
+        count = sum(
+            1 for e in deduped
+            if e.get("signals", {}).get(key, {}).get("available", False)
+        )
+        signal_counts[key] = count
+
+    # 8. Build snapshot dict (D-06 schema)
+    snapshot = {
+        "run_version": versions.get("run_version", _compute_run_version()),
+        "data_version": versions.get("data_version", "D0"),
+        "model_version": versions.get("model_version", "M0"),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "signal_counts": signal_counts,
+        "blend_weights": dict(blend_weights),
+        "per_signal_brier": per_signal_brier,
+        "blended_brier": blended_brier,
+        "drift_status": drift_status,
+        "drift_details": drift_details if drift_details else None,
+    }
+
+    # 9. Save snapshot via state.py
+    from src.state import save_run_snapshot
+
+    save_run_snapshot(snapshot)
+
+    # 10. Print governance dashlet
+    from src.output import print_governance_dashlet
+
+    drift_results_dict: dict[str, dict] = {}
+    for d in drift_details:
+        drift_results_dict[d.get("signal", "?")] = d
+
+    print_governance_dashlet(
+        versions=versions,
+        status=drift_status.replace("_", " "),
+        n_matches=n_matches,
+        per_signal_brier=per_signal_brier,
+        blend_weights=blend_weights,
+        drift_results=drift_results_dict if drift_results_dict else None,
+    )
+
+    return snapshot
