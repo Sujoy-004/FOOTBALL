@@ -344,3 +344,120 @@ class TestCompareBaselines:
         comp = compare_baselines(before, after)
         assert comp["deltas"]["brier"] == pytest.approx(0.05)
         assert comp["verdict"] == "REGRESSED"
+
+
+class TestBacktestTournament:
+    """Tests for evaluation.backtest_tournament() (Plan 16-03)."""
+
+    MOCK_TEAMS = {
+        "TeamA": {"elo": 1800},
+        "TeamC": {"elo": 1700},
+        "TeamB": {"elo": 1500},
+        "TeamD": {"elo": 1400},
+    }
+
+    def _make_historical(self, matches: list[tuple]) -> list[dict]:
+        """Build mock historical match dicts from (mid, ta, tb, actual, winner, is_draw, hs, as) tuples."""
+        result = []
+        for i, (mid, ta, tb, actual, winner, is_draw, hs, as_) in enumerate(matches):
+            result.append({
+                "match_id": mid,
+                "team_a": ta,
+                "team_b": tb,
+                "actual": actual,
+                "winner": winner,
+                "is_draw": is_draw,
+                "home_score": hs,
+                "away_score": as_,
+                "signals": {"elo": {"probability": 0.5, "available": True}},
+            })
+        return result
+
+    def test_backtest_tournament_basic(self):
+        """2-match tournament — verify report has correct keys and structure."""
+        from src.evaluation import backtest_tournament
+
+        matches = self._make_historical([
+            ("M01", "TeamA", "TeamB", 1.0, "TeamA", False, 2, 0),
+            ("M02", "TeamC", "TeamD", 1.0, "TeamC", False, 1, 0),
+        ])
+        report = backtest_tournament(matches, dict(self.MOCK_TEAMS), tournament_name="TestCup")
+        assert report["tournament"] == "TestCup"
+        assert report["n_matches"] == 2
+        assert "per_signal" in report
+        assert "elo" in report["per_signal"]
+        assert "winner_prediction" in report
+        assert "signal_ranking" in report
+        assert "available_signals" in report
+        assert "n_signals" in report
+        assert report["n_signals"] == 1
+        assert report["available_signals"] == ["elo"]
+
+    def test_backtest_tournament_metrics(self):
+        """Feed matches with known Elo outcomes — metrics match manual computation."""
+        from src.evaluation import backtest_tournament, brier_score, log_loss
+
+        matches = self._make_historical([
+            ("M01", "TeamA", "TeamB", 1.0, "TeamA", False, 2, 0),
+        ])
+        report = backtest_tournament(matches, dict(self.MOCK_TEAMS), tournament_name="Test")
+        assert report["n_matches"] == 1
+        elo_metrics = report["per_signal"]["elo"]
+        assert elo_metrics["n"] == 1
+        # TeamA(1800) vs TeamB(1500): expected_score = 1/(1+10^((1500-1800)/400))
+        # = 1/(1+10^(-0.75)) = 1/(1+0.1778) = 1/1.1778 = 0.849
+        # Brier = (0.849 - 1.0)^2
+        assert 0.0 < elo_metrics["brier"] < 0.1
+        assert elo_metrics["log_loss"] > 0.0
+        assert elo_metrics["ece"] >= 0.0
+
+    def test_backtest_tournament_winner_prediction(self):
+        """Winner prediction identifies highest-Elo team at tournament start."""
+        from src.evaluation import backtest_tournament
+
+        matches = self._make_historical([
+            ("M01", "TeamA", "TeamB", 1.0, "TeamA", False, 2, 0),
+            ("M02", "TeamA", "TeamC", 1.0, "TeamA", False, 1, 0),
+        ])
+        # TeamA has highest Elo (1800) → predicted winner
+        report = backtest_tournament(matches, dict(self.MOCK_TEAMS), tournament_name="Test")
+        wp = report["winner_prediction"]
+        assert wp["predicted"] == "TeamA"
+        assert wp["actual"] == "TeamA"
+        assert wp["correct"] is True
+
+    def test_backtest_tournament_empty(self):
+        """Empty tournament list returns empty report."""
+        from src.evaluation import backtest_tournament
+
+        report = backtest_tournament([], dict(self.MOCK_TEAMS), tournament_name="Empty")
+        assert report["tournament"] == "Empty"
+        assert report["n_matches"] == 0
+        assert report["per_signal"] == {}
+        assert report["winner_prediction"] == {"predicted": None, "actual": None, "correct": False}
+        assert report["signal_ranking"] == []
+
+    def test_backtest_tournament_deepcopy(self):
+        """Original teams dict unchanged after replay (Pitfall 6)."""
+        from src.evaluation import backtest_tournament
+        import copy
+
+        original_teams = copy.deepcopy(self.MOCK_TEAMS)
+        matches = self._make_historical([
+            ("M01", "TeamA", "TeamB", 1.0, "TeamA", False, 2, 0),
+            ("M02", "TeamC", "TeamD", 0.0, "TeamD", False, 0, 1),
+        ])
+        backtest_tournament(matches, dict(self.MOCK_TEAMS), tournament_name="Test")
+        # Original should be unchanged
+        assert self.MOCK_TEAMS == original_teams
+
+    def test_backtest_tournament_single_signal_report(self):
+        """With n_signals=1, blended is omitted from report."""
+        from src.evaluation import backtest_tournament
+
+        matches = self._make_historical([
+            ("M01", "TeamA", "TeamB", 1.0, "TeamA", False, 2, 0),
+        ])
+        report = backtest_tournament(matches, dict(self.MOCK_TEAMS), tournament_name="Test")
+        assert "blended" not in report.get("per_signal", {})
+        assert report["n_signals"] == 1
