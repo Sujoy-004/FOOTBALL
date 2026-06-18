@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Prediction Engine Modernization
-status: Phase 16 In Progress (3/3 plans, Task 3 of Plan 03 deferred), Phases 17-20 Defined
-last_updated: "2026-06-19T00:15:00.000Z"
+status: Phase 16 Complete (3/3 plans, all tasks done), Phases 17-20 Defined
+last_updated: "2026-06-19T00:30:00.000Z"
 progress:
   total_phases: 20
-  completed_phases: 15
-  planned_phases: 5
+  completed_phases: 16
+  planned_phases: 4
   total_plans: 44
-  completed_plans: 43
-  percent: 77
+  completed_plans: 44
+  percent: 100
 ---
 
 # Project State
@@ -162,21 +162,21 @@ Implementation:
 
 ## Current Position
 
-Phase: 16 — MODEL GOVERNANCE — ▼ In Progress
-Plans: 3/3 in-progress (Plan 01: Version Tracking — done, Plan 02: Drift Detection — done, Plan 03: Backtesting — Tasks 1-2 done, Task 3 deferred to separate agent)
-Status: Plan 03 Tasks 1-2 executed — 3 commits, 4 files, historical data (128 matches), backtest_tournament(), 6 backtest tests. Task 3 (_run_backtest orchestrator, governance integration) deferred.
+Phase: 16 — MODEL GOVERNANCE — ✅ Complete
+Plans: 3/3 complete (Plan 01: Version Tracking — done, Plan 02: Drift Detection — done, Plan 03: Backtesting — all tasks done)
+Status: All 3 plans executed — 5 commits, 7 files, historical data (128 matches), backtest_tournament(), _run_backtest() orchestrator, startup governance integration, 10 backtest tests. V2-12, V2-13, V2-14 all satisfied.
 
-- **Next:** Execute Plan 16-03 Task 3 (Backtest orchestrator + governance integration) via separate agent
-- **Plan:** `/gsd-execute-phase 16` (then Phase 17 → 18 → 19 → 20)
+- **Next:** Phase 17 (Enriched Match Context) or `/gsd-plan-phase 17`
+- **Plan:** Proceed to next phase via `/gsd-execute-phase 17` or plan via `/gsd-plan-phase 17`
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 43 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 2/3 P16)
-- Total plans planned: 44 (all above + 3 P16); P17-20 TBD
+- Total plans completed: 44 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 3 P16)
+- Total plans planned: 44 (all completed); P17-20 TBD
 - Average duration: ~10 min per plan (Phases 11-15)
-- Total commits: 104 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15 + 12 P16)
+- Total commits: 105 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15 + 13 P16)
 
 **By Phase:**
 | Phase | Plans | Duration | Avg/Plan |
@@ -192,7 +192,7 @@ Status: Plan 03 Tasks 1-2 executed — 3 commits, 4 files, historical data (128 
 | 14 | 2 | ~20 min | ~10 min |
 | 14a | 1 | ~X min | ~X min |
 | 15 | 3 | ~35 min | ~12 min |
-| 16 | 3/3 | 31 min (so far) | 10 min avg (Plan 01: 6min, Plan 02: 10min, Plan 03: 15min T1-2) |
+| 16 | 3/3 | 46 min | 15 min avg (Plan 01: 6min, Plan 02: 10min, Plan 03: 30min) |
 | 17 | TBD | defined | — |
 | 18 | TBD | defined | — |
 | 19 | TBD | defined | — |
@@ -257,17 +257,11 @@ Status: Plan 03 Tasks 1-2 executed — 3 commits, 4 files, historical data (128 
 ## Session Continuity
 
 - Last session: 2026-06-19
-- Phase 16 Plan 03 Tasks 1-2 executed: 3 commits, 4 files, backtesting foundation complete
-  - Created data/historical/2018.json + data/historical/2022.json (128 matches total)
-  - All matches have Architecture Q1 fields: winner, is_draw, home_score, away_score
-  - PK-decided matches correctly handled (actual=0.5, winner set, is_draw=false)
-  - Added backtest_tournament() to src/evaluation.py with Elo replay
-  - Deep-copy guard for teams dict (Pitfall 6) verified in tests
-  - Winner prediction: highest initial Elo team at tournament start
-  - TDD: RED (failing tests) → GREEN (implementation)
-  - 6 backtest tests added to test_evaluation.py, 41 evaluation tests pass
-  - V2-14 (backtesting) satisfied: historical data + backtest_tournament()
-  - Task 3 (_run_backtest orchestrator, governance integration) deferred to separate agent
+- Phase 16 Plan 03 all tasks executed: 4 commits, 5 files, backtesting framework complete
+  - Tasks 1-2: Created data/historical/2018.json + data/historical/2022.json (128 matches total), Architecture Q1 fields, PK-decided matches correctly handled (actual=0.5, winner set, is_draw=false), backtest_tournament() in evaluation.py with Elo replay, deep-copy guard (Pitfall 6), winner prediction, 6 TDD tests, 41 evaluation tests pass ✓
+  - Task 3: _run_backtest() orchestrator in governance.py — loads historical files, produces aggregate report with weighted per-signal metrics, signal ranking, governance_recommendation. Startup wiring: _run_governance() accepts teams param, calls _run_backtest on startup=True, passes backtest_summary to dashlet. main.py startup call passes teams=teams. T-16-08: try/except — backtest failure never blocks startup. 4 integration tests. 39 governance tests pass ✓
+  - V2-14 (backtesting) fully satisfied: historical data + backtest_tournament() + _run_backtest() + startup integration ✓
+  - Phase 16 complete — all 3 plans, all V2-12/13/14 requirements satisfied
 - Phase 16 Plan 02 executed: 5 commits, 5 files, governance orchestrator + drift detection complete
   - Added _deduplicate_history, _per_match_briers, check_drift, compute_reference_baselines, _run_governance to governance.py
   - Added print_governance_dashlet, print_drift_alert to output.py

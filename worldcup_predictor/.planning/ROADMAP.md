@@ -23,7 +23,7 @@ The v2.0 milestone modernizes the prediction engine. The audit revealed that the
 - [x] **Phase 14: Signal Blending** — Calibration layer, dynamic blender, simulation integration
 - [x] **Phase 14a: Prediction Retention Architecture Fix** — Permanent prediction ledger for pre-match signal archival
 - [x] **Phase 15: Context Signals** — Team form, lineup strength, player availability
-- [~] **Phase 16: Model Governance** — Versioning, Brier monitoring, backtesting, alerts (3/3 plans, Task 3 of Plan 03 deferred to separate agent)
+- [x] **Phase 16: Model Governance** — Versioning, Brier monitoring, backtesting, alerts (3/3 plans complete)
 - [ ] **Phase 17: Enriched Match Context** — Live event fields (goals, cards, subs, possession, shots, corners, fouls), coach/venue/referee/weather data
 - [ ] **Phase 18: xG & AI Prediction Signals** — xG predictions, AI preview/pre-match analysis ingestion
 - [ ] **Phase 19: Multi-League Framework** — All 65 BSD leagues, --league CLI flag, per-league state isolation
@@ -458,7 +458,7 @@ Plans:
 
 ---
 
-### Phase 16: Model Governance
+### Phase 16: Model Governance — Complete 2026-06-19
 
 **Goal:** Add the three pillars of governance — versioning (data/model/run), Brier monitoring per signal with drift detection, and backtesting against historical World Cups.
 
@@ -471,8 +471,8 @@ Plans:
 | ID | Requirement | Status |
 |----|------------|--------|
 | V2-12 | Model version, data version, and run version tracked | ✅ |
-| V2-13 | Per-signal Brier scoring with drift detection | 🔲 |
-| V2-14 | Backtesting framework against historical World Cups | 🔲 |
+| V2-13 | Per-signal Brier scoring with drift detection | ✅ |
+| V2-14 | Backtesting framework against historical World Cups | ✅ |
 
 **Success Criteria** (what must be TRUE):
 
@@ -484,13 +484,13 @@ Plans:
 - Backtest report: aggregate Brier, log loss, calibration ECE across historical tournaments
 - Governance dashlet in CLI shows: versions, per-signal Brier trend, last drift check timestamp
 
-**Plans:** 3 plans (1 complete, 2 remaining)
+**Plans:** 3 plans (all complete)
 
 Plans:
 
 - [x] 16-01: Version Tracking Foundation (governance constants, state persistence, pure version computation, 16 tests) — Complete 2026-06-18
-- [ ] 16-02: Governance Orchestrator + Drift Detection + Dashlet
-- [ ] 16-03: Backtesting Framework
+- [x] 16-02: Governance Orchestrator + Drift Detection + Dashlet — Complete 2026-06-18
+- [x] 16-03: Backtesting Framework (historical data, backtest_tournament, _run_backtest orchestrator, startup integration, 10 backtest tests) — Complete 2026-06-19
 
 ---
 
@@ -652,7 +652,7 @@ Plans:
 | 14. Signal Blending | v2.0 | 2/2 | Complete | 2026-06-17 |
 | 14a. Prediction Retention Fix | v2.0 | 1/1 | Complete | 2026-06-17 |
 | 15. Context Signals | v2.0 | 3/3 | Complete | 2026-06-17 |
-| 16. Model Governance | v2.0 | 2/3 | In Progress | 2026-06-18 |
+| 16. Model Governance | v2.0 | 3/3 | Complete | 2026-06-19 |
 | 17. Enriched Match Context | v2.0 | 0/0 | Defined | — |
 | 18. xG & AI Prediction Signals | v2.0 | 0/0 | Defined | — |
 | 19. Multi-League Framework | v2.0 | 0/0 | Defined | — |

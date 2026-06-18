@@ -72,7 +72,7 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 | V2-11 | Lineup strength factor (market value proxy) computed | 15 ✅ |
 | V2-12 | Model version, data version, and run version tracked | 16 ✅ |
 | V2-13 | Per-signal Brier scoring with drift detection | 16 ✅ |
-| V2-14 | Backtesting framework against historical World Cups | 16 |
+| V2-14 | Backtesting framework against historical World Cups | 16 ✅ |
 | V2-15 | Probability delta since last run displayed with signal breakdown | 20 |
 | V2-16 | Historical probability log across tournament duration | 20 |
 | V2-17 | Dark horse detection (highest Δ between average probability and champion probability) | 20 |
@@ -155,7 +155,7 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 | V2-11 | 15 | Complete |
 | V2-12 | 16 | Complete |
 | V2-13 | 16 | Complete |
-| V2-14 | 16 | Planned |
+| V2-14 | 16 | Complete |
 | V2-15 | 20 | Planned |
 | V2-16 | 20 | Planned |
 | V2-17 | 20 | Planned |
