@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Prediction Engine Modernization
-status: Phase 16 In Progress (2/3 plans), Phases 17-20 Defined
-last_updated: "2026-06-18T23:59:06.000Z"
+status: Phase 16 In Progress (3/3 plans, Task 3 of Plan 03 deferred), Phases 17-20 Defined
+last_updated: "2026-06-19T00:15:00.000Z"
 progress:
   total_phases: 20
   completed_phases: 15
@@ -163,20 +163,20 @@ Implementation:
 ## Current Position
 
 Phase: 16 — MODEL GOVERNANCE — ▼ In Progress
-Plans: 2/3 complete (Plan 01: Version Tracking — done, Plan 02: Drift Detection — done), Plan 03 remaining
-Status: Plan 02 executed — 5 commits, 5 files modified, 35 governance tests + 31 output tests passing, 493 total passing
+Plans: 3/3 in-progress (Plan 01: Version Tracking — done, Plan 02: Drift Detection — done, Plan 03: Backtesting — Tasks 1-2 done, Task 3 deferred to separate agent)
+Status: Plan 03 Tasks 1-2 executed — 3 commits, 4 files, historical data (128 matches), backtest_tournament(), 6 backtest tests. Task 3 (_run_backtest orchestrator, governance integration) deferred.
 
-- **Next:** Execute Plan 16-03 (Backtesting Framework)
+- **Next:** Execute Plan 16-03 Task 3 (Backtest orchestrator + governance integration) via separate agent
 - **Plan:** `/gsd-execute-phase 16` (then Phase 17 → 18 → 19 → 20)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 43 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 2 P16)
+- Total plans completed: 43 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 2/3 P16)
 - Total plans planned: 44 (all above + 3 P16); P17-20 TBD
 - Average duration: ~10 min per plan (Phases 11-15)
-- Total commits: 101 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15 + 9 P16)
+- Total commits: 104 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15 + 12 P16)
 
 **By Phase:**
 | Phase | Plans | Duration | Avg/Plan |
@@ -192,7 +192,7 @@ Status: Plan 02 executed — 5 commits, 5 files modified, 35 governance tests + 
 | 14 | 2 | ~20 min | ~10 min |
 | 14a | 1 | ~X min | ~X min |
 | 15 | 3 | ~35 min | ~12 min |
-| 16 | 2/3 | 16 min (so far) | 8 min avg (Plan 01: 6min, Plan 02: 10min) |
+| 16 | 3/3 | 31 min (so far) | 10 min avg (Plan 01: 6min, Plan 02: 10min, Plan 03: 15min T1-2) |
 | 17 | TBD | defined | — |
 | 18 | TBD | defined | — |
 | 19 | TBD | defined | — |
@@ -256,7 +256,18 @@ Status: Plan 02 executed — 5 commits, 5 files modified, 35 governance tests + 
 
 ## Session Continuity
 
-- Last session: 2026-06-18
+- Last session: 2026-06-19
+- Phase 16 Plan 03 Tasks 1-2 executed: 3 commits, 4 files, backtesting foundation complete
+  - Created data/historical/2018.json + data/historical/2022.json (128 matches total)
+  - All matches have Architecture Q1 fields: winner, is_draw, home_score, away_score
+  - PK-decided matches correctly handled (actual=0.5, winner set, is_draw=false)
+  - Added backtest_tournament() to src/evaluation.py with Elo replay
+  - Deep-copy guard for teams dict (Pitfall 6) verified in tests
+  - Winner prediction: highest initial Elo team at tournament start
+  - TDD: RED (failing tests) → GREEN (implementation)
+  - 6 backtest tests added to test_evaluation.py, 41 evaluation tests pass
+  - V2-14 (backtesting) satisfied: historical data + backtest_tournament()
+  - Task 3 (_run_backtest orchestrator, governance integration) deferred to separate agent
 - Phase 16 Plan 02 executed: 5 commits, 5 files, governance orchestrator + drift detection complete
   - Added _deduplicate_history, _per_match_briers, check_drift, compute_reference_baselines, _run_governance to governance.py
   - Added print_governance_dashlet, print_drift_alert to output.py
@@ -275,6 +286,6 @@ Status: Plan 02 executed — 5 commits, 5 files modified, 35 governance tests + 
 - Phase 15 fully executed: 3 plans (15-01: data layer, 15-02: form.py + lineup.py, 15-03: main.py wiring + 51 new tests). 477 tests passing. k_form=1.0, k_lineup=0.35.
 - Phase 16 context discussion complete: 4 areas covered (Versioning, Backtesting, Drift Detection, Governance Output). CONTEXT.md + DISCUSSION-LOG.md written.
 - Phase 16 research complete: 10 integration points analyzed, 8 pitfalls catalogued, validation architecture mapped.
-- Phase 16 planned: 3 plans (16-01 complete, 16-02 complete, 16-03 remaining).
+- Phase 16 planned: 3 plans (16-01 complete, 16-02 complete, 16-03 Tasks 1-2 complete, Task 3 deferred).
 - **Phase 17-20 redesigned to target 85% API coverage: P17 Enriched Match Context, P18 xG & AI Signals, P19 Multi-League Framework, P20 Output & Coverage Seal**
 - Next: Execute Plan 16-03 (Backtesting Framework).
