@@ -17,6 +17,8 @@ from src.output import (
     print_auto_refresh,
     print_shutdown_banner,
     print_error,
+    print_governance_dashlet,
+    print_drift_alert,
     _supports_color,
 )
 
@@ -357,3 +359,127 @@ class TestNoColorFlag:
         """NO_COLOR is False by default on fresh import."""
         import src.output as output_mod
         assert output_mod.NO_COLOR is False, "Default NO_COLOR should be False"
+
+
+# ─── Governance Dashlet Tests (Plan 16-02) ────────────────────────────────
+
+
+class TestGovernanceDashlet:
+    """Tests for print_governance_dashlet()."""
+
+    def _sample_versions(self):
+        return {
+            "data_version": "D3",
+            "model_version": "M2",
+            "run_version": "R47",
+            "last_data_change": "2026-06-18T12:00:00",
+            "last_model_change": "2026-06-18T12:00:00",
+            "last_run_timestamp": "2026-06-18T12:30:00",
+        }
+
+    def _sample_brier(self):
+        return {"elo": 0.108, "market_odds": 0.097, "catboost": 0.101, "form": 0.112, "lineup_strength": 0.118}
+
+    def _sample_weights(self):
+        return {"elo": 0.25, "market_odds": 0.25, "catboost": 0.20, "form": 0.15, "lineup_strength": 0.15}
+
+    def test_dashlet_cold_start_format(self):
+        """Cold-start: shows COLD START, PENDING, DISABLED, READY, version strings, match count."""
+        output = _capture(
+            print_governance_dashlet,
+            self._sample_versions(),
+            "COLD START",
+            19,
+            self._sample_brier(),
+            self._sample_weights(),
+        )
+        assert "MODEL GOVERNANCE" in output
+        assert "COLD START" in output
+        assert "Data Version" in output
+        assert "D3" in output
+        assert "Model Version" in output
+        assert "M2" in output
+        assert "Run Version" in output
+        assert "R47" in output
+        assert "19 / 30" in output
+        assert "PENDING" in output
+        assert "DISABLED" in output
+        assert "READY" in output
+
+    def test_dashlet_active_format(self):
+        """Active: shows HEALTHY, per-signal Brier table, drift status column."""
+        output = _capture(
+            print_governance_dashlet,
+            self._sample_versions(),
+            "HEALTHY",
+            50,
+            self._sample_brier(),
+            self._sample_weights(),
+        )
+        assert "MODEL GOVERNANCE" in output
+        assert "HEALTHY" in output
+        assert "elo" in output
+        assert "0.108" in output
+        assert "OK" in output
+
+    def test_dashlet_drift_format(self):
+        """Drift: shows DRIFT DETECTED alert section."""
+        drift_results = {
+            "market_odds": {
+                "signal": "market_odds",
+                "rolling_mean": 0.132,
+                "reference_baseline": 0.094,
+                "sigma": 0.0135,
+                "threshold": 0.121,
+                "drifted": True,
+                "delta": 0.011,
+            }
+        }
+        output = _capture(
+            print_governance_dashlet,
+            self._sample_versions(),
+            "DRIFT",
+            50,
+            self._sample_brier(),
+            self._sample_weights(),
+            drift_results=drift_results,
+        )
+        assert "DRIFT DETECTED" in output
+        assert "market_odds" in output
+        assert "0.094" in output  # reference
+        assert "0.132" in output  # rolling
+        assert "0.121" in output  # threshold
+
+    def test_dashlet_backtest_summary(self):
+        """Backtest summary line printed when provided."""
+        output = _capture(
+            print_governance_dashlet,
+            self._sample_versions(),
+            "HEALTHY",
+            50,
+            self._sample_brier(),
+            self._sample_weights(),
+            backtest_summary="2018 Brier=0.127",
+        )
+        assert "2018 Brier=0.127" in output
+
+
+class TestDriftAlert:
+    """Tests for print_drift_alert()."""
+
+    def test_drift_alert_format(self):
+        """All 5 fields printed: signal, reference, rolling, threshold, delta."""
+        drift_info = {
+            "signal": "market_odds",
+            "reference_baseline": 0.094,
+            "rolling_mean": 0.132,
+            "threshold": 0.121,
+            "delta": 0.011,
+        }
+        output = _capture(print_drift_alert, drift_info)
+        assert "DRIFT DETECTED" in output
+        assert "market_odds" in output
+        assert "0.094" in output
+        assert "0.132" in output
+        assert "0.121" in output
+        assert "0.011" in output
