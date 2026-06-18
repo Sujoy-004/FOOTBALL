@@ -1,0 +1,14 @@
+{
+  "doc_path": "worldcup_predictor/docs/ARCHITECTURE.md",
+  "claims_checked": 25,
+  "claims_passed": 24,
+  "claims_failed": 1,
+  "failures": [
+    {
+      "line": 149,
+      "claim": "validate_api_key() at main.py:531",
+      "expected": "function validate_api_key at line 531 in main.py",
+      "actual": "function validate_api_key found at line 624 in main.py (line 531 is inside _run_iteration)"
+    }
+  ]
+}

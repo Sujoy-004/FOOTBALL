@@ -1,0 +1,114 @@
+FIFA-WC/
+├── .gitignore
+├── AGENTS.md
+├── repo_tree.txt
+│
+├── .planning/
+│   ├── config.json
+│   ├── PROJECT.md
+│   ├── REQUIREMENTS.md
+│   ├── ROADMAP.md
+│   ├── STATE.md
+│   ├── codebase/
+│   │   ├── ARCHITECTURE.md
+│   │   ├── CONCERNS.md
+│   │   ├── CONVENTIONS.md
+│   │   ├── FEATURES.md
+│   │   ├── INTEGRATIONS.md
+│   │   ├── STACK.md
+│   │   ├── STRUCTURE.md
+│   │   └── TESTING.md
+│   ├── milestones/
+│   │   ├── v1.0-REQUIREMENTS.md
+│   │   └── v1.0-ROADMAP.md
+│   ├── phases/
+│   │   ├── 01-state-elo-foundation/
+│   │   ├── 02-monte-carlo-simulation/
+│   │   ├── 03-live-api-integration/
+│   │   ├── 04-main-loop-shutdown/
+│   │   ├── 05-console-output-formatting/
+│   │   ├── 06-cli-interface/
+│   │   ├── 07-48-team-dataset-group-definitions/
+│   │   ├── 08-group-stage-simulation-engine/
+│   │   ├── 09-knockout-bracket-annex-c-routing/
+│   │   ├── 10-integration-tests-bsd-verification/
+│   │   ├── 11-data-integrity-elo-foundation/
+│   │   └── 12-draw-handling-elo-math/
+│   ├── research/
+│   │   ├── ARCHITECTURE.md
+│   │   ├── FEATURES.md
+│   │   ├── PITFALLS.md
+│   │   ├── STACK.md
+│   │   └── SUMMARY.md
+│   └── seeds/
+│
+├── Result/
+│   ├── findings.html
+│   ├── run-log.html
+│   ├── screenshots/
+│   └── user-report.html
+│
+├── SOTs/
+│   ├── Appflow.md
+│   ├── Backend_Schema.md
+│   ├── Implementation_plan.md
+│   ├── MVP.md
+│   ├── PRD.md
+│   ├── TRD.md
+│   └── UI_UX_Design.md
+│
+└── worldcup_predictor/
+    ├── .env.example
+    ├── main.py
+    ├── MODERNIZATION-PROPOSAL.md
+    ├── requirements.txt
+    ├── RESPONSE.md
+    ├── benchmarks/
+    │   ├── benchmark_groups.py
+    │   └── BENCHMARK_RESULTS_08.md
+    ├── data/
+    │   ├── annex_c.json
+    │   ├── bracket.json
+    │   ├── elo_applied.json
+    │   ├── elo_update_log.json
+    │   ├── eloratings_cache.json
+    │   ├── eval_baseline.json
+    │   ├── groups.json
+    │   ├── played.json
+    │   ├── played_groups.json
+    │   ├── team_aliases.json
+    │   └── teams.json
+    ├── scripts/
+    │   └── benchmark_simulation.py
+    ├── src/
+    │   ├── __init__.py
+    │   ├── constants.py
+    │   ├── elo.py
+    │   ├── elo_sync.py
+    │   ├── fetcher.py
+    │   ├── groups.py
+    │   ├── knockout.py
+    │   ├── output.py
+    │   ├── simulation.py
+    │   └── state.py
+    └── tests/
+        ├── __init__.py
+        ├── conftest.py
+        ├── fixtures/
+        │   ├── eloratings_en_teams.tsv
+        │   └── eloratings_world.tsv
+        ├── test_cli.py
+        ├── test_elo.py
+        ├── test_elo_sync.py
+        ├── test_fetcher.py
+        ├── test_group_integration.py
+        ├── test_groups.py
+        ├── test_integration.py
+        ├── test_knockout.py
+        ├── test_live_smoke.py
+        ├── test_main_loop.py
+        ├── test_output.py
+        ├── test_scaffold.py
+        ├── test_simulation.py
+        ├── test_state_load.py
+        └── test_state.py

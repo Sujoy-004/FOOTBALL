@@ -1,0 +1,20 @@
+{
+  "doc_path": "worldcup_predictor/README.md",
+  "claims_checked": 20,
+  "claims_passed": 18,
+  "claims_failed": 2,
+  "failures": [
+    {
+      "line": 141,
+      "claim": "requirements.txt declares requests as dependency",
+      "expected": "requests listed in requirements.txt",
+      "actual": "requests not found in requirements.txt (only pytest, pytest-cov, python-dotenv present)"
+    },
+    {
+      "line": 170,
+      "claim": "387 passed, 1 skipped across 20 test modules",
+      "expected": "20 test modules (test_*.py files) in tests/ directory",
+      "actual": "Only 18 test_*.py files found in tests/ directory"
+    }
+  ]
+}

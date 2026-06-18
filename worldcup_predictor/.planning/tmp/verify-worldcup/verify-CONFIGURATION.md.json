@@ -1,0 +1,20 @@
+{
+  "doc_path": "worldcup_predictor/docs/CONFIGURATION.md",
+  "claims_checked": 35,
+  "claims_passed": 33,
+  "claims_failed": 2,
+  "failures": [
+    {
+      "line": 77,
+      "claim": "PREDICTIONS_API_URL constant defined in src/constants.py",
+      "expected": "PREDICTIONS_API_URL defined in src/constants.py",
+      "actual": "PREDICTIONS_API_URL not found in constants.py or any .py file; URL is hardcoded in src/predictors/catboost.py line 235"
+    },
+    {
+      "line": 118,
+      "claim": "requests declared as dependency in requirements.txt",
+      "expected": "requests listed in requirements.txt",
+      "actual": "requests not found in requirements.txt (only pytest, pytest-cov, python-dotenv present)"
+    }
+  ]
+}
