@@ -943,6 +943,7 @@ def main() -> None:
             signal_keys=["elo", "market_odds", "catboost", "form", "lineup_strength"],
             blend_weights={},
             startup=True,
+            teams=teams,
         )
         _last_gov_time = time.time()
 

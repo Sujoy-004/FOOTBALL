@@ -319,6 +319,7 @@ def _run_governance(
     signal_keys: list[str],
     blend_weights: dict[str, float],
     startup: bool = False,
+    teams: dict | None = None,
 ) -> dict:
     """Run one governance cycle: compute metrics, check drift, build snapshot.
 
@@ -327,12 +328,39 @@ def _run_governance(
         versions: Current version state from load_versions().
         signal_keys: Ordered list of active signal keys.
         blend_weights: Current blend weights from calibrate_and_blend().
-        startup: True if called during startup (triggers reference baseline init).
+        startup: True if called during startup (triggers backtest + reference baseline init).
+        teams: Team data dict (needed for backtest at startup). Defaults to None.
 
     Returns:
         dict: Run snapshot per D-06 schema.
     """
+    import sys
+
     from src.constants import COLD_START_THRESHOLD
+
+    # ── Startup backtest ──
+    backtest_summary: str | None = None
+    if startup and teams is not None:
+        try:
+            backtest_results = _run_backtest(teams)
+            if backtest_results:
+                best_sig = (
+                    backtest_results["signal_ranking"][0]
+                    if backtest_results["signal_ranking"]
+                    else "?"
+                )
+                best_brier = (
+                    backtest_results["per_signal"]
+                    .get(best_sig, {})
+                    .get("brier", 0.0)
+                )
+                backtest_summary = (
+                    f"{backtest_results['n_total_matches']} matches | "
+                    f"Best: {best_sig} Brier={best_brier:.4f}"
+                )
+        except Exception as e:
+            print(f"Backtest failed: {e}", file=sys.stderr)
+            backtest_summary = None
 
     # 1. Deduplicate entries
     deduped = _deduplicate_history(entries)
@@ -420,6 +448,139 @@ def _run_governance(
         per_signal_brier=per_signal_brier,
         blend_weights=blend_weights,
         drift_results=drift_results_dict if drift_results_dict else None,
+        backtest_summary=backtest_summary,
     )
 
     return snapshot
+
+
+# ─── Backtest Orchestrator (Plan 16-03) ─────────────────────────────────
+
+
+def _run_backtest(
+    teams: dict[str, dict],
+    historical_data_dir: str | None = None,
+) -> dict | None:
+    """Run backtesting against all historical tournament files.
+
+    One-shot at startup. Loads each historical tournament file,
+    replays through backtest_tournament(), collects per-tournament reports,
+    produces aggregate report, saves to eval_backtest_report.json.
+
+    Args:
+        teams: Current team data (deep-copied for replay by backtest_tournament).
+        historical_data_dir: Path to data/historical/ directory.
+            Defaults to constants.DATA_DIR / "historical".
+
+    Returns:
+        Aggregate report dict with per-tournament results, or None if no data.
+    """
+    import json
+    import sys
+    from pathlib import Path
+
+    from src.constants import DATA_DIR, GOV_BACKTEST_TOURNAMENTS
+    from src.evaluation import backtest_tournament
+    from src.state import save_backtest_report
+
+    if historical_data_dir is None:
+        historical_dir = DATA_DIR / "historical"
+    else:
+        historical_dir = Path(historical_data_dir)
+
+    per_tournament_reports: list[dict] = []
+
+    for tournament in GOV_BACKTEST_TOURNAMENTS:
+        file_path = historical_dir / f"{tournament}.json"
+        if not file_path.exists():
+            print(
+                f"Backtest: {tournament} data not found at {file_path}",
+                file=sys.stderr,
+            )
+            continue
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                matches: list[dict] = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            print(
+                f"Backtest: failed to load {tournament} data: {e}",
+                file=sys.stderr,
+            )
+            continue
+
+        report = backtest_tournament(matches, teams, tournament_name=tournament)
+        per_tournament_reports.append(report)
+
+    if not per_tournament_reports:
+        return None
+
+    # Build aggregate report
+    tournaments = [r["tournament"] for r in per_tournament_reports]
+    n_total_matches = sum(r["n_matches"] for r in per_tournament_reports)
+
+    # Aggregate per-signal metrics across tournaments (weighted by n_matches)
+    all_signal_keys: set[str] = set()
+    for r in per_tournament_reports:
+        all_signal_keys.update(r.get("per_signal", {}).keys())
+
+    aggregate_per_signal: dict[str, dict] = {}
+    for signal_key in sorted(all_signal_keys):
+        total_brier = 0.0
+        total_ll = 0.0
+        total_n = 0
+        for r in per_tournament_reports:
+            ps = r.get("per_signal", {})
+            if signal_key in ps:
+                sig_n = ps[signal_key].get("n", 0)
+                total_brier += ps[signal_key].get("brier", 0.0) * sig_n
+                total_ll += ps[signal_key].get("log_loss", 0.0) * sig_n
+                total_n += sig_n
+        if total_n > 0:
+            aggregate_per_signal[signal_key] = {
+                "brier": round(total_brier / total_n, 6),
+                "log_loss": round(total_ll / total_n, 6),
+                "n": total_n,
+            }
+
+    # Signal ranking: sorted by aggregate Brier ascending
+    signal_ranking = sorted(
+        aggregate_per_signal, key=lambda k: aggregate_per_signal[k]["brier"]
+    )
+
+    # Governance recommendation
+    best_signal = signal_ranking[0] if signal_ranking else None
+    if best_signal:
+        rec = (
+            f"Best signal: {best_signal} "
+            f"(Brier={aggregate_per_signal[best_signal]['brier']:.4f}). "
+            f"Backtest across {n_total_matches} matches from "
+            f"{', '.join(tournaments)}."
+        )
+    else:
+        rec = (
+            f"Backtest ran with no computable metrics "
+            f"across {n_total_matches} matches."
+        )
+
+    aggregate_report = {
+        "tournaments": tournaments,
+        "n_total_matches": n_total_matches,
+        "per_signal": aggregate_per_signal,
+        "signal_ranking": signal_ranking,
+        "governance_recommendation": rec,
+    }
+
+    save_backtest_report(aggregate_report)
+
+    # Print backtest summary line
+    if best_signal:
+        print(
+            f"Backtest: {', '.join(tournaments)} — "
+            f"{n_total_matches} matches, "
+            f"best signal: {best_signal} "
+            f"(Brier={aggregate_per_signal[best_signal]['brier']:.4f})"
+        )
+    else:
+        print(f"Backtest: {', '.join(tournaments)} — {n_total_matches} matches")
+
+    return aggregate_report

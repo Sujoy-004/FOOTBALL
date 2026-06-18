@@ -664,3 +664,113 @@ class TestShouldRunGov:
         import time
         main_mod._last_gov_time = time.time() - 1800  # 30 min ago
         assert main_mod._should_run_gov() is False
+
+
+class TestRunBacktest:
+    """Tests for governance._run_backtest() orchestrator (Plan 16-03 Task 3)."""
+
+    @pytest.fixture
+    def mock_teams(self):
+        return {
+            "France": {"elo": 2000},
+            "Croatia": {"elo": 1800},
+            "Belgium": {"elo": 1900},
+            "England": {"elo": 1850},
+        }
+
+    def _write_historical(self, tmp_path: Path, tournament: str, matches: list[dict]):
+        """Write a mock historical tournament file directly in tmp_path (matches _run_backtest lookup)."""
+        path = tmp_path / f"{tournament}.json"
+        with open(path, "w") as f:
+            json.dump(matches, f)
+
+    def _make_matches(self, *match_tuples) -> list[dict]:
+        """Create mock historical match dicts from (ta, tb, actual, winner, is_draw, hs, as) tuples."""
+        return [
+            {
+                "match_id": f"bt_{i:02d}",
+                "team_a": ta,
+                "team_b": tb,
+                "actual": actual,
+                "winner": winner,
+                "is_draw": is_draw,
+                "home_score": hs,
+                "away_score": as_,
+                "signals": {"elo": {"probability": 0.5, "available": True}},
+            }
+            for i, (ta, tb, actual, winner, is_draw, hs, as_) in enumerate(match_tuples)
+        ]
+
+    def test_run_backtest_produces_report(self, tmp_path, mock_teams, monkeypatch):
+        """Call _run_backtest with mock data — verify report returned with expected keys."""
+        monkeypatch.setattr("src.state.save_backtest_report", lambda r, data_dir=None: None)
+
+        from src.governance import _run_backtest
+
+        matches = self._make_matches(
+            ("France", "Croatia", 1.0, "France", False, 4, 2),
+        )
+        self._write_historical(tmp_path, "2018", matches)
+
+        report = _run_backtest(mock_teams, historical_data_dir=str(tmp_path))
+        assert report is not None
+        assert "tournaments" in report
+        assert "n_total_matches" in report
+        assert "per_signal" in report
+        assert "signal_ranking" in report
+        assert "governance_recommendation" in report
+        assert report["n_total_matches"] == 1
+        assert "2018" in report["tournaments"]
+
+    def test_run_backtest_aggregate(self, tmp_path, mock_teams, monkeypatch):
+        """Two tournaments backtested — aggregate has per_signal + signal_ranking."""
+        monkeypatch.setattr("src.state.save_backtest_report", lambda r, data_dir=None: None)
+
+        from src.governance import _run_backtest
+
+        matches_2018 = self._make_matches(
+            ("France", "Croatia", 1.0, "France", False, 4, 2),
+        )
+        matches_2022 = self._make_matches(
+            ("France", "England", 1.0, "France", False, 3, 1),
+        )
+        self._write_historical(tmp_path, "2018", matches_2018)
+        self._write_historical(tmp_path, "2022", matches_2022)
+
+        report = _run_backtest(mock_teams, historical_data_dir=str(tmp_path))
+        assert report is not None
+        assert report["n_total_matches"] == 2
+        assert len(report["tournaments"]) == 2
+        assert "per_signal" in report
+        assert "elo" in report["per_signal"]
+        assert report["signal_ranking"] == ["elo"]
+
+    def test_run_backtest_no_data(self, tmp_path, mock_teams, monkeypatch):
+        """Empty historical directory — returns None (graceful handling)."""
+        monkeypatch.setattr("src.state.save_backtest_report", lambda r, data_dir=None: None)
+
+        from src.governance import _run_backtest
+
+        report = _run_backtest(mock_teams, historical_data_dir=str(tmp_path))
+        assert report is None
+
+    def test_run_backtest_saves_report(self, tmp_path, mock_teams, monkeypatch):
+        """_run_backtest saves the aggregate report via state.save_backtest_report."""
+        saved_reports = []
+
+        def capture_save(report, data_dir=None):
+            saved_reports.append(report)
+
+        monkeypatch.setattr("src.state.save_backtest_report", capture_save)
+
+        from src.governance import _run_backtest
+
+        matches = self._make_matches(
+            ("France", "Croatia", 1.0, "France", False, 4, 2),
+        )
+        self._write_historical(tmp_path, "2018", matches)
+
+        report = _run_backtest(mock_teams, historical_data_dir=str(tmp_path))
+        assert report is not None
+        assert len(saved_reports) == 1
+        assert saved_reports[0] == report  # same dict saved
