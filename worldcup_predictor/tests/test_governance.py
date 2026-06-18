@@ -103,3 +103,154 @@ class TestBacktestReport:
         state.save_backtest_report(report, data_dir=tmp_path)
         loaded = state.load_backtest_report(data_dir=tmp_path)
         assert loaded == report
+
+
+# ─── Version increment tests (Task 2) ─────────────────────────────────────
+
+
+def make_versions(data=None):
+    """Helper: create a fresh versions dict, optionally overriding defaults."""
+    v = {
+        "data_version": "D0",
+        "model_version": "M0",
+        "run_version": "R0",
+        "last_data_change": None,
+        "last_model_change": None,
+        "last_run_timestamp": None,
+    }
+    if data:
+        v.update(data)
+    return v
+
+
+def match_entry(match_id, signals=None):
+    """Helper: create a minimal prediction_history entry."""
+    sigs = signals or {}
+    return {
+        "match_id": match_id,
+        "timestamp": "2026-06-18T12:00:00",
+        "team_a": "A",
+        "team_b": "B",
+        "actual": 1.0,
+        "signals": sigs,
+    }
+
+
+class TestDataVersion:
+    """Tests for governance._compute_data_version() increment logic."""
+
+    def test_data_version_new_match(self):
+        """New match_id in new_history not in prev_history → data_version increments."""
+        from src.governance import _compute_data_version
+
+        prev = [match_entry("M1"), match_entry("M2")]
+        new = [match_entry("M1"), match_entry("M2"), match_entry("M3")]
+        result = _compute_data_version(make_versions(), prev, new)
+        assert result == "D1"
+
+    def test_data_version_new_signal(self):
+        """Entry gains a new signal key → data_version increments."""
+        from src.governance import _compute_data_version
+
+        prev = [match_entry("M1", {"elo": {"probability": 0.6, "available": True}})]
+        new = [match_entry("M1", {
+            "elo": {"probability": 0.6, "available": True},
+            "form": {"probability": 0.5, "available": True},
+        })]
+        result = _compute_data_version(make_versions(), prev, new)
+        assert result == "D1"
+
+    def test_data_version_no_change(self):
+        """No new matches, no new signals → data_version unchanged."""
+        from src.governance import _compute_data_version
+
+        prev = [match_entry("M1", {"elo": {}})]
+        new = [match_entry("M1", {"elo": {}})]
+        result = _compute_data_version(make_versions(data={"data_version": "D5"}), prev, new)
+        assert result == "D5"
+
+    def test_data_version_not_on_merge(self):
+        """Merge execution or governance run does not increment data_version (D-02)."""
+        from src.governance import _compute_data_version
+
+        prev = [match_entry("M1")]
+        new = [match_entry("M1")]
+        result = _compute_data_version(make_versions(data={"data_version": "D3"}), prev, new)
+        assert result == "D3"
+
+
+class TestModelVersion:
+    """Tests for governance._compute_model_version() increment logic."""
+
+    def test_model_version_signal_added(self):
+        """Signal keys change from ['elo'] to ['elo', 'form'] → model_version increments."""
+        from src.governance import _compute_model_version
+
+        result = _compute_model_version(
+            make_versions(),
+            prev_signal_keys=["elo"],
+            new_signal_keys=["elo", "form"],
+            calibration_changed=False,
+        )
+        assert result == "M1"
+
+    def test_model_version_calibration_refit(self):
+        """Identity calibration → non-identity calibration → model_version increments."""
+        from src.governance import _compute_model_version
+
+        result = _compute_model_version(
+            make_versions(),
+            prev_signal_keys=["elo"],
+            new_signal_keys=["elo"],
+            calibration_changed=True,
+        )
+        assert result == "M1"
+
+    def test_model_version_no_change(self):
+        """No signal or calibration change → model_version unchanged."""
+        from src.governance import _compute_model_version
+
+        result = _compute_model_version(
+            make_versions(data={"model_version": "M4"}),
+            prev_signal_keys=["elo", "form"],
+            new_signal_keys=["elo", "form"],
+            calibration_changed=False,
+        )
+        assert result == "M4"
+
+    def test_model_version_calibration_changed_between_values(self):
+        """Calibration params change between non-identity values → increments."""
+        from src.governance import _compute_model_version
+
+        result = _compute_model_version(
+            make_versions(data={"model_version": "M2"}),
+            prev_signal_keys=["elo"],
+            new_signal_keys=["elo"],
+            calibration_changed=True,
+        )
+        assert result == "M3"
+
+    def test_model_version_calibration_unchanged(self):
+        """Calibration stays the same → no increment."""
+        from src.governance import _compute_model_version
+
+        result = _compute_model_version(
+            make_versions(data={"model_version": "M5"}),
+            prev_signal_keys=["elo"],
+            new_signal_keys=["elo"],
+            calibration_changed=False,
+        )
+        assert result == "M5"
+
+
+class TestRunVersion:
+    """Tests for governance._compute_run_version()."""
+
+    def test_run_version_format(self):
+        """_compute_run_version() returns ISO 8601 timestamp string."""
+        from src.governance import _compute_run_version
+
+        import re
+        result = _compute_run_version()
+        # ISO 8601 regex: 2026-06-18T12:00:00.000000 or similar
+        assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", result)
