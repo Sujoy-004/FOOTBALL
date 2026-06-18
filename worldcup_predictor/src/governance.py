@@ -8,7 +8,10 @@ Phase 16 — three-version approach (D-01):
 All functions are pure (no I/O). State persistence is handled in state.py.
 """
 
+import math
 from datetime import datetime, timezone
+
+from src.evaluation import brier_score
 
 
 def _parse_version_number(version_str: str, prefix: str) -> int:
@@ -165,3 +168,143 @@ def _maybe_update_versions(
     new_versions["last_run_timestamp"] = now
 
     return new_versions
+
+
+# ─── Drift Detection (Plan 16-02) ──────────────────────────────────────────
+
+
+def _deduplicate_history(entries: list[dict]) -> list[dict]:
+    """Deduplicate prediction_history entries by match_id (Pitfall 7).
+
+    Groups by match_id, keeps the last entry per match_id (list is
+    chronologically ordered). Returns deduplicated list preserving order.
+
+    Args:
+        entries: List of prediction_history entry dicts.
+
+    Returns:
+        Deduplicated list with only the last entry per match_id.
+    """
+    seen: dict[str, dict] = {}
+    order: list[str] = []
+    for entry in entries:
+        mid = entry.get("match_id")
+        if mid is None:
+            continue
+        if mid not in seen:
+            order.append(mid)
+        seen[mid] = entry
+    return [seen[mid] for mid in order]
+
+
+def _per_match_briers(entries: list[dict], signal_key: str) -> list[float]:
+    """Extract ordered per-match Brier scores for a signal.
+
+    Per D-09, extracts per-match Brier scores for sigma computation.
+    For each entry: checks signal availability, gets probability + actual,
+    computes (p - a) ** 2 via brier_score().
+
+    Args:
+        entries: Prediction_history entries (deduplicated recommended).
+        signal_key: Signal name (e.g., "elo", "market_odds").
+
+    Returns:
+        Ordered list of per-match Brier scores for valid entries.
+    """
+    briers: list[float] = []
+    for entry in entries:
+        signals = entry.get("signals", {})
+        sig = signals.get(signal_key)
+        if not sig or not sig.get("available", False):
+            continue
+        prob = sig.get("probability")
+        actual = entry.get("actual")
+        if prob is None or actual is None:
+            continue
+        briers.append(brier_score(prob, actual))
+    return briers
+
+
+def check_drift(
+    entries: list[dict],
+    signal_key: str,
+    reference_baseline: float,
+    window: int = 50,
+    sigma_threshold: float = 2.0,
+) -> dict | None:
+    """Check if a signal has drifted from its reference baseline.
+
+    Per D-09 formula:
+      rolling_sigma = std(per_match_briers in last window matches)
+      drift_alert = rolling_mean > reference_baseline + 2 * rolling_sigma
+
+    Args:
+        entries: Deduplicated prediction_history entries.
+        signal_key: Signal name to check.
+        reference_baseline: Fixed reference Brier for this signal.
+        window: Rolling window size (default 50).
+        sigma_threshold: Number of sigma above baseline for drift (default 2.0).
+
+    Returns:
+        Dict with drift info if check performed, or None if insufficient data.
+        Dict keys: signal, rolling_mean, reference_baseline, sigma, threshold, drifted.
+    """
+    per_match = _per_match_briers(entries, signal_key)
+
+    # Cold-start guard (D-10, Pitfall 3)
+    from src.constants import COLD_START_THRESHOLD
+
+    if len(per_match) < COLD_START_THRESHOLD:
+        return None
+
+    # Rolling window
+    rolling = per_match[-window:] if len(per_match) > window else per_match
+    n = len(rolling)
+    if n == 0:
+        return None
+
+    rolling_mean = sum(rolling) / n
+
+    # Population standard deviation
+    if n >= 2:
+        variance = sum((x - rolling_mean) ** 2 for x in rolling) / n
+        sigma = math.sqrt(variance)
+    else:
+        sigma = 0.0
+
+    threshold = reference_baseline + sigma_threshold * sigma
+    drifted = rolling_mean > threshold
+    delta = rolling_mean - threshold if drifted else 0.0
+
+    return {
+        "signal": signal_key,
+        "rolling_mean": rolling_mean,
+        "reference_baseline": reference_baseline,
+        "sigma": sigma,
+        "threshold": threshold,
+        "drifted": drifted,
+        "delta": delta,
+    }
+
+
+def compute_reference_baselines(entries: list[dict], signal_keys: list[str]) -> dict[str, float]:
+    """Compute reference baselines (overall Brier) for each signal.
+
+    Uses all entries for each signal to compute the overall mean Brier.
+    This serves as the fixed reference baseline per D-08.
+
+    Args:
+        entries: Deduplicated prediction_history entries.
+        signal_keys: List of signal keys to compute baselines for.
+
+    Returns:
+        Dict mapping signal_key -> overall Brier score.
+    """
+    baselines: dict[str, float] = {}
+    for key in signal_keys:
+        briers = _per_match_briers(entries, key)
+        if briers:
+            baselines[key] = sum(briers) / len(briers)
+        else:
+            baselines[key] = 1.0  # worst case for no data
+    return baselines
