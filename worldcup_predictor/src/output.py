@@ -411,3 +411,116 @@ def print_shutdown_banner(probs: dict[str, dict[str, float]]) -> None:
 def print_error(message: str) -> None:
     """Print bold red error with warning prefix and timestamp to stderr."""
     print(f"{_timestamp()} {_bold_red(f'⚠ {message}')}", file=sys.stderr)
+
+
+# ─── Governance Dashlet (Phase 16-02) ─────────────────────────────────────
+
+
+def print_governance_dashlet(
+    versions: dict,
+    status: str,
+    n_matches: int,
+    per_signal_brier: dict[str, float],
+    blend_weights: dict[str, float],
+    drift_results: dict | None = None,
+    backtest_summary: str | None = None,
+) -> None:
+    """Print the MODEL GOVERNANCE dashlet block.
+
+    Cold-start mode (< 30 matches): D-17 format with version info,
+    match count, explicit cold-start status, PENDING/DISABLED/READY lines.
+    Active mode (>= 30 matches): D-18 format with per-signal Brier table
+    and drift status column.
+
+    Args:
+        versions: Dict with data_version, model_version, run_version keys.
+        status: "COLD START" | "HEALTHY" | "DRIFT".
+        n_matches: Number of matches seen.
+        per_signal_brier: Dict of {signal_key: brier_value}.
+        blend_weights: Dict of {signal_key: weight}.
+        drift_results: Dict of {signal_key: drift_info} or None.
+        backtest_summary: Optional backtest summary string.
+    """
+    from src.constants import COLD_START_THRESHOLD
+
+    print()
+    print(_bold_cyan("MODEL GOVERNANCE"))
+    print()
+
+    # Always show version info
+    data_v = versions.get("data_version", "D?")
+    model_v = versions.get("model_version", "M?")
+    run_v = versions.get("run_version", "R?")
+
+    if n_matches < COLD_START_THRESHOLD:
+        # Cold-start format (D-17)
+        print(f"Data Version : {data_v}")
+        print(f"Model Version: {model_v}")
+        print(f"Run Version  : {run_v}")
+        print()
+        print(f"Matches Seen : {n_matches} / {COLD_START_THRESHOLD}")
+        print(f"Status       : {_bold_yellow('COLD START')}")
+        print()
+        print(f"Baseline     : PENDING")
+        print(f"Drift Check  : DISABLED")
+        print(f"Backtesting  : READY")
+    else:
+        # Active format (D-18)
+        print(f"Data  : {data_v}")
+        print(f"Model : {model_v}")
+        print(f"Run   : {run_v}")
+        print()
+
+        if status == "DRIFT":
+            print(f"Status : {_bold_red('DRIFT')}")
+        else:
+            status_color = _bold_cyan if status == "HEALTHY" else _bold_yellow
+            print(f"Status : {status_color(status)}")
+        print()
+
+        # Per-signal Brier table
+        header = f"{'Signal':<20} {'Brier':>8}  {'Drift':>6}"
+        print(header)
+        print("-" * len(header))
+
+        for signal_key in sorted(per_signal_brier.keys()):
+            brier_val = per_signal_brier[signal_key]
+            drift_ok = True
+            if drift_results and signal_key in drift_results:
+                drift_ok = not drift_results[signal_key].get("drifted", False)
+            drift_label = _green("OK") if drift_ok else _red("DRIFT")
+            print(f"{signal_key:<20} {brier_val:>8.3f}  {drift_label:>6}")
+
+        print()
+        print(f"Baseline Window : {COLD_START_THRESHOLD}")
+        print(f"Rolling Window  : 50")
+
+    # Drift alert section (only when drift exists)
+    if drift_results:
+        for signal_key, drift_info in drift_results.items():
+            if drift_info.get("drifted", False):
+                print_drift_alert(drift_info)
+
+    # Backtest summary
+    if backtest_summary:
+        print()
+        print(f"Backtest : {backtest_summary}")
+
+    print()
+
+
+def print_drift_alert(drift_info: dict) -> None:
+    """Print the expanded drift detection block (D-18, drift variant).
+
+    Args:
+        drift_info: Dict with keys: signal, reference_baseline, rolling_mean,
+                   threshold, delta.
+    """
+    print()
+    print(_bold_red("DRIFT DETECTED"))
+    print()
+    print(f"Signal      : {drift_info.get('signal', '?')}")
+    print(f"Reference   : {drift_info.get('reference_baseline', 0.0):.3f}")
+    print(f"Rolling     : {drift_info.get('rolling_mean', 0.0):.3f}")
+    print(f"Threshold   : {drift_info.get('threshold', 0.0):.3f}")
+    print(f"Delta       : +{drift_info.get('delta', 0.0):.3f}")
