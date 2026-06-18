@@ -980,6 +980,118 @@ def save_calibration_params(params: dict, data_dir: Path | str | None = None) ->
     _atomic_write_json(params, path)
 
 
+# ─── Governance (Phase 16) ────────────────────────────────────────────────
+
+
+def load_versions(data_dir: Path | str | None = None) -> dict:
+    """Load version state from versions.json.
+
+    Returns a default dict with D0/M0/R0 and None timestamps if the file
+    does not exist (graceful bootstrap).
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        dict with keys: data_version, model_version, run_version,
+        last_data_change, last_model_change, last_run_timestamp.
+    """
+    path = _resolve_data_dir(data_dir) / constants.GOV_DATA_FILE
+    if not path.exists():
+        return {
+            "data_version": "D0",
+            "model_version": "M0",
+            "run_version": "R0",
+            "last_data_change": None,
+            "last_model_change": None,
+            "last_run_timestamp": None,
+        }
+    with open(path, encoding="utf-8") as f:
+        return dict(json.load(f))
+
+
+def save_versions(versions: dict, data_dir: Path | str | None = None) -> None:
+    """Save version state to versions.json atomically.
+
+    Args:
+        versions: Dict with version keys (data_version, model_version, etc.).
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / constants.GOV_DATA_FILE
+    _atomic_write_json(versions, path)
+
+
+def save_run_snapshot(snapshot: dict, data_dir: Path | str | None = None) -> None:
+    """Save a single run snapshot to data/runs/{run_id}.json atomically.
+
+    Creates the runs/ subdirectory if it does not exist. Enforces retention
+    limit by removing oldest snapshots when count exceeds GOV_RUN_SNAPSHOT_RETENTION.
+
+    Args:
+        snapshot: Dict with governance payload (D-06 schema).
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    runs_dir = _resolve_data_dir(data_dir) / constants.GOV_RUNS_DIR
+    run_id = snapshot["run_version"]
+    # Sanitize run_id for filesystem — colons are invalid on Windows
+    safe_id = run_id.replace(":", "-")
+    path = runs_dir / f"{safe_id}.json"
+    _atomic_write_json(snapshot, path)
+
+    # Retention enforcement: keep only the most recent N snapshots
+    if constants.GOV_RUN_SNAPSHOT_RETENTION > 0:
+        files = sorted(runs_dir.glob("*.json"))
+        if len(files) > constants.GOV_RUN_SNAPSHOT_RETENTION:
+            to_delete = len(files) - constants.GOV_RUN_SNAPSHOT_RETENTION
+            for f in files[:to_delete]:
+                os.remove(str(f))
+
+
+def load_run_snapshot(run_id: str, data_dir: Path | str | None = None) -> dict | None:
+    """Load a specific run snapshot by run_version.
+
+    Args:
+        run_id: The run_version string (timestamp-based) identifying the snapshot.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        Dict with governance snapshot data, or None if the file does not exist.
+    """
+    safe_id = run_id.replace(":", "-")
+    path = _resolve_data_dir(data_dir) / constants.GOV_RUNS_DIR / f"{safe_id}.json"
+    if not path.exists():
+        return None
+    with open(path, encoding="utf-8") as f:
+        return dict(json.load(f))
+
+
+def load_backtest_report(data_dir: Path | str | None = None) -> dict | None:
+    """Load backtest evaluation report.
+
+    Args:
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+
+    Returns:
+        Dict with backtest report data, or None if the file does not exist.
+    """
+    path = _resolve_data_dir(data_dir) / "eval_backtest_report.json"
+    if not path.exists():
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_backtest_report(report: dict, data_dir: Path | str | None = None) -> None:
+    """Save backtest evaluation report to eval_backtest_report.json atomically.
+
+    Args:
+        report: Dict with backtest report data (per-tournament metrics, aggregate).
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    path = _resolve_data_dir(data_dir) / "eval_backtest_report.json"
+    _atomic_write_json(report, path)
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────
 
 

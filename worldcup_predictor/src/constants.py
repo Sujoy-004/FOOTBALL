@@ -218,3 +218,23 @@ FORM_CACHE_FILE: str = "form_cache.json"
 
 LINEUP_CACHE_FILE: str = "lineup_cache.json"
 """Filename for lineup strength signal cache in data/ directory."""
+
+# ─── Governance Constants (Phase 16) ───────────────────────────────────
+
+GOV_DATA_FILE: str = "versions.json"
+"""Filename for version tracking state in data/ directory."""
+
+GOV_RUNS_DIR: str = "runs"
+"""Directory for run snapshots relative to data/."""
+
+GOV_INTERVAL_HOURS: int = 1
+"""How often to run governance checks (startup + hourly + on drift)."""
+
+GOV_DRIFT_SIGMA_THRESHOLD: float = 2.0
+"""Number of standard deviations above reference baseline that triggers drift alert (D-09)."""
+
+GOV_BACKTEST_TOURNAMENTS: list[str] = ["2018", "2022"]
+"""Historical World Cups to backtest against (D-13)."""
+
+GOV_RUN_SNAPSHOT_RETENTION: int = 1000
+"""Maximum number of run snapshots to retain (the agent's discretion)."""
