@@ -133,6 +133,18 @@ All mitigations from threat register T-16-06 (JSON parse validation), T-16-07 (d
 - [x] PK-decided matches correctly flagged (winner set, is_draw=false)
 - [x] Elo state deep-copied before replay (Pitfall 6)
 
+## Self-Check: PASSED
+
+- [x] `data/historical/2018.json` exists with 64 valid entries ✓
+- [x] `data/historical/2022.json` exists with 64 valid entries ✓
+- [x] All entries have match_id, team_a, team_b, actual, signals.elo ✓
+- [x] `src/evaluation.py` has `backtest_tournament()` ✓
+- [x] `tests/test_evaluation.py` has TestBacktestTournament class ✓
+- [x] 4 commits: feat(16-03) → test(16-03) → feat(16-03) → docs(16-03) ✓
+- [x] All commits verified in git log ✓
+- [x] 41 evaluation tests pass (35 original + 6 new) ✓
+- [x] SUMMARY.md, STATE.md, ROADMAP.md updated ✓
+
 ---
 
 *Phase: 16-Model-Governance*
