@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Prediction Engine Modernization
-status: Phase 16 In Progress (1/3 plans), Phases 17-20 Defined
-last_updated: "2026-06-18T23:43:00.000Z"
+status: Phase 16 In Progress (2/3 plans), Phases 17-20 Defined
+last_updated: "2026-06-18T23:59:06.000Z"
 progress:
   total_phases: 20
   completed_phases: 15
   planned_phases: 5
   total_plans: 44
-  completed_plans: 42
-  percent: 76
+  completed_plans: 43
+  percent: 77
 ---
 
 # Project State
@@ -163,20 +163,20 @@ Implementation:
 ## Current Position
 
 Phase: 16 — MODEL GOVERNANCE — ▼ In Progress
-Plans: 1/3 complete (Plan 01: Version Tracking — done), Plans 02-03 remaining
-Status: Plan 01 executed — 4 commits, 4 files modified, 16 governance tests passing
+Plans: 2/3 complete (Plan 01: Version Tracking — done, Plan 02: Drift Detection — done), Plan 03 remaining
+Status: Plan 02 executed — 5 commits, 5 files modified, 35 governance tests + 31 output tests passing, 493 total passing
 
-- **Next:** Execute Plan 16-02 (Governance Orchestrator + Drift Detection + Dashlet)
+- **Next:** Execute Plan 16-03 (Backtesting Framework)
 - **Plan:** `/gsd-execute-phase 16` (then Phase 17 → 18 → 19 → 20)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 42 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 1 P16)
+- Total plans completed: 43 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 2 P16)
 - Total plans planned: 44 (all above + 3 P16); P17-20 TBD
 - Average duration: ~10 min per plan (Phases 11-15)
-- Total commits: 96 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15 + 4 P16)
+- Total commits: 101 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15 + 9 P16)
 
 **By Phase:**
 | Phase | Plans | Duration | Avg/Plan |
@@ -192,7 +192,7 @@ Status: Plan 01 executed — 4 commits, 4 files modified, 16 governance tests pa
 | 14 | 2 | ~20 min | ~10 min |
 | 14a | 1 | ~X min | ~X min |
 | 15 | 3 | ~35 min | ~12 min |
-| 16 | 1/3 | 6 min (so far) | 6 min (Plan 01) |
+| 16 | 2/3 | 16 min (so far) | 8 min avg (Plan 01: 6min, Plan 02: 10min) |
 | 17 | TBD | defined | — |
 | 18 | TBD | defined | — |
 | 19 | TBD | defined | — |
@@ -217,6 +217,9 @@ Status: Plan 01 executed — 4 commits, 4 files modified, 16 governance tests pa
 - DEFAULT_FORM_K=1.0 (not 0.6) — empirically validated from 19 matches, form_delta range [-1.01, +1.01]
 - DEFAULT_LINEUP_K=0.35 — ln ratio range [-5.31, +5.31] from €7.5M to €1.52B squad values
 - D-01 through D-07 (Phase 16): Three-version tracking — data_version increments per D-02 (new match OR new signal), model_version per D-03 (signal change OR calibration refit), run_version per D-04 (ISO 8601). Version IDs stored at entry and file level per D-05. Run snapshots stored in data/runs/ per D-06 with retention enforcement. versions.json at data/versions.json per D-07.
+- D-08/D-09 (Phase 16-02): Drift detection formula — rolling_mean > reference_baseline + 2*sigma with per-signal population std. Cold-start guard at 30 matches returns None from check_drift. Deduplication at governance read time only (match_id, keep last).
+- D-16/D-17/D-18 (Phase 16-02): Governance dashlet at startup + hourly. Cold-start format (version info, match count, PENDING/DISABLED/READY). Active format (per-signal Brier table with drift column, conditional drift section).
+- D-05/D-06 (Phase 16-02): Version IDs attached entry-level to prediction_history after calibrate+blend (not during merge). Run snapshots saved per D-06 schema with lean governance payload.
 
 ### Resolved in Phase 10
 
@@ -254,6 +257,14 @@ Status: Plan 01 executed — 4 commits, 4 files modified, 16 governance tests pa
 ## Session Continuity
 
 - Last session: 2026-06-18
+- Phase 16 Plan 02 executed: 5 commits, 5 files, governance orchestrator + drift detection complete
+  - Added _deduplicate_history, _per_match_briers, check_drift, compute_reference_baselines, _run_governance to governance.py
+  - Added print_governance_dashlet, print_drift_alert to output.py
+  - Wired governance hook into main.py _run_iteration() and startup
+  - Added version ID attachment to prediction_history entries
+  - Added 19 governance tests + 4 output tests
+  - V2-12 (version tracking) + V2-13 (drift detection) satisfied
+  - 35 governance tests, 31 output tests, 493 total passing (0 regressions)
 - Phase 16 Plan 01 executed: 4 commits, 4 files, version tracking foundation complete
   - Added 6 governance constants to constants.py
   - Added 6 governance persistence functions to state.py
@@ -264,6 +275,6 @@ Status: Plan 01 executed — 4 commits, 4 files modified, 16 governance tests pa
 - Phase 15 fully executed: 3 plans (15-01: data layer, 15-02: form.py + lineup.py, 15-03: main.py wiring + 51 new tests). 477 tests passing. k_form=1.0, k_lineup=0.35.
 - Phase 16 context discussion complete: 4 areas covered (Versioning, Backtesting, Drift Detection, Governance Output). CONTEXT.md + DISCUSSION-LOG.md written.
 - Phase 16 research complete: 10 integration points analyzed, 8 pitfalls catalogued, validation architecture mapped.
-- Phase 16 planned: 3 plans (16-01 complete, 16-02 and 16-03 remaining).
+- Phase 16 planned: 3 plans (16-01 complete, 16-02 complete, 16-03 remaining).
 - **Phase 17-20 redesigned to target 85% API coverage: P17 Enriched Match Context, P18 xG & AI Signals, P19 Multi-League Framework, P20 Output & Coverage Seal**
-- Next: Execute Plan 16-02 (Governance Orchestrator + Drift Detection + Dashlet).
+- Next: Execute Plan 16-03 (Backtesting Framework).

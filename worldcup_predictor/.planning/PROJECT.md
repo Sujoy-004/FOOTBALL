@@ -102,7 +102,7 @@ A live, self-updating tournament predictor in your terminal — when a match end
 | ✅ 14. Signal Blending | Complete | 2/2 | Platt scaling, Brier-weighted ensemble |
 | ✅ 14a. Prediction Retention Fix | Complete | 1/1 | Permanent prediction ledger |
 | ✅ 15. Context Signals | Complete | 3/3 | Team form, lineup strength |
-| 🔲 16. Model Governance | In Progress | 1/3 | Version tracking complete, drift + backtesting pending |
+| 🔲 16. Model Governance | In Progress | 2/3 | Version tracking + drift detection complete, backtesting pending |
 | 🔲 17. Enriched Match Context | Defined | — | Live event fields, coach/venue/ref/weather |
 | 🔲 18. xG & AI Prediction Signals | Defined | — | xG predictions, AI preview ingestion |
 | 🔲 19. Multi-League Framework | Defined | — | All 65 BSD leagues, --league flag |

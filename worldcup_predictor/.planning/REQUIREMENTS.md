@@ -70,14 +70,24 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 | V2-20 | Pre-match predictions retained permanently for historical Brier computation | 14a ✅ |
 | V2-10 | Team form signal (last 5 matches) computed and integrated | 15 ✅ |
 | V2-11 | Lineup strength factor (market value proxy) computed | 15 ✅ |
-| V2-12 | Model version, data version, and run version tracked | 16 |
-| V2-13 | Per-signal Brier scoring with drift detection | 16 |
+| V2-12 | Model version, data version, and run version tracked | 16 ✅ |
+| V2-13 | Per-signal Brier scoring with drift detection | 16 ✅ |
 | V2-14 | Backtesting framework against historical World Cups | 16 |
-| V2-15 | Probability delta since last run displayed with signal breakdown | 17 |
-| V2-16 | Historical probability log across tournament duration | 18 |
-| V2-17 | Dark horse detection (highest Δ between average probability and champion probability) | 18 |
+| V2-15 | Probability delta since last run displayed with signal breakdown | 20 |
+| V2-16 | Historical probability log across tournament duration | 20 |
+| V2-17 | Dark horse detection (highest Δ between average probability and champion probability) | 20 |
 | V2-18 | Baseline prediction evaluation framework (Brier, log loss, calibration) computed per match | 12b |
 | V2-19 | Match-level prediction history stored persistently for analysis | 12b |
+| V2-21 | Live match event fields (goals, cards, subs, possession, shots, corners, fouls) ingested from BSD | 17 |
+| V2-22 | Coach, venue, referee, and weather data ingested and accessible | 17 |
+| V2-23 | BSD xG predictions ingested as independent prediction signal | 18 |
+| V2-24 | BSD AI preview / pre-match analysis ingested and displayed | 18 |
+| V2-25 | League selection via CLI flag (--league) and config, supporting all 65 BSD leagues | 19 |
+| V2-26 | Multi-league data isolation (separate state files per league namespace) | 19 |
+| V2-27 | Per-match signal breakdown display (blended + per-signal) in console | 20 |
+| V2-28 | Confidence intervals (Clopper-Pearson) alongside probabilities | 20 |
+| V2-29 | Historical probability log with trend tracking | 20 |
+| V2-30 | 85% BSD API field coverage (monitored and reported) | 20 |
 
 ## Out of Scope
 
@@ -143,21 +153,31 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 | V2-20 | 14a | Complete |
 | V2-10 | 15 | Complete |
 | V2-11 | 15 | Complete |
-| V2-12 | 16 | Planned |
-| V2-13 | 16 | Planned |
+| V2-12 | 16 | Complete |
+| V2-13 | 16 | Complete |
 | V2-14 | 16 | Planned |
-| V2-15 | 17 | Planned |
-| V2-16 | 18 | Planned |
-| V2-17 | 18 | Planned |
+| V2-15 | 20 | Planned |
+| V2-16 | 20 | Planned |
+| V2-17 | 20 | Planned |
 | V2-18 | 12b | Complete |
 | V2-19 | 12b | Complete |
+| V2-21 | 17 | Defined |
+| V2-22 | 17 | Defined |
+| V2-23 | 18 | Defined |
+| V2-24 | 18 | Defined |
+| V2-25 | 19 | Defined |
+| V2-26 | 19 | Defined |
+| V2-27 | 20 | Defined |
+| V2-28 | 20 | Defined |
+| V2-29 | 20 | Defined |
+| V2-30 | 20 | Defined |
 
 **Coverage:**
 - v1.1 requirements: 31 total, 31 mapped ✅
-- v2.0 requirements: 20 total, 20 mapped ✅
+- v2.0 requirements: 30 total, 30 mapped ✅
 - Unmapped (any): 0 ✅
 
 ---
 
 *Requirements defined: 2026-06-14*
-*Last updated: 2026-06-18 — Phase 15 complete (V2-10, V2-11: form & lineup signals)*
+*Last updated: 2026-06-18 — Phases 16-20 defined with V2-12 through V2-30*

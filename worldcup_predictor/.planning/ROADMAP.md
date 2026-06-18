@@ -23,7 +23,7 @@ The v2.0 milestone modernizes the prediction engine. The audit revealed that the
 - [x] **Phase 14: Signal Blending** — Calibration layer, dynamic blender, simulation integration
 - [x] **Phase 14a: Prediction Retention Architecture Fix** — Permanent prediction ledger for pre-match signal archival
 - [x] **Phase 15: Context Signals** — Team form, lineup strength, player availability
-- [~] **Phase 16: Model Governance** — Versioning, Brier monitoring, backtesting, alerts (1/3 plans)
+- [~] **Phase 16: Model Governance** — Versioning, Brier monitoring, backtesting, alerts (2/3 plans)
 - [ ] **Phase 17: Enriched Match Context** — Live event fields (goals, cards, subs, possession, shots, corners, fouls), coach/venue/referee/weather data
 - [ ] **Phase 18: xG & AI Prediction Signals** — xG predictions, AI preview/pre-match analysis ingestion
 - [ ] **Phase 19: Multi-League Framework** — All 65 BSD leagues, --league CLI flag, per-league state isolation
@@ -652,7 +652,7 @@ Plans:
 | 14. Signal Blending | v2.0 | 2/2 | Complete | 2026-06-17 |
 | 14a. Prediction Retention Fix | v2.0 | 1/1 | Complete | 2026-06-17 |
 | 15. Context Signals | v2.0 | 3/3 | Complete | 2026-06-17 |
-| 16. Model Governance | v2.0 | 0/0 | Planned | — |
+| 16. Model Governance | v2.0 | 2/3 | In Progress | 2026-06-18 |
 | 17. Enriched Match Context | v2.0 | 0/0 | Defined | — |
 | 18. xG & AI Prediction Signals | v2.0 | 0/0 | Defined | — |
 | 19. Multi-League Framework | v2.0 | 0/0 | Defined | — |
