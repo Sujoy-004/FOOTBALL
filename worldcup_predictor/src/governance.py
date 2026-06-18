@@ -1,0 +1,167 @@
+"""Governance: version tracking, drift detection, and model oversight.
+
+Phase 16 — three-version approach (D-01):
+  - data_version:  increments on material dataset changes (D-02)
+  - model_version: increments on signal lineup / calibration changes (D-03)
+  - run_version:   timestamp-based, updated per governance cycle (D-04)
+
+All functions are pure (no I/O). State persistence is handled in state.py.
+"""
+
+from datetime import datetime, timezone
+
+
+def _parse_version_number(version_str: str, prefix: str) -> int:
+    """Parse version string like 'D14' or 'M7' to integer.
+
+    Args:
+        version_str: The version string (e.g., "D14", "M7", "R0").
+        prefix: The expected prefix character (e.g., "D", "M", "R").
+
+    Returns:
+        Integer version number, or 0 if parsing fails.
+    """
+    if not version_str or not version_str.startswith(prefix):
+        return 0
+    try:
+        return int(version_str[len(prefix):])
+    except (ValueError, IndexError):
+        return 0
+
+
+def _format_version(prefix: str, number: int) -> str:
+    """Format version number with prefix, e.g. ('D', 14) -> 'D14'."""
+    return f"{prefix}{number}"
+
+
+def _compute_data_version(
+    old_versions: dict,
+    prev_history: list[dict],
+    new_history: list[dict],
+) -> str:
+    """Compute new data_version per D-02 increment conditions.
+
+    Increments only when:
+      (A) A new match_id appears in new_history that wasn't in prev_history, OR
+      (B) An existing entry gained a new signal key not previously present.
+
+    Args:
+        old_versions: Current versions dict (must contain 'data_version').
+        prev_history: Previous prediction_history entries (list of dicts).
+        new_history: New/current prediction_history entries (list of dicts).
+
+    Returns:
+        New data_version string (e.g., "D5"), or the old version if no change.
+    """
+    # Build match_id sets
+    prev_ids = {e["match_id"] for e in prev_history if "match_id" in e}
+    new_ids = {e["match_id"] for e in new_history if "match_id" in e}
+
+    # Condition A: new match_id appeared
+    if new_ids - prev_ids:
+        current = _parse_version_number(
+            old_versions.get("data_version", "D0"), "D"
+        )
+        return _format_version("D", current + 1)
+
+    # Condition B: existing entry gained a new signal key
+    prev_by_id = {e["match_id"]: e for e in prev_history if "match_id" in e}
+    new_by_id = {e["match_id"]: e for e in new_history if "match_id" in e}
+
+    common_ids = prev_ids & new_ids
+    for mid in common_ids:
+        prev_sigs = set(prev_by_id[mid].get("signals", {}).keys())
+        new_sigs = set(new_by_id[mid].get("signals", {}).keys())
+        if new_sigs - prev_sigs:
+            current = _parse_version_number(
+                old_versions.get("data_version", "D0"), "D"
+            )
+            return _format_version("D", current + 1)
+
+    # No change
+    return old_versions.get("data_version", "D0")
+
+
+def _compute_model_version(
+    old_versions: dict,
+    prev_signal_keys: list[str],
+    new_signal_keys: list[str],
+    calibration_changed: bool,
+) -> str:
+    """Compute new model_version per D-03 increment conditions.
+
+    Increments when:
+      - Signal keys differ (signals added or removed), OR
+      - calibration_changed is True.
+
+    Args:
+        old_versions: Current versions dict (must contain 'model_version').
+        prev_signal_keys: Previous active signal key list.
+        new_signal_keys: New/current active signal key list.
+        calibration_changed: True if calibration_params dict changed.
+
+    Returns:
+        New model_version string (e.g., "M3"), or the old version if no change.
+    """
+    if set(prev_signal_keys) != set(new_signal_keys) or calibration_changed:
+        current = _parse_version_number(
+            old_versions.get("model_version", "M0"), "M"
+        )
+        return _format_version("M", current + 1)
+
+    return old_versions.get("model_version", "M0")
+
+
+def _compute_run_version() -> str:
+    """Compute new run_version per D-04 — ISO 8601 timestamp.
+
+    Returns:
+        ISO 8601 timestamp string via datetime.now(timezone.utc).isoformat().
+    """
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _maybe_update_versions(
+    old_versions: dict,
+    prev_history: list[dict],
+    new_history: list[dict],
+    prev_signal_keys: list[str],
+    new_signal_keys: list[str],
+    calibration_changed: bool,
+) -> dict:
+    """Compute and return updated versions dict.
+
+    Calls all three _compute_* functions and updates timestamps.
+
+    Args:
+        old_versions: Current versions dict.
+        prev_history: Previous prediction_history entries.
+        new_history: New/current prediction_history entries.
+        prev_signal_keys: Previous active signal key list.
+        new_signal_keys: New/current active signal key list.
+        calibration_changed: True if calibration_params changed.
+
+    Returns:
+        Updated versions dict with new version strings and timestamps.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    new_versions = dict(old_versions)
+
+    new_data = _compute_data_version(
+        old_versions, prev_history, new_history
+    )
+    if new_data != old_versions.get("data_version"):
+        new_versions["data_version"] = new_data
+        new_versions["last_data_change"] = now
+
+    new_model = _compute_model_version(
+        old_versions, prev_signal_keys, new_signal_keys, calibration_changed
+    )
+    if new_model != old_versions.get("model_version"):
+        new_versions["model_version"] = new_model
+        new_versions["last_model_change"] = now
+
+    new_versions["run_version"] = _compute_run_version()
+    new_versions["last_run_timestamp"] = now
+
+    return new_versions
