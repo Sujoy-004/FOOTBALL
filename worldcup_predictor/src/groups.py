@@ -181,27 +181,38 @@ def _simulate_single_match(
 def precompute_matchup_lambdas(
     groups: dict,
     elo_ratings: dict[str, float],
+    xg_overrides: dict[str, tuple[float, float]] | None = None,
 ) -> dict[str, tuple[float, float]]:
     """Precompute expected goals (λ) for every group match.
 
     λ values depend only on Elo ratings, which are fixed for a simulation run.
     Computing them once and reusing across iterations saves ~5.8s per 50K sims.
 
+    Phase 18 (D-04): When xg_overrides is provided and a match_id is present,
+    the xG tuple overrides the Elo-derived expected_goals() values.
+
     Args:
         groups: Groups dict (with or without "groups" wrapper key).
         elo_ratings: Dict mapping team name → Elo rating.
+        xg_overrides: Optional dict mapping match_id → (lambda_a, lambda_b)
+                      from BSD xG predictions. When provided and mid present,
+                      overrides Elo-derived expected_goals.
 
     Returns:
         Dict mapping match_id → (lambda_a, lambda_b).
+        xg_overrides values are used verbatim when applicable.
     """
     groups_data = groups.get("groups", groups)
     lambdas: dict[str, tuple[float, float]] = {}
     for group_data in groups_data.values():
         for match in group_data["matches"]:
             mid = match["match_id"]
-            ta, tb = match["team_a"], match["team_b"]
-            ea, eb = elo_ratings[ta], elo_ratings[tb]
-            lambdas[mid] = (expected_goals(ea, eb), expected_goals(eb, ea))
+            if xg_overrides and mid in xg_overrides:
+                lambdas[mid] = xg_overrides[mid]
+            else:
+                ta, tb = match["team_a"], match["team_b"]
+                ea, eb = elo_ratings[ta], elo_ratings[tb]
+                lambdas[mid] = (expected_goals(ea, eb), expected_goals(eb, ea))
     return lambdas
 
 

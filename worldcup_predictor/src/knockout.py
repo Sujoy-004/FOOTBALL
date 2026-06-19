@@ -258,6 +258,7 @@ def run_full_simulation(
     seed: int | None = None,
     played_groups: dict[str, dict] | None = None,
     blend_params: dict | None = None,
+    xg_overrides: dict[str, tuple[float, float]] | None = None,
 ) -> dict[str, dict[str, float]]:
     """Run full tournament simulation: group stage -> Annex C -> knockout.
 
@@ -275,6 +276,9 @@ def run_full_simulation(
         blend_params: Optional dict with "match_probs" for blended
                       probability injection. Falls back to Elo expected_score
                       when match data is unavailable.
+        xg_overrides: Optional dict mapping match_id → (lambda_a, lambda_b)
+                      from BSD xG predictions. Forwarded to
+                      precompute_matchup_lambdas().
 
     Returns:
         Dict mapping team name to dict of probabilities for each round.
@@ -286,7 +290,7 @@ def run_full_simulation(
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
     # Precompute λ values once (Elo ratings don't change across iterations)
-    matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings)
+    matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings, xg_overrides=xg_overrides)
 
     for _ in range(iterations):
         winner_progression: dict[str, str] = {}

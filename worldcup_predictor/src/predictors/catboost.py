@@ -17,6 +17,8 @@ Threat model:
 - T-13-06: Never log BSD_API_KEY. Use same Authorization: Token header pattern
   as fetcher.py. Exception messages exclude sensitive data.
 - T-13-SC: No new packages. catboost Python library NOT installed (REST API).
+- Phase 18: xG fields (expected_home_goals, expected_away_goals) extracted alongside
+  probabilities. xG values are already in Poisson lambda scale — no /100 division.
 """
 
 import json
@@ -42,26 +44,57 @@ _HOME_FIELDS = ("home_probability", "home_win", "probability_home")
 _DRAW_FIELDS = ("draw_probability", "draw", "probability_draw")
 _AWAY_FIELDS = ("away_probability", "away_win", "probability_away")
 
+# xG field names (Phase 18): BSD predictions endpoint contains
+# expected_home_goals / expected_away_goals (already in Poisson lambda scale).
+_XG_HOME_FIELDS: tuple[str, ...] = ("expected_home_goals", "home_expected_goals", "xg_home")
+_XG_AWAY_FIELDS: tuple[str, ...] = ("expected_away_goals", "away_expected_goals", "xg_away")
+
 
 # ─── Helpers ──────────────────────────────────────────────────────────────
 
 
 def _extract_probability(
-    predictions_dict: dict,
+    data: dict,
     field_names: tuple[str, ...],
 ) -> float | None:
     """Extract a single probability value by trying field names in priority order.
 
+    The BSD predictions API returns flat top-level percentage fields (0-100).
+    This function extracts the raw value and converts it to a 0-1 float.
+
     Args:
-        predictions_dict: The predictions sub-dict from a BSD prediction entry.
+        data: The prediction dict (or sub-dict) to read from.
         field_names: Ordered tuple of field names to try (e.g. "home_probability"
                      → "home_win" → "probability_home").
 
     Returns:
-        Float value if found and valid (int or float), None otherwise.
+        Float value between 0 and 1 if found and valid, None otherwise.
     """
     for name in field_names:
-        val = predictions_dict.get(name)
+        val = data.get(name)
+        if val is not None and isinstance(val, (int, float)):
+            return float(val) / 100.0
+    return None
+
+
+def _extract_xg(
+    data: dict,
+    field_names: tuple[str, ...],
+) -> float | None:
+    """Extract xG value by trying field names in priority order.
+
+    xG values are already in the correct scale (0.3–3.0) for Poisson lambdas
+    — do NOT divide by 100. Phase 18: xG overrides Elo in precompute_matchup_lambdas().
+
+    Args:
+        data: The prediction dict to read from.
+        field_names: Ordered tuple of field names to try.
+
+    Returns:
+        Float xG value if found, None otherwise.
+    """
+    for name in field_names:
+        val = data.get(name)
         if val is not None and isinstance(val, (int, float)):
             return float(val)
     return None
@@ -124,7 +157,8 @@ def parse_catboost_response(
 
     Returns:
         dict mapping match_id → entry dict with keys:
-        {probability, confidence, model_version, timestamp, available, reason?}.
+        {probability, confidence, model_version, timestamp, available, reason?}
+        and optional keys {expected_home_goals, expected_away_goals} (Phase 18 xG).
     """
     now = datetime.now(timezone.utc)
     result: dict[str, dict] = {}
@@ -163,27 +197,16 @@ def parse_catboost_response(
         # Build the entry dict
         timestamp = prediction.get("updated_at", now.isoformat())
 
-        predictions_dict = prediction.get("predictions")
-        if predictions_dict is None or not isinstance(predictions_dict, dict):
-            result[match_id] = {
-                "probability": None,
-                "confidence": None,
-                "model_version": None,
-                "timestamp": timestamp,
-                "available": False,
-                "reason": "predictions_not_available",
-            }
-            continue
-
-        # Extract probabilities with field-name fallback chain
-        home_prob = _extract_probability(predictions_dict, _HOME_FIELDS)
-        draw_prob = _extract_probability(predictions_dict, _DRAW_FIELDS)
-        away_prob = _extract_probability(predictions_dict, _AWAY_FIELDS)
+        # BSD predictions API returns flat top-level fields (percentages 0-100),
+        # not a nested "predictions" sub-dict. Read directly from prediction dict.
+        home_prob = _extract_probability(prediction, _HOME_FIELDS)
+        draw_prob = _extract_probability(prediction, _DRAW_FIELDS)
+        away_prob = _extract_probability(prediction, _AWAY_FIELDS)
 
         entry: dict = {
             "probability": None,
-            "confidence": predictions_dict.get("confidence"),
-            "model_version": predictions_dict.get("model_version"),
+            "confidence": prediction.get("confidence"),
+            "model_version": prediction.get("model_version"),
             "timestamp": timestamp,
         }
 
@@ -197,6 +220,14 @@ def parse_catboost_response(
             # Store canonical home-win probability per D-13
             entry["probability"] = home_prob
             entry["available"] = True
+
+        # Phase 18: Extract xG values alongside probabilities (no /100 division)
+        home_xg = _extract_xg(prediction, _XG_HOME_FIELDS)
+        away_xg = _extract_xg(prediction, _XG_AWAY_FIELDS)
+        if home_xg is not None:
+            entry["expected_home_goals"] = home_xg
+        if away_xg is not None:
+            entry["expected_away_goals"] = away_xg
 
         result[match_id] = entry
 
@@ -255,6 +286,19 @@ def fetch_and_cache_catboost(
             data = resp.json()
             results = data.get("results", [])
             parsed = parse_catboost_response(results, alias_lookup, groups, bracket)
+
+            # Upsert into permanent prediction ledger — matches form.py pattern
+            if parsed:
+                try:
+                    from src.state import ledger_upsert
+                    for mid, entry in parsed.items():
+                        ledger_upsert(mid, "catboost", entry)
+                except Exception:
+                    logger.warning(
+                        "Failed to upsert catboost into prediction ledger",
+                        exc_info=True,
+                    )
+
             return {
                 "fetched_at": now.isoformat(),
                 "expires_at": (now + timedelta(hours=cache_ttl_hours)).isoformat(),

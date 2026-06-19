@@ -14,6 +14,7 @@ from src.groups import (
     _simulate_single_match,
     compute_standings,
     expected_goals,
+    precompute_matchup_lambdas,
     rank_third_placed,
     resolve_r32_matchups,
     select_advancers,
@@ -65,6 +66,68 @@ class TestExpectedGoals:
         """Very weak team against very strong team gets near-zero lambda."""
         val = expected_goals(1000, 2500)
         assert val < 0.1, f"Expected tiny lambda for huge disadvantage, got {val}"
+
+
+# ─── precompute_matchup_lambdas tests (Phase 18 xG) ─────────────────────
+
+
+class TestPrecomputeMatchupLambdas:
+    """Tests for xG override wiring in precompute_matchup_lambdas()."""
+
+    def _make_group_a(self) -> dict:
+        return {
+            "groups": {
+                "A": {
+                    "teams": ["Mexico", "South Africa", "South Korea", "Czech Republic"],
+                    "matches": [
+                        {
+                            "match_id": "GS_A_01",
+                            "team_a": "Mexico",
+                            "team_b": "South Africa",
+                        },
+                    ],
+                },
+            },
+        }
+
+    def _make_elo(self) -> dict[str, float]:
+        return {"Mexico": 1850, "South Africa": 1700}
+
+    def test_xg_overrides_applied(self):
+        """xG overrides replace Elo-derived lambdas when match_id matches."""
+        groups = self._make_group_a()
+        elo = self._make_elo()
+        lambdas = precompute_matchup_lambdas(
+            groups, elo, xg_overrides={"GS_A_01": (2.5, 0.8)}
+        )
+        assert lambdas["GS_A_01"] == (2.5, 0.8)
+
+    def test_fallback_when_no_xg(self):
+        """Without xg_overrides, Elo-derived values are used."""
+        groups = self._make_group_a()
+        elo = self._make_elo()
+        lambdas = precompute_matchup_lambdas(groups, elo)
+        la, lb = lambdas["GS_A_01"]
+        assert la > 0 and lb > 0
+        assert la > lb
+
+    def test_fallback_when_mid_absent(self):
+        """Overrides for a different match_id don't affect this match."""
+        groups = self._make_group_a()
+        elo = self._make_elo()
+        lambdas = precompute_matchup_lambdas(
+            groups, elo, xg_overrides={"GS_B_01": (3.0, 1.0)}
+        )
+        la, lb = lambdas["GS_A_01"]
+        assert la > lb
+
+    def test_xg_overrides_none_default(self):
+        """Default None for xg_overrides uses Elo (same as no param)."""
+        groups = self._make_group_a()
+        elo = self._make_elo()
+        lambdas = precompute_matchup_lambdas(groups, elo, xg_overrides=None)
+        la, lb = lambdas["GS_A_01"]
+        assert la > 0 and lb > 0
 
 
 # ─── _poisson_sample tests ─────────────────────────────────────────────
