@@ -28,12 +28,23 @@ class TestParseArgs:
         args = _parse_args(["--seed", "42"])
         assert args.seed == 42
 
+    def test_ai_preview_flag(self):
+        """--ai-preview sets ai_preview=True."""
+        args = _parse_args(["--ai-preview"])
+        assert args.ai_preview is True
+
+    def test_ai_preview_default(self):
+        """Without --ai-preview, ai_preview is False."""
+        args = _parse_args([])
+        assert args.ai_preview is False
+
     def test_all_flags_together(self):
         """All flags work in combination."""
-        args = _parse_args(["--once", "--no-color", "--seed", "123"])
+        args = _parse_args(["--once", "--no-color", "--seed", "123", "--ai-preview"])
         assert args.once is True
         assert args.no_color is True
         assert args.seed == 123
+        assert args.ai_preview is True
 
     def test_seed_rejects_non_int(self):
         """--seed must be an integer → argparse raises SystemExit."""

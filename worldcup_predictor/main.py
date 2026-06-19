@@ -14,7 +14,7 @@ import random
 import signal
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
@@ -37,6 +37,9 @@ _elo_last_sync_time: float = 0.0
 
 _last_gov_time: float = 0.0
 """Tracks when governance last ran. 0.0 = never. Used for hourly check (D-16)."""
+
+_ai_preview_enabled: bool = False
+"""Module-level flag for --ai-preview CLI flag. Set in main() after parse_args (Phase 18)."""
 
 _prev_history: list[dict] | None = None
 """Snapshot of prediction_history BEFORE merge. Captured for data_version detection (Architecture Q4)."""
@@ -109,6 +112,8 @@ def _run_calibrate_and_blend(
     bracket: list[dict],
     odds_cache: dict,
     cb_cache: dict,
+    form_cache: dict | None = None,
+    lineup_cache: dict | None = None,
 ) -> dict | None:
     """Orchestrate calibration + blending via blender.calibrate_and_blend().
 
@@ -134,6 +139,8 @@ def _run_calibrate_and_blend(
             bracket_data=bracket,
             odds_cache=odds_cache or {},
             cb_cache=cb_cache or {},
+            form_cache=form_cache or {},
+            lineup_cache=lineup_cache or {},
         )
         if blend_params and blend_params.get("calibration_params"):
             save_calibration_params(blend_params["calibration_params"])
@@ -220,6 +227,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         metavar="N",
         help="Random seed for reproducible simulation (same seed + same data = same results)",
+    )
+    parser.add_argument(
+        "--ai-preview",
+        action="store_true",
+        dest="ai_preview",
+        help="Display BSD AI prediction previews after simulation output (Phase 18)",
     )
     return parser.parse_args(argv)
 
@@ -620,6 +633,52 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             state.save_played_groups(played_groups)
         state.save_teams(teams)
 
+    # ── Per-iteration prediction_history creation for new matches (Defect B Gap 2) ──
+    all_new = list(new_matches or []) + list(new_group_matches or [])
+    if all_new:
+        try:
+            existing_mids = set()
+            existing_history = state.load_prediction_history()
+            if existing_history:
+                existing_mids = {e.get("match_id", "") for e in existing_history}
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for m in all_new:
+                mid = m.get("match_id", "")
+                if not mid or mid in existing_mids:
+                    continue
+                t_a = m.get("team_a", "")
+                t_b = m.get("team_b", "")
+                if t_a not in teams or t_b not in teams:
+                    continue
+                p_a = elo.expected_score(teams[t_a]["elo"], teams[t_b]["elo"])
+                winner = m.get("winner")
+                if winner is None:
+                    actual_a = 0.5
+                elif winner == t_a:
+                    actual_a = 1.0
+                elif winner == t_b:
+                    actual_a = 0.0
+                else:
+                    continue
+                entry = {
+                    "match_id": mid,
+                    "timestamp": now_iso,
+                    "team_a": t_a,
+                    "team_b": t_b,
+                    "actual": actual_a,
+                    "signals": {
+                        "elo": {
+                            "probability": round(p_a, 4),
+                            "version": "v1",
+                            "timestamp": now_iso,
+                            "available": True,
+                        }
+                    },
+                }
+                state.append_prediction_history(entry)
+        except Exception:
+            print("Warning: Failed to create prediction_history entries for new matches", file=sys.stderr)
+
     # ── Signal cache refresh, merge into prediction_history ──
     signal_warnings: list[str] = []
 
@@ -648,6 +707,15 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             print(f"Warning: CatBoost fetch failed: {e}", file=sys.stderr)
             if not cb_cache or not cb_cache.get("matches"):
                 signal_warnings.append("CatBoost predictions unavailable — no cached data")
+
+    # ── Build xG overrides dict from CatBoost cache (Phase 18) ──
+    xg_overrides: dict[str, tuple[float, float]] = {}
+    if cb_cache and cb_cache.get("matches"):
+        for mid, entry in cb_cache["matches"].items():
+            home_xg = entry.get("expected_home_goals")
+            away_xg = entry.get("expected_away_goals")
+            if home_xg is not None and away_xg is not None:
+                xg_overrides[mid] = (home_xg, away_xg)
 
     # ── Context signal computation: form + lineup (Phase 15) ──
     form_cache = {}
@@ -681,7 +749,10 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     _merge_signals_into_history()
 
     # ── Calibrate, blend, inject into simulation (Phase 14) ──
-    blend_params = _run_calibrate_and_blend(teams, groups, bracket, odds_cache, cb_cache)
+    blend_params = _run_calibrate_and_blend(
+        teams, groups, bracket, odds_cache, cb_cache,
+        form_cache=form_cache, lineup_cache=lineup_cache,
+    )
 
     # ── Attach version IDs to prediction_history entries (D-05) ──
     # Tracks which data/model/run produced each entry's state.
@@ -802,7 +873,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
 
     # Simulate and print results
     sim_start = time.time()
-    probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=seed, blend_params=blend_params)
+    probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=seed, blend_params=blend_params, xg_overrides=xg_overrides)
     sim_elapsed = time.time() - sim_start
     output.print_simulation_duration(sim_elapsed)
 
@@ -813,6 +884,8 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
         output.print_third_place_bubble(third_ranked)
 
     output.print_probability_table(probs, prev_probs)
+    if _ai_preview_enabled:
+        output.print_ai_previews(played, played_groups)
     if prev_probs is not None:
         output.print_delta_summary(probs, prev_probs)
 
@@ -853,6 +926,9 @@ def validate_api_key() -> str:
 def main() -> None:
     """Load state, then enter continuous polling loop until signal."""
     args = _parse_args()
+
+    global _ai_preview_enabled
+    _ai_preview_enabled = args.ai_preview
 
     # Windows Console Host ANSI initialization (Python 3.10/3.11 quirk)
     if sys.platform == "win32":

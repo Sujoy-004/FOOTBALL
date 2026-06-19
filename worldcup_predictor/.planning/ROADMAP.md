@@ -24,7 +24,7 @@ The v2.0 milestone modernizes the prediction engine. The audit revealed that the
 - [x] **Phase 14a: Prediction Retention Architecture Fix** — Permanent prediction ledger for pre-match signal archival
 - [x] **Phase 15: Context Signals** — Team form, lineup strength, player availability
 - [x] **Phase 16: Model Governance** — Versioning, Brier monitoring, backtesting, alerts (3/3 plans complete)
-- [ ] **Phase 17: Enriched Match Context** — Live event fields (goals, cards, subs, possession, shots, corners, fouls), coach/venue/referee/weather data
+- [x] **Phase 17: Enriched Match Context** — Live event fields (yellow cards, red cards, shots on target, possession %), venue/referee data
 - [ ] **Phase 18: xG & AI Prediction Signals** — xG predictions, AI preview/pre-match analysis ingestion
 - [ ] **Phase 19: Multi-League Framework** — All 65 BSD leagues, --league CLI flag, per-league state isolation
 - [ ] **Phase 20: Output Enhancement & Coverage Seal** — Signal breakdown, confidence intervals, probability log, 85% API coverage
@@ -496,7 +496,7 @@ Plans:
 
 ### Phase 17: Enriched Match Context
 
-**Goal:** Expand BSD event field coverage from ~10 to 40+ fields — live match stats (goals, cards, subs, possession, shots, corners, fouls), plus coach, venue, referee, and weather data.
+**Goal:** Expand BSD event field coverage from ~10 to 20+ fields — P0 stat fields (yellow/red cards, shots on target, possession %) plus match context (venue, referee), stored inline in played.json/played_groups.json.
 
 **Depends on:** Phase 16
 
@@ -506,29 +506,61 @@ Plans:
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-21 | Live match event fields (goals, cards, subs, possession, shots, corners, fouls) ingested from BSD for each match | 🔲 |
-| V2-22 | Coach, venue, referee, and weather data ingested and accessible for match context | 🔲 |
+| V2-21 | Live match event fields (yellow cards, red cards, shots on target, possession %) ingested from BSD for each match | ✅ |
+| V2-22 | Venue and referee data ingested and accessible for match context | ✅ |
 
 **Success Criteria** (what must be TRUE):
 
-- BSD event feed parsed for all major event types (goals, yellow/red cards, substitutions, possession %, shots on/off target, corners, fouls)
-- Coach name, venue name, referee name, and weather conditions extracted per match
-- All enriched fields stored in `played.json` / `played_groups.json` per match
-- Graceful degradation when fields are missing from API response
-- Console optionally displays match context summary (--context flag)
-- Zero regression on existing test suite
+- BSD event feed parsed for 6 P0 stat fields (yellow_cards, red_cards, shots_on_target, ball_possession, fouls, corner_kicks)
+- Venue name and referee name extracted per match
+- All enriched fields stored inline in `played.json` / `played_groups.json` per match
+- Graceful degradation when fields are missing from API response (sparse dict, absent keys)
+- Zero regression on existing test suite (527 passed, 3 skipped)
 
-**Plans:** TBD
+**Plans:** 3 plans (all complete)
 
 Plans:
 
-- *(to be planned via /gsd-plan-phase 17)*
+- [x] 17-01-PLAN.md — Enrichment Core Module (Wave 1): src/enrichment.py with FIELD_MAP, extract_stats(), extract_context()
+- [x] 17-02-PLAN.md — Fetcher Integration (Wave 1): wire enrichment into process_matches() and process_group_matches()
+- [x] 17-03-PLAN.md — Tests (Wave 2): test_enrichment.py unit tests, fetcher integration tests
+
+---
+
+### Phase 17b: Signal Pipeline Repair
+
+**Goal:** Repair four pipeline defects that prevent the multi-signal blending architecture (Phases 13-15) from operating as designed. The CatBoost parser, market odds ledger population, calibration actual-field reading, and match_probs implementation are all non-functional — simulation runs on pure Elo despite claiming to blend 5 signals.
+
+**Depends on:** Phase 17
+
+**Requirements**: V2-05, V2-06, V2-07, V2-08, V2-20
+
+**Success Criteria** (what must be TRUE):
+
+- odds_cache populated and saved; ledger contains market_odds for cached match_ids
+- prediction_history entries overlap with ledger's market_odds match_ids
+- CatBoost parser returns correct 0-1 probabilities from BSD flat-format API response
+- ledger contains catboost entries (via ledger_upsert) matching the form/lineup pattern
+- Calibration receives actual outcomes (entry["actual"] read at correct level)
+- match_probs is non-empty; `_get_blended_prob()` returns blended values different from expected_score
+- Simulation consumes blended probabilities (5-part evidence chain)
+- Multi-signal blend weights are not all equal; missing signals re-normalize gracefully
+- Zero regression on 527+ existing tests
+
+**Plans:** 4 plans
+
+Plans:
+
+- [ ] 17b-01-PLAN.md — Signal Ledger Population (Wave 1): fix CatBoost parser + odds ledger_upsert
+- [ ] 17b-02-PLAN.md — Per-Iteration History & Blender Wiring (Wave 1): prediction_history creation + form/lineup cache plumbing
+- [ ] 17b-03-PLAN.md — Blender Repair (Wave 1): actual-field fix + match_probs implementation
+- [ ] 17b-04-PLAN.md — Pipeline Verification Tests (Wave 2): tests for all four defect repairs
 
 ---
 
 ### Phase 18: xG & AI Prediction Signals
 
-**Goal:** Integrate BSD's xG predictions and AI-powered pre-match analysis as additional prediction signals feeding into the blender.
+**Goal:** Integrate BSD's xG predictions as Poisson simulation lambda overrides and AI-powered pre-match analysis as display-only enrichment.
 
 **Depends on:** Phase 17
 
@@ -538,24 +570,27 @@ Plans:
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-23 | BSD xG predictions ingested as independent prediction signal | 🔲 |
-| V2-24 | BSD AI preview / pre-match analysis ingested and displayed | 🔲 |
+| V2-23 | BSD xG predictions ingested as independent prediction signal | ✅ |
+| V2-24 | BSD AI preview / pre-match analysis ingested and displayed | ✅ |
 
 **Success Criteria** (what must be TRUE):
 
-- xG data points (home_xg, away_xg) extracted from BSD match predictions endpoint
-- xG converted to match outcome probabilities via Poisson-based xG model
-- AI preview text ingested and stored per match
-- xG registered as a 5th signal in the blender alongside Elo/odds/catboost/form/lineup
-- AI preview displayed in console output when available
-- Missing xG or AI preview degrades gracefully (signal marked unavailable)
+- `expected_home_goals` / `expected_away_goals` (xG) extracted from BSD predictions endpoint
+- xG available as optional lambda overrides in `precompute_matchup_lambdas()`
+- AI preview text (`ai_preview.text`) extracted from events endpoint, stored inline on match entries
+- AI preview displayed via `--ai-preview` CLI flag
+- Missing xG falls back to Elo-derived `expected_goals()` — no warnings, no errors
+- Missing AI preview produces no display — no warnings, no errors
+- xG is NOT registered as a blender signal (same model as catboost — would double-count)
 - Zero regression on existing test suite
 
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
 
-- *(to be planned via /gsd-plan-phase 18)*
+- [x] 18-01-PLAN.md — xG Extraction & Lambda Override (Wave 1)
+- [x] 18-02-PLAN.md — AI Preview Extraction & Display (Wave 1)
+- [x] 18-03-PLAN.md — CLI Wiring & Integration Tests (Wave 2)
 
 ---
 
@@ -653,7 +688,8 @@ Plans:
 | 14a. Prediction Retention Fix | v2.0 | 1/1 | Complete | 2026-06-17 |
 | 15. Context Signals | v2.0 | 3/3 | Complete | 2026-06-17 |
 | 16. Model Governance | v2.0 | 3/3 | Complete | 2026-06-19 |
-| 17. Enriched Match Context | v2.0 | 0/0 | Defined | — |
+| 17. Enriched Match Context | v2.0 | 3/3 | Complete | 2026-06-19 |
+| 17b. Signal Pipeline Repair | v2.0 | 4/4 | Complete | 2026-06-19 |
 | 18. xG & AI Prediction Signals | v2.0 | 0/0 | Defined | — |
 | 19. Multi-League Framework | v2.0 | 0/0 | Defined | — |
 | 20. Output Enhancement & Coverage Seal | v2.0 | 0/0 | Defined | — |

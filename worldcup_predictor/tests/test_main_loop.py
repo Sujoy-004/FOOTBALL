@@ -13,14 +13,24 @@ MAIN_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = MAIN_DIR / "data"
 
 
-def _runner_code() -> str:
+def _runner_code(data_dir=None) -> str:
     """Inline Python that mocks requests.get + run_full_simulation, sets POLL_INTERVAL=1, then calls main.main()."""
+    data_override = ""
+    if data_dir is not None:
+        data_override = (
+            f"import src.constants\n"
+            f"src.constants.DATA_DIR = {str(data_dir)!r}\n"
+            f"import importlib\n"
+            f"import src.state\n"
+            f"importlib.reload(src.state)\n"
+        )
     return (
         f"import os, sys\n"
         f"os.environ['POLL_INTERVAL'] = '1'\n"
         f"os.environ['BSD_API_KEY'] = 'test_dummy_key'\n"
         f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
         f"os.chdir({str(MAIN_DIR)!r})\n"
+        f"{data_override}"
         f"import requests\n"
         f"import src.constants\n"
         f"src.constants.API_TIMEOUT = 1\n"
@@ -46,8 +56,17 @@ def _runner_code() -> str:
      )
 
 
-def _runner_code_with_flag(flag: str) -> str:
+def _runner_code_with_flag(flag: str, data_dir=None) -> str:
     """Inline Python that mocks requests.get + run_full_simulation, passes `flag` as CLI arg, then calls main.main()."""
+    data_override = ""
+    if data_dir is not None:
+        data_override = (
+            f"import src.constants\n"
+            f"src.constants.DATA_DIR = {str(data_dir)!r}\n"
+            f"import importlib\n"
+            f"import src.state\n"
+            f"importlib.reload(src.state)\n"
+        )
     return (
          f"import os, sys\n"
          f"os.environ['POLL_INTERVAL'] = '1'\n"
@@ -55,6 +74,7 @@ def _runner_code_with_flag(flag: str) -> str:
          f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
          f"os.chdir({str(MAIN_DIR)!r})\n"
          f"sys.argv = ['main.py', {flag!r}]\n"
+         f"{data_override}"
          f"import requests\n"
          f"import src.constants\n"
          f"src.constants.API_TIMEOUT = 1\n"
@@ -80,10 +100,14 @@ def _runner_code_with_flag(flag: str) -> str:
     )
 
 
-def test_once_flag_runs_single_cycle():
+def test_once_flag_runs_single_cycle(tmp_path):
     """--once runs a single fetch->simulate->print cycle, then exits (no polling loop)."""
+    import shutil
+    src_dir = MAIN_DIR / "data"
+    for f in ["teams.json", "groups.json", "bracket.json", "annex_c.json", "played.json", "team_aliases.json"]:
+        shutil.copy2(src_dir / f, tmp_path / f)
     proc = subprocess.Popen(
-        [sys.executable, "-u", "-c", _runner_code_with_flag("--once")],
+        [sys.executable, "-u", "-c", _runner_code_with_flag("--once", data_dir=tmp_path)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
     try:
@@ -111,13 +135,17 @@ def test_once_flag_runs_single_cycle():
     )
 
 
-def test_main_loop_runs_iterations():
+def test_main_loop_runs_iterations(tmp_path):
     """Loop should run multiple fetch cycles when poll interval is short.
 
     Each cycle prints 'Polling...' heartbeat when no new matches.
     """
+    import shutil
+    src_dir = MAIN_DIR / "data"
+    for f in ["teams.json", "groups.json", "bracket.json", "annex_c.json", "played.json", "team_aliases.json"]:
+        shutil.copy2(src_dir / f, tmp_path / f)
     proc = subprocess.Popen(
-        [sys.executable, "-u", "-c", _runner_code()],
+        [sys.executable, "-u", "-c", _runner_code(data_dir=tmp_path)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
     try:
@@ -130,16 +158,20 @@ def test_main_loop_runs_iterations():
     )
 
 
-def test_main_loop_clean_shutdown():
+def test_main_loop_clean_shutdown(tmp_path):
     """Ctrl+C should print final probabilities banner before exit.
 
     Current main.py has no loop and no shutdown banner -> fails.
     """
+    import shutil
+    src_dir = MAIN_DIR / "data"
+    for f in ["teams.json", "groups.json", "bracket.json", "annex_c.json", "played.json", "team_aliases.json"]:
+        shutil.copy2(src_dir / f, tmp_path / f)
     kwargs = {}
     if sys.platform == "win32":
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     proc = subprocess.Popen(
-        [sys.executable, "-u", "-c", _runner_code()],
+        [sys.executable, "-u", "-c", _runner_code(data_dir=tmp_path)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         **kwargs,
     )
@@ -231,6 +263,83 @@ def test_seed_propagates_through_run_iteration(monkeypatch):
 
     assert len(captured_seeds) >= 1, "run_full_simulation should have been called"
     assert 42 in captured_seeds, f"seed=42 should be in captured_seeds: {captured_seeds}"
+
+
+def test_ai_preview_flag_disabled(tmp_path):
+    """Without --ai-preview, 'No AI previews available.' must NOT appear."""
+    import shutil
+    src_dir = MAIN_DIR / "data"
+    for f in ["teams.json", "groups.json", "bracket.json", "annex_c.json", "played.json", "team_aliases.json"]:
+        shutil.copy2(src_dir / f, tmp_path / f)
+    code = _runner_code_with_flag("--once", data_dir=tmp_path)
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "-c", code],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        stdout, stderr = proc.communicate()
+    assert proc.returncode == 0, f"exit {proc.returncode}: {stderr}"
+    assert "No AI previews available." not in stdout, (
+        f"--once alone must NOT print AI previews. stdout={stdout!r}"
+    )
+
+
+def test_ai_preview_flag_enabled(tmp_path):
+    """With --ai-preview --once, 'No AI previews available.' appears (gate works)."""
+    import shutil
+    src_dir = MAIN_DIR / "data"
+    for f in ["teams.json", "groups.json", "bracket.json", "annex_c.json", "played.json", "team_aliases.json"]:
+        shutil.copy2(src_dir / f, tmp_path / f)
+    code = (
+        f"import os, sys\n"
+        f"os.environ['POLL_INTERVAL'] = '1'\n"
+        f"os.environ['BSD_API_KEY'] = 'test_dummy_key'\n"
+        f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
+        f"os.chdir({str(MAIN_DIR)!r})\n"
+        f"sys.argv = ['main.py', '--ai-preview', '--once']\n"
+        f"import requests\n"
+        f"import src.constants\n"
+        f"src.constants.DATA_DIR = {str(tmp_path)!r}\n"
+        f"import importlib\n"
+        f"import src.state\n"
+        f"importlib.reload(src.state)\n"
+        f"src.constants.API_TIMEOUT = 1\n"
+        f"class _MockResp:\n"
+        f"  status_code=200\n"
+        f"  text = ''\n"
+        f"  def json(self):\n"
+        f"    return {{}}\n"
+        f"  def raise_for_status(self):\n"
+        f"    pass\n"
+        f"  @property\n"
+        f"  def ok(self):\n"
+        f"    return True\n"
+        f"requests.get = lambda url, **kw: _MockResp()\n"
+        f"import src.knockout\n"
+        f"def _mock_sim(*args, **kwargs):\n"
+        f"    teams = args[0] if args else kwargs.get('teams', {{}})\n"
+        f"    return {{name: {{'qf': 0.5, 'sf': 0.3, 'final': 0.1, 'champion': 0.05}} for name in teams}}\n"
+        f"src.knockout.run_full_simulation = _mock_sim\n"
+        f"import main\n"
+        f"main.run_full_simulation = _mock_sim\n"
+        f"main.main()\n"
+    )
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "-c", code],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        stdout, stderr = proc.communicate()
+    assert proc.returncode == 0, f"exit {proc.returncode}: {stderr}"
+    assert "No AI previews available." in stdout, (
+        f"--ai-preview --once must show AI previews gate. stdout={stdout!r}"
+    )
 
 
 class TestHistoricalCatchUp:
@@ -695,3 +804,173 @@ class TestDrawBackfillIntegration:
         assert hist[0]["signals"]["elo"]["available"] is True
         assert hist[0]["signals"]["elo"]["team_a_elo"] == 2100
         assert hist[0]["signals"]["elo"]["team_b_elo"] == 2000
+
+
+class TestPerIterationHistory:
+    """_run_iteration creates prediction_history entries for newly-finished matches."""
+
+    def _make_mock_response(self):
+        class MockResp:
+            status_code = 200
+            ok = True
+            def json(self):
+                return {}
+            def raise_for_status(self):
+                pass
+        return MockResp()
+
+    def test_per_iteration_creates_history_entries(self, monkeypatch):
+        """New match detection triggers append_prediction_history with ELO signal."""
+        import main as main_mod
+        import src.state
+
+        mock_sim_teams = lambda *a, **kw: {n: {"qf": 0.5, "sf": 0.3, "final": 0.1, "champion": 0.05} for n in (a[0] if a else kw.get("teams", {}))}
+        monkeypatch.setattr("requests.get", lambda *a, **kw: self._make_mock_response())
+        monkeypatch.setattr(main_mod, "run_full_simulation", mock_sim_teams)
+        monkeypatch.setattr(src.knockout, "run_full_simulation", mock_sim_teams)
+        monkeypatch.setattr(src.state, "save_teams", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_signal_cache", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_prediction_history", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_calibration_params", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "load_prediction_history", lambda: [])
+
+        captured_entries = []
+        monkeypatch.setattr(src.state, "append_prediction_history",
+                            lambda e: captured_entries.append(e))
+
+        # Ensure fetch_raw_matches returns truthy so process_matches is called
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: [{"id": 99999}])
+        # Mock process_matches to return a new knockout match
+        new_match = {
+            "match_id": "M99",
+            "team_a": "Arg",
+            "team_b": "Bra",
+            "winner": "Arg",
+            "home_score": 2,
+            "away_score": 1,
+        }
+        monkeypatch.setattr(main_mod, "process_matches", lambda *a, **kw: [new_match])
+
+        teams = {"Arg": {"elo": 2000}, "Bra": {"elo": 1900}}
+        groups = {"groups": {"A": {"teams": ["Arg", "Bra"], "matches": []}}}
+        bracket = [{"match_id": "M99", "round": "FINAL", "source_matches": ["SF_1", "SF_2"], "winner": None}]
+        annex_c = {"_meta": {"source": "test"}}
+        played = {}
+        played_groups = {}
+
+        main_mod._run_iteration(
+            teams=teams, groups=groups, bracket=bracket, annex_c=annex_c,
+            played=played, played_groups=played_groups,
+            api_key="test", aliases={},
+            last_sim_time=0.0, last_request_time=0.0,
+        )
+
+        assert len(captured_entries) == 1
+        entry = captured_entries[0]
+        assert entry["match_id"] == "M99"
+        assert "signals" in entry
+        assert "elo" in entry["signals"]
+        assert entry["signals"]["elo"]["available"] is True
+        assert "probability" in entry["signals"]["elo"]
+        assert entry["actual"] == 1.0  # Arg won
+        assert 0 < entry["signals"]["elo"]["probability"] < 1
+
+    def test_per_iteration_dedup_skips_existing(self, monkeypatch):
+        """Matches already in prediction_history are not duplicated."""
+        import main as main_mod
+        import src.state
+
+        mock_sim_teams = lambda *a, **kw: {n: {"qf": 0.5, "sf": 0.3, "final": 0.1, "champion": 0.05} for n in (a[0] if a else kw.get("teams", {}))}
+        monkeypatch.setattr("requests.get", lambda *a, **kw: self._make_mock_response())
+        monkeypatch.setattr(main_mod, "run_full_simulation", mock_sim_teams)
+        monkeypatch.setattr(src.knockout, "run_full_simulation", mock_sim_teams)
+        monkeypatch.setattr(src.state, "save_teams", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_played", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_signal_cache", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_prediction_history", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_calibration_params", lambda *a, **kw: None)
+
+        existing_history = [{"match_id": "M99"}]
+        monkeypatch.setattr(src.state, "load_prediction_history", lambda: existing_history)
+
+        captured_entries = []
+        monkeypatch.setattr(src.state, "append_prediction_history",
+                            lambda e: captured_entries.append(e))
+
+        new_match = {
+            "match_id": "M99",
+            "team_a": "Arg",
+            "team_b": "Bra",
+            "winner": "Arg",
+            "home_score": 2,
+            "away_score": 1,
+        }
+        monkeypatch.setattr(main_mod, "process_matches", lambda *a, **kw: [new_match])
+
+        teams = {"Arg": {"elo": 2000}, "Bra": {"elo": 1900}}
+        groups = {"groups": {"A": {"teams": ["Arg", "Bra"], "matches": []}}}
+        bracket = [{"match_id": "M99", "round": "FINAL", "source_matches": ["SF_1", "SF_2"], "winner": None}]
+        annex_c = {"_meta": {"source": "test"}}
+
+        main_mod._run_iteration(
+            teams=teams, groups=groups, bracket=bracket, annex_c=annex_c,
+            played={}, played_groups={},
+            api_key="test", aliases={},
+            last_sim_time=0.0, last_request_time=0.0,
+        )
+
+        assert len(captured_entries) == 0
+
+    def test_per_iteration_group_match_creates_entry(self, monkeypatch):
+        """Group match also creates prediction_history entry."""
+        import main as main_mod
+        import src.state
+
+        mock_sim_teams = lambda *a, **kw: {n: {"qf": 0.5, "sf": 0.3, "final": 0.1, "champion": 0.05} for n in (a[0] if a else kw.get("teams", {}))}
+        monkeypatch.setattr("requests.get", lambda *a, **kw: self._make_mock_response())
+        monkeypatch.setattr(main_mod, "run_full_simulation", mock_sim_teams)
+        monkeypatch.setattr(src.knockout, "run_full_simulation", mock_sim_teams)
+        monkeypatch.setattr(src.state, "save_teams", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_played_groups", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_signal_cache", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_prediction_history", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "save_calibration_params", lambda *a, **kw: None)
+        monkeypatch.setattr(src.state, "load_prediction_history", lambda: [])
+
+        captured_entries = []
+        monkeypatch.setattr(src.state, "append_prediction_history",
+                            lambda e: captured_entries.append(e))
+
+        # Return no knockout match, but one group match
+        monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: [{"id": 99999}])
+        monkeypatch.setattr(main_mod, "process_matches", lambda *a, **kw: [])
+        new_group_match = {
+            "match_id": "GS_A_01",
+            "team_a": "Arg",
+            "team_b": "Bra",
+            "winner": None,  # draw
+            "home_score": 1,
+            "away_score": 1,
+        }
+        monkeypatch.setattr(main_mod, "process_group_matches", lambda *a, **kw: [new_group_match])
+
+        teams = {"Arg": {"elo": 2000}, "Bra": {"elo": 1900}}
+        groups = {"groups": {"A": {"teams": ["Arg", "Bra"], "matches": [
+            {"match_id": "GS_A_01", "team_a": "Arg", "team_b": "Bra"}]}}}
+        bracket = []
+        annex_c = {}
+
+        main_mod._run_iteration(
+            teams=teams, groups=groups, bracket=bracket, annex_c=annex_c,
+            played={}, played_groups={},
+            api_key="test", aliases={},
+            last_sim_time=0.0, last_request_time=0.0,
+        )
+
+        assert len(captured_entries) == 1
+        entry = captured_entries[0]
+        assert entry["match_id"] == "GS_A_01"
+        assert entry["actual"] == 0.5  # draw

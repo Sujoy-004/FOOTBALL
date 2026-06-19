@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Prediction Engine Modernization
-status: Phase 16 Complete (3/3 plans, all tasks done), Phases 17-20 Defined
-last_updated: "2026-06-19T00:30:00.000Z"
+status: ✅ Phase 18 complete — xG & AI Prediction Signals (3 plans executed)
+last_updated: "2026-06-19T15:30:00.000Z"
 progress:
-  total_phases: 20
-  completed_phases: 16
-  planned_phases: 4
-  total_plans: 44
-  completed_plans: 44
-  percent: 100
+  total_phases: 21
+  completed_phases: 19
+  planned_phases: 2
+  total_plans: 54
+  completed_plans: 54
+  percent: 100.0
 ---
 
 # Project State
@@ -162,21 +162,36 @@ Implementation:
 
 ## Current Position
 
-Phase: 16 — MODEL GOVERNANCE — ✅ Complete
-Plans: 3/3 complete (Plan 01: Version Tracking — done, Plan 02: Drift Detection — done, Plan 03: Backtesting — all tasks done)
-Status: All 3 plans executed — 5 commits, 7 files, historical data (128 matches), backtest_tournament(), _run_backtest() orchestrator, startup governance integration, 10 backtest tests. V2-12, V2-13, V2-14 all satisfied.
+Phase: 17 — ENRICHED MATCH CONTEXT — ✅ Complete
+Plans: 3 plans in 2 waves — all executed
+Status: src/enrichment.py created. Full suite: 527 passed, 3 skipped, 0 failures.
 
-- **Next:** Phase 17 (Enriched Match Context) or `/gsd-plan-phase 17`
-- **Plan:** Proceed to next phase via `/gsd-execute-phase 17` or plan via `/gsd-plan-phase 17`
+Phase: 17b — SIGNAL PIPELINE REPAIR — ✅ Complete (4 plans verified)
+Plans: 17b-01 (Signal Ledger Population), 17b-02 (Per-Iteration History), 17b-03 (Blender Repair), 17b-04 (Pipeline Verification)
+Status: All 4 plans executed. 5 defects fixed (CatBoost parser, ledger_upsert gaps, per-iteration history, blender actual-field, match_probs placeholder). 540/541 tests pass, 0 regressions. V1-V9 all PASS. RESPONSE.md written with full runtime evidence.
+
+Phase: 18 — xG & AI PREDICTION SIGNALS — ✅ Complete (3 plans executed)
+Plans: 18-01 (xG Extraction & Lambda Override), 18-02 (AI Preview Extraction & Display), 18-03 (CLI Wiring & Integration Tests)
+Status: xG values extracted from BSD predictions alongside probabilities, stored as optional entry keys. xg_overrides dict built from cb_cache and passed to precompute_matchup_lambdas() — overrides Elo-derived lambdas when present. AI preview extracted from events endpoint, stored inline on match entries. --ai-preview CLI flag gates display. 555/556 tests pass, 0 regressions. V2-23 and V2-24 satisfied.
+
+- **Next:** `/gsd-plan-phase 19` — plan Phase 19 (Multi-League Framework)
+- **Plan:** After Phase 19 planned → execute & verify
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 44 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 3 P16)
-- Total plans planned: 44 (all completed); P17-20 TBD
+- Total plans completed: 54 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 3 P16 + 3 P17 + 4 P17b + 3 P18)
+- Total plans planned: 54 (all completed); P19-20 TBD
+
+## Performance Metrics
+
+**Velocity:**
+
+- Total plans completed: 54 (10 v1.0 + 4 P7 + 4 P8 + 3 P9 + 4 P10 + 3 P11 + 3 P12 + 1 P12b + 3 P13 + 2 P14 + 1 P14a + 3 P15 + 3 P16 + 3 P17 + 4 P17b + 3 P18)
+- Total plans planned: 54 (all completed); P19-20 TBD
 - Average duration: ~10 min per plan (Phases 11-15)
-- Total commits: 105 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15 + 13 P16)
+- Total commits: 111 (63 pre-P13 + 16 P13 + 2 P14 + 5 P14a + 6 P15 + 13 P16 + 3 P17 + 3 P18)
 
 **By Phase:**
 | Phase | Plans | Duration | Avg/Plan |
@@ -193,8 +208,9 @@ Status: All 3 plans executed — 5 commits, 7 files, historical data (128 matche
 | 14a | 1 | ~X min | ~X min |
 | 15 | 3 | ~35 min | ~12 min |
 | 16 | 3/3 | 46 min | 15 min avg (Plan 01: 6min, Plan 02: 10min, Plan 03: 30min) |
-| 17 | TBD | defined | — |
-| 18 | TBD | defined | — |
+| 17 | 3 | ~25 min | ~8 min |
+| 17b | 4 | ~30 min | ~8 min |
+| 18 | 3 | ~25 min | ~8 min |
 | 19 | TBD | defined | — |
 | 20 | TBD | defined | — |
 
@@ -257,6 +273,19 @@ Status: All 3 plans executed — 5 commits, 7 files, historical data (128 matche
 ## Session Continuity
 
 - Last session: 2026-06-19
+- Phase 18 fully executed: 3 plans, 3 commits (xG extraction, AI preview, CLI wiring)
+  - Plan 18-01: _extract_xg() + _XG_HOME_FIELDS/_XG_AWAY_FIELDS added to catboost.py. xg_overrides param in precompute_matchup_lambdas() and run_full_simulation(). 4 deterministic TestPrecomputeMatchupLambdas tests.
+  - Plan 18-02: _extract_ai_preview() in fetcher.py, wired into process_matches()/process_group_matches(). print_ai_previews() display in output.py. 7 AI preview tests.
+  - Plan 18-03: --ai-preview CLI flag, _ai_preview_enabled module flag, xg_overrides dict built from cb_cache, xg_overrides passed to run_full_simulation(), AI preview display gated. 4 integration tests. 555/556 passed, 0 regressions.
+  - V2-23 (xG overrides) and V2-24 (AI preview) satisfied.
+  - Challenges 1 and 2 closed (no default console noise; deterministic xG test).
+- Phase 17 fully executed: 3 plans, 3 commits (enrichment.py, fetcher wiring, tests)
+  - Plan 17-01: Created src/enrichment.py with FIELD_MAP (8 stat entries + 2 context entries), extract_stats(), extract_context() using priority-ordered field-name fallback chains per D-11
+  - Plan 17-02: Wired enrichment into fetcher.py — both process_matches() (knockout) and process_group_matches() (group) call extract_stats()/extract_context() before append
+  - Plan 17-03: 10 unit tests in test_enrichment.py + 3 integration tests in test_fetcher.py
+  - Zero regressions: 527 passed, 3 skipped (live smoke needs BSD_API_KEY), 0 failures
+  - V2-21 (live match event fields) and V2-22 (coach, venue, referee) satisfied for P0 scope
+  - BSD probe evidence documented in RESPONSE.md; _probe/ directory cleaned up
 - Phase 16 Plan 03 all tasks executed: 4 commits, 5 files, backtesting framework complete
   - Tasks 1-2: Created data/historical/2018.json + data/historical/2022.json (128 matches total), Architecture Q1 fields, PK-decided matches correctly handled (actual=0.5, winner set, is_draw=false), backtest_tournament() in evaluation.py with Elo replay, deep-copy guard (Pitfall 6), winner prediction, 6 TDD tests, 41 evaluation tests pass ✓
   - Task 3: _run_backtest() orchestrator in governance.py — loads historical files, produces aggregate report with weighted per-signal metrics, signal ranking, governance_recommendation. Startup wiring: _run_governance() accepts teams param, calls _run_backtest on startup=True, passes backtest_summary to dashlet. main.py startup call passes teams=teams. T-16-08: try/except — backtest failure never blocks startup. 4 integration tests. 39 governance tests pass ✓
@@ -282,4 +311,7 @@ Status: All 3 plans executed — 5 commits, 7 files, historical data (128 matche
 - Phase 16 research complete: 10 integration points analyzed, 8 pitfalls catalogued, validation architecture mapped.
 - Phase 16 planned: 3 plans (16-01 complete, 16-02 complete, 16-03 Tasks 1-2 complete, Task 3 deferred).
 - **Phase 17-20 redesigned to target 85% API coverage: P17 Enriched Match Context, P18 xG & AI Signals, P19 Multi-League Framework, P20 Output & Coverage Seal**
-- Next: Execute Plan 16-03 (Backtesting Framework).
+- **Phase 17 context gathered 2026-06-19:** 18 decisions captured (D-01 through D-18). Schema: stats + context groups inline in played.json. P0 scope: yellow cards, red cards, shots on target, possession, venue, referee. Live BSD probe required before planning.
+- Next: Execute live BSD probe to confirm field names, then `/gsd-plan-phase 17`.
+- **Phase 18 context gathered 2026-06-19:** 15 decisions captured in 18-CONTEXT.md. BSD probe confirmed xG and AI preview field names/endpoints. V2-23 revised from "independent prediction signal" to "simulation input". AI preview: inline enrichment + `--ai-preview` flag. No historical backfill.
+- Next: `/gsd-plan-phase 18`
