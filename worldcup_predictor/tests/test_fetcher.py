@@ -202,3 +202,47 @@ def test_process_matches_pk():
     assert result[0]["winner"] == "Argentina"
     assert result[0]["is_draw"] is False
     assert result[0]["match_id"] == "R16_X"
+
+
+ENRICHED_MATCH = {
+    "id": 99993, "status": "finished",
+    "home_team": "Iran", "away_team": "Argentina",
+    "home_score": 0, "away_score": 2,
+    "event_date": "2026-06-15T22:00:00Z", "league": {"id": 27},
+    "live_stats": {
+        "home": {"yellow_cards": 3, "red_cards": 0, "shots_on_target": 2, "ball_possession": 42},
+        "away": {"yellow_cards": 1, "red_cards": 0, "shots_on_target": 5, "ball_possession": 58},
+    },
+    "venue": {"name": "Azadi Stadium"},
+    "referee": {"name": "Felix Zwayer"},
+}
+
+
+def test_process_matches_with_enrichment():
+    """process_matches() attaches stats and context keys when BSD provides them."""
+    bracket = [
+        {"match_id": "R16_X", "team_a": "Argentina", "team_b": "Iran", "source_matches": None, "winner": None},
+    ]
+    result = process_matches([ENRICHED_MATCH], {}, bracket, SAMPLE_ALIASES, set())
+    assert len(result) == 1
+    entry = result[0]
+    assert "stats" in entry
+    assert entry["stats"]["yellow_cards_home"] == 3
+    assert entry["stats"]["yellow_cards_away"] == 1
+    assert entry["stats"]["possession_home"] == 42
+    assert entry["stats"]["possession_away"] == 58
+    assert "context" in entry
+    assert entry["context"]["venue"] == "Azadi Stadium"
+    assert entry["context"]["referee"] == "Felix Zwayer"
+
+
+def test_process_matches_no_stats():
+    """process_matches() omits stats key when BSD live_stats is None."""
+    bracket = [
+        {"match_id": "R16_X", "team_a": "Argentina", "team_b": "Iran", "source_matches": None, "winner": None},
+    ]
+    no_stats = dict(ENRICHED_MATCH, live_stats=None)
+    result = process_matches([no_stats], {}, bracket, SAMPLE_ALIASES, set())
+    assert len(result) == 1
+    assert "stats" not in result[0]
+    assert "context" in result[0]
