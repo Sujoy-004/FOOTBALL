@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from src.output import (
+    print_ai_previews,
     print_probability_table,
     print_delta_summary,
     print_simulation_duration,
@@ -483,3 +484,64 @@ class TestDriftAlert:
         assert "0.132" in output
         assert "0.121" in output
         assert "0.011" in output
+
+
+# ─── AI Preview Display Tests (Phase 18) ────────────────────────────────────
+
+
+class TestAiPreviews:
+    """Tests for print_ai_previews()."""
+
+    def test_print_ai_previews_shows_text(self):
+        """Preview text appears in captured output with header."""
+        played = {}
+        played_groups = {
+            "GS_A_01": {
+                "match_id": "GS_A_01",
+                "team_a": "Mexico",
+                "team_b": "South Africa",
+                "ai_preview": "Mexico expected to dominate possession.",
+            },
+        }
+        output = _capture(print_ai_previews, played, played_groups)
+        assert "AI Previews" in output
+        assert "Mexico" in output
+        assert "South Africa" in output
+        assert "Mexico expected to dominate possession." in output
+
+    def test_print_ai_previews_no_data(self):
+        """No ai_preview entries shows the dim 'No AI previews available.' message."""
+        played = {}
+        played_groups = {
+            "GS_A_01": {
+                "match_id": "GS_A_01",
+                "team_a": "Mexico",
+                "team_b": "South Africa",
+            },
+        }
+        output = _capture(print_ai_previews, played, played_groups)
+        assert "No AI previews available." in output
+
+    def test_print_ai_previews_knockout_and_group(self):
+        """Both knockout and group match previews appear."""
+        played = {
+            "M73": {
+                "match_id": "M73",
+                "team_a": "Argentina",
+                "team_b": "Brazil",
+                "ai_preview": "Argentina slight favorites.",
+            },
+        }
+        played_groups = {
+            "GS_A_01": {
+                "match_id": "GS_A_01",
+                "team_a": "Mexico",
+                "team_b": "South Africa",
+                "ai_preview": "Mexico should win comfortably.",
+            },
+        }
+        output = _capture(print_ai_previews, played, played_groups)
+        assert "Argentina" in output
+        assert "Brazil" in output
+        assert "Mexico" in output
+        assert "South Africa" in output

@@ -5,7 +5,12 @@ import json
 import pytest
 import requests
 
-from src.fetcher import build_historic_url, fetch_raw_matches, process_matches
+from src.fetcher import (
+    _extract_ai_preview,
+    build_historic_url,
+    fetch_raw_matches,
+    process_matches,
+)
 
 
 class MockResponse:
@@ -234,6 +239,35 @@ def test_process_matches_with_enrichment():
     assert "context" in entry
     assert entry["context"]["venue"] == "Azadi Stadium"
     assert entry["context"]["referee"] == "Felix Zwayer"
+
+
+# ─── AI preview extraction tests (Phase 18) ────────────────────────────
+
+
+def test_extract_ai_preview_present():
+    """Valid ai_preview.text returns the text string."""
+    result = _extract_ai_preview({
+        "ai_preview": {"text": "Mexico expected to dominate possession."}
+    })
+    assert result == "Mexico expected to dominate possession."
+
+
+def test_extract_ai_preview_missing():
+    """Absent ai_preview key returns None."""
+    result = _extract_ai_preview({})
+    assert result is None
+
+
+def test_extract_ai_preview_empty_text():
+    """Empty ai_preview.text returns None."""
+    result = _extract_ai_preview({"ai_preview": {"text": ""}})
+    assert result is None
+
+
+def test_extract_ai_preview_not_dict():
+    """Non-dict ai_preview returns None."""
+    result = _extract_ai_preview({"ai_preview": "just a string"})
+    assert result is None
 
 
 def test_process_matches_no_stats():

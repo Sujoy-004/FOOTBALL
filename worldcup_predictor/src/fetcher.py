@@ -165,6 +165,10 @@ def process_matches(
         if ctx is not None:
             entry["context"] = ctx
 
+        ai_preview = _extract_ai_preview(match)
+        if ai_preview is not None:
+            entry["ai_preview"] = ai_preview
+
         results.append(entry)
 
     return results
@@ -197,6 +201,26 @@ def _find_bracket_match(home_norm: str, away_norm: str, bracket: list[dict]) -> 
             continue
         if {match["team_a"], match["team_b"]} == {home_norm, away_norm}:
             return match["match_id"]
+    return None
+
+
+def _extract_ai_preview(raw_event: dict) -> str | None:
+    """Extract AI preview text from a raw BSD event dict.
+
+    BSD API returns ai_preview as a nested dict: {"text": "...", "generated_at": "..."}.
+    Graceful degradation per D-11: missing preview returns None. No warnings. No errors.
+
+    Args:
+        raw_event: Raw BSD API event dict.
+
+    Returns:
+        The AI preview text string, or None if absent.
+    """
+    preview = raw_event.get("ai_preview")
+    if isinstance(preview, dict):
+        text = preview.get("text")
+        if text and isinstance(text, str) and text.strip():
+            return text.strip()
     return None
 
 
@@ -368,6 +392,10 @@ def process_group_matches(
         ctx = extract_context(match)
         if ctx is not None:
             entry["context"] = ctx
+
+        ai_preview = _extract_ai_preview(match)
+        if ai_preview is not None:
+            entry["ai_preview"] = ai_preview
 
         results.append(entry)
 

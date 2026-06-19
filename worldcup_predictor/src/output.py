@@ -281,6 +281,49 @@ def print_match_alert(match: dict) -> None:
     print(_bold_yellow("=" * 60))
 
 
+def print_ai_previews(played: dict, played_groups: dict) -> None:
+    """Print AI preview text for all played matches.
+
+    Default console output unchanged. AI preview shown only when --ai-preview
+    CLI flag is passed (D-09). Missing ai_preview produces no warnings or errors (D-11).
+
+    Args:
+        played: Dict of played knockout matches.
+        played_groups: Dict of played group matches.
+    """
+    has_any = False
+
+    for group_letter in "ABCDEFGHIJKL"[:GROUP_COUNT]:
+        group_matches = [
+            m for m in played_groups.values()
+            if m.get("match_id", "").startswith(f"GS_{group_letter}_")
+        ]
+        if not group_matches:
+            continue
+        for match in sorted(group_matches, key=lambda m: m.get("match_id", "")):
+            preview = match.get("ai_preview")
+            if preview:
+                if not has_any:
+                    print(_bold_white("\n─── AI Previews ───"))
+                    has_any = True
+                print(f"\n{_bold_white(match['team_a'])} vs {_bold_white(match['team_b'])}:")
+                print(preview)
+
+    if played:
+        for mid in sorted(played):
+            match = played[mid]
+            preview = match.get("ai_preview")
+            if preview:
+                if not has_any:
+                    print(_bold_white("\n─── AI Previews ───"))
+                    has_any = True
+                print(f"\n{_bold_white(match['team_a'])} vs {_bold_white(match['team_b'])}:")
+                print(preview)
+
+    if not has_any:
+        print(_dim("No AI previews available."))
+
+
 def print_elo_changes(updates: dict[str, dict[str, float]]) -> None:
     """Print Elo rating changes after a match.
 
