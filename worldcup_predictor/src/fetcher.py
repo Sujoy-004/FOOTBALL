@@ -8,6 +8,7 @@ from datetime import datetime
 import requests
 
 from src import constants
+from src.enrichment import extract_stats, extract_context
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ def process_matches(
                 winner = None
                 is_draw = True
 
-        results.append({
+        entry: dict = {
             "match_id": bracket_id,
             "team_a": home_norm,
             "team_b": away_norm,
@@ -154,7 +155,17 @@ def process_matches(
             "home_score": home_score,
             "away_score": away_score,
             "completed_at": match.get("event_date", ""),
-        })
+        }
+
+        stats = extract_stats(match)
+        if stats is not None:
+            entry["stats"] = stats
+
+        ctx = extract_context(match)
+        if ctx is not None:
+            entry["context"] = ctx
+
+        results.append(entry)
 
     return results
 
@@ -339,7 +350,7 @@ def process_group_matches(
             is_draw = True
 
         # Append entry per D-04 structure
-        results.append({
+        entry: dict = {
             "match_id": match_id,
             "team_a": home_norm,
             "team_b": away_norm,
@@ -348,6 +359,16 @@ def process_group_matches(
             "home_score": home_score,
             "away_score": away_score,
             "completed_at": match.get("event_date", ""),
-        })
+        }
+
+        stats = extract_stats(match)
+        if stats is not None:
+            entry["stats"] = stats
+
+        ctx = extract_context(match)
+        if ctx is not None:
+            entry["context"] = ctx
+
+        results.append(entry)
 
     return results
