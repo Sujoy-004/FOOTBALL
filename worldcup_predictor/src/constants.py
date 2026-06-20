@@ -3,6 +3,32 @@
 import os
 from pathlib import Path
 
+# ─── Multi-League Framework (Phase 19) ─────────────────────────────────────
+
+DEFAULT_LEAGUE_ID: int = 27
+"""Default BSD league ID (World Cup 2026)."""
+
+LEAGUES: dict[int, str] = {
+    27: "World Cup 2026",
+    # TODO: populate remaining 64 leagues from BSD API /api/leagues/
+}
+"""Static catalog of BSD league IDs to league names.
+Populated from BSD API /api/leagues/ at implementation time.
+League IDs are stable per D-03 — no API dependency at runtime."""
+
+
+def api_url_for_league(league_id: int) -> str:
+    """Build BSD events API URL for a given league ID."""
+    return f"https://sports.bzzoiro.com/api/events/?league_id={league_id}&limit=200"
+
+
+def predictions_url_for_league(league_id: int) -> str:
+    """Build BSD predictions API URL for a given league ID."""
+    return f"https://sports.bzzoiro.com/api/predictions/?league={league_id}"
+
+
+# ─── Core Constants ────────────────────────────────────────────────────────
+
 K_FACTOR: int = 60
 """Default K-factor for World Cup finals matches (eloratings.net standard)."""
 
