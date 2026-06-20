@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 import requests
 
 from src import constants
+from src.constants import predictions_url_for_league
 from src.fetcher import (
     _find_bracket_match,
     _find_group_match,
@@ -243,6 +244,7 @@ def fetch_and_cache_catboost(
     groups: dict,
     bracket: list[dict],
     cache_ttl_hours: int = 24,
+    league_id: int = 27,
 ) -> dict:
     """Fetch CatBoost predictions from BSD API, parse, and return cache dict.
 
@@ -263,7 +265,7 @@ def fetch_and_cache_catboost(
         matches (dict of match_id → entry).
     """
     now = datetime.now(timezone.utc)
-    url = "https://sports.bzzoiro.com/api/predictions/?league=27"
+    url = predictions_url_for_league(league_id)
     headers = {"Authorization": f"Token {api_key}"}
     backoff_seconds = [1, 2, 4]
 

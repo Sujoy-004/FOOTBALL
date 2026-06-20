@@ -13,14 +13,14 @@ from src.enrichment import extract_stats, extract_context
 logger = logging.getLogger(__name__)
 
 
-def build_historic_url() -> str:
+def build_historic_url(league_id: int = 27) -> str:
     """Build events URL with date range for historical catch-up from WC start to today."""
     today = datetime.now().strftime("%Y-%m-%d")
     base = "https://sports.bzzoiro.com/api/events/"
-    return f"{base}?league_id=27&date_from={constants.WC_START_DATE}&date_to={today}&limit=200"
+    return f"{base}?league_id={league_id}&date_from={constants.WC_START_DATE}&date_to={today}&limit=200"
 
 
-def fetch_raw_matches(api_key: str, api_url: str = "", timeout: int = 10) -> list[dict]:
+def fetch_raw_matches(api_key: str, api_url: str = "", league_id: int = 27, timeout: int = 10) -> list[dict]:
     if not api_url:
         api_url = constants.API_URL
     if timeout == 10:
@@ -52,7 +52,7 @@ def fetch_raw_matches(api_key: str, api_url: str = "", timeout: int = 10) -> lis
             all_events = [
                 e for e in all_events
                 if isinstance(e.get("league"), dict)
-                and e["league"].get("id") == 27
+                and e["league"].get("id") == league_id
             ]
             return all_events
 
