@@ -191,7 +191,18 @@ class TestComputeKFactor:
 
 
 class TestDrawBackfill:
-    """Tests for historical draw backfill logic in main._run_draw_backfill."""
+    """Tests for historical draw backfill logic in main._run_draw_backfill.
+
+    All tests monkeypatch state.save_teams/save_elo_applied/save_elo_update_log
+    to prevent modification of production data files in data/.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _mock_saves(self, monkeypatch):
+        """Prevent all _run_draw_backfill tests from writing to production data/."""
+        monkeypatch.setattr("main.state.save_teams", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.save_elo_applied", lambda *a, **kw: None)
+        monkeypatch.setattr("main.state.save_elo_update_log", lambda *a, **kw: None)
 
     def test_backfill_detects_draw_candidates(self):
         """Scans played for h==a matches not in elo_applied."""
@@ -274,7 +285,7 @@ class TestDrawBackfill:
 
         # Mock save functions to prevent modifying production data
         saved_log = None
-        def mock_save_log(log):
+        def mock_save_log(log, data_dir=None):
             nonlocal saved_log
             saved_log = list(log)
 

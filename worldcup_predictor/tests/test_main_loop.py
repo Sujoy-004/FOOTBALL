@@ -834,11 +834,11 @@ class TestPerIterationHistory:
         monkeypatch.setattr(src.state, "save_signal_cache", lambda *a, **kw: None)
         monkeypatch.setattr(src.state, "save_prediction_history", lambda *a, **kw: None)
         monkeypatch.setattr(src.state, "save_calibration_params", lambda *a, **kw: None)
-        monkeypatch.setattr(src.state, "load_prediction_history", lambda: [])
+        monkeypatch.setattr(src.state, "load_prediction_history", lambda *a, **kw: [])
 
         captured_entries = []
         monkeypatch.setattr(src.state, "append_prediction_history",
-                            lambda e: captured_entries.append(e))
+                            lambda e, *a, **kw: captured_entries.append(e))
 
         # Ensure fetch_raw_matches returns truthy so process_matches is called
         monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: [{"id": 99999}])
@@ -894,11 +894,11 @@ class TestPerIterationHistory:
         monkeypatch.setattr(src.state, "save_calibration_params", lambda *a, **kw: None)
 
         existing_history = [{"match_id": "M99"}]
-        monkeypatch.setattr(src.state, "load_prediction_history", lambda: existing_history)
+        monkeypatch.setattr(src.state, "load_prediction_history", lambda *a, **kw: existing_history)
 
         captured_entries = []
         monkeypatch.setattr(src.state, "append_prediction_history",
-                            lambda e: captured_entries.append(e))
+                            lambda e, *a, **kw: captured_entries.append(e))
 
         new_match = {
             "match_id": "M99",
@@ -938,11 +938,11 @@ class TestPerIterationHistory:
         monkeypatch.setattr(src.state, "save_signal_cache", lambda *a, **kw: None)
         monkeypatch.setattr(src.state, "save_prediction_history", lambda *a, **kw: None)
         monkeypatch.setattr(src.state, "save_calibration_params", lambda *a, **kw: None)
-        monkeypatch.setattr(src.state, "load_prediction_history", lambda: [])
+        monkeypatch.setattr(src.state, "load_prediction_history", lambda *a, **kw: [])
 
         captured_entries = []
         monkeypatch.setattr(src.state, "append_prediction_history",
-                            lambda e: captured_entries.append(e))
+                            lambda e, *a, **kw: captured_entries.append(e))
 
         # Return no knockout match, but one group match
         monkeypatch.setattr(main_mod, "fetch_raw_matches", lambda *a, **kw: [{"id": 99999}])

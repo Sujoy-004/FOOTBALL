@@ -69,3 +69,40 @@ class TestParseArgs:
             assert False, "Should have raised SystemExit"
         except SystemExit:
             pass
+
+    # ── Phase 19 Multi-League Framework tests ──
+
+    def test_league_flag(self):
+        """--league 65 sets league=65."""
+        args = _parse_args(["--league", "65"])
+        assert args.league == 65
+
+    def test_league_default(self):
+        """Without --league, league is None (not overridden)."""
+        args = _parse_args([])
+        assert args.league is None
+
+    def test_list_leagues_flag(self):
+        """--list-leagues sets list_leagues=True."""
+        args = _parse_args(["--list-leagues"])
+        assert args.list_leagues is True
+
+    def test_list_leagues_default(self):
+        """Without --list-leagues, list_leagues is False."""
+        args = _parse_args([])
+        assert args.list_leagues is False
+
+    def test_league_rejects_non_int(self):
+        """--league must be an integer → argparse raises SystemExit."""
+        try:
+            _parse_args(["--league", "abc"])
+            assert False, "Should have raised SystemExit"
+        except SystemExit:
+            pass
+
+    def test_league_with_other_flags(self):
+        """--league works alongside other flags."""
+        args = _parse_args(["--league", "65", "--once", "--seed", "42"])
+        assert args.league == 65
+        assert args.once is True
+        assert args.seed == 42
