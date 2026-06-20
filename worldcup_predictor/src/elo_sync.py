@@ -14,6 +14,7 @@ import io
 import logging
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 
@@ -276,6 +277,7 @@ def apply_graduated_correction(
 
 def sync_elo_from_eloratings(
     teams: dict[str, dict],
+    data_dir: Path | str | None = None,
 ) -> list[dict] | None:
     """Full Elo sync pipeline: fetch -> parse -> validate -> resolve -> correct -> persist.
 
@@ -290,6 +292,7 @@ def sync_elo_from_eloratings(
     Args:
         teams: Dict mapping canonical team name to team data.
                Mutated in-place by apply_graduated_correction().
+        data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
 
     Returns:
         List of correction log entries if drift was found, empty list [] if
@@ -314,19 +317,19 @@ def sync_elo_from_eloratings(
     corrections = apply_graduated_correction(teams, eloratings_values)
 
     # Persist audit trail (D-12)
-    log = state.load_elo_update_log()
+    log = state.load_elo_update_log(data_dir)
     log.extend(corrections)
-    state.save_elo_update_log(log)
+    state.save_elo_update_log(log, data_dir)
 
     # Persist cache (D-14)
     state.save_eloratings_cache({
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "values": eloratings_values,
-    })
+    }, data_dir)
 
     # Persist updated Elo values if corrections were applied
     if corrections:
-        state.save_teams(teams)
+        state.save_teams(teams, data_dir)
 
     logger.info("Sync complete: %d corrections applied", len(corrections))
 

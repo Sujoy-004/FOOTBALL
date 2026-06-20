@@ -10,6 +10,7 @@ All functions are pure (no I/O). State persistence is handled in state.py.
 
 import math
 from datetime import datetime, timezone
+from pathlib import Path
 
 from src.evaluation import brier_score
 
@@ -320,6 +321,7 @@ def _run_governance(
     blend_weights: dict[str, float],
     startup: bool = False,
     teams: dict | None = None,
+    data_dir: Path | str | None = None,
 ) -> dict:
     """Run one governance cycle: compute metrics, check drift, build snapshot.
 
@@ -330,6 +332,7 @@ def _run_governance(
         blend_weights: Current blend weights from calibrate_and_blend().
         startup: True if called during startup (triggers backtest + reference baseline init).
         teams: Team data dict (needed for backtest at startup). Defaults to None.
+        data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
 
     Returns:
         dict: Run snapshot per D-06 schema.
@@ -432,7 +435,7 @@ def _run_governance(
     # 9. Save snapshot via state.py
     from src.state import save_run_snapshot
 
-    save_run_snapshot(snapshot)
+    save_run_snapshot(snapshot, data_dir)
 
     # 10. Print governance dashlet
     from src.output import print_governance_dashlet

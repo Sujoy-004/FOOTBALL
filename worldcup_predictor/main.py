@@ -68,7 +68,9 @@ def _should_run_gov() -> bool:
     return False
 
 
-def _merge_signals_into_history() -> None:
+def _merge_signals_into_history(
+    data_dir: Path | str | None = None,
+) -> None:
     """Merge retained signal data into prediction_history entries.
 
     CRITICAL DATA FLOW: Without this, evaluate_all_matches(signal_name="market_odds")
@@ -78,11 +80,14 @@ def _merge_signals_into_history() -> None:
     looks up the match_id in the permanent prediction ledger (Phase 14a).
     If a signal is available for that match, adds it to the entry's signals dict.
     Saves updated history atomically via save_prediction_history().
+
+    Args:
+        data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
     """
-    history = state.load_prediction_history()
+    history = state.load_prediction_history(data_dir)
     if not history:
         return
-    ledger = state.load_prediction_ledger()
+    ledger = state.load_prediction_ledger(data_dir)
     if not ledger:
         return
     changed = False
@@ -105,7 +110,7 @@ def _merge_signals_into_history() -> None:
             signals["lineup_strength"] = dict(match_signals["lineup_strength"])
             changed = True
     if changed:
-        state.save_prediction_history(history)
+        state.save_prediction_history(history, data_dir)
 
 
 def _run_calibrate_and_blend(
@@ -116,11 +121,15 @@ def _run_calibrate_and_blend(
     cb_cache: dict,
     form_cache: dict | None = None,
     lineup_cache: dict | None = None,
+    data_dir: Path | str | None = None,
 ) -> dict | None:
     """Orchestrate calibration + blending via blender.calibrate_and_blend().
 
     Loads data from disk, delegates to pure-function pipeline in blender.py,
     persists calibration params.
+
+    Args:
+        data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
 
     Returns blend_params dict (for simulation) or None (graceful degradation).
     """
@@ -128,7 +137,7 @@ def _run_calibrate_and_blend(
         from src.blender import calibrate_and_blend
         from src.state import load_prediction_history, save_calibration_params
 
-        history = load_prediction_history()
+        history = load_prediction_history(data_dir)
         if not history:
             return None
 
@@ -145,7 +154,7 @@ def _run_calibrate_and_blend(
             lineup_cache=lineup_cache or {},
         )
         if blend_params and blend_params.get("calibration_params"):
-            save_calibration_params(blend_params["calibration_params"])
+            save_calibration_params(blend_params["calibration_params"], data_dir)
         n_matches = len(blend_params.get("match_probs", {})) if blend_params else 0
         n_signals = len(blend_params.get("blend_weights", {})) if blend_params else 0
         if blend_params:
@@ -157,7 +166,10 @@ def _run_calibrate_and_blend(
         return None
 
 
-def _run_elo_sync(teams: dict[str, dict]) -> None:
+def _run_elo_sync(
+    teams: dict[str, dict],
+    data_dir: Path | str | None = None,
+) -> None:
     """Run Elo sync from eloratings.net with cache fallback per D-15/D-19/D-20.
 
     On first-ever run with no cache and sync failure, prints a clear error
@@ -166,15 +178,19 @@ def _run_elo_sync(teams: dict[str, dict]) -> None:
 
     Updates _elo_last_sync_time on any successful sync, even if no corrections
     were needed, so the periodic 24h timer advances correctly.
+
+    Args:
+        teams: Team data dict.
+        data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
     """
     global _elo_last_sync_time
     start = time.time()
-    corrections = elo_sync.sync_elo_from_eloratings(teams)
+    corrections = elo_sync.sync_elo_from_eloratings(teams, data_dir=data_dir)
     elapsed = time.time() - start
 
     if corrections is None:
         # Fetch failed (D-15, D-19, D-20)
-        cache = state.load_eloratings_cache()
+        cache = state.load_eloratings_cache(data_dir)
         if not cache and _elo_last_sync_time == 0.0:
             # D-20: First run, no cache, network failure
             output.print_error(
@@ -309,6 +325,8 @@ def _run_historical_catch_up(
     played_groups: dict[str, dict],
     played: dict[str, dict],
     elo_applied: set[str] | None = None,
+    league_id: int = 27,
+    data_dir: Path | str | None = None,
 ) -> tuple[dict[str, dict], dict[str, dict], set[str]]:
     """Fetch all finished matches from WC_START to today, ingest any not yet played.
 
@@ -319,11 +337,13 @@ def _run_historical_catch_up(
 
     Args:
         elo_applied: Set of match_ids that already have Elo applied (restart guard).
+        league_id: BSD league ID for URL construction and fetch filtering.
+        data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
 
     Returns (updated played_groups, updated played, updated elo_applied).
     """
-    historic_url = build_historic_url()
-    raw = fetch_raw_matches(api_key, api_url=historic_url)
+    historic_url = build_historic_url(league_id=league_id)
+    raw = fetch_raw_matches(api_key, api_url=historic_url, league_id=league_id)
     if not raw:
         return played_groups, played, elo_applied or set()
 
@@ -343,7 +363,7 @@ def _run_historical_catch_up(
         for m in new_group:
             output.print_match_alert(m)
             played_groups[m["match_id"]] = m
-        state.save_played_groups(played_groups)
+        state.save_played_groups(played_groups, data_dir)
         new_matches_all.extend(new_group)
         total_new += len(new_group)
 
@@ -432,7 +452,7 @@ def _run_historical_catch_up(
                 played_bsd_event_ids.add(bsd_id)
 
         if new_knockout_matches:
-            state.save_played(played)
+            state.save_played(played, data_dir)
             new_matches_all.extend(new_knockout_matches)
 
     if total_new:
@@ -449,7 +469,7 @@ def _run_historical_catch_up(
         if elo_updates:
             elo_updated = True
     if elo_updated:
-        state.save_teams(teams)
+        state.save_teams(teams, data_dir)
 
     return played_groups, played, elo_applied
 
@@ -459,6 +479,7 @@ def _run_draw_backfill(
     played: dict[str, dict],
     played_groups: dict[str, dict],
     elo_applied: set[str],
+    data_dir: Path | str | None = None,
 ) -> set[str]:
     """One-shot backfill: replay all historical draws through fixed Elo pipeline.
 
@@ -471,6 +492,7 @@ def _run_draw_backfill(
         played: Played knockout matches dict.
         played_groups: Played group matches dict.
         elo_applied: Set of match_ids that already have Elo applied.
+        data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
 
     Returns:
         Updated elo_applied set with backfilled match_ids added.
@@ -495,7 +517,7 @@ def _run_draw_backfill(
 
     candidates.sort(key=lambda x: (x.get("completed_at", ""), x.get("match_id", "")))
 
-    log = state.load_elo_update_log()
+    log = state.load_elo_update_log(data_dir)
     backfilled: set[str] = set()
 
     for m in candidates:
@@ -516,9 +538,9 @@ def _run_draw_backfill(
         elo_applied.add(mid)
         backfilled.add(mid)
 
-    state.save_elo_applied(elo_applied)
-    state.save_teams(teams)
-    state.save_elo_update_log(log)
+    state.save_elo_applied(elo_applied, data_dir)
+    state.save_teams(teams, data_dir)
+    state.save_elo_update_log(log, data_dir)
 
     if backfilled:
         print(f"Draw backfill: applied Elo to {len(backfilled)} historical draw(s)")
@@ -530,17 +552,21 @@ def _record_eval_baseline(
     teams: dict[str, dict],
     played: dict[str, dict],
     played_groups: dict[str, dict],
+    data_dir: Path | str | None = None,
 ) -> None:
     """Record baseline evaluation report using the evaluation framework.
 
     Delegates to evaluation.evaluate_all_matches() and persists the report.
     Replaces the ad-hoc Brier/log-loss computation from Phase 12.
+
+    Args:
+        data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
     """
     from src.evaluation import evaluate_all_matches
     from src.state import save_eval_baseline_report
 
     report = evaluate_all_matches(teams, played, played_groups, signal_name="elo")
-    save_eval_baseline_report(report)
+    save_eval_baseline_report(report, data_dir)
 
     if report["n_matches"] > 0:
         m = report["metrics"]
@@ -551,7 +577,7 @@ def _record_eval_baseline(
         print("Baseline: no matches to evaluate")
 
 
-def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_key, aliases, last_sim_time, last_request_time, prev_probs=None, seed=None):
+def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_key, aliases, last_sim_time, last_request_time, prev_probs=None, seed=None, league_id=27, data_dir=None):
     """Run one fetch -> process -> simulate -> print cycle.
 
     Args:
@@ -567,6 +593,8 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
         last_request_time: Timestamp of last API request.
         prev_probs: Previous iteration probabilities for delta display.
         seed: int or None. Passed to run_full_simulation() for reproducible Monte Carlo.
+        league_id: BSD league ID for fetch filtering.
+        data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
 
     Returns (updated_last_sim_time, updated_last_request_time, probs).
     """
@@ -577,7 +605,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     if _elo_last_sync_time > 0:
         hours_since_sync = (time.time() - _elo_last_sync_time) / 3600
         if hours_since_sync >= ELO_SYNC_INTERVAL_HOURS:
-            _run_elo_sync(teams)
+            _run_elo_sync(teams, data_dir=data_dir)
 
     # ── Staleness warning (D-16) ──
     if _elo_last_sync_time > 0:
@@ -605,7 +633,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
 
     # Fetch matches from API
     last_request_time = time.time()
-    raw = fetch_raw_matches(api_key)
+    raw = fetch_raw_matches(api_key, league_id=league_id)
 
     # Process new matches
     new_matches = []
@@ -622,8 +650,8 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             elo_updates = elo.apply_elo_update(m, teams)
             output.print_elo_changes(elo_updates)
             played[m["match_id"]] = m
-            state.save_teams(teams)
-            state.save_played(played)
+            state.save_teams(teams, data_dir)
+            state.save_played(played, data_dir)
     else:
         output.print_heartbeat()
 
@@ -645,15 +673,15 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             elo_updates = elo.apply_elo_update(m, teams)
             output.print_elo_changes(elo_updates)
             played_groups[m["match_id"]] = m
-            state.save_played_groups(played_groups)
-        state.save_teams(teams)
+            state.save_played_groups(played_groups, data_dir)
+        state.save_teams(teams, data_dir)
 
     # ── Per-iteration prediction_history creation for new matches (Defect B Gap 2) ──
     all_new = list(new_matches or []) + list(new_group_matches or [])
     if all_new:
         try:
             existing_mids = set()
-            existing_history = state.load_prediction_history()
+            existing_history = state.load_prediction_history(data_dir)
             if existing_history:
                 existing_mids = {e.get("match_id", "") for e in existing_history}
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -690,7 +718,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                         }
                     },
                 }
-                state.append_prediction_history(entry)
+                state.append_prediction_history(entry, data_dir)
         except Exception:
             print("Warning: Failed to create prediction_history entries for new matches", file=sys.stderr)
 
@@ -698,26 +726,27 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     signal_warnings: list[str] = []
 
     # Refresh odds from existing events (no extra API call — reuses raw data)
-    odds_cache = state.load_signal_cache(ODDS_CACHE_FILE)
+    odds_cache = state.load_signal_cache(ODDS_CACHE_FILE, data_dir)
     if raw and not state.is_cache_valid(odds_cache, ODDS_CACHE_TTL_HOURS):
         try:
             odds_cache = fetch_and_cache_odds(
                 api_key, raw, aliases, groups, ODDS_CACHE_TTL_HOURS
             )
-            state.save_signal_cache(odds_cache, ODDS_CACHE_FILE)
+            state.save_signal_cache(odds_cache, ODDS_CACHE_FILE, data_dir)
         except Exception as e:
             print(f"Warning: Odds fetch failed: {e}", file=sys.stderr)
             if not odds_cache or not odds_cache.get("matches"):
                 signal_warnings.append("Market odds unavailable — no cached data")
 
     # Refresh CatBoost (dedicated API call only if cache expired)
-    cb_cache = state.load_signal_cache(CATBOOST_CACHE_FILE)
+    cb_cache = state.load_signal_cache(CATBOOST_CACHE_FILE, data_dir)
     if not state.is_cache_valid(cb_cache, CATBOOST_CACHE_TTL_HOURS):
         try:
             cb_cache = fetch_and_cache_catboost(
-                api_key, aliases, groups, bracket, CATBOOST_CACHE_TTL_HOURS
+                api_key, aliases, groups, bracket, CATBOOST_CACHE_TTL_HOURS,
+                league_id=league_id,
             )
-            state.save_signal_cache(cb_cache, CATBOOST_CACHE_FILE)
+            state.save_signal_cache(cb_cache, CATBOOST_CACHE_FILE, data_dir)
         except Exception as e:
             print(f"Warning: CatBoost fetch failed: {e}", file=sys.stderr)
             if not cb_cache or not cb_cache.get("matches"):
@@ -739,7 +768,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             teams, groups, bracket=bracket,
             played=played, played_groups=played_groups,
         )
-        state.save_signal_cache(form_cache, FORM_CACHE_FILE)
+        state.save_signal_cache(form_cache, FORM_CACHE_FILE, data_dir)
     except Exception as e:
         print(f"Warning: Form signal computation failed: {e}", file=sys.stderr)
         if not form_cache or not form_cache.get("matches"):
@@ -748,7 +777,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     lineup_cache = {}
     try:
         lineup_cache = compute_lineup_signal(groups, bracket=bracket)
-        state.save_signal_cache(lineup_cache, LINEUP_CACHE_FILE)
+        state.save_signal_cache(lineup_cache, LINEUP_CACHE_FILE, data_dir)
     except Exception as e:
         print(f"Warning: Lineup signal computation failed: {e}", file=sys.stderr)
         if not lineup_cache or not lineup_cache.get("matches"):
@@ -757,16 +786,17 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     # ══ Architecture Q4+Q5: Capture pre-mutation state ══
     # Capture prev_history for data_version change detection.
     # Must happen BEFORE _merge_signals_into_history().
-    _prev_history = state.load_prediction_history()
-    _prev_cal_params = state.load_calibration_params()
+    _prev_history = state.load_prediction_history(data_dir)
+    _prev_cal_params = state.load_calibration_params(data_dir)
 
     # Merge signal cache data into prediction_history entries
-    _merge_signals_into_history()
+    _merge_signals_into_history(data_dir=data_dir)
 
     # ── Calibrate, blend, inject into simulation (Phase 14) ──
     blend_params = _run_calibrate_and_blend(
         teams, groups, bracket, odds_cache, cb_cache,
         form_cache=form_cache, lineup_cache=lineup_cache,
+        data_dir=data_dir,
     )
 
     # ── Attach version IDs to prediction_history entries (D-05) ──
@@ -777,12 +807,12 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
         from src.governance import _maybe_update_versions
         from src.state import load_versions, save_versions, load_prediction_history, save_prediction_history, load_calibration_params
 
-        current_versions = load_versions()
-        new_cal_params = load_calibration_params()
+        current_versions = load_versions(data_dir)
+        new_cal_params = load_calibration_params(data_dir)
         calibration_changed = _prev_cal_params != new_cal_params  # Architecture Q5
 
         # Determine signal keys from current prediction_history
-        ph = load_prediction_history()
+        ph = load_prediction_history(data_dir)
         ph_signal_keys = sorted(
             k for entry in ph
             if isinstance(entry.get("signals"), dict)
@@ -801,10 +831,10 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             new_signal_keys=list(set(ph_signal_keys)),
             calibration_changed=calibration_changed,
         )
-        save_versions(updated_versions)
+        save_versions(updated_versions, data_dir)
 
         # Attach version IDs to entries that don't have them yet
-        devices = load_prediction_history()
+        devices = load_prediction_history(data_dir)
         modified = False
         for entry in devices:
             if "data_version" not in entry:
@@ -813,7 +843,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                 entry["run_version"] = updated_versions.get("run_version", "R0")
                 modified = True
         if modified:
-            save_prediction_history(devices)
+            save_prediction_history(devices, data_dir)
     except Exception as e:
         print(f"Version tracking failed: {e}", file=sys.stderr)
 
@@ -862,8 +892,8 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             from src.governance import _run_governance
             from src.state import load_versions, load_prediction_history
 
-            gov_entries = load_prediction_history()
-            gov_versions = load_versions()
+            gov_entries = load_prediction_history(data_dir)
+            gov_versions = load_versions(data_dir)
             gov_signal_keys = sorted(
                 k for entry in gov_entries
                 if isinstance(entry.get("signals"), dict)
@@ -875,6 +905,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                 versions=gov_versions,
                 signal_keys=list(set(gov_signal_keys)),
                 blend_weights=blend_params.get("blend_weights", {}) if blend_params else {},
+                data_dir=data_dir,
             )
             _last_gov_time = time.time()
         except Exception as e:
@@ -936,6 +967,58 @@ def validate_api_key() -> str:
         print("Warning: API availability check failed, continuing...", file=sys.stderr)
 
     return api_key
+
+
+def _migrate_legacy_data(data_dir: Path, league_id: int) -> None:
+    """One-shot non-destructive migration from data/ to data/{league_id}/.
+
+    Only runs when league_id == 27 (legacy layout). Copies league-scoped
+    state files from data/ to data/27/ if data/27/played.json doesn't exist.
+    Original data/*.json files are never deleted (D-07).
+
+    Args:
+        data_dir: Base data directory (constants.DATA_DIR, typically data/).
+        league_id: Resolved league ID to migrate to.
+    """
+    import shutil
+
+    if league_id != 27:
+        return  # Only migrate from legacy 27 layout
+
+    target_dir = data_dir / str(league_id)
+    guard_file = target_dir / "played.json"
+    if guard_file.exists():
+        return  # Idempotent: already migrated (D-08)
+
+    league_scoped_files: list[str] = [
+        "played.json", "played_groups.json", "teams.json",
+        "predictions_ledger.json", "prediction_history.json",
+        "catboost_cache.json", "odds_cache.json", "form_cache.json",
+        "lineup_cache.json", "elo_applied.json", "elo_update_log.json",
+        "calibration_params.json", "versions.json",
+    ]
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    migrated = 0
+    for filename in league_scoped_files:
+        src = data_dir / filename
+        if src.exists():
+            shutil.copy2(src, target_dir / filename)
+            migrated += 1
+
+    # Also migrate runs/ subdirectory
+    src_runs = data_dir / "runs"
+    if src_runs.exists():
+        dst_runs = target_dir / "runs"
+        dst_runs.mkdir(exist_ok=True)
+        for f in src_runs.iterdir():
+            if f.is_file():
+                shutil.copy2(f, dst_runs / f.name)
+
+    if migrated:
+        logging.getLogger(__name__).info(
+            "Migrated %d files from data/ to data/%d/", migrated, league_id
+        )
 
 
 def _resolve_league_id(args: argparse.Namespace) -> tuple[int, Path]:
@@ -1019,51 +1102,58 @@ def main() -> None:
     load_dotenv()
 
     try:
-        teams = state.load_teams()
-        bracket = state.load_bracket()
-        played = state.load_played()
-        played_groups = state.load_played_groups()
-        groups = state.load_groups()
-        annex_c = state.load_annex_c()
+        # ── One-time migration (D-05 through D-08) ──
+        _migrate_legacy_data(constants.DATA_DIR, league_id)
+
+        teams = state.load_teams(data_dir=league_data_dir)            # per-league
+        bracket = state.load_bracket()                                 # shared — no data_dir
+        played = state.load_played(data_dir=league_data_dir)           # per-league
+        played_groups = state.load_played_groups(data_dir=league_data_dir)  # per-league
+        groups = state.load_groups()                                   # shared
+        annex_c = state.load_annex_c()                                 # shared
         api_key = validate_api_key()
-        aliases = state.load_aliases()
+        aliases = state.load_aliases()                                 # shared (team_aliases)
 
         # ── Historical catch-up: fetch all finished matches from tournament
         #     start to today. Runs unconditionally on every startup — existing
         #     match_id dedup in process_group_matches prevents re-ingestion.
         #     Elo updates are applied chronologically with (completed_at, match_id)
         #     ordering, guarded by elo_applied_ids to prevent double-counting.
-        __elo_applied = state.load_elo_applied()
+        __elo_applied = state.load_elo_applied(data_dir=league_data_dir)
         played_groups, played, __elo_applied = _run_historical_catch_up(
             api_key, teams, groups, bracket, annex_c, aliases,
             played_groups, played, elo_applied=__elo_applied,
+            league_id=league_id, data_dir=league_data_dir,
         )
-        state.save_elo_applied(__elo_applied)
+        state.save_elo_applied(__elo_applied, data_dir=league_data_dir)
 
         # ── Historical draw backfill ──
         # One-shot: replays all historical draws through fixed Elo pipeline (D-14, D-15)
-        __elo_applied = _run_draw_backfill(teams, played, played_groups, __elo_applied)
+        __elo_applied = _run_draw_backfill(teams, played, played_groups, __elo_applied,
+                                           data_dir=league_data_dir)
 
         # ── Baseline metrics ──
         # Record one-shot Brier/log-loss baseline for Phase 12b (D-18)
-        _record_eval_baseline(teams, played, played_groups)
+        _record_eval_baseline(teams, played, played_groups,
+                              data_dir=league_data_dir)
 
         # ── Prediction history migration (one-shot, before signal fetch) ──
-        n_migrated = state.migrate_prediction_history()
+        n_migrated = state.migrate_prediction_history(data_dir=league_data_dir)
         if n_migrated:
             print(f"Prediction history migrated: {n_migrated} entries to compound format")
 
         # ── Seed CatBoost cache at startup (dedicated API call) ──
         try:
             cb_cache = fetch_and_cache_catboost(
-                api_key, aliases, groups, bracket, CATBOOST_CACHE_TTL_HOURS
+                api_key, aliases, groups, bracket, CATBOOST_CACHE_TTL_HOURS,
+                league_id=league_id,
             )
-            state.save_signal_cache(cb_cache, CATBOOST_CACHE_FILE)
+            state.save_signal_cache(cb_cache, CATBOOST_CACHE_FILE, league_data_dir)
         except Exception as e:
             print(f"Warning: initial CatBoost fetch failed: {e}", file=sys.stderr)
 
         # ── Merge CatBoost into prediction_history — even if cache is partial ──
-        _merge_signals_into_history()
+        _merge_signals_into_history(data_dir=league_data_dir)
 
         # ── Warm Poisson base rate cache (V2-09) ──
         try:
@@ -1079,7 +1169,7 @@ def main() -> None:
         # ── Startup Elo sync per D-01, D-18 ──
         # Runs after historical catch-up (Pitfall 7: catch-up first, then sync)
         # and before the first simulation. Always fetches fresh Elo values.
-        _run_elo_sync(teams)
+        _run_elo_sync(teams, data_dir=league_data_dir)
 
         # Apply --no-color before any console output (D-05)
         if args.no_color:
@@ -1091,8 +1181,8 @@ def main() -> None:
         from src.state import load_versions, load_prediction_history
         from src.governance import _run_governance
 
-        gov_entries = load_prediction_history()
-        gov_versions = load_versions()
+        gov_entries = load_prediction_history(data_dir=league_data_dir)
+        gov_versions = load_versions(data_dir=league_data_dir)
         _run_governance(
             entries=gov_entries,
             versions=gov_versions,
@@ -1100,6 +1190,7 @@ def main() -> None:
             blend_weights={},
             startup=True,
             teams=teams,
+            data_dir=league_data_dir,
         )
         _last_gov_time = time.time()
 
@@ -1109,6 +1200,7 @@ def main() -> None:
                 teams, groups, bracket, annex_c, played, played_groups, api_key, aliases,
                 last_sim_time=0.0, last_request_time=0.0,
                 prev_probs=None, seed=args.seed,
+                league_id=league_id, data_dir=league_data_dir,
             )
             sys.exit(0)
 
@@ -1126,7 +1218,7 @@ def main() -> None:
         last_sim_time, last_request_time, prev_probs = _run_iteration(
             teams, groups, bracket, annex_c, played, played_groups, api_key, aliases,
             last_sim_time, last_request_time, prev_probs,
-            seed=args.seed,
+            seed=args.seed, league_id=league_id, data_dir=league_data_dir,
         )
 
         # Continuous polling loop
@@ -1137,19 +1229,22 @@ def main() -> None:
             last_sim_time, last_request_time, prev_probs = _run_iteration(
                 teams, groups, bracket, annex_c, played, played_groups, api_key, aliases,
                 last_sim_time, last_request_time, prev_probs,
-                seed=args.seed,
+                seed=args.seed, league_id=league_id, data_dir=league_data_dir,
             )
 
         # Shutdown path
-        shutdown_odds = state.load_signal_cache(ODDS_CACHE_FILE)
-        shutdown_cb = state.load_signal_cache(CATBOOST_CACHE_FILE)
-        shutdown_blend = _run_calibrate_and_blend(teams, groups, bracket, shutdown_odds, shutdown_cb)
+        shutdown_odds = state.load_signal_cache(ODDS_CACHE_FILE, league_data_dir)
+        shutdown_cb = state.load_signal_cache(CATBOOST_CACHE_FILE, league_data_dir)
+        shutdown_blend = _run_calibrate_and_blend(
+            teams, groups, bracket, shutdown_odds, shutdown_cb,
+            data_dir=league_data_dir,
+        )
         final_probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=args.seed, blend_params=shutdown_blend)
         output.print_shutdown_banner(final_probs)
 
-        state.save_teams(teams)
-        state.save_played(played)
-        state.save_played_groups(played_groups)
+        state.save_teams(teams, data_dir=league_data_dir)
+        state.save_played(played, data_dir=league_data_dir)
+        state.save_played_groups(played_groups, data_dir=league_data_dir)
 
     except ValueError as e:
         output.print_error(f"Data error: {e}")
