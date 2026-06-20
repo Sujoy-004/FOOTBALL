@@ -61,6 +61,19 @@ def test_build_historic_url_format(monkeypatch):
     assert "limit=200" in url
 
 
+def test_build_historic_url_custom_league(monkeypatch):
+    """build_historic_url(league_id=65) returns URL with league_id=65 instead of default 27."""
+    from datetime import datetime
+    import src.constants as c
+    url = build_historic_url(league_id=65)
+    assert url.startswith("https://sports.bzzoiro.com/api/events/")
+    assert f"date_from={c.WC_START_DATE}" in url
+    assert f"date_to={datetime.now().strftime('%Y-%m-%d')}" in url
+    assert "league_id=65" in url
+    assert "league_id=27" not in url
+    assert "limit=200" in url
+
+
 def test_fetch_success(monkeypatch):
     def mock_get(url, **kwargs):
         return MockResponse(200, {"results": SAMPLE_MATCHES})
