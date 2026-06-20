@@ -80,14 +80,14 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 | V2-19 | Match-level prediction history stored persistently for analysis | 12b |
 | V2-21 | Live match event fields (goals, cards, subs, possession, shots, corners, fouls) ingested from BSD | 17 |
 | V2-22 | Coach, venue, referee, and weather data ingested and accessible | 17 |
-| V2-23 | BSD xG predictions ingested as independent prediction signal | 18 |
+| V2-23 | BSD xG predictions (`expected_home_goals`, `expected_away_goals`) ingested as optional Poisson simulation lambda overrides | 18 |
 | V2-24 | BSD AI preview / pre-match analysis ingested and displayed | 18 |
-| V2-25 | League selection via CLI flag (--league) and config, supporting all 65 BSD leagues | 19 |
-| V2-26 | Multi-league data isolation (separate state files per league namespace) | 19 |
+| V2-25 | League selection via CLI flag (--league) and config (single-league, World Cup scope) | 19 |
+| V2-26 | Per-league state isolation (World Cup scope: league 27 only) | 19 |
 | V2-27 | Per-match signal breakdown display (blended + per-signal) in console | 20 |
 | V2-28 | Confidence intervals (Clopper-Pearson) alongside probabilities | 20 |
 | V2-29 | Historical probability log with trend tracking | 20 |
-| V2-30 | 85% BSD API field coverage (monitored and reported) | 20 |
+| V2-30 | ≥60% BSD API meaningful field coverage (counts Prediction + Display + Operational fields only; excludes No-Value noise) with automated auditor script | 20 |
 
 ## Out of Scope
 
@@ -95,6 +95,7 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 |---------|--------|
 | Player-level modeling | Massive data pipeline for marginal gain; team-level only |
 | Multi-tournament / historical archive | Only current World Cup |
+| Non-World-Cup BSD leagues (64 others) | Project is World Cup only |
 | Mobile app | CLI is the product |
 | Real-time WebSocket / live ticker | Overengineering for polling-based tool |
 | Betting advice / "value bet" alerts | Legal gray area |
@@ -180,4 +181,4 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 ---
 
 *Requirements defined: 2026-06-14*
-*Last updated: 2026-06-18 — Phases 16-20 defined with V2-12 through V2-30*
+*Last updated: 2026-06-21 — V2-30 re-scoped to meaningful-field coverage with value-based classification*
