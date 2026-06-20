@@ -15,9 +15,11 @@ import signal
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 from dotenv import load_dotenv
 
+from src import constants
 from src import elo, elo_sync, output, state
 from src.constants import API_TIMEOUT, ELO_SYNC_INTERVAL_HOURS, POLL_INTERVAL
 from src.constants import ODDS_CACHE_TTL_HOURS, CATBOOST_CACHE_TTL_HOURS, ODDS_CACHE_FILE, CATBOOST_CACHE_FILE
@@ -233,6 +235,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         dest="ai_preview",
         help="Display BSD AI prediction previews after simulation output (Phase 18)",
+    )
+    parser.add_argument(
+        "--league",
+        type=int,
+        default=None,
+        metavar="ID",
+        help="BSD league ID (default: 27 for World Cup; see --list-leagues for all 65)",
+    )
+    parser.add_argument(
+        "--list-leagues",
+        action="store_true",
+        dest="list_leagues",
+        help="Print all available league IDs and names, then exit",
     )
     return parser.parse_args(argv)
 
@@ -923,12 +938,77 @@ def validate_api_key() -> str:
     return api_key
 
 
+def _resolve_league_id(args: argparse.Namespace) -> tuple[int, Path]:
+    """Resolve league_id with precedence: CLI --league > config.json > default 27.
+
+    Args:
+        args: Parsed CLI arguments from _parse_args().
+
+    Returns:
+        Tuple of (league_id: int, league_data_dir: Path).
+    """
+    config_path = constants.DATA_DIR.parent / "config.json"
+    league_id = constants.DEFAULT_LEAGUE_ID  # 27
+
+    # 1. Load config.json if it exists
+    if config_path.exists():
+        try:
+            with open(config_path, encoding="utf-8") as f:
+                config = json.load(f)
+            league_id = int(config.get("league_id", constants.DEFAULT_LEAGUE_ID))
+        except (json.JSONDecodeError, ValueError, TypeError):
+            logging.warning(
+                "Corrupt config.json at %s, falling back to league %d",
+                config_path, constants.DEFAULT_LEAGUE_ID,
+            )
+            league_id = constants.DEFAULT_LEAGUE_ID
+    else:
+        # Auto-create config.json with default (D-11)
+        # Use atomic write pattern: write to temp, then rename
+        import tempfile
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(config_path.parent),
+            prefix="config.",
+            suffix=".tmp",
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump({"league_id": constants.DEFAULT_LEAGUE_ID}, f, indent=2)
+            os.replace(tmp_path, str(config_path))
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+
+    # 2. CLI override (D-10: CLI > config.json > 27)
+    if args.league is not None:
+        league_id = args.league
+
+    # Per RECOMMENDATION: do NOT persist CLI --league into config.json.
+    # Config.json is for persisted preference; CLI is for one-off override.
+
+    league_data_dir = constants.DATA_DIR / str(league_id)
+    return league_id, league_data_dir
+
+
 def main() -> None:
     """Load state, then enter continuous polling loop until signal."""
     args = _parse_args()
 
     global _ai_preview_enabled
     _ai_preview_enabled = args.ai_preview
+
+    # Handle --list-leagues early: print catalog and exit (D-02)
+    if args.list_leagues:
+        for lid, name in sorted(constants.LEAGUES.items()):
+            print(f"{lid:>4}: {name}")
+        sys.exit(0)
+
+    # Resolve league_id with precedence: CLI > config.json > 27
+    league_id, league_data_dir = _resolve_league_id(args)
 
     # Windows Console Host ANSI initialization (Python 3.10/3.11 quirk)
     if sys.platform == "win32":
