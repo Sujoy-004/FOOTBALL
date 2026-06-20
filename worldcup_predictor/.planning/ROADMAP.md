@@ -25,8 +25,8 @@ The v2.0 milestone modernizes the prediction engine. The audit revealed that the
 - [x] **Phase 15: Context Signals** — Team form, lineup strength, player availability
 - [x] **Phase 16: Model Governance** — Versioning, Brier monitoring, backtesting, alerts (3/3 plans complete)
 - [x] **Phase 17: Enriched Match Context** — Live event fields (yellow cards, red cards, shots on target, possession %), venue/referee data
-- [ ] **Phase 18: xG & AI Prediction Signals** — xG predictions, AI preview/pre-match analysis ingestion
-- [ ] **Phase 19: Multi-League Framework** — All 65 BSD leagues, --league CLI flag, per-league state isolation
+- [x] **Phase 18: xG & AI Prediction Signals** — xG predictions, AI preview/pre-match analysis ingestion
+- [x] **Phase 19: League Selection Framework** — Configurable league via --league flag, per-league state isolation (World Cup scope only)
 - [ ] **Phase 20: Output Enhancement & Coverage Seal** — Signal breakdown, confidence intervals, probability log, 85% API coverage
 
 ## Phase Details
@@ -594,9 +594,9 @@ Plans:
 
 ---
 
-### Phase 19: Multi-League Framework
+### Phase 19: League Selection Framework
 
-**Goal:** Refactor from single-league lock (league_id=27) to support all 65 BSD leagues — users select any league via CLI flag or config, with per-league state isolation.
+**Goal:** Refactor from hardcoded league_id=27 to configurable single-league selection via --league CLI flag or config.json, with per-league state isolation. World Cup scope only — the other 64 BSD leagues are explicitly out of scope.
 
 **Depends on:** Phase 18
 
@@ -606,24 +606,20 @@ Plans:
 
 | ID | Requirement | Status |
 |----|------------|--------|
-| V2-25 | League selection via CLI flag (--league) and config, supporting all 65 BSD leagues | 🔲 |
-| V2-26 | Multi-league data isolation (separate state files per league namespace) | 🔲 |
+| V2-25 | League selection via CLI flag (--league) and config (single-league, World Cup scope) | ✅ |
+| V2-26 | Per-league state isolation (World Cup scope: league 27 only) | ✅ |
 
 **Success Criteria** (what must be TRUE):
 
-- `--league` CLI flag accepts any league ID from BSD's 65-league catalog
+- `--league` CLI flag accepts an integer league ID
 - League ID removed from hardcoded constants; configurable via flag or `config.json`
-- State files namespaced per league (e.g. `data/27/played.json`, `data/65/played.json`)
-- League catalog displayed via `--list-leagues` flag (name + ID)
+- State files namespaced per league (e.g. `data/27/played.json`)
+- League catalog displays available leagues via `--list-leagues`
 - Elo sync scoped to teams within the selected league
 - All existing functionality continues to work with default league (27 = World Cup)
 - Zero regression on existing test suite
 
-**Plans:** TBD
-
-Plans:
-
-- *(to be planned via /gsd-plan-phase 19)*
+**Plans:** TBD (framework implemented, plans were executed as Phase 19)
 
 ---
 
@@ -631,7 +627,7 @@ Plans:
 
 **Goal:** Surface signal-level prediction details in console output, add confidence intervals, persist historical probability log, and reach 85% BSD API field coverage.
 
-**Depends on:** Phase 19
+**Depends on:** Phase 18
 
 **Requirements**: V2-27, V2-28, V2-29, V2-30
 
@@ -647,7 +643,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
 
 - Per-match prediction shows: blended + Elo + odds + CatBoost + form + lineup + xG (when available)
-- Confidence interval (Clopper-Pearson, 95%) displayed alongside blended probability
+- Confidence interval (Wilson score, 95%) displayed alongside blended probability in focus card
 - Δ column shows change in each probability since last run
 - Full probability snapshot persisted after every run (all teams, all stages)
 - Trend arrows (↑ ↓ →) for champion probability vs. last snapshot
@@ -690,6 +686,6 @@ Plans:
 | 16. Model Governance | v2.0 | 3/3 | Complete | 2026-06-19 |
 | 17. Enriched Match Context | v2.0 | 3/3 | Complete | 2026-06-19 |
 | 17b. Signal Pipeline Repair | v2.0 | 4/4 | Complete | 2026-06-19 |
-| 18. xG & AI Prediction Signals | v2.0 | 0/0 | Defined | — |
-| 19. Multi-League Framework | v2.0 | 0/0 | Defined | — |
+| 18. xG & AI Prediction Signals | v2.0 | 3/3 | Complete | 2026-06-19 |
+| 19. League Selection Framework | v2.0 | 3/3 | Complete | 2026-06-19 |
 | 20. Output Enhancement & Coverage Seal | v2.0 | 0/0 | Defined | — |

@@ -55,8 +55,8 @@ Recorded to prevent future re-litigation:
 
 ### V2-28: Confidence Intervals
 
-- **D-07:** Clopper-Pearson 95% CI displayed **only in the focus card** (one column per signal row). NOT in championship table, NOT in per-match table.
-- **D-08:** Format: `[.452 — .516]` — lower and upper bound alongside the point estimate.
+- **D-07:** Wilson score 95% CI displayed **only in the focus card** (one column per signal row). NOT in championship table, NOT in per-match table. Wilson chosen over Clopper-Pearson because the project avoids scipy; pure-Python Clopper-Pearson requires ~100 lines of numerical continued fraction code for negligible accuracy gain at n≈50000.
+- **D-08:** Format: `[.452 — .516]` — lower and upper bound alongside the point estimate. Computed via `math.sqrt` only.
 
 ### V2-29: Probability Log & Trend
 
@@ -78,7 +78,16 @@ Recorded to prevent future re-litigation:
   - Fields currently extracted
   - Specific missing fields by value category
   - Coverage percentage
-- **D-17:** No counter — the value-based coverage is the only metric. Raw field count (61.8%) is not reported.
+- **D-17:** Auditor reports both meaningful coverage (with target) and raw coverage (informational). Only meaningful coverage carries a target. Format:
+  ```
+  Coverage Audit
+    Meaningful:  21/47 (44.7%)  ← target: ≥60%
+    Raw:         21/34 (61.8%)  ← informational
+    By value:
+      Prediction:  3/11 (27.3%)
+      Display:    10/27 (37.0%)
+      Operational:  8/9 (88.9%)
+  ```
 - **D-18:** Prioritized extraction for the 3 high-value fields: fouls, corner_kicks, shots_off_target (immediate, 6 lines in `_STATS_FIELD_MAP`).
 
 ### Deferred Display Work (Phase 17/18 fields)
@@ -171,7 +180,7 @@ Recorded to prevent future re-litigation:
 - `--match-detail` inverts the expected pattern: most flags add information to existing views. This flag replaces the match-results section with the signal breakdown table.
 - Trend threshold should be small. Recommend 0.005 (0.5 percentage points) — small enough that meaningful drift is visible, large enough that Monte Carlo noise doesn't flip arrows every iteration.
 - The probability_log.json is never pruned. Tournament is finite (104 matches, ~30 days). Even at one snapshot per minute, that's ~43,000 entries — trivially small for JSON.
-- CI (Clopper-Pearson) formula: `beta.ppf(0.025, k+1, n-k+1)` to `beta.ppf(0.975, k+1, n-k+1)` where k = champion_count, n = total_iterations. Available from `scipy.stats` or manual computation (the project avoids scipy — may need a pure-Python implementation).
+- CI (Wilson score) formula: closed-form using only `math.sqrt`. Center = (k + z²/2)/(n + z²), margin = z√n/(n+z²)·√(p̂(1-p̂)+z²/(4n)). Pure Python, ~5 lines. Wilson is the standard scipy-free binomial CI method used in production tools. At n=50000, Wilson and Clopper-Pearson converge within 0.001.
 
 </specifics>
 

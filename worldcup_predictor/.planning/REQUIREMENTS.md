@@ -85,7 +85,7 @@ Requirements for the 48-team FIFA World Cup 2026 format migration. Each maps to 
 | V2-25 | League selection via CLI flag (--league) and config (single-league, World Cup scope) | 19 |
 | V2-26 | Per-league state isolation (World Cup scope: league 27 only) | 19 |
 | V2-27 | Per-match signal breakdown display (blended + per-signal) in console | 20 |
-| V2-28 | Confidence intervals (Clopper-Pearson) alongside probabilities | 20 |
+| V2-28 | 95% Wilson score confidence intervals alongside probabilities | 20 |
 | V2-29 | Historical probability log with trend tracking | 20 |
 | V2-30 | ≥60% BSD API meaningful field coverage (counts Prediction + Display + Operational fields only; excludes No-Value noise) with automated auditor script | 20 |
 
