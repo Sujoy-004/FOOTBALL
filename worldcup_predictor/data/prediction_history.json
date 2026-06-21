@@ -21248,5 +21248,165 @@
     "data_version": "D3",
     "model_version": "M21",
     "run_version": "2026-06-21T05:19:35.084063+00:00"
+  },
+  {
+    "match_id": "M01",
+    "timestamp": "2026-06-21T05:21:07.825345+00:00",
+    "team_a": "A",
+    "team_b": "B",
+    "actual": 1.0,
+    "signals": {
+      "elo": {
+        "probability": 0.6401,
+        "version": "v1",
+        "timestamp": "2026-06-21T05:21:07.825345+00:00",
+        "available": true,
+        "team_a_elo": 2000,
+        "team_b_elo": 1900
+      }
+    },
+    "data_version": "D3",
+    "model_version": "M22",
+    "run_version": "2026-06-21T05:21:31.925540+00:00"
+  },
+  {
+    "match_id": "M01",
+    "timestamp": "2026-06-21T05:21:07.973513+00:00",
+    "team_a": "A",
+    "team_b": "B",
+    "actual": 1.0,
+    "signals": {
+      "elo": {
+        "probability": 0.6401,
+        "version": "v1",
+        "timestamp": "2026-06-21T05:21:07.973513+00:00",
+        "available": true,
+        "team_a_elo": 2000,
+        "team_b_elo": 1900
+      }
+    },
+    "data_version": "D3",
+    "model_version": "M22",
+    "run_version": "2026-06-21T05:21:31.925540+00:00"
+  },
+  {
+    "match_id": "M01",
+    "timestamp": "2026-06-21T05:21:08.084401+00:00",
+    "team_a": "A",
+    "team_b": "B",
+    "actual": 1.0,
+    "signals": {
+      "elo": {
+        "probability": 0.6401,
+        "version": "v1",
+        "timestamp": "2026-06-21T05:21:08.084401+00:00",
+        "available": true,
+        "team_a_elo": 2000,
+        "team_b_elo": 1900
+      }
+    },
+    "data_version": "D3",
+    "model_version": "M22",
+    "run_version": "2026-06-21T05:21:31.925540+00:00"
+  },
+  {
+    "match_id": "M01",
+    "timestamp": "2026-06-21T05:37:25.640850+00:00",
+    "team_a": "A",
+    "team_b": "B",
+    "actual": 1.0,
+    "signals": {
+      "elo": {
+        "probability": 0.6401,
+        "version": "v1",
+        "timestamp": "2026-06-21T05:37:25.640850+00:00",
+        "available": true,
+        "team_a_elo": 2000,
+        "team_b_elo": 1900
+      }
+    },
+    "data_version": "D3",
+    "model_version": "M23",
+    "run_version": "2026-06-21T05:37:48.949550+00:00"
+  },
+  {
+    "match_id": "M01",
+    "timestamp": "2026-06-21T05:37:25.724885+00:00",
+    "team_a": "A",
+    "team_b": "B",
+    "actual": 1.0,
+    "signals": {
+      "elo": {
+        "probability": 0.6401,
+        "version": "v1",
+        "timestamp": "2026-06-21T05:37:25.724885+00:00",
+        "available": true,
+        "team_a_elo": 2000,
+        "team_b_elo": 1900
+      }
+    },
+    "data_version": "D3",
+    "model_version": "M23",
+    "run_version": "2026-06-21T05:37:48.949550+00:00"
+  },
+  {
+    "match_id": "M01",
+    "timestamp": "2026-06-21T05:37:25.786169+00:00",
+    "team_a": "A",
+    "team_b": "B",
+    "actual": 1.0,
+    "signals": {
+      "elo": {
+        "probability": 0.6401,
+        "version": "v1",
+        "timestamp": "2026-06-21T05:37:25.786169+00:00",
+        "available": true,
+        "team_a_elo": 2000,
+        "team_b_elo": 1900
+      }
+    },
+    "data_version": "D3",
+    "model_version": "M23",
+    "run_version": "2026-06-21T05:37:48.949550+00:00"
+  },
+  {
+    "match_id": "M01",
+    "timestamp": "2026-06-21T19:47:16.438165+00:00",
+    "team_a": "A",
+    "team_b": "B",
+    "actual": 1.0,
+    "signals": {
+      "elo": {
+        "probability": 0.6401,
+        "version": "v1",
+        "timestamp": "2026-06-21T19:47:16.438165+00:00",
+        "available": true,
+        "team_a_elo": 2000,
+        "team_b_elo": 1900
+      }
+    },
+    "data_version": "D3",
+    "model_version": "M24",
+    "run_version": "2026-06-21T19:47:40.358972+00:00"
+  },
+  {
+    "match_id": "M01",
+    "timestamp": "2026-06-21T19:47:16.497483+00:00",
+    "team_a": "A",
+    "team_b": "B",
+    "actual": 1.0,
+    "signals": {
+      "elo": {
+        "probability": 0.6401,
+        "version": "v1",
+        "timestamp": "2026-06-21T19:47:16.497483+00:00",
+        "available": true,
+        "team_a_elo": 2000,
+        "team_b_elo": 1900
+      }
+    },
+    "data_version": "D3",
+    "model_version": "M24",
+    "run_version": "2026-06-21T19:47:40.358972+00:00"
   }
 ]

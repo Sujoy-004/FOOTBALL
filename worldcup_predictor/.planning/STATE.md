@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: World Cup 2026 Support
+milestone: v2.0
+milestone_name: Prediction Engine Modernization
 status: executing
-last_updated: "2026-06-21T04:57:48.076Z"
+last_updated: "2026-06-21T06:20:00.000Z"
 progress:
-  total_phases: 17
-  completed_phases: 12
-  total_plans: 46
-  completed_plans: 40
-  percent: 87
+  total_phases: 20
+  completed_phases: 20
+  total_plans: 57
+  completed_plans: 57
+  percent: 100
 ---
 
 # Project State
@@ -18,13 +18,9 @@ progress:
 
 - See: `.planning/PROJECT.md` (updated 2026-06-14)
 - Core value: A live, self-updating tournament predictor in your terminal — when a match ends, within seconds the script detects it, updates Elo, re-simulates, and shows how every team's odds changed
-- Current focus: Phase 16 — Model Governance (planned)
+- Current focus: Phase 20 — complete (v2.0 milestone fully shipped)
 - 6 canonical docs generated on 2026-06-16 (README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, CONFIGURATION)
-- Phase 13 executed: 3 plans, 16 commits, 387 tests, 17/17 must-haves VERIFICATION PASSED
-- Phase 14 executed: 2 plans, 2 commits, 40 blender tests, 427 total passing
-- Phase 14a executed: 1 plan, prediction ledger fix bridging Phase 13/14 gap
-- Phase 15 executed: 3 plans, 9 commits, 51 form+lineup tests, 477 total passing
-- Test suite: 16 test modules, 477+ passed (post-Phase 15), 1 skipped (live smoke needs BSD_API_KEY)
+- Test suite: 601 passed, 1 skipped (live smoke needs BSD_API_KEY)
 
 ## Milestones & Completed Phases
 

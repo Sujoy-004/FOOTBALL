@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 MVP** — Phases 1–6 (shipped 2026-06-14)
 - ✅ **v1.1 World Cup 2026 Support** — Phases 7–10 (shipped 2026-06-14)
-- 📋 **v2.0 Prediction Engine Modernization** — Phases 11–20 (active)
+- ✅ **v2.0 Prediction Engine Modernization** — Phases 11–20 (shipped 2026-06-21)
 
 ## Overview
 
@@ -27,7 +27,7 @@ The v2.0 milestone modernizes the prediction engine. The audit revealed that the
 - [x] **Phase 17: Enriched Match Context** — Live event fields (yellow cards, red cards, shots on target, possession %), venue/referee data
 - [x] **Phase 18: xG & AI Prediction Signals** — xG predictions, AI preview/pre-match analysis ingestion
 - [x] **Phase 19: League Selection Framework** — Configurable league via --league flag, per-league state isolation (World Cup scope only)
-- [ ] **Phase 20: Output Enhancement & Coverage Seal** — Signal breakdown, confidence intervals, probability log, 85% API coverage
+- [x] **Phase 20: Output Enhancement & Coverage Seal** — Signal breakdown, confidence intervals, probability log, 85% API coverage
 
 ## Phase Details
 
