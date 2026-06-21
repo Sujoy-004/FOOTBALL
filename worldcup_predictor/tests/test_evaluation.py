@@ -166,8 +166,9 @@ class TestEvaluateAllMatchesSignalName:
                         "winner": "A", "home_score": 2, "away_score": 0,
                         "completed_at": "2026-06-15T20:00:00Z"}}
 
-    def test_evaluate_signal_elo(self, teams, played_basic):
+    def test_evaluate_signal_elo(self, teams, played_basic, tmp_path, monkeypatch):
         """signal_name='elo' replays through Elo pipeline and produces compound entries."""
+        monkeypatch.setattr("src.constants.DATA_DIR", tmp_path)
         result = evaluate_all_matches(teams, played_basic, {}, signal_name="elo")
         assert result["n_matches"] == 1
         assert 0 < result["metrics"]["brier"] < 1

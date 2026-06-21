@@ -1207,6 +1207,7 @@ def _migrate_legacy_data(data_dir: Path | str, league_id: int) -> None:
         "catboost_cache.json", "odds_cache.json", "form_cache.json",
         "lineup_cache.json", "elo_applied.json", "elo_update_log.json",
         "calibration_params.json", "versions.json",
+        "probability_log.json",
     ]
 
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -1230,6 +1231,71 @@ def _migrate_legacy_data(data_dir: Path | str, league_id: int) -> None:
         logging.getLogger(__name__).info(
             "Migrated %d files from data/ to data/%d/", migrated, league_id
         )
+
+
+def _merge_probability_log(data_dir: Path | str, league_data_dir: Path | str) -> None:
+    """Merge root probability_log history into league data dir (data/27/ canonical).
+
+    For existing installs: root entries that don't exist in the league dir
+    (deduplicated by ISO timestamp) are appended to the league copy. Root is
+    never modified. Idempotent on subsequent runs — only new (by timestamp)
+    root entries are merged.
+
+    Args:
+        data_dir: Base data directory (constants.DATA_DIR, typically data/).
+        league_data_dir: Per-league data directory (data/<league_id>/).
+    """
+    from src.constants import PROBABILITY_LOG_FILE
+
+    root_path = Path(data_dir) / PROBABILITY_LOG_FILE
+    league_path = Path(league_data_dir) / PROBABILITY_LOG_FILE
+
+    if not root_path.exists():
+        return
+
+    try:
+        with open(root_path, encoding="utf-8") as f:
+            root_log: list[dict] = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return
+    if not root_log:
+        return
+
+    if league_path.exists():
+        try:
+            with open(league_path, encoding="utf-8") as f:
+                league_log: list[dict] = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            league_log = []
+    else:
+        league_log = []
+
+    existing_timestamps = {e["timestamp"] for e in league_log if isinstance(e, dict) and "timestamp" in e}
+    new_entries = [e for e in root_log if isinstance(e, dict) and e.get("timestamp") not in existing_timestamps]
+
+    if not new_entries:
+        return
+
+    league_log.extend(new_entries)
+
+    import tempfile
+    league_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(league_path.parent), prefix="prob_log.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(league_log, f, indent=2)
+        os.replace(tmp, str(league_path))
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+    logging.getLogger(__name__).info(
+        "Merged %d probability log entries from data/ to data/%d/",
+        len(new_entries), 27,
+    )
 
 
 def _resolve_league_id(args: argparse.Namespace) -> tuple[int, Path]:
@@ -1317,6 +1383,11 @@ def main() -> None:
     try:
         # ── One-time migration (D-05 through D-08) ──
         _migrate_legacy_data(Path(constants.DATA_DIR), league_id)
+
+        # ── Probability log merge (D-20: data/27 is canonical) ──
+        # Merge any root entries into data/27/ that don't already exist there
+        # (by timestamp). Idempotent. Root copy becomes stale after merge.
+        _merge_probability_log(Path(constants.DATA_DIR), league_data_dir)
 
         teams = state.load_teams(data_dir=league_data_dir)            # per-league
         bracket = state.load_bracket()                                 # shared — no data_dir
