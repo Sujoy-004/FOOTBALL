@@ -53,8 +53,39 @@ def _timestamp() -> str:
     return _dim(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]")
 
 
-def print_probability_table(probs: dict, prev_probs: dict | None = None) -> None:
-    """Print the top-5 probability table with optional delta column."""
+def _compute_trend_arrow(current_prob: float, team_name: str, prob_log: list[dict]) -> str:
+    """Compute trend arrow for a team based on rolling 5-window mean.
+
+    Args:
+        current_prob: Current champion probability for the team.
+        team_name: Canonical team name.
+        prob_log: List of probability snapshot dicts from probability_log.json.
+
+    Returns:
+        "↑" if current > window mean + threshold,
+        "↓" if current < window mean - threshold,
+        "→" if within threshold,
+        " " if insufficient data (< 6 snapshots).
+    """
+    threshold = 0.005
+    if len(prob_log) < 6:
+        return " "
+    window = prob_log[-6:-1]
+    window_probs = [
+        s.get("probabilities", {}).get(team_name, {}).get("champion", 0.0)
+        for s in window
+    ]
+    window_mean = sum(window_probs) / len(window_probs)
+    if current_prob > window_mean + threshold:
+        return "↑"
+    elif current_prob < window_mean - threshold:
+        return "↓"
+    else:
+        return "→"
+
+
+def print_probability_table(probs: dict, prev_probs: dict | None = None, prob_log: list[dict] | None = None) -> None:
+    """Print the top-5 probability table with optional delta and trend columns."""
     sorted_names = sorted(probs, key=lambda n: probs[n]["champion"], reverse=True)
     top5 = sorted_names[:5]
     remaining = sorted_names[5:]
@@ -63,13 +94,16 @@ def print_probability_table(probs: dict, prev_probs: dict | None = None) -> None
     print(f"{_timestamp()} {_bold_cyan(label)}")
 
     has_delta = prev_probs is not None
+    has_trend = prob_log is not None and len(prob_log) >= 6
 
     header = f"{'':>3} {'Team':<18} {'QF':>6} {'SF':>6} {'FINAL':>8} {'CHAMPION':>8}"
     if has_delta:
         header += f"  {'Delta':>8}"
+    if has_trend:
+        header += f"  {'Trend':>6}"
     print(_bold_cyan(header))
 
-    sep_len = 51 + (9 if has_delta else 0)
+    sep_len = 51 + (9 if has_delta else 0) + (8 if has_trend else 0)
     print(_bold_cyan("-" * sep_len))
 
     for rank, name in enumerate(top5, 1):
@@ -86,6 +120,9 @@ def print_probability_table(probs: dict, prev_probs: dict | None = None) -> None
             row += f"  {delta_str:>8}"
         elif has_delta:
             row += f"  {'—':>8}"
+        if has_trend and name in probs:
+            arrow = _compute_trend_arrow(probs[name]["champion"], name, prob_log)
+            row += f"  {arrow:>6}"
         print(row)
 
     if remaining:

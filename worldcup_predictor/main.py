@@ -935,6 +935,14 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     if prev_probs is not None:
         output.print_delta_summary(probs, prev_probs)
 
+    # Probability log snapshot (Phase 20)
+    try:
+        snapshot = {"timestamp": datetime.now(timezone.utc).isoformat(), "probabilities": probs}
+        state.append_probability_log(snapshot, data_dir=data_dir)
+    except Exception:
+        import sys as _sys
+        print("Warning: Failed to save probability log snapshot", file=_sys.stderr)
+
     return time.time(), last_request_time, probs
 
 

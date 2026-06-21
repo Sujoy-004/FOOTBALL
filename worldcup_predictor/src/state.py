@@ -714,6 +714,41 @@ def append_prediction_history(
     _atomic_write_json(history, path)
 
 
+# ─── Probability Log (Phase 20) ─────────────────────────────────────────────
+
+
+def load_probability_log(data_dir: Path | str | None = None) -> list[dict]:
+    """Load the rolling probability log.
+
+    Returns empty list if the file does not exist.
+
+    Args:
+        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
+    """
+    from src.constants import PROBABILITY_LOG_FILE
+    path = _resolve_data_dir(data_dir) / PROBABILITY_LOG_FILE
+    if not path.exists():
+        return []
+    with open(path, encoding="utf-8") as f:
+        return list(json.load(f))
+
+
+def append_probability_log(snapshot: dict, data_dir: Path | str | None = None) -> None:
+    """Append a probability snapshot to the rolling log.
+
+    Loads existing log, appends new snapshot, saves all. Atomic write.
+
+    Args:
+        snapshot: Dict with 'timestamp' and 'probabilities' keys.
+        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
+    """
+    from src.constants import PROBABILITY_LOG_FILE
+    log = load_probability_log(data_dir)
+    log.append(snapshot)
+    path = _resolve_data_dir(data_dir) / PROBABILITY_LOG_FILE
+    _atomic_write_json(log, path)
+
+
 # ─── Signal Cache Helpers (Phase 13) ────────────────────────────────────────
 
 

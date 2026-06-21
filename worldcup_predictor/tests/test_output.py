@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from src.output import (
+    _compute_trend_arrow,
     print_ai_previews,
     print_probability_table,
     print_delta_summary,
@@ -547,6 +548,51 @@ class TestAiPreviews:
         assert "Brazil" in output
         assert "Mexico" in output
         assert "South Africa" in output
+
+
+def _make_prob_log(*probs: float) -> list[dict]:
+    """Helper: create a probability log list from a sequence of champion probs."""
+    return [
+        {
+            "timestamp": "t",
+            "probabilities": {
+                "Argentina": {"champion": p},
+                "Brazil": {"champion": p + 0.01},
+                "France": {"champion": p - 0.01},
+                "Germany": {"champion": p - 0.02},
+                "England": {"champion": p - 0.03},
+            },
+        }
+        for p in probs
+    ]
+
+
+class TestTrendColumn:
+    def test_trend_arrow_up(self):
+        arrow = _compute_trend_arrow(0.25, "Argentina", _make_prob_log(0.24, 0.24, 0.24, 0.24, 0.24, 0.24))
+        assert arrow == "↑"
+
+    def test_trend_arrow_down(self):
+        arrow = _compute_trend_arrow(0.23, "Argentina", _make_prob_log(0.24, 0.24, 0.24, 0.24, 0.24, 0.24))
+        assert arrow == "↓"
+
+    def test_trend_arrow_flat(self):
+        arrow = _compute_trend_arrow(0.242, "Argentina", _make_prob_log(0.24, 0.24, 0.24, 0.24, 0.24, 0.24))
+        assert arrow == "→"
+
+    def test_trend_hidden_first_run(self, full_probs):
+        output = _capture(print_probability_table, full_probs)
+        assert "Trend" not in output
+
+    def test_trend_column_printed(self, full_probs):
+        prob_log = [{"timestamp": "1", "probabilities": {"Argentina": {"champion": 0.24}, "Brazil": {"champion": 0.25}, "France": {"champion": 0.20}, "Germany": {"champion": 0.15}, "England": {"champion": 0.10}}}] * 7
+        output = _capture(print_probability_table, full_probs, None, prob_log)
+        assert "Trend" in output
+
+    def test_trend_hidden_when_insufficient_data(self, full_probs):
+        prob_log = [{"timestamp": "1", "probabilities": {"Argentina": {"champion": 0.24}}}] * 3
+        output = _capture(print_probability_table, full_probs, None, prob_log)
+        assert "Trend" not in output
 
 
 class TestCoverageAudit:

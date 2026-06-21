@@ -170,6 +170,10 @@ keyed by match_id, and is never deleted."""
 PREDICTION_HISTORY_SCHEMA_VERSION: int = 2
 """Schema version for prediction_history.json. v1=flat (Phase 12b), v2=compound (Phase 13+)."""
 
+PROBABILITY_LOG_FILE: str = "probability_log.json"
+"""Filename for rolling probability log in data/ directory (Phase 20).
+Array of snapshot dicts appended after every _run_iteration(). Never pruned."""
+
 # ─── Blender Constants (Phase 14) ──────────────────────────────────────────
 
 CALIBRATION_PARAMS_FILE: str = "calibration_params.json"
