@@ -633,7 +633,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
 
     # Fetch matches from API
     last_request_time = time.time()
-    raw = fetch_raw_matches(api_key, league_id=league_id)
+    raw = fetch_raw_matches(api_key, api_url=constants.api_url_for_league(league_id), league_id=league_id)
 
     # Process new matches
     new_matches = []
@@ -969,7 +969,7 @@ def validate_api_key() -> str:
     return api_key
 
 
-def _migrate_legacy_data(data_dir: Path, league_id: int) -> None:
+def _migrate_legacy_data(data_dir: Path | str, league_id: int) -> None:
     """One-shot non-destructive migration from data/ to data/{league_id}/.
 
     Only runs when league_id == 27 (legacy layout). Copies league-scoped
@@ -985,6 +985,8 @@ def _migrate_legacy_data(data_dir: Path, league_id: int) -> None:
     if league_id != 27:
         return  # Only migrate from legacy 27 layout
 
+    # Ensure Path for / operator (tests may pass str)
+    data_dir = Path(data_dir) if isinstance(data_dir, str) else data_dir
     target_dir = data_dir / str(league_id)
     guard_file = target_dir / "played.json"
     if guard_file.exists():
@@ -1030,7 +1032,9 @@ def _resolve_league_id(args: argparse.Namespace) -> tuple[int, Path]:
     Returns:
         Tuple of (league_id: int, league_data_dir: Path).
     """
-    config_path = constants.DATA_DIR.parent / "config.json"
+    # Ensure DATA_DIR is a Path for parent access (tests may set str)
+    base_data_dir = Path(constants.DATA_DIR) if isinstance(constants.DATA_DIR, str) else constants.DATA_DIR
+    config_path = base_data_dir.parent / "config.json"
     league_id = constants.DEFAULT_LEAGUE_ID  # 27
 
     # 1. Load config.json if it exists
@@ -1073,7 +1077,7 @@ def _resolve_league_id(args: argparse.Namespace) -> tuple[int, Path]:
     # Per RECOMMENDATION: do NOT persist CLI --league into config.json.
     # Config.json is for persisted preference; CLI is for one-off override.
 
-    league_data_dir = constants.DATA_DIR / str(league_id)
+    league_data_dir = base_data_dir / str(league_id)
     return league_id, league_data_dir
 
 
@@ -1092,7 +1096,6 @@ def main() -> None:
 
     # Resolve league_id with precedence: CLI > config.json > 27
     league_id, league_data_dir = _resolve_league_id(args)
-
     # Windows Console Host ANSI initialization (Python 3.10/3.11 quirk)
     if sys.platform == "win32":
         os.system("")
@@ -1103,7 +1106,7 @@ def main() -> None:
 
     try:
         # ── One-time migration (D-05 through D-08) ──
-        _migrate_legacy_data(constants.DATA_DIR, league_id)
+        _migrate_legacy_data(Path(constants.DATA_DIR), league_id)
 
         teams = state.load_teams(data_dir=league_data_dir)            # per-league
         bracket = state.load_bracket()                                 # shared — no data_dir

@@ -26,10 +26,12 @@ from src.blender import (
     loo_cv_blended_brier,
     compute_poisson_base_rate,
     compute_rolling_brier,
+    calibrate_and_blend,
     _sigmoid,
     _log_odds,
     _platt_targets
 )
+from src.elo import expected_score
 
 
 class TestPlattCalibration:
@@ -258,23 +260,23 @@ class TestRollingBrier:
     """Tests for compute_rolling_brier function."""
     
     def test_computes_brier(self):
-        """pass sample history entries with signal predictions and actuals — pure function test."""
+        """pass sample history entries with signal predictions and actuals � pure function test."""
         entries = [
             {
                 "available": True,
+                "actual": 1.0,
                 "signals": {
                     "test_signal": {
                         "probability": 0.7,
-                        "actual": 1.0
                     }
                 }
             },
             {
                 "available": True,
+                "actual": 0.0,
                 "signals": {
                     "test_signal": {
                         "probability": 0.3,
-                        "actual": 0.0
                     }
                 }
             }
@@ -294,10 +296,10 @@ class TestRollingBrier:
         for i in range(10):
             entries.append({
                 "available": True,
+                "actual": 1.0,
                 "signals": {
                     "test_signal": {
                         "probability": 0.5 + i * 0.01,
-                        "actual": 1.0
                     }
                 }
             })
@@ -420,6 +422,199 @@ class TestBlendPipeline:
             assert "calibration_params" in result
             assert "blend_weights" in result
             assert "match_probs" in result
+
+
+class TestActualFieldFix:
+    """Calibrate_and_blend reads actual from entry.get('actual') not signal_data.get('actual')."""
+
+    def test_compute_rolling_brier_entry_actual(self):
+        """compute_rolling_brier reads actual from entry top level."""
+        entries = [
+            {
+                "available": True,
+                "actual": 1.0,
+                "signals": {
+                    "test_signal": {
+                        "probability": 0.7,
+                    }
+                }
+            }
+        ]
+        result = compute_rolling_brier(entries, "test_signal")
+        expected = (0.7 - 1.0) ** 2
+        assert abs(result - expected) < 0.000001
+
+    def test_calibrate_and_blend_entry_actual(self):
+        """calibrate_and_blend Flow A collects actuals from entry top level."""
+        history = []
+        for i in range(35):
+            history.append({
+                "match_id": f"GS_A_{i:02d}",
+                "team_a": "TeamA",
+                "team_b": "TeamB",
+                "actual": 1.0 if i < 18 else (0.0 if i < 33 else 0.5),
+                "signals": {
+                    "elo": {"probability": 0.6, "version": "v1", "available": True},
+                    "market_odds": {"probability": 0.65, "version": "v1", "available": True},
+                }
+            })
+
+        elo_ratings = {"TeamA": 1800, "TeamB": 1700}
+        groups_data = {"groups": {"A": {"teams": ["TeamA", "TeamB"], "matches": [
+            {"match_id": "GS_A_00", "team_a": "TeamA", "team_b": "TeamB"}]}}}
+        odds_cache = {"matches": {"GS_A_00": {"probability": 0.65, "available": True}}}
+        cb_cache = {"matches": {}}
+
+        result = calibrate_and_blend(
+            history=history[:35],
+            signal_keys=["elo", "market_odds"],
+            elo_ratings=elo_ratings,
+            groups_data=groups_data,
+            bracket_data=[],
+            odds_cache=odds_cache,
+            cb_cache=cb_cache,
+            brier_window=50,
+            cold_start_threshold=30,
+        )
+        assert result is not None
+        # Should have calibration_params with n_matches > 0 for both signals
+        assert result["calibration_params"]["elo"]["n_matches"] >= 30
+        assert result["calibration_params"]["market_odds"]["n_matches"] >= 30
+
+
+class TestMatchProbs:
+    """calibrate_and_blend Flow C produces match_probs with blended_prob != expected_score."""
+
+    def test_match_probs_populated(self):
+        """match_probs returned with entries and blended prob ≠ expected_score."""
+        history = []
+        for i in range(35):
+            history.append({
+                "match_id": f"GS_A_{i:02d}",
+                "team_a": "TeamA",
+                "team_b": "TeamB",
+                "actual": 1.0 if i < 18 else (0.0 if i < 33 else 0.5),
+                "signals": {
+                    "elo": {"probability": 0.55 + (i % 5) * 0.02, "version": "v1", "available": True},
+                    "market_odds": {"probability": 0.60 - (i % 5) * 0.01, "version": "v1", "available": True},
+                }
+            })
+
+        elo_ratings = {"TeamA": 1800, "TeamB": 1700}
+        groups_data = {"groups": {"A": {"teams": ["TeamA", "TeamB"], "matches": [
+            {"match_id": "GS_A_00", "team_a": "TeamA", "team_b": "TeamB"}]}}}
+        odds_cache = {"matches": {"GS_A_00": {"probability": 0.65, "available": True}}}
+        cb_cache = {"matches": {}}
+
+        expected = expected_score(1800, 1700)
+
+        result = calibrate_and_blend(
+            history=history[:35],
+            signal_keys=["elo", "market_odds"],
+            elo_ratings=elo_ratings,
+            groups_data=groups_data,
+            bracket_data=[],
+            odds_cache=odds_cache,
+            cb_cache=cb_cache,
+            brier_window=50,
+            cold_start_threshold=30,
+        )
+        assert result is not None
+        assert "match_probs" in result
+        assert len(result["match_probs"]) > 0
+        mp = result["match_probs"].get("GS_A_00")
+        assert mp is not None
+        assert isinstance(mp, float)
+        assert 0 <= mp <= 1
+        # blended prob should differ from expected_score because market_odds contributes
+        assert abs(mp - expected) > 0.001, (
+            f"blended_prob {mp} should differ from expected_score {expected}"
+        )
+
+    def test_match_probs_all_signals_contribute(self):
+        """match_probs includes signals from odds_cache, cb_cache, form_cache, lineup_cache."""
+        history = []
+        for i in range(35):
+            history.append({
+                "match_id": f"GS_A_{i:02d}",
+                "team_a": "TeamA",
+                "team_b": "TeamB",
+                "actual": 1.0,
+                "signals": {
+                    "elo": {"probability": 0.6, "version": "v1", "available": True},
+                    "market_odds": {"probability": 0.7, "version": "v1", "available": True},
+                    "catboost": {"probability": 0.65, "version": "v1", "available": True},
+                    "form": {"probability": 0.55, "version": "v1", "available": True},
+                    "lineup_strength": {"probability": 0.62, "version": "v1", "available": True},
+                }
+            })
+
+        elo_ratings = {"TeamA": 1800, "TeamB": 1700}
+        groups_data = {"groups": {"A": {"teams": ["TeamA", "TeamB"], "matches": [
+            {"match_id": "GS_A_00", "team_a": "TeamA", "team_b": "TeamB"}]}}}
+        odds_cache = {"matches": {"GS_A_00": {"probability": 0.70, "available": True}}}
+        cb_cache = {"matches": {"GS_A_00": {"probability": 0.65, "available": True}}}
+        form_cache = {"matches": {"GS_A_00": {"probability": 0.55, "available": True}}}
+        lineup_cache = {"matches": {"GS_A_00": {"probability": 0.62, "available": True}}}
+
+        result = calibrate_and_blend(
+            history=history[:35],
+            signal_keys=["elo", "market_odds", "catboost", "form", "lineup_strength"],
+            elo_ratings=elo_ratings,
+            groups_data=groups_data,
+            bracket_data=[],
+            odds_cache=odds_cache,
+            cb_cache=cb_cache,
+            form_cache=form_cache,
+            lineup_cache=lineup_cache,
+            brier_window=50,
+            cold_start_threshold=30,
+        )
+        assert result is not None
+        mp = result["match_probs"].get("GS_A_00")
+        assert mp is not None
+        expected = expected_score(1800, 1700)
+        assert abs(mp - expected) > 0.001
+        assert result["calibration_params"]["elo"]["n_matches"] >= 30
+
+    def test_match_probs_empty_caches_sets_default(self):
+        """match_probs entry set to 0.5 when no cache data available for that match."""
+        history = []
+        for i in range(35):
+            history.append({
+                "match_id": f"GS_A_{i:02d}",
+                "team_a": "TeamA",
+                "team_b": "TeamB",
+                "actual": 1.0,
+                "signals": {
+                    "elo": {"probability": 0.6, "version": "v1", "available": True},
+                    "market_odds": {"probability": 0.7, "version": "v1", "available": True},
+                }
+            })
+
+        elo_ratings = {"TeamA": 1800, "TeamB": 1700}
+        groups_data = {"groups": {"A": {"teams": ["TeamA", "TeamB"], "matches": [
+            {"match_id": "GS_A_00", "team_a": "TeamA", "team_b": "TeamB"},
+            {"match_id": "GS_A_99", "team_a": "TeamA", "team_b": "TeamB"}]}}}
+        odds_cache = {"matches": {"GS_A_00": {"probability": 0.65, "available": True}}}
+        cb_cache = {"matches": {}}
+
+        result = calibrate_and_blend(
+            history=history[:35],
+            signal_keys=["elo", "market_odds"],
+            elo_ratings=elo_ratings,
+            groups_data=groups_data,
+            bracket_data=[],
+            odds_cache=odds_cache,
+            cb_cache=cb_cache,
+            brier_window=50,
+            cold_start_threshold=30,
+        )
+        assert result is not None
+        assert "GS_A_00" in result["match_probs"]
+        assert "GS_A_99" in result["match_probs"]
+        # GS_A_99 has no cache data, elo alone so != 0.5
+        assert result["match_probs"]["GS_A_99"] != 0.5
 
 
 if __name__ == "__main__":

@@ -1,0 +1,18 @@
+{
+  "model": "elo-only",
+  "phase": "13",
+  "generated_at": "2026-06-19T03:32:16.977755+00:00",
+  "n_matches": 0,
+  "metrics": {
+    "brier": 0.0,
+    "log_loss": 0.0,
+    "accuracy": 0.0,
+    "n": 0
+  },
+  "calibration": {
+    "bins": [],
+    "ece": 0.0
+  },
+  "history_file": "data/prediction_history.json",
+  "n_history_entries": 0
+}

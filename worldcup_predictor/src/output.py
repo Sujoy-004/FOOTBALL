@@ -12,6 +12,8 @@ from src.constants import GROUP_COUNT, MATCHES_PER_GROUP, POLL_INTERVAL
 from src.elo_sync import get_staleness_level
 
 
+import math
+
 # Ensure stdout uses UTF-8 for Unicode symbols (▲, ▼, ⚠, →) on Windows
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -550,6 +552,112 @@ def print_governance_dashlet(
         print(f"Backtest : {backtest_summary}")
 
     print()
+
+
+# ─── Coverage Auditor (Phase 20-01) ────────────────────────────────────────
+
+_PREDICTION_FIELDS: list[str] = [
+    "odds_home", "odds_draw", "odds_away", "expected_goals",
+    "actual_home_xg", "actual_away_xg", "odds_over_25", "odds_under_25",
+    "odds_btts_yes", "expected_home_goals", "expected_away_goals",
+]
+
+_DISPLAY_FIELDS: list[str] = [
+    "home_score", "away_score", "event_date", "venue.name", "referee.name",
+    "ai_preview.text", "yellow_cards", "red_cards", "shots_on_target",
+    "ball_possession", "venue.city", "home_coach.name", "away_coach.name",
+    "round_name", "fouls", "corner_kicks", "shots_off_target",
+    "shots_inside_box", "temperature_c", "wind_speed", "weather_code",
+    "pitch_condition", "attendance", "funfacts", "home_score_ht", "away_score_ht",
+    "event_uuid",
+]
+
+_OPERATIONAL_FIELDS: list[str] = [
+    "id", "status", "home_team", "away_team", "league.id",
+    "group_name", "winner", "period", "current_minute",
+]
+
+
+def coverage_audit() -> dict:
+    """Compute coverage metrics against 47-field meaningful denominator.
+
+    Returns:
+        dict with keys:
+            - meaningful: {covered, total, pct, target, target_met, missing}
+            - raw: {covered, total, pct}
+            - by_category: {category: {covered, total, pct}}
+    """
+    extracted_display = {
+        "venue.name", "referee.name", "ai_preview.text", "yellow_cards",
+        "red_cards", "shots_on_target", "ball_possession", "venue.city",
+        "home_coach.name", "away_coach.name", "fouls", "corner_kicks",
+        "shots_off_target", "home_score", "away_score", "event_date",
+        "round_name",
+    }
+    extracted_prediction = {
+        "odds_home", "odds_draw", "odds_away",
+        "expected_home_goals", "expected_away_goals",
+    }
+    extracted_operational = {
+        "id", "status", "home_team", "away_team",
+        "league.id", "group_name", "winner",
+    }
+    total_extracted = extracted_display | extracted_prediction | extracted_operational
+
+    meaningful_all = set(_PREDICTION_FIELDS + _DISPLAY_FIELDS + _OPERATIONAL_FIELDS)
+    n_meaningful = len(meaningful_all)
+    n_meaningful_covered = len(total_extracted & meaningful_all)
+    pct_meaningful = round(n_meaningful_covered / n_meaningful * 100, 1) if n_meaningful else 0.0
+
+    categories = {
+        "Prediction": (extracted_prediction, set(_PREDICTION_FIELDS)),
+        "Display": (extracted_display, set(_DISPLAY_FIELDS)),
+        "Operational": (extracted_operational, set(_OPERATIONAL_FIELDS)),
+    }
+    by_category = {}
+    for name, (extracted_set, total_set) in categories.items():
+        covered = len(extracted_set & total_set)
+        total = len(total_set)
+        by_category[name] = {
+            "covered": covered,
+            "total": total,
+            "pct": round(covered / total * 100, 1) if total else 0.0,
+        }
+
+    missing = sorted(meaningful_all - total_extracted)
+
+    return {
+        "meaningful": {
+            "covered": n_meaningful_covered,
+            "total": n_meaningful,
+            "pct": pct_meaningful,
+            "target": 60.0,
+            "target_met": pct_meaningful >= 60.0,
+            "missing": missing,
+        },
+        "raw": {
+            "covered": len(total_extracted),
+            "total": len(meaningful_all),  # meaningless? meaningless is a subset of raw
+            "pct": round(len(total_extracted) / len(meaningful_all) * 100, 1) if meaningful_all else 0.0,
+        },
+        "by_category": by_category,
+    }
+
+
+def print_coverage_audit() -> None:
+    """Print the coverage audit report (D-17 format)."""
+    audit = coverage_audit()
+    m = audit["meaningful"]
+    r = audit["raw"]
+
+    print(f"\n{_bold_white('Coverage Audit')}")
+    target_label = f"← target: ≥60%" if not m["target_met"] else f"✓ target ≥60% met"
+    target_color = _red if not m["target_met"] else _green
+    print(f"  {_dim('Meaningful:')}  {m['covered']}/{m['total']} ({m['pct']}%)  {target_color(target_label)}")
+    print(f"  {_dim('Raw:')}         {r['covered']}/{r['total']} ({r['pct']}%)")
+    print(f"  {_dim('By value:')}")
+    for name, cat in sorted(audit["by_category"].items()):
+        print(f"    {name}:  {cat['covered']}/{cat['total']} ({cat['pct']}%)")
 
 
 def print_drift_alert(drift_info: dict) -> None:

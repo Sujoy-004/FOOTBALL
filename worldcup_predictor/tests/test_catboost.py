@@ -51,28 +51,19 @@ class TestParsePredictions:
             "home_team": "Argentina",
             "away_team": "Algeria",
             "event_date": "2026-06-17T05:00:00+00:00",
-            "predictions": {
-                "home_probability": 0.64,
-                "draw_probability": 0.20,
-                "away_probability": 0.17,
-                "confidence": 0.88,
-                "model_version": "catboost-v5.0",
-            },
+            "home_probability": 64.0,
+            "draw_probability": 20.0,
+            "away_probability": 17.0,
+            "confidence": 0.88,
+            "model_version": "catboost-v5.0",
             "updated_at": "2026-06-16T12:00:00+00:00",
         }
         if overrides:
-            self._deep_update(pred, overrides)
+            pred.update(overrides)
         return pred
 
-    def _deep_update(self, target: dict, updates: dict) -> None:
-        for k, v in updates.items():
-            if isinstance(v, dict) and isinstance(target.get(k), dict):
-                target[k].update(v)
-            else:
-                target[k] = v
-
     def test_parse_valid_prediction(self):
-        """BSD prediction dict → entry with probability, available=True."""
+        """BSD prediction dict → entry with probability=0.64 (64% → /100)."""
         result = parse_catboost_response(
             [self._make_valid_prediction()],
             self._make_alias_lookup(),
@@ -99,8 +90,10 @@ class TestParsePredictions:
         assert entry["timestamp"] == "2026-06-16T12:00:00+00:00"
 
     def test_parse_null_predictions(self):
-        """predictions field is None → available=False, reason='predictions_not_available'."""
-        pred = self._make_valid_prediction({"predictions": None})
+        """All probability fields are None → available=False, reason='predictions_not_available'."""
+        pred = self._make_valid_prediction({
+            "home_probability": None, "draw_probability": None, "away_probability": None,
+        })
         result = parse_catboost_response(
             [pred], self._make_alias_lookup(), self._make_groups(), [],
         )
@@ -120,7 +113,7 @@ class TestParsePredictions:
     def test_parse_negative_probability(self):
         """Negative probability → available=False, reason='invalid_probability'."""
         pred = self._make_valid_prediction({
-            "predictions": {"home_probability": -0.5},
+            "home_probability": -50.0,
         })
         result = parse_catboost_response(
             [pred], self._make_alias_lookup(), self._make_groups(), [],
@@ -133,17 +126,26 @@ class TestParsePredictions:
     def test_parse_probabilities_not_sum_one(self):
         """Non-normalized probs stored as-is (normalization happens in Phase 14)."""
         pred = self._make_valid_prediction({
-            "predictions": {
-                "home_probability": 0.8,
-                "draw_probability": 0.3,
-                "away_probability": 0.2,
-            },
+            "home_probability": 80.0,
+            "draw_probability": 30.0,
+            "away_probability": 20.0,
         })
         result = parse_catboost_response(
             [pred], self._make_alias_lookup(), self._make_groups(), [],
         )
         entry = result["GS_B_01"]
         assert entry["probability"] == 0.8
+        assert entry["available"] is True
+
+    def test_parse_flat_percentage_format(self):
+        """Percentage values (64.0) are converted to 0-1 floats (0.64)."""
+        pred = self._make_valid_prediction()
+        result = parse_catboost_response(
+            [pred], self._make_alias_lookup(), self._make_groups(), [],
+        )
+        entry = result["GS_B_01"]
+        assert entry["probability"] == 0.64
+        assert abs(entry["probability"] * 100.0 - 64.0) < 0.001
         assert entry["available"] is True
 
     def test_parse_different_field_names(self):
@@ -157,19 +159,17 @@ class TestParsePredictions:
                 },
             },
         }
-        # Fallback 1: home_win, draw, away_win
+        # Fallback 1: home_win, draw, away_win (flat top-level fields)
         pred1 = {
             "event_id": 200,
             "home_team": "Brazil",
             "away_team": "Japan",
             "event_date": "2026-06-18T05:00:00+00:00",
-            "predictions": {
-                "home_win": 0.55,
-                "draw": 0.25,
-                "away_win": 0.20,
-                "confidence": 0.75,
-                "model_version": "catboost-v5.0",
-            },
+            "home_win": 55.0,
+            "draw": 25.0,
+            "away_win": 20.0,
+            "confidence": 0.75,
+            "model_version": "catboost-v5.0",
             "updated_at": "2026-06-17T12:00:00+00:00",
         }
         result = parse_catboost_response([pred1], alias, groups, [])
@@ -177,19 +177,17 @@ class TestParsePredictions:
         assert entry["probability"] == 0.55
         assert entry["confidence"] == 0.75
 
-        # Fallback 2: probability_home, probability_draw, probability_away
+        # Fallback 2: probability_home, probability_draw, probability_away (flat)
         pred2 = {
             "event_id": 201,
             "home_team": "Brazil",
             "away_team": "Japan",
             "event_date": "2026-06-18T05:00:00+00:00",
-            "predictions": {
-                "probability_home": 0.60,
-                "probability_draw": 0.22,
-                "probability_away": 0.18,
-                "confidence": 0.80,
-                "model_version": "catboost-v5.0",
-            },
+            "probability_home": 60.0,
+            "probability_draw": 22.0,
+            "probability_away": 18.0,
+            "confidence": 0.80,
+            "model_version": "catboost-v5.0",
             "updated_at": "2026-06-17T12:00:00+00:00",
         }
         result = parse_catboost_response([pred2], alias, groups, [])
@@ -224,9 +222,11 @@ class TestMissingPredictions:
         }
         predictions = [
             {"event_id": 100, "home_team": "Argentina", "away_team": "Algeria",
-             "predictions": None, "updated_at": "2026-06-16T12:00:00+00:00"},
+             "home_probability": None, "draw_probability": None, "away_probability": None,
+             "updated_at": "2026-06-16T12:00:00+00:00"},
             {"event_id": 200, "home_team": "Brazil", "away_team": "Japan",
-             "predictions": None, "updated_at": "2026-06-16T12:00:00+00:00"},
+             "home_probability": None, "draw_probability": None, "away_probability": None,
+             "updated_at": "2026-06-16T12:00:00+00:00"},
         ]
         result = parse_catboost_response(predictions, alias_lookup, groups, [])
         assert result["GS_B_01"]["available"] is False
@@ -255,16 +255,15 @@ class TestMissingPredictions:
             {
                 "event_id": 100, "home_team": "Argentina", "away_team": "Algeria",
                 "event_date": "2026-06-17T05:00:00+00:00",
-                "predictions": {
-                    "home_probability": 0.64, "draw_probability": 0.20,
-                    "away_probability": 0.17, "confidence": 0.88,
-                    "model_version": "catboost-v5.0",
-                },
+                "home_probability": 64.0, "draw_probability": 20.0,
+                "away_probability": 17.0, "confidence": 0.88,
+                "model_version": "catboost-v5.0",
                 "updated_at": "2026-06-16T12:00:00+00:00",
             },
             {
                 "event_id": 200, "home_team": "Brazil", "away_team": "Japan",
-                "predictions": None, "updated_at": "2026-06-16T12:00:00+00:00",
+                "home_probability": None, "draw_probability": None, "away_probability": None,
+                "updated_at": "2026-06-16T12:00:00+00:00",
             },
         ]
         result = parse_catboost_response(predictions, alias_lookup, groups, [])
@@ -404,13 +403,11 @@ class TestCatboostFetch:
                     "home_team": "Argentina",
                     "away_team": "Algeria",
                     "event_date": "2026-06-17T05:00:00+00:00",
-                    "predictions": {
-                        "home_probability": 0.64,
-                        "draw_probability": 0.20,
-                        "away_probability": 0.17,
-                        "confidence": 0.88,
-                        "model_version": "catboost-v5.0",
-                    },
+                    "home_probability": 64.0,
+                    "draw_probability": 20.0,
+                    "away_probability": 17.0,
+                    "confidence": 0.88,
+                    "model_version": "catboost-v5.0",
                     "updated_at": "2026-06-16T12:00:00+00:00",
                 },
             ],
@@ -424,6 +421,52 @@ class TestCatboostFetch:
         assert "GS_B_01" in cache["matches"]
         assert cache["matches"]["GS_B_01"]["probability"] == 0.64
         assert cache["matches"]["GS_B_01"]["available"] is True
+
+    def test_fetch_upserts_ledger(self, monkeypatch):
+        """fetch_and_cache_catboost calls ledger_upsert for each parsed match."""
+        alias_lookup = {"argentina": "Argentina", "algeria": "Algeria"}
+        groups = {
+            "groups": {
+                "B": {
+                    "teams": ["Argentina", "Algeria"],
+                    "matches": [{"match_id": "GS_B_01", "team_a": "Argentina", "team_b": "Algeria"}],
+                },
+            },
+        }
+        json_data = {
+            "count": 1,
+            "results": [
+                {
+                    "event_id": 12345,
+                    "home_team": "Argentina",
+                    "away_team": "Algeria",
+                    "event_date": "2026-06-17T05:00:00+00:00",
+                    "home_probability": 64.0,
+                    "draw_probability": 20.0,
+                    "away_probability": 17.0,
+                    "confidence": 0.88,
+                    "model_version": "catboost-v5.0",
+                    "updated_at": "2026-06-16T12:00:00+00:00",
+                },
+            ],
+        }
+        mock_resp = self._make_mock_response(json_data=json_data)
+        monkeypatch.setattr("requests.get", lambda *a, **kw: mock_resp)
+
+        calls = []
+        def fake_ledger_upsert(mid, signal, entry):
+            calls.append((mid, signal, entry.get("probability")))
+        monkeypatch.setattr("src.state.ledger_upsert", fake_ledger_upsert)
+
+        fetch_and_cache_catboost(
+            "test_key", alias_lookup, groups, [], cache_ttl_hours=24,
+        )
+
+        assert len(calls) == 1
+        mid, signal, prob = calls[0]
+        assert mid == "GS_B_01"
+        assert signal == "catboost"
+        assert abs(prob - 0.64) < 0.001
 
 
 # ─── Edge Case Tests ─────────────────────────────────────────────────
@@ -453,10 +496,8 @@ class TestParsePredictionsEdgeCases:
                 "event_id": 100,
                 "home_team": "Argentina",
                 "away_team": "Algeria",  # Not in alias_lookup
-                "predictions": {
-                    "home_probability": 0.64, "draw_probability": 0.20,
-                    "away_probability": 0.17,
-                },
+                "home_probability": 64.0, "draw_probability": 20.0,
+                "away_probability": 17.0,
                 "updated_at": "2026-06-16T12:00:00+00:00",
             },
         ]
@@ -475,13 +516,11 @@ class TestParsePredictionsEdgeCases:
                 "home_team": "Brazil",
                 "away_team": "Germany",
                 "event_date": "2026-06-28T17:00:00+00:00",
-                "predictions": {
-                    "home_probability": 0.55,
-                    "draw_probability": 0.25,
-                    "away_probability": 0.20,
-                    "confidence": 0.82,
-                    "model_version": "catboost-v5.0",
-                },
+                "home_probability": 55.0,
+                "draw_probability": 25.0,
+                "away_probability": 20.0,
+                "confidence": 0.82,
+                "model_version": "catboost-v5.0",
                 "updated_at": "2026-06-27T12:00:00+00:00",
             },
         ]
@@ -509,13 +548,11 @@ class TestParsePredictionsEdgeCases:
                 "home_team": "France",
                 "away_team": "Netherlands",
                 "event_date": "2026-06-13T21:00:00+00:00",
-                "predictions": {
-                    "home_probability": 0.48,
-                    "draw_probability": 0.27,
-                    "away_probability": 0.25,
-                    "confidence": 0.80,
-                    "model_version": "catboost-v5.0",
-                },
+                "home_probability": 48.0,
+                "draw_probability": 27.0,
+                "away_probability": 25.0,
+                "confidence": 0.80,
+                "model_version": "catboost-v5.0",
                 "updated_at": "2026-06-12T12:00:00+00:00",
             },
         ]
@@ -530,7 +567,8 @@ class TestParsePredictionsEdgeCases:
         """Non-dict items in predictions list are skipped gracefully."""
         predictions = [
             {"event_id": 100, "home_team": "Argentina", "away_team": "Algeria",
-             "predictions": None, "updated_at": "2026-06-16T12:00:00+00:00"},
+             "home_probability": None, "draw_probability": None, "away_probability": None,
+             "updated_at": "2026-06-16T12:00:00+00:00"},
             "not a dict",
             42,
             None,

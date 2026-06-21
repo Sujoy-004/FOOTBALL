@@ -47,6 +47,32 @@ ONLY_VENUE_EVENT = {**FINISHED_EVENT, "referee": None}
 
 ONLY_REFEREE_EVENT = {**FINISHED_EVENT, "venue": None}
 
+FINISHED_EVENT_WITH_NEW_FIELDS = {
+    **FINISHED_EVENT,
+    "live_stats": {
+        "home": {
+            "yellow_cards": 2,
+            "red_cards": 1,
+            "shots_on_target": 6,
+            "ball_possession": 58,
+            "fouls": 12,
+            "corner_kicks": 7,
+            "shots_off_target": 4,
+        },
+        "away": {
+            "yellow_cards": 1,
+            "red_cards": 0,
+            "shots_on_target": 3,
+            "ball_possession": 42,
+            "fouls": 8,
+            "corner_kicks": 3,
+            "shots_off_target": 2,
+        },
+    },
+    "home_coach": {"name": "Gerardo Martino"},
+    "away_coach": {"name": "Hugo Broos"},
+}
+
 UPCOMING_EVENT = {
     "id": 8316,
     "status": "notstarted",
@@ -91,6 +117,16 @@ class TestExtractStats:
     def test_upcoming_match(self):
         assert extract_stats(UPCOMING_EVENT) is None
 
+    def test_fouls_corners_shots_off(self):
+        stats = extract_stats(FINISHED_EVENT_WITH_NEW_FIELDS)
+        assert stats is not None
+        assert stats["fouls_home"] == 12
+        assert stats["fouls_away"] == 8
+        assert stats["corner_kicks_home"] == 7
+        assert stats["corner_kicks_away"] == 3
+        assert stats["shots_off_target_home"] == 4
+        assert stats["shots_off_target_away"] == 2
+
 
 class TestExtractContext:
     def test_both_fields(self):
@@ -119,3 +155,14 @@ class TestExtractContext:
         assert ctx is not None
         assert ctx["venue"] == "Lumen Field"
         assert ctx["referee"] == "Felix Zwayer"
+
+    def test_venue_city(self):
+        ctx = extract_context(FINISHED_EVENT_WITH_NEW_FIELDS)
+        assert ctx is not None
+        assert ctx.get("venue_city") == "Mexico City"
+
+    def test_coach_names(self):
+        ctx = extract_context(FINISHED_EVENT_WITH_NEW_FIELDS)
+        assert ctx is not None
+        assert ctx.get("home_coach") == "Gerardo Martino"
+        assert ctx.get("away_coach") == "Hugo Broos"

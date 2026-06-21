@@ -1,0 +1,18 @@
+{
+  "tournaments": [
+    "2018",
+    "2022"
+  ],
+  "n_total_matches": 86,
+  "per_signal": {
+    "elo": {
+      "brier": 0.181165,
+      "log_loss": 0.665558,
+      "n": 86
+    }
+  },
+  "signal_ranking": [
+    "elo"
+  ],
+  "governance_recommendation": "Best signal: elo (Brier=0.1812). Backtest across 86 matches from 2018, 2022."
+}

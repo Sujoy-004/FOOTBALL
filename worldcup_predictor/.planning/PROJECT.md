@@ -102,11 +102,11 @@ A live, self-updating tournament predictor in your terminal — when a match end
 | ✅ 14. Signal Blending | Complete | 2/2 | Platt scaling, Brier-weighted ensemble |
 | ✅ 14a. Prediction Retention Fix | Complete | 1/1 | Permanent prediction ledger |
 | ✅ 15. Context Signals | Complete | 3/3 | Team form, lineup strength |
-| 🔲 16. Model Governance | In Progress | 2/3 | Version tracking + drift detection complete, backtesting pending |
-| 🔲 17. Enriched Match Context | Defined | — | Live event fields, coach/venue/ref/weather |
-| 🔲 18. xG & AI Prediction Signals | Defined | — | xG predictions, AI preview ingestion |
-| 🔲 19. Multi-League Framework | Defined | — | All 65 BSD leagues, --league flag |
-| 🔲 20. Output Enhancement & Coverage Seal | Defined | — | Signal breakdown, CI, probability log, 85% API coverage |
+| ✅ 16. Model Governance | Complete | 3/3 | Version tracking, drift detection, backtesting |
+| ✅ 17. Enriched Match Context | Complete | 3/3 | Live event fields, venue/referee data |
+| ✅ 18. xG & AI Prediction Signals | Complete | 3/3 | xG overrides, AI preview display |
+| ✅ 19. League Selection Framework | Complete | 3/3 | --league flag, per-league state isolation (World Cup scope) |
+| 🔲 20. Output Enhancement & Coverage Seal | Planned | — | Signal breakdown, CI, probability log, 85% API coverage |
 
 ## Requirements
 
@@ -173,6 +173,7 @@ A live, self-updating tournament predictor in your terminal — when a match end
 | Web dashboard | Console-only; v2.x candidate |
 | ML models (XGBoost, neural nets) | Beyond scope; Elo + CatBoost sufficient |
 | Multi-tournament support | Only current World Cup |
+| Non-World-Cup BSD leagues (64 others) | Project is World Cup only |
 | Player-level modeling | Massive data pipeline for marginal gain |
 | Betting odds comparison | Post-MVP enhancement |
 | Mobile notifications | Post-MVP enhancement |

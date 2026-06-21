@@ -35,6 +35,8 @@ def test_live_smoke_once():
     """Smoke test: --once fetches, simulates, prints valid 48-team predictions.
 
     This runs the actual main.py --once flow with a live BSD API call.
+    NOTE: Uses production data/ directory directly — runs live API calls
+    only when BSD_API_KEY is set. Skipped by default.
     Verifies:
     1. Exit code 0
     2. Expected probabilities output contains team names from teams.json

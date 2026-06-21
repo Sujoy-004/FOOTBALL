@@ -1,0 +1,369 @@
+{
+  "fetched_at": "2026-06-20T04:45:12.006432+00:00",
+  "expires_at": "2026-06-20T05:45:12.006432+00:00",
+  "matches": {
+    "GS_A_01": {
+      "probability": 0.5404472280003644,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_A_02": {
+      "probability": 0.5492756605859423,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_A_03": {
+      "probability": 0.6286688196958103,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_A_04": {
+      "probability": 0.5088993807226182,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_A_05": {
+      "probability": 0.5900971612711666,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_A_06": {
+      "probability": 0.5814590388911136,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_B_01": {
+      "probability": null,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": false,
+      "reason": "no_match_history: Bosnia and Herzegovina"
+    },
+    "GS_B_02": {
+      "probability": 0.4932871801047181,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_B_03": {
+      "probability": 0.6345514648800141,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_B_04": {
+      "probability": null,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": false,
+      "reason": "no_match_history: Bosnia and Herzegovina"
+    },
+    "GS_B_05": {
+      "probability": null,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": false,
+      "reason": "no_match_history: Bosnia and Herzegovina"
+    },
+    "GS_B_06": {
+      "probability": 0.6407557512771601,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_C_01": {
+      "probability": 0.42538318142639736,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_C_02": {
+      "probability": 0.52473525765332,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_C_03": {
+      "probability": 0.5089148663615878,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_C_04": {
+      "probability": 0.5986239685132478,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_C_05": {
+      "probability": 0.5833100139945538,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_C_06": {
+      "probability": 0.484165642075159,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_D_01": {
+      "probability": 0.710731666642131,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_D_02": {
+      "probability": 0.5999910806794767,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_D_03": {
+      "probability": 0.7364726535074374,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_D_04": {
+      "probability": 0.37906651753006093,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_D_05": {
+      "probability": 0.5321492726211432,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_D_06": {
+      "probability": 0.6507385158208608,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_E_01": {
+      "probability": 0.5249112838065306,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_E_02": {
+      "probability": 0.3430108218502603,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_E_03": {
+      "probability": 0.6790987824700041,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_E_04": {
+      "probability": 0.3209012175299959,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_E_05": {
+      "probability": 0.6569891781497398,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_E_06": {
+      "probability": 0.8021106939196445,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_F_01": {
+      "probability": 0.47691277748938865,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_F_02": {
+      "probability": 0.42082752900763953,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_F_03": {
+      "probability": 0.5564983354863953,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_F_04": {
+      "probability": 0.4435016645136047,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_F_05": {
+      "probability": 0.5791724709923604,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_F_06": {
+      "probability": 0.6332859933327901,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_G_01": {
+      "probability": 0.389580362275816,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_G_02": {
+      "probability": 0.5028347699408343,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_G_03": {
+      "probability": 0.38688721599698517,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "GS_G_04": {
+      "probability": 0.6131127840030148,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_G_05": {
+      "probability": 0.49716523005916574,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_G_06": {
+      "probability": 0.3842009693000429,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_H_01": {
+      "probability": 0.2879461046177699,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_H_02": {
+      "probability": 0.31434830211968073,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_H_03": {
+      "probability": 0.46866309692437763,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_H_04": {
+      "probability": 0.5313369030756223,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_H_05": {
+      "probability": 0.6856516978803193,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_H_06": {
+      "probability": 0.6579914124987546,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_I_01": {
+      "probability": 0.5990971830176949,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_I_02": {
+      "probability": 0.5809095174870339,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_I_03": {
+      "probability": 0.5187903009418678,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_I_04": {
+      "probability": 0.48120969905813216,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_I_05": {
+      "probability": 0.41909048251296616,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_I_06": {
+      "probability": 0.4375007092221352,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_J_01": {
+      "probability": 0.553184586875893,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_J_02": {
+      "probability": 0.46771940915361454,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_J_03": {
+      "probability": 0.5848822640903794,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_J_04": {
+      "probability": 0.4151177359096207,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_J_05": {
+      "probability": 0.5322805908463855,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_J_06": {
+      "probability": 0.6158926484988634,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_K_01": {
+      "probability": 0.334575082092762,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_K_02": {
+      "probability": 0.45194808750374205,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_K_03": {
+      "probability": 0.37877245136641075,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_K_04": {
+      "probability": 0.6212275486335893,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_K_05": {
+      "probability": 0.548051912496258,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_K_06": {
+      "probability": 0.42507863137375285,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_L_01": {
+      "probability": 0.6279796994020594,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_L_02": {
+      "probability": 0.3984334994655172,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_L_03": {
+      "probability": 0.7182010956293102,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_L_04": {
+      "probability": 0.2817989043706899,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_L_05": {
+      "probability": 0.6015665005344827,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    },
+    "GS_L_06": {
+      "probability": 0.7937291835052638,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  }
+}

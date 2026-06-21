@@ -23,11 +23,20 @@ _STATS_FIELD_MAP: dict[str, str] = {
     "shots_on_target_away": "shots_on_target",
     "possession_home": "ball_possession",
     "possession_away": "ball_possession",
+    "fouls_home": "fouls",
+    "fouls_away": "fouls",
+    "corner_kicks_home": "corner_kicks",
+    "corner_kicks_away": "corner_kicks",
+    "shots_off_target_home": "shots_off_target",
+    "shots_off_target_away": "shots_off_target",
 }
 
 _CONTEXT_SOURCE_MAP: dict[str, tuple[str, str]] = {
     "venue": ("venue", "name"),
     "referee": ("referee", "name"),
+    "venue_city": ("venue", "city"),
+    "home_coach": ("home_coach", "name"),
+    "away_coach": ("away_coach", "name"),
 }
 
 

@@ -11,6 +11,8 @@ Uses ONLY Python stdlib (math module). No numpy, no sklearn per D-01.
 import json
 import math
 
+from src.elo import expected_score
+
 EPS = 1e-15
 RIDGE = 1e-6
 MAX_ITER = 50
@@ -181,7 +183,7 @@ def compute_rolling_brier(entries: list[dict], signal_key: str, window: int = BR
         
         signal_data = signals[signal_key]
         probability = signal_data.get('probability')
-        actual = signal_data.get('actual')
+        actual = entry.get('actual')
         
         if probability is None or actual is None:
             continue
@@ -369,7 +371,9 @@ def calibrate_and_blend(history: list[dict], signal_keys: list[str], elo_ratings
                         groups_data: dict, bracket_data: list[dict],
                         odds_cache: dict, cb_cache: dict,
                         brier_window: int = BRIER_WINDOW_SIZE,
-                        cold_start_threshold: int = COLD_START_THRESHOLD) -> dict | None:
+                        cold_start_threshold: int = COLD_START_THRESHOLD,
+                        form_cache: dict | None = None,
+                        lineup_cache: dict | None = None) -> dict | None:
     """
     Orchestration function — the single entry point for the entire calibration+blending pipeline.
     Accepts all data as parameters. No file I/O. Pure computation.
@@ -401,7 +405,7 @@ def calibrate_and_blend(history: list[dict], signal_keys: list[str], elo_ratings
             
             signal_data = signals[signal_key]
             probability = signal_data.get('probability')
-            actual = signal_data.get('actual')
+            actual = entry.get('actual')
             
             if probability is not None and actual is not None:
                 predictions.append(probability)
@@ -435,13 +439,77 @@ def calibrate_and_blend(history: list[dict], signal_keys: list[str], elo_ratings
     # Flow C — Match probabilities
     match_probs = {}
     
-    # For group matches: look up team_a, team_b from groups_data → compute elo probability via expected_score()
-    # For market_odds and catboost: read from respective caches by match_id
-    # For each signal with data for this match: apply_calibration(p_raw, A, B)
-    # Blend calibrated probs via blend_predictions()
-    
-    # This is a simplified implementation - the full implementation would need
-    # to iterate through all matches and compute probabilities
+    try:
+        # Default caches to empty dicts
+        form_cache = form_cache or {}
+        lineup_cache = lineup_cache or {}
+        
+        # Collect all matches from groups and bracket
+        all_matches: list[dict] = []
+        groups_data_inner = groups_data.get("groups", groups_data) if isinstance(groups_data, dict) else groups_data
+        if isinstance(groups_data_inner, dict):
+            for group_letter in groups_data_inner:
+                group = groups_data_inner[group_letter]
+                if isinstance(group, dict):
+                    for m in group.get("matches", []):
+                        if isinstance(m, dict):
+                            all_matches.append(m)
+        
+        if isinstance(bracket_data, list):
+            for m in bracket_data:
+                if isinstance(m, dict):
+                    all_matches.append(m)
+        
+        # Build cache lookups by match_id
+        odds_matches = odds_cache.get("matches", {}) if isinstance(odds_cache, dict) else {}
+        cb_matches = cb_cache.get("matches", {}) if isinstance(cb_cache, dict) else {}
+        form_matches = form_cache.get("matches", {}) if isinstance(form_cache, dict) else {}
+        lineup_matches = lineup_cache.get("matches", {}) if isinstance(lineup_cache, dict) else {}
+        
+        for match in all_matches:
+            mid = match.get("match_id", "")
+            if not mid:
+                continue
+            t_a = match.get("team_a", "")
+            t_b = match.get("team_b", "")
+            if t_a not in elo_ratings or t_b not in elo_ratings:
+                continue
+            
+            # Collect raw probabilities from each signal
+            elo_prob = expected_score(elo_ratings[t_a], elo_ratings[t_b])
+            odds_prob = odds_matches.get(mid, {}).get("probability") if isinstance(odds_matches.get(mid), dict) else None
+            cb_prob = cb_matches.get(mid, {}).get("probability") if isinstance(cb_matches.get(mid), dict) else None
+            form_prob = form_matches.get(mid, {}).get("probability") if isinstance(form_matches.get(mid), dict) else None
+            lineup_prob = lineup_matches.get(mid, {}).get("probability") if isinstance(lineup_matches.get(mid), dict) else None
+            
+            raw_probs: dict[str, float] = {}
+            for sig_key, raw_p in [
+                ("elo", elo_prob),
+                ("market_odds", odds_prob),
+                ("catboost", cb_prob),
+                ("form", form_prob),
+                ("lineup_strength", lineup_prob),
+            ]:
+                if raw_p is not None and isinstance(raw_p, (int, float)):
+                    raw_probs[sig_key] = raw_p
+            
+            if not raw_probs:
+                match_probs[mid] = 0.5
+                continue
+            
+            # Apply calibration to each raw probability
+            calibrated_probs: dict[str, float] = {}
+            for sig_key, raw_p in raw_probs.items():
+                cal = calibration_params.get(sig_key, {})
+                A = cal.get("A", 1.0) if isinstance(cal, dict) else 1.0
+                B = cal.get("B", 0.0) if isinstance(cal, dict) else 0.0
+                calibrated_probs[sig_key] = apply_calibration(raw_p, A, B)
+            
+            # Blend calibrated probabilities
+            blended = blend_predictions(calibrated_probs, blend_weights)
+            match_probs[mid] = blended
+    except Exception:
+        pass
     
     if calibration_params and blend_weights:
         return {

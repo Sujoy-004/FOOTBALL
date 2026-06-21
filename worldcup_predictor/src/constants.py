@@ -10,11 +10,8 @@ DEFAULT_LEAGUE_ID: int = 27
 
 LEAGUES: dict[int, str] = {
     27: "World Cup 2026",
-    # TODO: populate remaining 64 leagues from BSD API /api/leagues/
 }
-"""Static catalog of BSD league IDs to league names.
-Populated from BSD API /api/leagues/ at implementation time.
-League IDs are stable per D-03 — no API dependency at runtime."""
+"""Static catalog of BSD league IDs to league names (World Cup only)."""
 
 
 def api_url_for_league(league_id: int) -> str:

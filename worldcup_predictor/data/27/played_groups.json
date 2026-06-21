@@ -1,0 +1,636 @@
+{
+  "GS_A_01": {
+    "match_id": "GS_A_01",
+    "team_a": "Mexico",
+    "team_b": "South Africa",
+    "winner": "Mexico",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 0,
+    "completed_at": "2026-06-11T23:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 2,
+      "red_cards_home": 1,
+      "red_cards_away": 2,
+      "shots_on_target_home": 4,
+      "shots_on_target_away": 2,
+      "possession_home": 61,
+      "possession_away": 39
+    },
+    "context": {
+      "venue": "Estadio Azteca",
+      "referee": "Wilton Pereira Sampaio"
+    }
+  },
+  "GS_A_06": {
+    "match_id": "GS_A_06",
+    "team_a": "South Korea",
+    "team_b": "Czech Republic",
+    "winner": "South Korea",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 1,
+    "completed_at": "2026-06-12T06:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 0,
+      "shots_on_target_home": 6,
+      "shots_on_target_away": 4,
+      "possession_home": 62,
+      "possession_away": 38
+    },
+    "context": {
+      "venue": "Estadio Akron",
+      "referee": "Amin Mohamed Omar"
+    }
+  },
+  "GS_D_01": {
+    "match_id": "GS_D_01",
+    "team_a": "United States",
+    "team_b": "Paraguay",
+    "winner": "United States",
+    "is_draw": false,
+    "home_score": 4,
+    "away_score": 1,
+    "completed_at": "2026-06-13T05:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 5,
+      "shots_on_target_home": 6,
+      "shots_on_target_away": 1,
+      "possession_home": 65,
+      "possession_away": 35
+    },
+    "context": {
+      "venue": "SoFi Stadium",
+      "referee": "Danny Makkelie"
+    }
+  },
+  "GS_B_06": {
+    "match_id": "GS_B_06",
+    "team_a": "Qatar",
+    "team_b": "Switzerland",
+    "winner": null,
+    "is_draw": true,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-06-13T23:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 2,
+      "yellow_cards_away": 1,
+      "shots_on_target_home": 4,
+      "shots_on_target_away": 7,
+      "possession_home": 32,
+      "possession_away": 68
+    },
+    "context": {
+      "venue": "Levi's Stadium",
+      "referee": "Said Martinez"
+    }
+  },
+  "GS_C_01": {
+    "match_id": "GS_C_01",
+    "team_a": "Brazil",
+    "team_b": "Morocco",
+    "winner": null,
+    "is_draw": true,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-06-14T02:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 2,
+      "yellow_cards_away": 0,
+      "shots_on_target_home": 5,
+      "shots_on_target_away": 3,
+      "possession_home": 51,
+      "possession_away": 49
+    },
+    "context": {
+      "venue": "MetLife Stadium",
+      "referee": "Slavko Vin\u010di\u0107"
+    }
+  },
+  "GS_C_06": {
+    "match_id": "GS_C_06",
+    "team_a": "Haiti",
+    "team_b": "Scotland",
+    "winner": "Scotland",
+    "is_draw": false,
+    "home_score": 0,
+    "away_score": 1,
+    "completed_at": "2026-06-14T05:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 3,
+      "shots_on_target_home": 2,
+      "shots_on_target_away": 2,
+      "possession_home": 54,
+      "possession_away": 46
+    },
+    "context": {
+      "venue": "Gillette Stadium",
+      "referee": "Mustapha Ghorbal"
+    }
+  },
+  "GS_D_06": {
+    "match_id": "GS_D_06",
+    "team_a": "Australia",
+    "team_b": "T\u00fcrkiye",
+    "winner": "Australia",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 0,
+    "completed_at": "2026-06-14T08:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 0,
+      "yellow_cards_away": 1,
+      "shots_on_target_home": 4,
+      "shots_on_target_away": 8,
+      "possession_home": 28,
+      "possession_away": 72
+    },
+    "context": {
+      "venue": "BC Place",
+      "referee": "Jes\u00fas Valenzuela"
+    }
+  },
+  "GS_E_01": {
+    "match_id": "GS_E_01",
+    "team_a": "Germany",
+    "team_b": "Cura\u00e7ao",
+    "winner": "Germany",
+    "is_draw": false,
+    "home_score": 7,
+    "away_score": 1,
+    "completed_at": "2026-06-14T21:00:00+04:00",
+    "stats": {
+      "shots_on_target_home": 12,
+      "shots_on_target_away": 2,
+      "possession_home": 65,
+      "possession_away": 35
+    },
+    "context": {
+      "venue": "NRG Stadium",
+      "referee": "Jalal Jayed"
+    }
+  },
+  "GS_F_01": {
+    "match_id": "GS_F_01",
+    "team_a": "Netherlands",
+    "team_b": "Japan",
+    "winner": null,
+    "is_draw": true,
+    "home_score": 2,
+    "away_score": 2,
+    "completed_at": "2026-06-15T00:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 3,
+      "yellow_cards_away": 0,
+      "shots_on_target_home": 6,
+      "shots_on_target_away": 3,
+      "possession_home": 60,
+      "possession_away": 40
+    },
+    "context": {
+      "venue": "AT&T Stadium",
+      "referee": "Ismail Elfath"
+    }
+  },
+  "GS_E_06": {
+    "match_id": "GS_E_06",
+    "team_a": "Ivory Coast",
+    "team_b": "Ecuador",
+    "winner": "Ivory Coast",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 0,
+    "completed_at": "2026-06-15T03:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 3,
+      "yellow_cards_away": 1,
+      "shots_on_target_home": 4,
+      "shots_on_target_away": 1,
+      "possession_home": 48,
+      "possession_away": 52
+    },
+    "context": {
+      "venue": "Lincoln Financial Field",
+      "referee": "Michael Oliver"
+    }
+  },
+  "GS_F_06": {
+    "match_id": "GS_F_06",
+    "team_a": "Sweden",
+    "team_b": "Tunisia",
+    "winner": "Sweden",
+    "is_draw": false,
+    "home_score": 5,
+    "away_score": 1,
+    "completed_at": "2026-06-15T06:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 0,
+      "yellow_cards_away": 1,
+      "shots_on_target_home": 7,
+      "shots_on_target_away": 2,
+      "possession_home": 49,
+      "possession_away": 51
+    },
+    "context": {
+      "venue": "Estadio BBVA",
+      "referee": "Yael Falcon Perez"
+    }
+  },
+  "GS_H_01": {
+    "match_id": "GS_H_01",
+    "team_a": "Spain",
+    "team_b": "Cape Verde",
+    "winner": null,
+    "is_draw": true,
+    "home_score": 0,
+    "away_score": 0,
+    "completed_at": "2026-06-15T20:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 1,
+      "shots_on_target_home": 7,
+      "shots_on_target_away": 1,
+      "possession_home": 74,
+      "possession_away": 26
+    },
+    "context": {
+      "venue": "Mercedes-Benz Stadium",
+      "referee": "Adham Mohammad"
+    }
+  },
+  "GS_G_01": {
+    "match_id": "GS_G_01",
+    "team_a": "Belgium",
+    "team_b": "Egypt",
+    "winner": null,
+    "is_draw": true,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-06-15T23:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 2,
+      "yellow_cards_away": 2,
+      "shots_on_target_home": 3,
+      "shots_on_target_away": 3,
+      "possession_home": 53,
+      "possession_away": 47
+    },
+    "context": {
+      "venue": "Lumen Field",
+      "referee": "Ramon Abatti Abel"
+    }
+  },
+  "GS_H_06": {
+    "match_id": "GS_H_06",
+    "team_a": "Saudi Arabia",
+    "team_b": "Uruguay",
+    "winner": null,
+    "is_draw": true,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-06-16T02:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 0,
+      "shots_on_target_home": 3,
+      "shots_on_target_away": 10,
+      "possession_home": 33,
+      "possession_away": 67
+    },
+    "context": {
+      "venue": "Hard Rock Stadium",
+      "referee": "Maurizio Mariani"
+    }
+  },
+  "GS_G_06": {
+    "match_id": "GS_G_06",
+    "team_a": "Iran",
+    "team_b": "New Zealand",
+    "winner": null,
+    "is_draw": true,
+    "home_score": 2,
+    "away_score": 2,
+    "completed_at": "2026-06-16T05:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 0,
+      "shots_on_target_home": 4,
+      "shots_on_target_away": 8,
+      "possession_home": 48,
+      "possession_away": 52
+    },
+    "context": {
+      "venue": "SoFi Stadium",
+      "referee": "C\u00e9sar Ramos Palazuelos"
+    }
+  },
+  "GS_I_01": {
+    "match_id": "GS_I_01",
+    "team_a": "France",
+    "team_b": "Senegal",
+    "winner": "France",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 1,
+    "completed_at": "2026-06-16T23:00:00+04:00",
+    "stats": {
+      "shots_on_target_home": 8,
+      "shots_on_target_away": 2,
+      "possession_home": 54,
+      "possession_away": 46
+    },
+    "context": {
+      "venue": "MetLife Stadium",
+      "referee": "Alireza Faghani"
+    }
+  },
+  "GS_I_06": {
+    "match_id": "GS_I_06",
+    "team_a": "Iraq",
+    "team_b": "Norway",
+    "winner": "Norway",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 4,
+    "completed_at": "2026-06-17T02:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 0,
+      "shots_on_target_home": 1,
+      "shots_on_target_away": 5,
+      "possession_home": 39,
+      "possession_away": 61
+    },
+    "context": {
+      "venue": "Gillette Stadium",
+      "referee": "Pierre Ghislain Atcho"
+    }
+  },
+  "GS_J_01": {
+    "match_id": "GS_J_01",
+    "team_a": "Argentina",
+    "team_b": "Algeria",
+    "winner": "Argentina",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 0,
+    "completed_at": "2026-06-17T05:00:00+04:00",
+    "stats": {
+      "shots_on_target_home": 6,
+      "shots_on_target_away": 0,
+      "possession_home": 48,
+      "possession_away": 52
+    },
+    "context": {
+      "venue": "Arrowhead Stadium",
+      "referee": "Szymon Marciniak"
+    }
+  },
+  "GS_J_06": {
+    "match_id": "GS_J_06",
+    "team_a": "Austria",
+    "team_b": "Jordan",
+    "winner": "Austria",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 1,
+    "completed_at": "2026-06-17T08:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 0,
+      "shots_on_target_home": 4,
+      "shots_on_target_away": 4,
+      "possession_home": 63,
+      "possession_away": 37
+    },
+    "context": {
+      "venue": "Levi's Stadium",
+      "referee": "Dahane Beida"
+    }
+  },
+  "GS_K_01": {
+    "match_id": "GS_K_01",
+    "team_a": "Portugal",
+    "team_b": "DR Congo",
+    "winner": null,
+    "is_draw": true,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-06-17T21:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 3,
+      "yellow_cards_away": 1,
+      "shots_on_target_home": 1,
+      "shots_on_target_away": 2,
+      "possession_home": 75,
+      "possession_away": 25
+    },
+    "context": {
+      "venue": "NRG Stadium",
+      "referee": "Abdulrahman Al-Jassim"
+    }
+  },
+  "GS_L_01": {
+    "match_id": "GS_L_01",
+    "team_a": "England",
+    "team_b": "Croatia",
+    "winner": "England",
+    "is_draw": false,
+    "home_score": 4,
+    "away_score": 2,
+    "completed_at": "2026-06-18T00:00:00+04:00",
+    "stats": {
+      "shots_on_target_home": 11,
+      "shots_on_target_away": 5,
+      "possession_home": 52,
+      "possession_away": 48
+    },
+    "context": {
+      "venue": "AT&T Stadium",
+      "referee": "Clement Turpin"
+    }
+  },
+  "GS_L_06": {
+    "match_id": "GS_L_06",
+    "team_a": "Ghana",
+    "team_b": "Panama",
+    "winner": "Ghana",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 0,
+    "completed_at": "2026-06-18T03:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 2,
+      "shots_on_target_home": 2,
+      "shots_on_target_away": 4,
+      "possession_home": 38,
+      "possession_away": 62
+    },
+    "context": {
+      "venue": "BMO Field",
+      "referee": "Glenn Nyberg"
+    }
+  },
+  "GS_K_06": {
+    "match_id": "GS_K_06",
+    "team_a": "Uzbekistan",
+    "team_b": "Colombia",
+    "winner": "Colombia",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 3,
+    "completed_at": "2026-06-18T06:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 1,
+      "shots_on_target_home": 2,
+      "shots_on_target_away": 4,
+      "possession_home": 39,
+      "possession_away": 61
+    },
+    "context": {
+      "venue": "Estadio Azteca",
+      "referee": "Anthony Taylor"
+    }
+  },
+  "GS_A_05": {
+    "match_id": "GS_A_05",
+    "team_a": "Czech Republic",
+    "team_b": "South Africa",
+    "winner": null,
+    "is_draw": true,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-06-18T20:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 2,
+      "shots_on_target_home": 3,
+      "shots_on_target_away": 4,
+      "possession_home": 38,
+      "possession_away": 62
+    },
+    "context": {
+      "venue": "Mercedes-Benz Stadium",
+      "referee": "Tori Penso"
+    }
+  },
+  "GS_B_02": {
+    "match_id": "GS_B_02",
+    "team_a": "Canada",
+    "team_b": "Qatar",
+    "winner": "Canada",
+    "is_draw": false,
+    "home_score": 6,
+    "away_score": 0,
+    "completed_at": "2026-06-19T02:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 1,
+      "red_cards_home": 0,
+      "red_cards_away": 2,
+      "shots_on_target_home": 10,
+      "shots_on_target_away": 0,
+      "possession_home": 79,
+      "possession_away": 21
+    },
+    "context": {
+      "venue": "BC Place",
+      "referee": "Cristian Garay"
+    }
+  },
+  "GS_A_02": {
+    "match_id": "GS_A_02",
+    "team_a": "Mexico",
+    "team_b": "South Korea",
+    "winner": "Mexico",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 0,
+    "completed_at": "2026-06-19T05:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 0,
+      "yellow_cards_away": 2,
+      "shots_on_target_home": 4,
+      "shots_on_target_away": 2,
+      "possession_home": 42,
+      "possession_away": 58
+    },
+    "context": {
+      "venue": "Estadio Akron",
+      "referee": "Gustavo Tejera"
+    }
+  },
+  "GS_D_02": {
+    "match_id": "GS_D_02",
+    "team_a": "United States",
+    "team_b": "Australia",
+    "winner": "United States",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 0,
+    "completed_at": "2026-06-19T23:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 3,
+      "yellow_cards_away": 4,
+      "shots_on_target_home": 2,
+      "shots_on_target_away": 2,
+      "possession_home": 62,
+      "possession_away": 38
+    },
+    "context": {
+      "venue": "Lumen Field",
+      "referee": "Felix Zwayer"
+    }
+  },
+  "GS_C_05": {
+    "match_id": "GS_C_05",
+    "team_a": "Scotland",
+    "team_b": "Morocco",
+    "winner": "Morocco",
+    "is_draw": false,
+    "home_score": 0,
+    "away_score": 1,
+    "completed_at": "2026-06-20T02:00:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 1,
+      "shots_on_target_home": 0,
+      "shots_on_target_away": 2,
+      "possession_home": 41,
+      "possession_away": 59
+    },
+    "context": {
+      "venue": "Gillette Stadium",
+      "referee": "Ilgiz Tantashev"
+    }
+  },
+  "GS_C_02": {
+    "match_id": "GS_C_02",
+    "team_a": "Brazil",
+    "team_b": "Haiti",
+    "winner": "Brazil",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 0,
+    "completed_at": "2026-06-20T04:30:00+04:00",
+    "stats": {
+      "yellow_cards_home": 1,
+      "yellow_cards_away": 3,
+      "shots_on_target_home": 5,
+      "shots_on_target_away": 3,
+      "possession_home": 57,
+      "possession_away": 43
+    },
+    "context": {
+      "venue": "Lincoln Financial Field",
+      "referee": "Alejandro Hernandez"
+    }
+  }
+}

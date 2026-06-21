@@ -93,7 +93,9 @@ Recorded to prevent future re-litigation:
 ### Deferred Display Work (Phase 17/18 fields)
 
 - **D-19:** Coach names, fouls, corner_kicks, shots_off_target, xG all appear **inside the focus card only** — NOT as a separate section, NOT in any table.
-- **D-20:** Focus card layout: signal breakdown (top) → per-signal Δ + CI (middle) → match context (venue, referee, coaches) → match stats (fouls, corners, shots, possession, cards, xG).
+- **D-19a:** D-19/D-20 display slots are **conditional on data availability** (per phase-review decision). The focus card populates these slots when `match_entry` (enriched match data from `played`/`played_groups`) exists. For upcoming matches (primary V2-27 path), stats section is hidden and context section shows a single dimmed placeholder line. This matches the project's graceful-degradation philosophy.
+- **D-20:** Focus card layout: signal breakdown (top) → per-signal Δ + CI (middle) → match context (venue, referee, coaches) [conditional] → match stats (fouls, corners, shots, possession, cards, xG) [conditional].
+- **D-20a:** Focus card secondary path (`--match-detail PLAYED_MATCH_ID`): signals reconstructed from prediction_ledger (odds, catboost, form, lineup_strength) + Elo recompute + prediction_history (blended). Per-signal Δ shows "—" for played matches — only one historical snapshot exists. Not a defect.
 
 ### the agent's Discretion
 

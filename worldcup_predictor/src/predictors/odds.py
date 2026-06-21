@@ -193,6 +193,18 @@ def fetch_and_cache_odds(
     now = datetime.now(timezone.utc)
     parsed = parse_odds_response(bsd_events, alias_lookup, groups, bracket=bracket)
 
+    # Upsert into permanent prediction ledger — matches form.py pattern
+    if parsed:
+        try:
+            from src.state import ledger_upsert
+            for mid, entry in parsed.items():
+                ledger_upsert(mid, "market_odds", entry)
+        except Exception:
+            logger.warning(
+                "Failed to upsert market_odds into prediction ledger",
+                exc_info=True,
+            )
+
     return {
         "fetched_at": now.isoformat(),
         "expires_at": (now + timedelta(hours=cache_ttl_hours)).isoformat(),

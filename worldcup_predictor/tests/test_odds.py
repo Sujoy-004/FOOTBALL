@@ -453,3 +453,47 @@ class TestFetchAndCacheOdds:
         # GS_C_01 has missing odds
         assert cache["matches"]["GS_C_01"]["available"] is False
         assert cache["matches"]["GS_C_01"]["reason"] == "odds_not_available"
+
+    def test_fetch_upserts_market_odds_ledger(self):
+        """fetch_and_cache_odds calls ledger_upsert for each parsed event."""
+        alias_lookup = {"argentina": "Argentina", "algeria": "Algeria"}
+        groups = {
+            "groups": {
+                "B": {
+                    "teams": ["Argentina", "Algeria"],
+                    "matches": [
+                        {"match_id": "GS_B_01", "team_a": "Argentina", "team_b": "Algeria"},
+                    ],
+                }
+            }
+        }
+        events = [
+            {
+                "id": 209476,
+                "home_team": "Argentina",
+                "away_team": "Algeria",
+                "odds_home": 1.45,
+                "odds_draw": 4.20,
+                "odds_away": 7.50,
+                "status": "upcoming",
+                "event_date": "2026-06-17T05:00:00+00:00",
+                "round_number": 1,
+                "group_name": "Group B",
+            }
+        ]
+        import src.state
+        original = src.state.ledger_upsert
+        calls = []
+        def fake_ledger_upsert(mid, signal, entry):
+            calls.append((mid, signal, entry.get("probability")))
+        src.state.ledger_upsert = fake_ledger_upsert
+        try:
+            cache = fetch_and_cache_odds("test_key", events, alias_lookup, groups)
+        finally:
+            src.state.ledger_upsert = original
+
+        assert len(calls) == 1
+        mid, signal, prob = calls[0]
+        assert mid == "GS_B_01"
+        assert signal == "market_odds"
+        assert 0 < prob < 1

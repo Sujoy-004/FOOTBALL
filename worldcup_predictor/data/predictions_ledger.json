@@ -1,0 +1,1004 @@
+{
+  "GS_J_06": {
+    "market_odds": {
+      "probability": 0.7150837988826816,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.7266930003040819,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.6158926484988634,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_K_01": {
+    "market_odds": {
+      "probability": 0.7503199361982307,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6641861456704885,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.334575082092762,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_L_01": {
+    "market_odds": {
+      "probability": 0.543750448726553,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6081670835430566,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.6279796994020594,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_L_06": {
+    "market_odds": {
+      "probability": 0.47399139125994016,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.7693544102986835,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.7937291835052638,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_K_06": {
+    "market_odds": {
+      "probability": 0.11903277795560346,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.391080961022344,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.42507863137375285,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_A_05": {
+    "market_odds": {
+      "probability": 0.4732709129169202,
+      "available": true
+    },
+    "form": {
+      "probability": 0.5900971612711666,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.33342030251901567,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_B_05": {
+    "market_odds": {
+      "probability": 0.5948370206647926,
+      "available": true
+    },
+    "form": {
+      "probability": null,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": false,
+      "reason": "no_match_history: Bosnia and Herzegovina"
+    },
+    "lineup_strength": {
+      "probability": 0.4287129932579774,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_B_02": {
+    "market_odds": {
+      "probability": 0.7096005580771705,
+      "available": true
+    },
+    "form": {
+      "probability": 0.4932871801047181,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6870702278248669,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_A_02": {
+    "market_odds": {
+      "probability": 0.514585764294049,
+      "available": true
+    },
+    "form": {
+      "probability": 0.5492756605859423,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5281347701019559,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_D_02": {
+    "market_odds": {
+      "probability": 0.537656448453625,
+      "available": true
+    },
+    "form": {
+      "probability": 0.5999910806794767,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6342553579820813,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_C_05": {
+    "market_odds": {
+      "probability": 0.2412680949187283,
+      "available": true
+    },
+    "form": {
+      "probability": 0.5833100139945538,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5838016650308557,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_C_02": {
+    "market_odds": {
+      "probability": 0.9006442916637669,
+      "available": true
+    },
+    "form": {
+      "probability": 0.52473525765332,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.8407517316683356,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_D_05": {
+    "market_odds": {
+      "probability": 0.42199560312595275,
+      "available": true
+    },
+    "form": {
+      "probability": 0.5321492726211432,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.4027393780945357,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_F_02": {
+    "market_odds": {
+      "probability": 0.5752486136542363,
+      "available": true
+    },
+    "form": {
+      "probability": 0.42082752900763953,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5539609246603963,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_E_02": {
+    "market_odds": {
+      "probability": 0.6084867894315452,
+      "available": true
+    },
+    "form": {
+      "probability": 0.3430108218502603,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5519132394652938,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_E_05": {
+    "market_odds": {
+      "probability": 0.7405809897741291,
+      "available": true
+    },
+    "form": {
+      "probability": 0.6569891781497398,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.22052846792587621,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_F_05": {
+    "market_odds": {
+      "probability": 0.20208728337710896,
+      "available": true
+    },
+    "form": {
+      "probability": 0.5791724709923604,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6186259389201797,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_H_02": {
+    "market_odds": {
+      "probability": 0.8527480197680433,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.7833703953838569,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.31434830211968073,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_G_02": {
+    "market_odds": {
+      "probability": 0.6670570818742307,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6908957289261035,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.5028347699408343,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    }
+  },
+  "GS_H_05": {
+    "market_odds": {
+      "probability": 0.6509213932388447,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.2904532783605421,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.6856516978803193,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_G_05": {
+    "market_odds": {
+      "probability": 0.18907579813801095,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.631485591943369,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.49716523005916574,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_J_02": {
+    "market_odds": {
+      "probability": 0.5661584652692856,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6028020503230237,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.46771940915361454,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_I_02": {
+    "market_odds": {
+      "probability": 0.8586145540195365,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.8448210204692387,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.5809095174870339,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_I_05": {
+    "market_odds": {
+      "probability": 0.4497354497354497,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.48162163586003087,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.41909048251296616,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_J_05": {
+    "market_odds": {
+      "probability": 0.1802245333942873,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.7299212061534254,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.5322805908463855,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_K_02": {
+    "market_odds": {
+      "probability": 0.7525429967603483,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.7036860625515196,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.45194808750374205,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_L_02": {
+    "market_odds": {
+      "probability": 0.7146212298446515,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6491826719999546,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.3984334994655172,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_L_05": {
+    "market_odds": {
+      "probability": 0.1377144420028105,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.7990719002428803,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.6015665005344827,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_K_05": {
+    "market_odds": {
+      "probability": 0.6371457322725761,
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.43539730365756063,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.548051912496258,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_A_01": {
+    "form": {
+      "probability": 0.4415203687281744,
+      "timestamp": "2026-06-21T05:02:17.950334+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": null,
+      "timestamp": "2026-06-21T05:02:17.958307+00:00",
+      "available": false,
+      "reason": "team_value_not_found: Arg"
+    }
+  },
+  "GS_A_03": {
+    "form": {
+      "probability": 0.6286688196958103,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5016900442612098,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_A_04": {
+    "form": {
+      "probability": 0.5088993807226182,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.35735610735200496,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_A_06": {
+    "form": {
+      "probability": 0.5814590388911136,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.4735502435206563,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_B_01": {
+    "form": {
+      "probability": null,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": false,
+      "reason": "no_match_history: Bosnia and Herzegovina"
+    },
+    "lineup_strength": {
+      "probability": 0.5266797998926123,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "catboost": {
+      "probability": 0.64,
+      "confidence": 0.88,
+      "model_version": "catboost-v5.0",
+      "timestamp": "2026-06-16T12:00:00+00:00",
+      "available": true
+    },
+    "market_odds": {
+      "probability": 0.6499535747446611,
+      "timestamp": "2026-06-21T05:02:18.308178+00:00",
+      "available": true
+    }
+  },
+  "GS_B_03": {
+    "form": {
+      "probability": 0.6345514648800141,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.4550508337244562,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_B_04": {
+    "form": {
+      "probability": null,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": false,
+      "reason": "no_match_history: Bosnia and Herzegovina"
+    },
+    "lineup_strength": {
+      "probability": 0.6636576875478186,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_B_06": {
+    "form": {
+      "probability": 0.6407557512771601,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.2755305468645075,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_C_01": {
+    "form": {
+      "probability": 0.42538318142639736,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5634543462109557,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "market_odds": {
+      "probability": null,
+      "timestamp": "2026-06-21T05:02:18.308178+00:00",
+      "available": false,
+      "reason": "odds_not_available"
+    }
+  },
+  "GS_C_03": {
+    "form": {
+      "probability": 0.5089148663615878,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6441890637917895,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_C_04": {
+    "form": {
+      "probability": 0.5986239685132478,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.8035511323493532,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_C_06": {
+    "form": {
+      "probability": 0.484165642075159,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.25535758977928413,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_D_01": {
+    "form": {
+      "probability": 0.710731666642131,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5798331576461648,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_D_03": {
+    "form": {
+      "probability": 0.7364726535074374,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.4820139150982264,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_D_04": {
+    "form": {
+      "probability": 0.37906651753006093,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5568599048066124,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_D_06": {
+    "form": {
+      "probability": 0.6507385158208608,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.34921497654971845,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_E_01": {
+    "form": {
+      "probability": 0.5249112838065306,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.8310026430644514,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_E_03": {
+    "form": {
+      "probability": 0.6790987824700041,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5817984347244646,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_E_04": {
+    "form": {
+      "probability": 0.3209012175299959,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.2003119333602926,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_E_06": {
+    "form": {
+      "probability": 0.8021106939196445,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5304015870994818,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_F_01": {
+    "form": {
+      "probability": 0.47691277748938865,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.5886608968041731,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_F_03": {
+    "form": {
+      "probability": 0.5564983354863953,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6989183547591925,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_F_04": {
+    "form": {
+      "probability": 0.4435016645136047,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.46462302231736907,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_F_06": {
+    "form": {
+      "probability": 0.6332859933327901,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6514604248519617,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_G_01": {
+    "form": {
+      "probability": 0.389580362275816,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    },
+    "lineup_strength": {
+      "probability": 0.6322019809610429,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    }
+  },
+  "GS_G_03": {
+    "lineup_strength": {
+      "probability": 0.7465451360257932,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.38688721599698517,
+      "timestamp": "2026-06-20T04:45:12.006432+00:00",
+      "available": true
+    }
+  },
+  "GS_G_04": {
+    "lineup_strength": {
+      "probability": 0.5652839814003914,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.6131127840030148,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_G_06": {
+    "lineup_strength": {
+      "probability": 0.5685555057728907,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.3842009693000429,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_H_01": {
+    "lineup_strength": {
+      "probability": 0.7893547780990539,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.2879461046177699,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_H_03": {
+    "lineup_strength": {
+      "probability": 0.6053618131967001,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.46866309692437763,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_H_04": {
+    "lineup_strength": {
+      "probability": 0.4910949559848358,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.5313369030756223,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_H_06": {
+    "lineup_strength": {
+      "probability": 0.2978494522679349,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.6579914124987546,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_I_01": {
+    "lineup_strength": {
+      "probability": 0.5998466029049372,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.5990971830176949,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_I_03": {
+    "lineup_strength": {
+      "probability": 0.5820706429392446,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.5187903009418678,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_I_04": {
+    "lineup_strength": {
+      "probability": 0.784099732074005,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.48120969905813216,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_I_06": {
+    "lineup_strength": {
+      "probability": 0.20370996655939716,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.4375007092221352,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_J_01": {
+    "lineup_strength": {
+      "probability": 0.5988893790037977,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.553184586875893,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_J_03": {
+    "lineup_strength": {
+      "probability": 0.8013992125337274,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.5848822640903794,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_J_04": {
+    "lineup_strength": {
+      "probability": 0.5040785207931365,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.4151177359096207,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_K_03": {
+    "lineup_strength": {
+      "probability": 0.6039957249153732,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.37877245136641075,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_K_04": {
+    "lineup_strength": {
+      "probability": 0.5455997876183736,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.6212275486335893,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_L_03": {
+    "lineup_strength": {
+      "probability": 0.8605802777450254,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.7182010956293102,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  },
+  "GS_L_04": {
+    "lineup_strength": {
+      "probability": 0.5438456787415406,
+      "timestamp": "2026-06-20T04:45:14.291630+00:00",
+      "available": true
+    },
+    "form": {
+      "probability": 0.2817989043706899,
+      "timestamp": "2026-06-20T04:45:12.007945+00:00",
+      "available": true
+    }
+  }
+}

@@ -20,6 +20,8 @@ from src.output import (
     print_error,
     print_governance_dashlet,
     print_drift_alert,
+    coverage_audit,
+    print_coverage_audit,
     _supports_color,
 )
 
@@ -545,3 +547,26 @@ class TestAiPreviews:
         assert "Brazil" in output
         assert "Mexico" in output
         assert "South Africa" in output
+
+
+class TestCoverageAudit:
+    def test_meaningful_denominator_is_47(self):
+        result = coverage_audit()
+        assert result["meaningful"]["total"] == 47
+
+    def test_meaningful_target_60(self):
+        result = coverage_audit()
+        assert result["meaningful"]["target"] == 60.0
+        assert isinstance(result["meaningful"]["target_met"], bool)
+
+    def test_by_category_keys(self):
+        result = coverage_audit()
+        assert "Prediction" in result["by_category"]
+        assert "Display" in result["by_category"]
+        assert "Operational" in result["by_category"]
+
+    def test_print_output_format(self):
+        output = _capture(print_coverage_audit)
+        assert "Coverage Audit" in output
+        assert "Meaningful" in output
+        assert "Raw" in output

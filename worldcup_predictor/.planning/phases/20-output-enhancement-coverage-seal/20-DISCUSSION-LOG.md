@@ -69,6 +69,21 @@
 
 **User's choice:** In focus card only. No separate section. Coach names extractable, stats already in `_STATS_FIELD_MAP`.
 
+### Phase Review Clarification (2026-06-21)
+
+**Issue identified:** Focus card's stats/context sections (D-19/D-20) cannot be populated for upcoming matches. `played`/`played_groups` dicts contain only finished matches. `matches_data` is built from upcoming matches. These populations are disjoint — no single match can have both signals (upcoming) and stats/context (played) simultaneously.
+
+**Resolution:** D-19/D-20 display slots are **conditional content**. Focus card guarantees signals + Δ + CI + provenance. Stats and context populate when `match_entry` exists. For upcoming matches: stats hidden, context shows dimmed placeholder. This matches the project's graceful-degradation pattern used throughout Phases 13, 17, 18.
+
+**Secondary path added:** `--match-detail PLAYED_MATCH_ID` reconstructs signals from prediction_ledger (4 signals) + Elo recompute + prediction_history (blended). Per-signal Δ shows "—" for played matches — not a defect (single historical snapshot).
+
+| Decision | Value |
+|----------|-------|
+| Primary path | Upcoming-match focus card (signals + Δ + CI + provenance guaranteed) |
+| D-19/D-20 semantics | Conditional display slots, not guaranteed content |
+| Secondary path | Best-effort played match inspection via prediction_ledger |
+| Historical Δ | Unavailable for played matches — shows "—", accepted behavior |
+
 ---
 
 ## V2-30 (previously resolved)

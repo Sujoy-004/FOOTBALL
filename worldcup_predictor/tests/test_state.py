@@ -178,14 +178,23 @@ def test_saved_file_is_valid_json(tmp_path):
 MAIN_DIR = Path(__file__).resolve().parent.parent
 
 
-def test_main_runs_successfully():
+def test_main_runs_successfully(tmp_path):
     """main.py should print team/bracket summary (may be killed by timeout when loop added)."""
+    import shutil
+    src_dir = MAIN_DIR / "data"
+    for f in ["teams.json", "groups.json", "bracket.json", "annex_c.json", "played.json", "team_aliases.json"]:
+        shutil.copy2(src_dir / f, tmp_path / f)
     runner_code = (
         f"import os, sys\n"
         f"os.environ['POLL_INTERVAL'] = '1'\n"
         f"os.environ['BSD_API_KEY'] = 'test_dummy_key'\n"
         f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
         f"os.chdir({str(MAIN_DIR)!r})\n"
+        f"import src.constants\n"
+        f"src.constants.DATA_DIR = {str(tmp_path)!r}\n"
+        f"import importlib\n"
+        f"import src.state\n"
+        f"importlib.reload(src.state)\n"
         f"import requests\n"
         f"import src.constants\n"
         f"src.constants.API_TIMEOUT = 1\n"

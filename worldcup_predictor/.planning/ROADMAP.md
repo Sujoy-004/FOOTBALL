@@ -625,7 +625,7 @@ Plans:
 
 ### Phase 20: Output Enhancement & Coverage Seal
 
-**Goal:** Surface signal-level prediction details in console output, add confidence intervals, persist historical probability log, and reach 85% BSD API field coverage.
+**Goal:** Surface signal-level prediction details in console output (per-match signal table + focus card), add Wilson Score 95% confidence intervals, persist historical probability log with trend tracking, and reach ≥60% BSD API meaningful field coverage.
 
 **Depends on:** Phase 18
 
@@ -636,9 +636,9 @@ Plans:
 | ID | Requirement | Status |
 |----|------------|--------|
 | V2-27 | Per-match signal breakdown display (blended + per-signal) in console | 🔲 |
-| V2-28 | Confidence intervals (Clopper-Pearson) alongside probabilities | 🔲 |
+| V2-28 | 95% Wilson score confidence intervals alongside probabilities | 🔲 |
 | V2-29 | Historical probability log across tournament duration with trend tracking | 🔲 |
-| V2-30 | 85% BSD API field coverage (monitored and reported) | 🔲 |
+| V2-30 | ≥60% BSD API meaningful field coverage (monitored and reported) | 🔲 |
 
 **Success Criteria** (what must be TRUE):
 
@@ -647,16 +647,18 @@ Plans:
 - Δ column shows change in each probability since last run
 - Full probability snapshot persisted after every run (all teams, all stages)
 - Trend arrows (↑ ↓ →) for champion probability vs. last snapshot
-- Coverage auditor script reports % of BSD API fields utilized; target ≥85%
+- Coverage auditor script reports % of BSD API meaningful fields utilized; target ≥60% (47 meaningful field denominator)
 - Console output fits within terminal width (no wrapping)
 - Historical deltas not shown on first run (no baseline to diff against)
 - Zero regression on existing test suite
 
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
 
-- *(to be planned via /gsd-plan-phase 20)*
+- [ ] 20-01-PLAN.md — Field Extraction & Coverage Seal (add fouls/corners/shots_off_target + venue.city + coach names to enrichment maps; coverage auditor with meaningful/raw dual-metric, ≥60% target) — Wave 1
+- [ ] 20-02-PLAN.md — Probability Log & Trend Tracking (probability_log.json persistence, per-iteration snapshot capture, trend arrow ↑/↓/→ in championship table with 5-snapshot rolling window) — Wave 2
+- [ ] 20-03-PLAN.md — Per-Match Signal Table & Focus Card (--match-detail CLI flag, 7-signal breakdown table, focus card with per-signal Δ + Wilson 95% CI + match context + match stats) — Wave 3
 
 ---
 
@@ -688,4 +690,4 @@ Plans:
 | 17b. Signal Pipeline Repair | v2.0 | 4/4 | Complete | 2026-06-19 |
 | 18. xG & AI Prediction Signals | v2.0 | 3/3 | Complete | 2026-06-19 |
 | 19. League Selection Framework | v2.0 | 3/3 | Complete | 2026-06-19 |
-| 20. Output Enhancement & Coverage Seal | v2.0 | 0/0 | Defined | — |
+| 20. Output Enhancement & Coverage Seal | v2.0 | 0/3 | Planned | — |

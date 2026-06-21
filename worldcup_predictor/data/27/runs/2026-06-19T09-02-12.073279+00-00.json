@@ -1,0 +1,24 @@
+{
+  "run_version": "2026-06-19T09:02:12.073279+00:00",
+  "data_version": "D1",
+  "model_version": "M8",
+  "timestamp": "2026-06-19T09:02:12.097927+00:00",
+  "signal_counts": {
+    "elo": 0,
+    "form": 0,
+    "market_odds": 0,
+    "lineup_strength": 0,
+    "catboost": 0
+  },
+  "blend_weights": {},
+  "per_signal_brier": {
+    "elo": 1.0,
+    "form": 1.0,
+    "market_odds": 1.0,
+    "lineup_strength": 1.0,
+    "catboost": 1.0
+  },
+  "blended_brier": 0.0,
+  "drift_status": "COLD_START",
+  "drift_details": null
+}

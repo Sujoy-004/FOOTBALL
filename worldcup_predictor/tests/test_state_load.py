@@ -159,7 +159,9 @@ def test_validate_annex_c_valid_495_passes():
         winner_groups = ['A', 'B', 'D', 'E', 'G', 'I', 'K', 'L']
         value = {}
         for i, wg in enumerate(winner_groups):
-            target = combo[i % 8]
+            target = combo[(i + 1) % 8]
+            if target == wg:
+                target = combo[(i + 2) % 8]
             value[f'1{wg}'] = f'3{target}'
         valid_data[key] = value
 
@@ -178,7 +180,9 @@ def test_validate_annex_c_self_reference_raises():
         winner_groups = ['A', 'B', 'D', 'E', 'G', 'I', 'K', 'L']
         value = {}
         for i, wg in enumerate(winner_groups):
-            target = combo[i % 8]
+            target = combo[(i + 1) % 8]
+            if target == wg:
+                target = combo[(i + 2) % 8]
             value[f'1{wg}'] = f'3{target}'
         valid_data[key] = value
 
@@ -202,7 +206,9 @@ def test_validate_annex_c_ref_outside_key_raises():
         winner_groups = ['A', 'B', 'D', 'E', 'G', 'I', 'K', 'L']
         value = {}
         for i, wg in enumerate(winner_groups):
-            target = combo[i % 8]
+            target = combo[(i + 1) % 8]
+            if target == wg:
+                target = combo[(i + 2) % 8]
             value[f'1{wg}'] = f'3{target}'
         valid_data[key] = value
 
@@ -226,7 +232,9 @@ def test_load_annex_c_valid(tmp_path):
         winner_groups = ['A', 'B', 'D', 'E', 'G', 'I', 'K', 'L']
         value = {}
         for i, wg in enumerate(winner_groups):
-            target = combo[i % 8]
+            target = combo[(i + 1) % 8]
+            if target == wg:
+                target = combo[(i + 2) % 8]
             value[f'1{wg}'] = f'3{target}'
         valid_data[key] = value
 
