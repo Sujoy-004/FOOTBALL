@@ -58,9 +58,10 @@ def _normalize_prediction(pred: dict) -> dict:
     """Normalize nested BSD event format to flat format expected by parser.
 
     The live BSD /api/predictions/ endpoint wraps event data in a nested
-    ``event`` dict with ``{id, home_team: {name, id}, away_team: {name, id}}``.
-    This helper flattens it so downstream code (field-name fallback chains,
-    team resolution) works unchanged.
+    ``event`` dict. ``event.home_team`` / ``event.away_team`` may be either
+    a plain string (``"New Zealand"``) or a dict (``{name: "New Zealand",
+    id: ...}``). This helper flattens it so downstream code (field-name
+    fallback chains, team resolution) works unchanged.
 
     Safe to call on already-flat dicts — returns a copy and only overwrites
     keys that are missing at the top level.
@@ -73,11 +74,17 @@ def _normalize_prediction(pred: dict) -> dict:
     if "event_id" not in flat and isinstance(event.get("id"), int):
         flat["event_id"] = event["id"]
     ht = event.get("home_team")
-    if "home_team" not in flat and isinstance(ht, dict):
-        flat["home_team"] = ht.get("name", "")
+    if "home_team" not in flat:
+        if isinstance(ht, dict):
+            flat["home_team"] = ht.get("name", "")
+        elif isinstance(ht, str):
+            flat["home_team"] = ht
     at = event.get("away_team")
-    if "away_team" not in flat and isinstance(at, dict):
-        flat["away_team"] = at.get("name", "")
+    if "away_team" not in flat:
+        if isinstance(at, dict):
+            flat["away_team"] = at.get("name", "")
+        elif isinstance(at, str):
+            flat["away_team"] = at
     return flat
 
 

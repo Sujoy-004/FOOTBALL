@@ -627,8 +627,8 @@ class TestLiveBsdFormat:
             "id": 1001,
             "event": {
                 "id": 5001,
-                "home_team": {"name": "Argentina", "id": 1},
-                "away_team": {"name": "Algeria", "id": 2},
+                "home_team": "Argentina",
+                "away_team": "Algeria",
             },
             "prob_home_win": 64.0,
             "prob_draw": 20.0,
@@ -643,8 +643,8 @@ class TestLiveBsdFormat:
             pred.update(overrides)
         return pred
 
-    def test_parse_live_nested_event(self):
-        """Nested event dict + prob_home_win → correctly parsed."""
+    def test_parse_live_string_team_names(self):
+        """event.home_team/away_team as plain strings (real API format)."""
         result = parse_catboost_response(
             [self._make_live_prediction()],
             self._make_alias_lookup(),
@@ -657,6 +657,29 @@ class TestLiveBsdFormat:
         assert entry["available"] is True
         assert entry["confidence"] == 0.88
         assert entry["model_version"] == "catboost-v5.0"
+
+    def test_parse_live_dict_team_names(self):
+        """event.home_team/away_team as dicts (alternate API format)."""
+        pred = {
+            "id": 1002,
+            "event": {
+                "id": 5002,
+                "home_team": {"name": "Argentina", "id": 1},
+                "away_team": {"name": "Algeria", "id": 2},
+            },
+            "prob_home_win": 64.0,
+            "prob_draw": 20.0,
+            "prob_away_win": 17.0,
+            "confidence": 0.88,
+            "model_version": "catboost-v5.0",
+            "updated_at": "2026-06-21T12:00:00+00:00",
+        }
+        result = parse_catboost_response(
+            [pred], self._make_alias_lookup(), self._make_groups(), [],
+        )
+        assert "GS_B_01" in result
+        assert result["GS_B_01"]["probability"] == 0.64
+        assert result["GS_B_01"]["available"] is True
 
     def test_parse_live_xg_fields(self):
         """expected_home_goals / expected_away_goals extracted from live format."""
@@ -679,8 +702,8 @@ class TestLiveBsdFormat:
             "id": 2002,
             "event": {
                 "id": 6002,
-                "home_team": {"name": "Brazil", "id": 3},
-                "away_team": {"name": "Germany", "id": 4},
+                "home_team": "Brazil",
+                "away_team": "Germany",
             },
             "prob_home_win": 55.0,
             "prob_draw": 25.0,
@@ -721,13 +744,13 @@ class TestLiveBsdFormat:
     def test_parse_live_flat_format_still_works(self):
         """Flat (legacy) format still works alongside new nested format."""
         predictions = [
-            # Live nested format
+            # Live nested format (string team names — real API)
             {
                 "id": 101,
                 "event": {
                     "id": 5001,
-                    "home_team": {"name": "Argentina", "id": 1},
-                    "away_team": {"name": "Algeria", "id": 2},
+                    "home_team": "Argentina",
+                    "away_team": "Algeria",
                 },
                 "prob_home_win": 64.0,
                 "prob_draw": 20.0,
