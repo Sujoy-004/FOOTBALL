@@ -1,4 +1,5 @@
 # .planning/ - GSD research artifacts
+.planning/
 
 # Python
 __pycache__/
@@ -13,10 +14,34 @@ __pycache__/
 # Generated artifacts
 Result/
 
-# Temp GSD artifacts
-.planning/tmp/
-.planning/seeds/
+# Runtime data - prediction run outputs
+data/runs/
 
-# Runtime data (auto-generated)
+# Runtime data - generated variant runs
+data/27/
+
+# Runtime data - auto-generated caches
 eloratings_cache.json
 elo_update_log.json
+catboost_cache.json
+form_cache.json
+lineup_cache.json
+odds_cache.json
+
+# Runtime data - generated logs/ledgers/reports
+elo_applied.json
+prediction_history.json
+predictions_ledger.json
+probability_log.json
+eval_backtest_report.json
+eval_baseline_report.json
+calibration_params.json
+
+# Runtime data - version tracking
+versions.json
+
+# Generated benchmark reports
+benchmarks/BENCHMARK_RESULTS_*.md
+
+# AI-generated responses
+RESPONSE.md
