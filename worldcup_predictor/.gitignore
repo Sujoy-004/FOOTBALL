@@ -10,6 +10,13 @@ __pycache__/
 # Environment secrets
 .env
 
+# Generated artifacts
+Result/
+
+# Temp GSD artifacts
+.planning/tmp/
+.planning/seeds/
+
 # Runtime data (auto-generated)
 eloratings_cache.json
 elo_update_log.json
