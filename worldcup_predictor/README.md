@@ -122,8 +122,7 @@ worldcup_predictor/
 ├── src/
 │   ├── elo.py        # Elo rating engine (K-multiplier, PK mode)
 │   ├── elo_sync.py   # Sync from eloratings.net (24h)
-│   ├── simulation.py # Monte Carlo knockout simulation
-│   ├── knockout.py   # Full tournament (group + knockout)
+│   ├── knockout.py   # Monte Carlo knockout + full tournament simulation
 │   ├── fetcher.py    # BSD API fetch/match processing
 │   ├── groups.py     # Group stage simulation & standings
 │   ├── state.py      # JSON persistence, bracket validation, signal cache
@@ -135,7 +134,7 @@ worldcup_predictor/
 │       └── catboost.py# CatBoost from BSD predictions API
 ├── data/             # JSON state files (teams, groups, bracket,
 │                     # odds_cache, catboost_cache, prediction_history, etc.)
-├── tests/            # 18 modules, 387 tests
+├── tests/            # 26 modules, 611 tests
 └── requirements.txt  # pytest, pytest-cov, python-dotenv (requests is transitive)
 ```
 
@@ -149,11 +148,7 @@ Phase 12b added comprehensive evaluation:
 - **Per-signal metrics**: Evaluate Elo, market odds, and CatBoost independently
 - **Prediction history**: `data/prediction_history.json` persists match-level signals for longitudinal analysis
 
-Run evaluation:
-
-```bash
-python main.py --eval
-```
+Evaluation runs automatically at startup, recording a baseline report to `data/eval_baseline_report.json`.
 
 ## Tests
 
@@ -165,4 +160,4 @@ pytest
 pytest --cov=src --cov-report=term-missing
 ```
 
-387 passed, 1 skipped across 18 test modules covering Elo, groups, knockout, simulation, fetcher, state, output, CLI, evaluation, odds, catboost, and integration scenarios.
+611 passed across 26 test modules covering Elo, groups, knockout, fetcher, state, output, CLI, evaluation, odds, catboost, blender, enrichment, governance, and integration scenarios.
