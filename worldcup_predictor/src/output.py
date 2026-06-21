@@ -591,6 +591,65 @@ def print_governance_dashlet(
     print()
 
 
+# ─── Wilson Score Confidence Interval (Phase 20-03) ─────────────────────────
+
+
+def wilson_score_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """Compute Wilson score 95% CI for k successes in n trials.
+
+    Closed-form using only math.sqrt (D-07). At n=50000, converges with
+    Clopper-Pearson within 0.001.
+
+    Args:
+        k: Number of successes.
+        n: Number of trials.
+        z: Z-score for confidence level (1.96 = 95%).
+
+    Returns:
+        Tuple of (lower, upper) bounds rounded to 3 decimal places.
+    """
+    if n == 0:
+        return (0.0, 0.0)
+    p = k / n
+    z2 = z * z
+    denominator = 1.0 + z2 / n
+    center = (p + z2 / (2.0 * n)) / denominator
+    margin = z * math.sqrt((p * (1.0 - p) + z2 / (4.0 * n)) / n) / denominator
+    return (round(center - margin, 3), round(center + margin, 3))
+
+
+def format_ci(k: int, n: int) -> str:
+    """Format Wilson score CI as a display string.
+
+    Args:
+        k: Number of successes.
+        n: Number of trials.
+
+    Returns:
+        Formatted string like "[0.496 — 0.504]" (em-dash separator).
+    """
+    low, high = wilson_score_ci(k, n)
+    return f"[{low:.3f} \u2014 {high:.3f}]"
+
+
+def wilson_ci_from_prob(p: float | None, n: int = 50000) -> str | None:
+    """Convert a probability to Wilson CI display string.
+
+    Converts probability to pseudo-count for the Wilson formula.
+
+    Args:
+        p: Probability value (0-1) or None.
+        n: Number of pseudo-trials (default 50000).
+
+    Returns:
+        Formatted CI string, or None if p is None.
+    """
+    if p is None:
+        return None
+    k = round(p * n)
+    return format_ci(k, n)
+
+
 # ─── Coverage Auditor (Phase 20-01) ────────────────────────────────────────
 
 _PREDICTION_FIELDS: list[str] = [
@@ -695,6 +754,185 @@ def print_coverage_audit() -> None:
     print(f"  {_dim('By value:')}")
     for name, cat in sorted(audit["by_category"].items()):
         print(f"    {name}:  {cat['covered']}/{cat['total']} ({cat['pct']}%)")
+
+
+# ─── Per-Match Signal Table & Focus Card (Phase 20-03) ──────────────────────
+
+
+def _fmt_prob(val: float | None) -> str:
+    """Format a probability value for signal table display."""
+    if val is None:
+        return "   N/A"
+    return f"{val:>6.3f}"
+
+
+def _fmt_xg(val: tuple | None) -> str:
+    """Format an xG tuple for signal table display."""
+    if val is None:
+        return "   N/A"
+    return f"{val[0]:.1f}/{val[1]:.1f}"
+
+
+def _format_delta_cell(delta: float) -> str:
+    """Format a delta value with ▲/▼ arrow and color."""
+    if delta > 0.0005:
+        return f"  {_green(chr(9650))} {delta:+.3f}"
+    elif delta < -0.0005:
+        return f"  {_red(chr(9660))} {delta:+.3f}"
+    else:
+        return f"  {'=':>6}"
+
+
+def print_match_detail_table(matches_data: list[dict], prev_matches_data: list[dict] | None = None) -> None:
+    """Print per-match signal breakdown table (~85 cols, D-01).
+
+    Shows 7 signal columns (Elo, Odds, CatBoost, Form, Lineup, xG) plus
+    blended Δ triage column.
+
+    Args:
+        matches_data: List of match dicts with match_id, team_a, team_b,
+                     signals dict, blended float.
+        prev_matches_data: Optional list of previous match dicts for Δ column.
+    """
+    if not matches_data:
+        print(_dim("No upcoming matches."))
+        return
+
+    prev_lookup: dict[str, float] = {}
+    if prev_matches_data:
+        for m in prev_matches_data:
+            prev_lookup[m["match_id"]] = m.get("blended", 0.0)
+
+    header = (
+        f"{'Match':<12} {'Team A':<18} {'Team B':<18} "
+        f"{'Elo':>6} {'Odds':>6} {'CB':>6} {'Form':>6} {'Line':>6} {'xG':>6} {'Δ':>6}"
+    )
+    print(_bold_cyan(header))
+    print(_bold_cyan("-" * len(header)))
+
+    for match in sorted(matches_data, key=lambda m: m["match_id"]):
+        sig = match["signals"]
+        t_a = match["team_a"][:18]
+        t_b = match["team_b"][:18]
+        mid_short = match["match_id"][:12]
+
+        row = (
+            f"{mid_short:<12} {t_a:<18} {t_b:<18} "
+            f"{sig['elo']:>6.3f} {_fmt_prob(sig.get('odds')):>6} "
+            f"{_fmt_prob(sig.get('catboost')):>6} {_fmt_prob(sig.get('form')):>6} "
+            f"{_fmt_prob(sig.get('lineup')):>6} {_fmt_xg(sig.get('xg')):>6} "
+        )
+
+        mid = match["match_id"]
+        if mid in prev_lookup:
+            delta = match["blended"] - prev_lookup[mid]
+            row += _format_delta_cell(delta)
+        else:
+            row += f"  {'—':>6}"
+        print(row)
+
+    print()
+
+
+def print_focus_card(match_data: dict, match_entry: dict | None = None) -> None:
+    """Print the match focus card (Mockup 3 layout per D-20).
+
+    Signals top → Δ/CI → context → stats. Conditional content per D-19/D-20:
+    upcoming matches show guaranteed content only; played matches add
+    context and stats sections.
+
+    Args:
+        match_data: Dict with team_a, team_b, match_id, signals dict,
+                   blended, prev_signals, blended_delta.
+        match_entry: Optional match entry dict with stats and context.
+    """
+    sig = match_data["signals"]
+    stats_data = (match_entry or {}).get("stats") or {}
+    ctx = (match_entry or {}).get("context") or {}
+
+    print()
+    print(_bold_white(f"\u2500\u2500\u2500 {match_data['team_a']} vs {match_data['team_b']} ({match_data['match_id']}) \u2500\u2500\u2500"))
+
+    # Signal section
+    print(_bold_cyan(f"{'Signal':<14} {'Prob':>8} {'Δ':>8} {'CI':>16}"))
+    print(_bold_cyan("-" * 48))
+
+    provenance = {
+        "blended": "Brier-weighted blend",
+        "elo": "eloratings.net expected score",
+        "odds": "Market vig-removed odds",
+        "catboost": "BSD CatBoost prediction",
+        "form": "Last-5 form residual",
+        "lineup": "Squad market value ratio",
+        "xg": "BSD xG Poisson lambda",
+    }
+
+    prev_signals = match_data.get("prev_signals", {})
+    blended_delta = match_data.get("blended_delta")
+
+    def _make_row(label: str, prob, prev_prob, ci_str: str | None) -> str:
+        prob_str = f"{prob:.3f}" if isinstance(prob, (int, float)) else (str(prob) if prob else "N/A")
+        if isinstance(prob, (int, float)) and isinstance(prev_prob, (int, float)):
+            delta_str = _format_delta_cell(prob - prev_prob)
+        else:
+            delta_str = f"  {'—':>6}"
+        ci_fmt = ci_str if ci_str else " " * 16
+        return f"{label:<14} {prob_str:>8} {delta_str} {ci_fmt:>16}"
+
+    # Blended row (special: uses blended_delta)
+    blended_prob = match_data.get("blended")
+    blended_display = f"{blended_prob:.3f}" if isinstance(blended_prob, (int, float)) else "N/A"
+    blended_delta_str = _format_delta_cell(blended_delta) if isinstance(blended_delta, (int, float)) else f"  {'—':>6}"
+    print(f"{'Blended':<14} {blended_display:>8} {blended_delta_str} {' ' * 16:>16}")
+
+    # Elo
+    print(_make_row("Elo", sig.get("elo"), prev_signals.get("elo"), wilson_ci_from_prob(sig.get("elo"))))
+    print(_make_row("Odds", sig.get("odds"), prev_signals.get("odds"), wilson_ci_from_prob(sig.get("odds"))))
+    print(_make_row("CatBoost", sig.get("catboost"), prev_signals.get("catboost"), wilson_ci_from_prob(sig.get("catboost"))))
+    print(_make_row("Form", sig.get("form"), prev_signals.get("form"), wilson_ci_from_prob(sig.get("form"))))
+    print(_make_row("Lineup", sig.get("lineup"), prev_signals.get("lineup"), wilson_ci_from_prob(sig.get("lineup"))))
+
+    # xG row (display-only, no prob/CI)
+    xg = sig.get("xg")
+    xg_str = f"{xg[0]:.1f}/{xg[1]:.1f}" if isinstance(xg, tuple) and xg else "N/A"
+    print(f"{'xG':<14} {xg_str:>8} {'  —':>6} {' ' * 16:>16}")
+
+    # Context section — conditional on match_entry existence
+    if match_entry is None:
+        print()
+        print(_dim("Context/stat data available after match completion."))
+    else:
+        print()
+        print(_bold_white("Match Context"))
+        context_fields = [
+            ("Venue", ctx.get("venue", "\u2014")),
+            ("Referee", ctx.get("referee", "\u2014")),
+            ("City", ctx.get("venue_city", "\u2014")),
+            ("Home Coach", ctx.get("home_coach", "\u2014")),
+            ("Away Coach", ctx.get("away_coach", "\u2014")),
+        ]
+        for label, val in context_fields:
+            print(f"  {label:<12} {val}")
+
+        # Stats section — only if match_entry and stats have entries
+        if stats_data:
+            print()
+            print(_bold_white("Match Stats"))
+            stat_fields = [
+                ("Fouls", "fouls_home", "fouls_away"),
+                ("Corners", "corner_kicks_home", "corner_kicks_away"),
+                ("Shots off", "shots_off_target_home", "shots_off_target_away"),
+                ("Shots on", "shots_on_target_home", "shots_on_target_away"),
+                ("Possession", "possession_home", "possession_away"),
+                ("YC", "yellow_cards_home", "yellow_cards_away"),
+                ("RC", "red_cards_home", "red_cards_away"),
+            ]
+            for label, h_key, a_key in stat_fields:
+                h_val = stats_data.get(h_key, "\u2014")
+                a_val = stats_data.get(a_key, "\u2014")
+                print(f"  {label:<12} {a_val} - {h_val}")
+
+    print()
 
 
 def print_drift_alert(drift_info: dict) -> None:

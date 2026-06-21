@@ -66,5 +66,73 @@
         "champion": 0.05
       }
     }
+  },
+  {
+    "timestamp": "2026-06-21T05:19:35.161050+00:00",
+    "probabilities": {
+      "Arg": {
+        "qf": 0.5,
+        "sf": 0.3,
+        "final": 0.1,
+        "champion": 0.05
+      },
+      "Bra": {
+        "qf": 0.5,
+        "sf": 0.3,
+        "final": 0.1,
+        "champion": 0.05
+      }
+    }
+  },
+  {
+    "timestamp": "2026-06-21T05:19:44.961820+00:00",
+    "probabilities": {
+      "Arg": {
+        "qf": 0.5,
+        "sf": 0.3,
+        "final": 0.1,
+        "champion": 0.05
+      },
+      "Bra": {
+        "qf": 0.5,
+        "sf": 0.3,
+        "final": 0.1,
+        "champion": 0.05
+      }
+    }
+  },
+  {
+    "timestamp": "2026-06-21T05:19:45.021998+00:00",
+    "probabilities": {
+      "Arg": {
+        "qf": 0.5,
+        "sf": 0.3,
+        "final": 0.1,
+        "champion": 0.05
+      },
+      "Bra": {
+        "qf": 0.5,
+        "sf": 0.3,
+        "final": 0.1,
+        "champion": 0.05
+      }
+    }
+  },
+  {
+    "timestamp": "2026-06-21T05:19:45.113085+00:00",
+    "probabilities": {
+      "Arg": {
+        "qf": 0.5,
+        "sf": 0.3,
+        "final": 0.1,
+        "champion": 0.05
+      },
+      "Bra": {
+        "qf": 0.5,
+        "sf": 0.3,
+        "final": 0.1,
+        "champion": 0.05
+      }
+    }
   }
 ]

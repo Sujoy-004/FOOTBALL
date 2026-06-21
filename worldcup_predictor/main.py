@@ -43,6 +43,12 @@ _last_gov_time: float = 0.0
 _ai_preview_enabled: bool = False
 """Module-level flag for --ai-preview CLI flag. Set in main() after parse_args (Phase 18)."""
 
+_match_detail_enabled: str | None = None
+"""Stores --match-detail arg value. None=disabled, 'table'=match table, MATCH_ID=focus card (Phase 20)."""
+
+_prev_signal_data: dict | None = None
+"""Snapshot of per-match signal DATA from previous iteration for per-signal Δ (Phase 20, D-04)."""
+
 _prev_history: list[dict] | None = None
 """Snapshot of prediction_history BEFORE merge. Captured for data_version detection (Architecture Q4)."""
 
@@ -251,6 +257,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         dest="ai_preview",
         help="Display BSD AI prediction previews after simulation output (Phase 18)",
+    )
+    parser.add_argument(
+        "--match-detail",
+        type=str,
+        nargs="?",
+        const="table",
+        default=None,
+        help="Display per-match signal breakdown. Use --match-detail to show table, --match-detail MATCH_ID to show focus card (Phase 20)",
     )
     parser.add_argument(
         "--league",
@@ -575,6 +589,157 @@ def _record_eval_baseline(
               f"({report['n_matches']} matches)")
     else:
         print("Baseline: no matches to evaluate")
+
+
+# ── Signal data helpers (Phase 20-03) ──────────────────────────────────────
+
+
+def _collect_matches_from_groups(groups: dict) -> list[dict]:
+    """Collect all upcoming matches from groups.
+
+    Skips played matches using played_groups. Returns group matches
+    with team_a/team_b orientation.
+
+    Args:
+        groups: Group definitions dict.
+
+    Returns:
+        List of match dicts.
+    """
+    matches = []
+    groups_data = groups.get("groups", groups) if isinstance(groups, dict) else groups
+    if isinstance(groups_data, dict):
+        for group_letter in groups_data:
+            group = groups_data[group_letter]
+            if isinstance(group, dict):
+                for m in group.get("matches", []):
+                    if isinstance(m, dict) and not m.get("winner"):
+                        m["group"] = group_letter
+                        matches.append(m)
+    return matches
+
+
+def _collect_matches_from_bracket(bracket: list[dict], played: dict) -> list[dict]:
+    """Collect upcoming knockout matches from bracket.
+
+    Args:
+        bracket: Bracket match list.
+        played: Dict of played knockout matches.
+
+    Returns:
+        List of upcoming bracket match dicts.
+    """
+    matches = []
+    for m in bracket:
+        if isinstance(m, dict) and m.get("match_id", "") not in played:
+            m = dict(m)
+            m["team_a"] = m.get("home", "")
+            m["team_b"] = m.get("away", "")
+            matches.append(m)
+    return matches
+
+
+def _expected_score_for_match(t_a: str, t_b: str, teams: dict) -> float:
+    """Elo expected score for team_a vs team_b."""
+    from src.elo import expected_score
+    if t_a in teams and t_b in teams:
+        return expected_score(teams[t_a]["elo"], teams[t_b]["elo"])
+    return 0.5
+
+
+def _gather_signal_data(
+    teams: dict,
+    groups: dict,
+    bracket: list[dict],
+    odds_cache: dict | None,
+    cb_cache: dict | None,
+    form_cache: dict | None,
+    lineup_cache: dict | None,
+    xg_overrides: dict | None,
+    played: dict,
+    played_groups: dict | None = None,
+) -> list[dict]:
+    """Build per-match signal data for the match detail table.
+
+    Args:
+        teams: Team data dict with Elo ratings.
+        groups: Group definitions dict.
+        bracket: Bracket match list.
+        odds_cache: Odds signal cache.
+        cb_cache: CatBoost signal cache.
+        form_cache: Form signal cache.
+        lineup_cache: Lineup strength cache.
+        xg_overrides: xG overrides dict.
+        played: Played knockout matches.
+        played_groups: Played group matches.
+
+    Returns:
+        List of match data dicts with signals.
+    """
+    odds_m = (odds_cache or {}).get("matches", {})
+    cb_m = (cb_cache or {}).get("matches", {})
+    form_m = (form_cache or {}).get("matches", {})
+    lineup_m = (lineup_cache or {}).get("matches", {})
+
+    played_mids: set = set()
+    for g in (played_groups or {}).values():
+        if isinstance(g, dict):
+            mid = g.get("match_id")
+            if mid:
+                played_mids.add(mid)
+
+    all_matches = _collect_matches_from_groups(groups)
+    all_matches += _collect_matches_from_bracket(bracket, played)
+
+    result = []
+    for match in all_matches:
+        mid = match.get("match_id", "")
+        t_a = match.get("team_a", "")
+        t_b = match.get("team_b", "")
+        if not mid or not t_a or not t_b:
+            continue
+
+        elo_prob = _expected_score_for_match(t_a, t_b, teams)
+        odds_prob = None
+        if mid in odds_m and isinstance(odds_m[mid], dict):
+            odds_prob = odds_m[mid].get("probability")
+        cb_prob = None
+        if mid in cb_m and isinstance(cb_m[mid], dict):
+            cb_prob = cb_m[mid].get("probability")
+        form_prob = None
+        if mid in form_m and isinstance(form_m[mid], dict):
+            form_prob = form_m[mid].get("probability")
+        lineup_prob = None
+        if mid in lineup_m and isinstance(lineup_m[mid], dict):
+            lineup_prob = lineup_m[mid].get("probability")
+
+        xg_val = None
+        if xg_overrides and mid in xg_overrides:
+            xg_val = xg_overrides[mid]
+
+        # Compute blended from available signals (same logic as blender)
+        blended = elo_prob
+        if odds_prob is not None:
+            blended = (blended + odds_prob) / 2
+        if cb_prob is not None:
+            blended = (blended + cb_prob) / 2
+
+        result.append({
+            "match_id": mid,
+            "team_a": t_a,
+            "team_b": t_b,
+            "signals": {
+                "elo": elo_prob,
+                "odds": odds_prob,
+                "catboost": cb_prob,
+                "form": form_prob,
+                "lineup": lineup_prob,
+                "xg": xg_val,
+            },
+            "blended": round(blended, 4),
+        })
+
+    return result
 
 
 def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_key, aliases, last_sim_time, last_request_time, prev_probs=None, seed=None, league_id=27, data_dir=None):
@@ -943,6 +1108,42 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
         import sys as _sys
         print("Warning: Failed to save probability log snapshot", file=_sys.stderr)
 
+    # ── Match detail table / focus card display (Phase 20-03) ──
+    global _match_detail_enabled, _prev_signal_data
+    if _match_detail_enabled:
+        try:
+            matches_data = _gather_signal_data(
+                teams, groups, bracket,
+                odds_cache, cb_cache, form_cache, lineup_cache,
+                xg_overrides, played, played_groups,
+            )
+            if _match_detail_enabled == "table":
+                output.print_match_detail_table(matches_data, _prev_signal_data)
+            else:
+                target_mid = _match_detail_enabled
+                for md in matches_data:
+                    if md["match_id"] == target_mid:
+                        # Find match entry for context/stats if played
+                        match_entry = None
+                        if target_mid in played:
+                            match_entry = played[target_mid]
+                        elif target_mid in (played_groups or {}):
+                            match_entry = (played_groups or {}).get(target_mid)
+                        # Build prev_signals for delta
+                        prev_data = None
+                        if _prev_signal_data:
+                            prev_data = next((d for d in _prev_signal_data if d["match_id"] == target_mid), None)
+                        focus_data = dict(md)
+                        if prev_data:
+                            focus_data["prev_signals"] = prev_data["signals"]
+                            focus_data["blended_delta"] = md["blended"] - prev_data["blended"]
+                        output.print_focus_card(focus_data, match_entry)
+                        break
+            _prev_signal_data = matches_data
+        except Exception:
+            import sys as _sys2
+            print("Warning: Failed to display match detail table", file=_sys2.stderr)
+
     return time.time(), last_request_time, probs
 
 
@@ -1093,8 +1294,9 @@ def main() -> None:
     """Load state, then enter continuous polling loop until signal."""
     args = _parse_args()
 
-    global _ai_preview_enabled
+    global _ai_preview_enabled, _match_detail_enabled
     _ai_preview_enabled = args.ai_preview
+    _match_detail_enabled = args.match_detail
 
     # Handle --list-leagues early: print catalog and exit (D-02)
     if args.list_leagues:

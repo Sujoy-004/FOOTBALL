@@ -23,6 +23,11 @@ from src.output import (
     print_drift_alert,
     coverage_audit,
     print_coverage_audit,
+    print_match_detail_table,
+    print_focus_card,
+    wilson_score_ci,
+    format_ci,
+    wilson_ci_from_prob,
     _supports_color,
 )
 
@@ -593,6 +598,144 @@ class TestTrendColumn:
         prob_log = [{"timestamp": "1", "probabilities": {"Argentina": {"champion": 0.24}}}] * 3
         output = _capture(print_probability_table, full_probs, None, prob_log)
         assert "Trend" not in output
+
+
+class TestWilsonCI:
+    def test_ci_known_values(self):
+        low, high = wilson_score_ci(25000, 50000)
+        assert 0.496 <= low <= 0.504
+        assert 0.496 <= high <= 0.504
+
+    def test_ci_extreme(self):
+        low, high = wilson_score_ci(0, 50000)
+        assert low >= 0.0
+        assert high >= 0.0
+
+    def test_ci_zero_n(self):
+        assert wilson_score_ci(0, 0) == (0.0, 0.0)
+
+    def test_format_ci(self):
+        import re
+        result = format_ci(25000, 50000)
+        assert re.match(r"\[\d\.\d{3} — \d\.\d{3}\]", result)
+
+    def test_wilson_ci_from_prob(self):
+        result = wilson_ci_from_prob(0.5, 50000)
+        assert result is not None
+        assert isinstance(result, str)
+
+
+def _sample_match_data() -> dict:
+    return {
+        "match_id": "M73",
+        "team_a": "Argentina",
+        "team_b": "Brazil",
+        "signals": {
+            "elo": 0.55, "odds": 0.52, "catboost": 0.53,
+            "form": 0.51, "lineup": 0.54, "xg": (2.1, 1.2),
+        },
+        "blended": 0.53,
+    }
+
+
+def _sample_prev_data() -> dict:
+    return {
+        "match_id": "M73",
+        "blended": 0.50,
+    }
+
+
+def _sample_match_data_focus() -> dict:
+    return {
+        "match_id": "M73",
+        "team_a": "Argentina",
+        "team_b": "Brazil",
+        "signals": {
+            "elo": 0.55, "odds": 0.52, "catboost": 0.53,
+            "form": 0.51, "lineup": 0.54, "xg": (2.1, 1.2),
+        },
+        "blended": 0.53,
+        "prev_signals": {"elo": 0.53, "odds": 0.50, "catboost": 0.51, "form": 0.50, "lineup": 0.52},
+        "blended_delta": 0.03,
+    }
+
+
+class TestMatchDetailTable:
+    def test_empty_shows_no_upcoming(self):
+        output = _capture(print_match_detail_table, [])
+        assert "No upcoming matches." in output
+
+    def test_table_header_columns(self):
+        output = _capture(print_match_detail_table, [_sample_match_data()])
+        assert "Match" in output
+        assert "Team A" in output
+        assert "Team B" in output
+        assert "Elo" in output
+        assert "Odds" in output
+        assert "CB" in output
+        assert "Form" in output
+        assert "Line" in output
+        assert "xG" in output
+        assert "Δ" in output
+
+    def test_delta_shows_for_prev_data(self):
+        output = _capture(print_match_detail_table, [_sample_match_data()], [_sample_prev_data()])
+        assert "▲" in output or "▼" in output or "=" in output
+
+
+class TestFocusCard:
+    def test_signal_section_header(self):
+        output = _capture(print_focus_card, _sample_match_data_focus())
+        assert "Signal" in output
+        assert "Prob" in output
+        assert "Δ" in output
+        assert "CI" in output
+
+    def test_upcoming_match_context(self):
+        output = _capture(print_focus_card, _sample_match_data_focus())
+        assert "Context/stat data available after match completion." in output
+        assert "Match Context" not in output
+        assert "Match Stats" not in output
+
+    def test_played_match_context(self):
+        match_data = _sample_match_data_focus()
+        match_entry = {
+            "stats": {
+                "fouls_home": 12, "fouls_away": 8,
+                "corner_kicks_home": 7, "corner_kicks_away": 3,
+            },
+            "context": {
+                "venue": "Estadio Azteca",
+                "referee": "Wilton Pereira Sampaio",
+                "venue_city": "Mexico City",
+                "home_coach": "Gerardo Martino",
+                "away_coach": "Hugo Broos",
+            },
+        }
+        output = _capture(print_focus_card, match_data, match_entry)
+        assert "Match Context" in output
+        assert "Estadio Azteca" in output
+        assert "Wilton Pereira Sampaio" in output
+
+    def test_played_match_stats(self):
+        match_data = _sample_match_data_focus()
+        match_entry = {
+            "stats": {
+                "fouls_home": 12, "fouls_away": 8,
+                "corner_kicks_home": 7, "corner_kicks_away": 3,
+            },
+            "context": {},
+        }
+        output = _capture(print_focus_card, match_data, match_entry)
+        assert "Match Stats" in output
+        assert "Fouls" in output
+        assert "Corners" in output
+
+    def test_missing_stats_played(self):
+        match_data = _sample_match_data_focus()
+        match_entry = {"context": {}}
+        output = _capture(print_focus_card, match_data, match_entry)
+        assert "Match Stats" not in output
 
 
 class TestCoverageAudit:

@@ -467,12 +467,12 @@
   "GS_A_01": {
     "form": {
       "probability": 0.4415203687281744,
-      "timestamp": "2026-06-21T05:09:07.879867+00:00",
+      "timestamp": "2026-06-21T05:19:45.050231+00:00",
       "available": true
     },
     "lineup_strength": {
       "probability": null,
-      "timestamp": "2026-06-21T05:09:07.889009+00:00",
+      "timestamp": "2026-06-21T05:19:45.063187+00:00",
       "available": false,
       "reason": "team_value_not_found: Arg"
     }
@@ -534,7 +534,7 @@
     },
     "market_odds": {
       "probability": 0.6499535747446611,
-      "timestamp": "2026-06-21T05:09:08.389002+00:00",
+      "timestamp": "2026-06-21T05:19:45.482098+00:00",
       "available": true
     }
   },
@@ -588,7 +588,7 @@
     },
     "market_odds": {
       "probability": null,
-      "timestamp": "2026-06-21T05:09:08.389002+00:00",
+      "timestamp": "2026-06-21T05:19:45.482098+00:00",
       "available": false,
       "reason": "odds_not_available"
     }
