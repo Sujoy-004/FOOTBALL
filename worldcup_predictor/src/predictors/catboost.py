@@ -41,9 +41,9 @@ logger = logging.getLogger(__name__)
 # Priority-ordered fallback field names for home/draw/away probabilities.
 # The BSD predictions endpoint may use different key names depending on
 # API version. Each tuple is tried in order until a valid value is found.
-_HOME_FIELDS = ("home_probability", "home_win", "probability_home")
-_DRAW_FIELDS = ("draw_probability", "draw", "probability_draw")
-_AWAY_FIELDS = ("away_probability", "away_win", "probability_away")
+_HOME_FIELDS = ("home_probability", "prob_home_win", "home_win", "probability_home")
+_DRAW_FIELDS = ("draw_probability", "prob_draw", "draw", "probability_draw")
+_AWAY_FIELDS = ("away_probability", "prob_away_win", "away_win", "probability_away")
 
 # xG field names (Phase 18): BSD predictions endpoint contains
 # expected_home_goals / expected_away_goals (already in Poisson lambda scale).
@@ -52,6 +52,33 @@ _XG_AWAY_FIELDS: tuple[str, ...] = ("expected_away_goals", "away_expected_goals"
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────
+
+
+def _normalize_prediction(pred: dict) -> dict:
+    """Normalize nested BSD event format to flat format expected by parser.
+
+    The live BSD /api/predictions/ endpoint wraps event data in a nested
+    ``event`` dict with ``{id, home_team: {name, id}, away_team: {name, id}}``.
+    This helper flattens it so downstream code (field-name fallback chains,
+    team resolution) works unchanged.
+
+    Safe to call on already-flat dicts — returns a copy and only overwrites
+    keys that are missing at the top level.
+    """
+    event = pred.get("event")
+    if not isinstance(event, dict):
+        return pred
+
+    flat = dict(pred)
+    if "event_id" not in flat and isinstance(event.get("id"), int):
+        flat["event_id"] = event["id"]
+    ht = event.get("home_team")
+    if "home_team" not in flat and isinstance(ht, dict):
+        flat["home_team"] = ht.get("name", "")
+    at = event.get("away_team")
+    if "away_team" not in flat and isinstance(at, dict):
+        flat["away_team"] = at.get("name", "")
+    return flat
 
 
 def _extract_probability(
@@ -167,6 +194,9 @@ def parse_catboost_response(
     for prediction in bsd_predictions:
         if not isinstance(prediction, dict):
             continue
+
+        # Normalize nested event dict → flat format
+        prediction = _normalize_prediction(prediction)
 
         # Skip entries without a valid event_id
         event_id = prediction.get("event_id")

@@ -586,3 +586,174 @@ class TestParsePredictionsEdgeCases:
         result = parse_catboost_response(predictions, alias_lookup, groups, [])
         assert "GS_B_01" in result
         assert result["GS_B_01"]["available"] is False
+
+
+class TestLiveBsdFormat:
+    """parse_catboost_response with live BSD /api/predictions/ response format.
+
+    The live API wraps event data under a nested ``event`` dict and uses
+    ``prob_home_win`` / ``prob_draw`` / ``prob_away_win`` field names.
+    """
+
+    def _make_alias_lookup(self):
+        return {
+            "argentina": "Argentina",
+            "algeria": "Algeria",
+            "brazil": "Brazil",
+            "japan": "Japan",
+            "germany": "Germany",
+        }
+
+    def _make_groups(self):
+        return {
+            "groups": {
+                "B": {
+                    "teams": ["Argentina", "Algeria"],
+                    "matches": [
+                        {"match_id": "GS_B_01", "team_a": "Argentina", "team_b": "Algeria"},
+                    ],
+                },
+                "C": {
+                    "teams": ["Brazil", "Japan"],
+                    "matches": [
+                        {"match_id": "GS_C_01", "team_a": "Brazil", "team_b": "Japan"},
+                    ],
+                },
+            },
+        }
+
+    def _make_live_prediction(self, overrides: dict | None = None) -> dict:
+        pred = {
+            "id": 1001,
+            "event": {
+                "id": 5001,
+                "home_team": {"name": "Argentina", "id": 1},
+                "away_team": {"name": "Algeria", "id": 2},
+            },
+            "prob_home_win": 64.0,
+            "prob_draw": 20.0,
+            "prob_away_win": 17.0,
+            "expected_home_goals": 1.8,
+            "expected_away_goals": 0.9,
+            "confidence": 0.88,
+            "model_version": "catboost-v5.0",
+            "updated_at": "2026-06-21T12:00:00+00:00",
+        }
+        if overrides:
+            pred.update(overrides)
+        return pred
+
+    def test_parse_live_nested_event(self):
+        """Nested event dict + prob_home_win → correctly parsed."""
+        result = parse_catboost_response(
+            [self._make_live_prediction()],
+            self._make_alias_lookup(),
+            self._make_groups(),
+            [],
+        )
+        assert "GS_B_01" in result, f"Expected GS_B_01, got keys: {list(result)}"
+        entry = result["GS_B_01"]
+        assert entry["probability"] == 0.64
+        assert entry["available"] is True
+        assert entry["confidence"] == 0.88
+        assert entry["model_version"] == "catboost-v5.0"
+
+    def test_parse_live_xg_fields(self):
+        """expected_home_goals / expected_away_goals extracted from live format."""
+        result = parse_catboost_response(
+            [self._make_live_prediction()],
+            self._make_alias_lookup(),
+            self._make_groups(),
+            [],
+        )
+        entry = result["GS_B_01"]
+        assert entry.get("expected_home_goals") == 1.8
+        assert entry.get("expected_away_goals") == 0.9
+
+    def test_parse_live_bracket_match(self):
+        """Knockout prediction with nested event resolves against bracket."""
+        bracket = [
+            {"match_id": "R16_1", "team_a": "Brazil", "team_b": "Germany"},
+        ]
+        pred = {
+            "id": 2002,
+            "event": {
+                "id": 6002,
+                "home_team": {"name": "Brazil", "id": 3},
+                "away_team": {"name": "Germany", "id": 4},
+            },
+            "prob_home_win": 55.0,
+            "prob_draw": 25.0,
+            "prob_away_win": 20.0,
+            "confidence": 0.82,
+            "model_version": "catboost-v5.0",
+            "updated_at": "2026-06-27T12:00:00+00:00",
+        }
+        result = parse_catboost_response(
+            [pred], self._make_alias_lookup(), {"groups": {}}, bracket,
+        )
+        assert "R16_1" in result
+        assert result["R16_1"]["probability"] == 0.55
+        assert result["R16_1"]["available"] is True
+
+    def test_parse_live_missing_all_probs(self):
+        """All prob fields None in live format → available=False."""
+        pred = self._make_live_prediction({
+            "prob_home_win": None,
+            "prob_draw": None,
+            "prob_away_win": None,
+        })
+        result = parse_catboost_response(
+            [pred], self._make_alias_lookup(), self._make_groups(), [],
+        )
+        entry = result["GS_B_01"]
+        assert entry["available"] is False
+        assert entry["reason"] == "predictions_not_available"
+
+    def test_parse_live_missing_event_key(self):
+        """No event key → gracefully skipped (no event_id to match)."""
+        pred = {"id": 3003}  # No event key at all
+        result = parse_catboost_response(
+            [pred], self._make_alias_lookup(), self._make_groups(), [],
+        )
+        assert len(result) == 0
+
+    def test_parse_live_flat_format_still_works(self):
+        """Flat (legacy) format still works alongside new nested format."""
+        predictions = [
+            # Live nested format
+            {
+                "id": 101,
+                "event": {
+                    "id": 5001,
+                    "home_team": {"name": "Argentina", "id": 1},
+                    "away_team": {"name": "Algeria", "id": 2},
+                },
+                "prob_home_win": 64.0,
+                "prob_draw": 20.0,
+                "prob_away_win": 17.0,
+                "confidence": 0.88,
+                "model_version": "catboost-v5.0",
+                "updated_at": "2026-06-21T12:00:00+00:00",
+            },
+            # Legacy flat format
+            {
+                "event_id": 5002,
+                "home_team": "Brazil",
+                "away_team": "Japan",
+                "event_date": "2026-06-18T05:00:00+00:00",
+                "home_probability": 55.0,
+                "draw_probability": 25.0,
+                "away_probability": 20.0,
+                "confidence": 0.75,
+                "model_version": "catboost-v5.0",
+                "updated_at": "2026-06-20T12:00:00+00:00",
+            },
+        ]
+        result = parse_catboost_response(
+            predictions, self._make_alias_lookup(), self._make_groups(), [],
+        )
+        assert "GS_B_01" in result
+        assert result["GS_B_01"]["probability"] == 0.64
+        assert "GS_C_01" in result
+        assert result["GS_C_01"]["probability"] == 0.55
