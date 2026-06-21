@@ -1,6 +1,10 @@
 # .planning/ - GSD research artifacts
 .planning/
 
+# Planning docs (SOTs) and generated docs
+SOTs/
+docs/
+
 # Python
 __pycache__/
 *.pyc
