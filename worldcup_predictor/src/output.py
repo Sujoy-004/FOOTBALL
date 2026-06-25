@@ -8,7 +8,7 @@ import sys
 import time
 from typing import Callable
 
-from src.constants import GROUP_COUNT, MATCHES_PER_GROUP, POLL_INTERVAL
+from src.constants import GROUP_COUNT, MATCHES_PER_GROUP, POLL_INTERVAL, TREND_THRESHOLD
 from src.elo_sync import get_staleness_level
 
 
@@ -67,7 +67,7 @@ def _compute_trend_arrow(current_prob: float, team_name: str, prob_log: list[dic
         "→" if within threshold,
         " " if insufficient data (< 6 snapshots).
     """
-    threshold = 0.005
+    threshold = TREND_THRESHOLD
     if len(prob_log) < 6:
         return " "
     window = prob_log[-6:-1]
