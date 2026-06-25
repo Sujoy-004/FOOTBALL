@@ -105,14 +105,14 @@ def process_matches(
         home_name = match.get("home_team", "")
         away_name = match.get("away_team", "")
 
-        home_norm = _normalize_team(home_name, alias_lookup)
-        away_norm = _normalize_team(away_name, alias_lookup)
+        home_norm = normalize_team(home_name, alias_lookup)
+        away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
             logger.warning("Unmatchable team names: home=%r, away=%r", home_name, away_name)
             continue
 
-        bracket_id = _find_bracket_match(home_norm, away_norm, bracket)
+        bracket_id = find_bracket_match(home_norm, away_norm, bracket)
         if bracket_id is None:
             logger.warning("No bracket match found for %s vs %s", home_norm, away_norm)
             continue
@@ -191,11 +191,11 @@ def _build_alias_lookup(aliases: dict[str, list[str]], bracket: list[dict]) -> d
     return lookup
 
 
-def _normalize_team(api_name: str, alias_lookup: dict[str, str]) -> str | None:
+def normalize_team(api_name: str, alias_lookup: dict[str, str]) -> str | None:
     return alias_lookup.get(api_name.strip().lower())
 
 
-def _find_bracket_match(home_norm: str, away_norm: str, bracket: list[dict]) -> str | None:
+def find_bracket_match(home_norm: str, away_norm: str, bracket: list[dict]) -> str | None:
     for match in bracket:
         if match.get("team_a") is None or match.get("team_b") is None:
             continue
@@ -236,7 +236,7 @@ def _extract_group_letter(group_name: str) -> str | None:
     return letter
 
 
-def _find_group_match(
+def find_group_match(
     home_norm: str,
     away_norm: str,
     group_letter: str,
@@ -245,7 +245,7 @@ def _find_group_match(
 ) -> str | None:
     """Find group match_id by team pair within a group.
 
-    Mirrors _find_bracket_match() at line 150. Uses team pair set equality
+    Mirrors find_bracket_match() at line 150. Uses team pair set equality
     to resolve the match slot. The round_number parameter is available for
     additional filtering if needed in future data versions.
 
@@ -268,10 +268,6 @@ def _find_group_match(
     return None
 
 
-# Public aliases for private helpers used externally by predictors/ (Phase 20)
-normalize_team = _normalize_team
-find_bracket_match = _find_bracket_match
-find_group_match = _find_group_match
 
 
 def process_group_matches(
@@ -340,8 +336,8 @@ def process_group_matches(
         # Normalize team names
         home_name = match.get("home_team", "")
         away_name = match.get("away_team", "")
-        home_norm = _normalize_team(home_name, alias_lookup)
-        away_norm = _normalize_team(away_name, alias_lookup)
+        home_norm = normalize_team(home_name, alias_lookup)
+        away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
             logger.warning(
@@ -351,7 +347,7 @@ def process_group_matches(
 
         # Find group match slot (D-03)
         round_number = match.get("round_number", 0)
-        match_id = _find_group_match(
+        match_id = find_group_match(
             home_norm, away_norm, group_letter, round_number, groups
         )
         if match_id is None:
