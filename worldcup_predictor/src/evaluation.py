@@ -432,14 +432,3 @@ def backtest_tournament(
     }
 
 
-def compare_baselines(before: dict, after: dict) -> dict:
-    b_m, a_m = before.get("metrics", {}), after.get("metrics", {})
-    def delta(key):
-        return round(a_m.get(key, 0) - b_m.get(key, 0), 6)
-    return {
-        "comparison": f"{before.get('model', '?')} vs {after.get('model', '?')}",
-        "before": {"model": before.get("model"), "generated_at": before.get("generated_at"), "n_matches": before.get("n_matches"), "metrics": b_m, "ece": before.get("calibration", {}).get("ece")},
-        "after": {"model": after.get("model"), "generated_at": after.get("generated_at"), "n_matches": after.get("n_matches"), "metrics": a_m, "ece": after.get("calibration", {}).get("ece")},
-        "deltas": {"brier": delta("brier"), "log_loss": delta("log_loss"), "accuracy": delta("accuracy"), "ece": round(after.get("calibration", {}).get("ece", 0) - before.get("calibration", {}).get("ece", 0), 6), "n_matches": a_m.get("n", 0) - b_m.get("n", 0)},
-        "verdict": "IMPROVED" if a_m.get("brier", 0) - b_m.get("brier", 0) < -0.01 else "REGRESSED" if a_m.get("brier", 0) - b_m.get("brier", 0) > 0.01 else "SIMILAR",
-    }

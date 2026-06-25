@@ -7,7 +7,7 @@ import pytest
 from src.evaluation import (
     brier_score, log_loss, compute_metrics,
     calibration_curve, expected_calibration_error,
-    evaluate_all_matches, compare_baselines,
+    evaluate_all_matches,
 )
 
 
@@ -323,28 +323,6 @@ class TestEvaluateAllMatchesSignalName:
             assert result["n_matches"] == 1
         finally:
             constants.DATA_DIR = orig_dir
-
-
-class TestCompareBaselines:
-    def test_different(self):
-        before = {"model": "elo-only", "metrics": {"brier": 0.18, "log_loss": 0.5, "accuracy": 0.7, "n": 10}, "calibration": {"ece": 0.05}}
-        after = {"model": "elo-odds", "metrics": {"brier": 0.15, "log_loss": 0.4, "accuracy": 0.75, "n": 10}, "calibration": {"ece": 0.03}}
-        comp = compare_baselines(before, after)
-        assert comp["deltas"]["brier"] == pytest.approx(-0.03)
-        assert comp["verdict"] == "IMPROVED"
-
-    def test_identical(self):
-        r = {"model": "elo-only", "metrics": {"brier": 0.18, "log_loss": 0.5, "accuracy": 0.7, "n": 10}, "calibration": {"ece": 0.05}}
-        comp = compare_baselines(r, r)
-        assert comp["deltas"]["brier"] == 0.0
-        assert comp["verdict"] == "SIMILAR"
-
-    def test_regressed(self):
-        before = {"model": "a", "metrics": {"brier": 0.15, "log_loss": 0.4, "accuracy": 0.75, "n": 10}, "calibration": {"ece": 0.03}}
-        after = {"model": "b", "metrics": {"brier": 0.2, "log_loss": 0.6, "accuracy": 0.65, "n": 10}, "calibration": {"ece": 0.08}}
-        comp = compare_baselines(before, after)
-        assert comp["deltas"]["brier"] == pytest.approx(0.05)
-        assert comp["verdict"] == "REGRESSED"
 
 
 class TestBacktestTournament:
