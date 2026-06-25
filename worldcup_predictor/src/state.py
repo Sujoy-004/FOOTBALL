@@ -1048,22 +1048,6 @@ def load_run_snapshot(run_id: str, data_dir: Path | str | None = None) -> dict |
         return dict(json.load(f))
 
 
-def load_backtest_report(data_dir: Path | str | None = None) -> dict | None:
-    """Load backtest evaluation report.
-
-    Args:
-        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
-
-    Returns:
-        Dict with backtest report data, or None if the file does not exist.
-    """
-    path = _resolve_data_dir(data_dir) / "eval_backtest_report.json"
-    if not path.exists():
-        return None
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
-
 def save_backtest_report(report: dict, data_dir: Path | str | None = None) -> None:
     """Save backtest evaluation report to eval_backtest_report.json atomically.
 

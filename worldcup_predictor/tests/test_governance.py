@@ -84,26 +84,6 @@ class TestRunSnapshot:
         assert runs_dir.is_dir()
 
 
-class TestBacktestReport:
-    """Tests for state.load_backtest_report() and state.save_backtest_report()."""
-
-    def test_load_backtest_report_not_exists(self, tmp_path):
-        """File missing → returns None."""
-        report = state.load_backtest_report(data_dir=tmp_path)
-        assert report is None
-
-    def test_save_and_load_backtest_report(self, tmp_path):
-        """Save and load backtest report dict, verify keys."""
-        report = {
-            "tournaments": ["2018", "2022"],
-            "n_total_matches": 128,
-            "per_signal": {},
-            "signal_ranking": [],
-        }
-        state.save_backtest_report(report, data_dir=tmp_path)
-        loaded = state.load_backtest_report(data_dir=tmp_path)
-        assert loaded == report
-
 
 # ─── Version increment tests (Task 2) ─────────────────────────────────────
 
