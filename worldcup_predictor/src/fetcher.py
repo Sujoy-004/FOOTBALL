@@ -268,6 +268,12 @@ def _find_group_match(
     return None
 
 
+# Public aliases for private helpers used externally by predictors/ (Phase 20)
+normalize_team = _normalize_team
+find_bracket_match = _find_bracket_match
+find_group_match = _find_group_match
+
+
 def process_group_matches(
     raw_matches: list[dict],
     teams: dict[str, dict],
