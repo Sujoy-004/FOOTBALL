@@ -11,7 +11,7 @@ from collections import defaultdict
 from src import constants
 
 
-MAX_EXPECTED_GOALS = 8.0
+MAX_EXPECTED_GOALS = constants.MAX_EXPECTED_GOALS
 
 _POISSON_BASE_RATE_CACHE: float | None = None
 """Cached Poisson base rate computed from historical data to avoid re-reading file every call."""
@@ -56,13 +56,13 @@ def expected_goals(
     effective_base = base_rate
     if effective_base is None:
         effective_base = _POISSON_BASE_RATE_CACHE if _POISSON_BASE_RATE_CACHE is not None else constants.EXPECTED_GOALS_BASE_RATE
-    adj_base = effective_base * 1.05
+    adj_base = effective_base * constants.HOME_ADVANTAGE_MULTIPLIER
     return min(adj_base * (10.0 ** ((rating_a - rating_b) / 400.0)), MAX_EXPECTED_GOALS)
 
 
 _POISSON_TABLES: dict[float, list[int]] = {}
-_TABLE_BITS = 10
-_TABLE_SIZE = 1 << _TABLE_BITS
+_TABLE_BITS = constants.POISSON_TABLE_BITS
+_TABLE_SIZE = constants.POISSON_TABLE_SIZE
 
 
 def _build_poisson_table(lam: float) -> list[int]:

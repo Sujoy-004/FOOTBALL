@@ -73,10 +73,10 @@ Prevents unrealistically high expectations from extreme Elo gaps."""
 HOME_ADVANTAGE_MULTIPLIER: float = 1.05
 """Home advantage multiplier applied to expected goals (∼+5% boost)."""
 
-_POISSON_TABLE_BITS: int = 10
+POISSON_TABLE_BITS: int = 10
 """Number of random bits for Poisson inverse-CDF lookup table (2^10 = 1024)."""
 
-_POISSON_TABLE_SIZE: int = 1 << _POISSON_TABLE_BITS
+POISSON_TABLE_SIZE: int = 1 << POISSON_TABLE_BITS
 """Number of entries in the precomputed Poisson lookup table (1024)."""
 
 TREND_THRESHOLD: float = 0.005
