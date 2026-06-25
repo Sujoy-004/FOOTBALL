@@ -217,32 +217,6 @@ def save_elo_applied(elo_applied: set[str], data_dir: Path | str | None = None) 
     _atomic_write_json(sorted(elo_applied), path)
 
 
-def load_state_meta(data_dir: Path | str | None = None) -> dict:
-    """Load state metadata (e.g. elo_version).
-
-    Args:
-        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
-
-    Returns:
-        dict: Metadata dict, empty if file does not exist.
-    """
-    path = _resolve_data_dir(data_dir) / "state_meta.json"
-    if not path.exists():
-        return {}
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_state_meta(meta: dict, data_dir: Path | str | None = None) -> None:
-    """Save state metadata (e.g. elo_version).
-
-    Args:
-        meta: Dict of metadata key/value pairs.
-        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
-    """
-    path = _resolve_data_dir(data_dir) / "state_meta.json"
-    _atomic_write_json(meta, path)
-
 
 def load_eloratings_cache(data_dir: Path | str | None = None) -> dict:
     """Load last-known-good Elo cache from eloratings_cache.json.
