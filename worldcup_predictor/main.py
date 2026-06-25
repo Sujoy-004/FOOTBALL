@@ -69,7 +69,7 @@ def _should_run_gov() -> bool:
     now = time.time()
     if _last_gov_time == 0.0:
         return True
-    if now - _last_gov_time >= 3600:  # hourly
+    if now - _last_gov_time >= constants.GOVERNANCE_INTERVAL_SECONDS:
         return True
     return False
 
