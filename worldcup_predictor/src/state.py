@@ -143,17 +143,6 @@ def save_teams(teams: dict[str, dict], data_dir: Path | str | None = None) -> No
     _atomic_write_json(teams, path)
 
 
-def save_bracket(bracket: list[dict], data_dir: Path | str | None = None) -> None:
-    """Save bracket data to bracket.json atomically.
-
-    Args:
-        bracket: List of match objects.
-        data_dir: Directory for the JSON files. Defaults to constants.DATA_DIR.
-    """
-    path = _resolve_data_dir(data_dir) / "bracket.json"
-    _atomic_write_json(bracket, path)
-
-
 def save_played(played: dict[str, dict], data_dir: Path | str | None = None) -> None:
     """Save played match data to played.json atomically.
 

@@ -24,7 +24,6 @@ from src.state import (
     load_signal_cache,
     load_teams,
     migrate_prediction_history,
-    save_bracket,
     save_played,
     save_signal_cache,
     save_teams,
@@ -122,17 +121,6 @@ def test_teams_roundtrip(tmp_path):
     data = {"Argentina": {"elo": 2100}, "France": {"elo": 2050}}
     save_teams(data, data_dir=tmp_path)
     loaded = load_teams(data_dir=tmp_path)
-    assert loaded == data
-
-
-def test_bracket_roundtrip(tmp_path):
-    """save_bracket → load_bracket roundtrip should return identical data."""
-    data = [
-        {"match_id": "R16_1", "round": "R16", "team_a": "Arg", "team_b": "Nig", "source_matches": None, "winner": None},
-        {"match_id": "QF_1", "round": "QF", "team_a": None, "team_b": None, "source_matches": ["R16_1"], "winner": None},
-    ]
-    save_bracket(data, data_dir=tmp_path)
-    loaded = load_bracket(data_dir=tmp_path)
     assert loaded == data
 
 
