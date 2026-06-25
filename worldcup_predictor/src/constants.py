@@ -66,6 +66,22 @@ EXPECTED_GOALS_BASE_RATE: float = 1.25
 """Base expected goals per team per match at Elo-neutral conditions (Elo=1500 vs Elo=1500).
 Used by groups.py Poisson model. Historical World Cup group stage average."""
 
+MAX_EXPECTED_GOALS: float = 8.0
+"""Maximum expected goals per team per match (Poisson lambda cap).
+Prevents unrealistically high expectations from extreme Elo gaps."""
+
+HOME_ADVANTAGE_MULTIPLIER: float = 1.05
+"""Home advantage multiplier applied to expected goals (∼+5% boost)."""
+
+_POISSON_TABLE_BITS: int = 10
+"""Number of random bits for Poisson inverse-CDF lookup table (2^10 = 1024)."""
+
+_POISSON_TABLE_SIZE: int = 1 << _POISSON_TABLE_BITS
+"""Number of entries in the precomputed Poisson lookup table (1024)."""
+
+TREND_THRESHOLD: float = 0.005
+"""Minimum probability change (0.5 pp) to display a trend arrow in the probability table."""
+
 # ─── Elo Sync Constants ──────────────────────────────────────────────────
 
 ELORATINGS_TSV_URL: str = "https://www.eloratings.net/World.tsv"
@@ -256,6 +272,9 @@ GOV_RUNS_DIR: str = "runs"
 
 GOV_INTERVAL_HOURS: int = 1
 """How often to run governance checks (startup + hourly + on drift)."""
+
+GOVERNANCE_INTERVAL_SECONDS: int = 3600
+"""Governance runs at startup and hourly thereafter (1 hour = 3600 seconds)."""
 
 GOV_DRIFT_SIGMA_THRESHOLD: float = 2.0
 """Number of standard deviations above reference baseline that triggers drift alert (D-09)."""
