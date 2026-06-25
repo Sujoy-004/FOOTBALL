@@ -31,9 +31,9 @@ import requests
 from src import constants
 from src.constants import predictions_url_for_league
 from src.fetcher import (
-    _find_bracket_match,
-    _find_group_match,
-    _normalize_team,
+    find_bracket_match,
+    find_group_match,
+    normalize_team,
 )
 
 logger = logging.getLogger(__name__)
@@ -159,10 +159,10 @@ def _find_match_id(
     """
     groups_data = groups.get("groups", groups)
     for group_letter in groups_data:
-        match_id = _find_group_match(home_norm, away_norm, group_letter, 0, groups)
+        match_id = find_group_match(home_norm, away_norm, group_letter, 0, groups)
         if match_id:
             return match_id
-    return _find_bracket_match(home_norm, away_norm, bracket)
+    return find_bracket_match(home_norm, away_norm, bracket)
 
 
 # ─── Response Parsing ─────────────────────────────────────────────────────
@@ -213,8 +213,8 @@ def parse_catboost_response(
         # Normalize team names
         home_name = prediction.get("home_team", "")
         away_name = prediction.get("away_team", "")
-        home_norm = _normalize_team(home_name, alias_lookup)
-        away_norm = _normalize_team(away_name, alias_lookup)
+        home_norm = normalize_team(home_name, alias_lookup)
+        away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
             logger.debug(

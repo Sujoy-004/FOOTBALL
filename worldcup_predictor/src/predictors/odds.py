@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from src import constants
-from src.fetcher import _find_bracket_match, _find_group_match, _normalize_team
+from src.fetcher import find_bracket_match, find_group_match, normalize_team
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +114,8 @@ def parse_odds_response(
 
         home_name = event.get("home_team", "")
         away_name = event.get("away_team", "")
-        home_norm = _normalize_team(home_name, alias_lookup)
-        away_norm = _normalize_team(away_name, alias_lookup)
+        home_norm = normalize_team(home_name, alias_lookup)
+        away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
             logger.debug("Skipping event %s: unmatchable teams %r vs %r",
@@ -128,10 +128,10 @@ def parse_odds_response(
 
         if group_letter is not None:
             round_number = event.get("round_number", 0)
-            match_id = _find_group_match(home_norm, away_norm, group_letter,
-                                          round_number, groups)
-        elif bracket is not None:
-            match_id = _find_bracket_match(home_norm, away_norm, bracket)
+            match_id = find_group_match(home_norm, away_norm, group_letter,
+                round_number, groups)
+        else:
+            match_id = find_bracket_match(home_norm, away_norm, bracket)
 
         if match_id is None:
             logger.debug("Skipping event %s: no match_id found for %s vs %s",

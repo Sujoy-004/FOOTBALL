@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from src.fetcher import process_group_matches, _extract_group_letter, _find_group_match
+from src.fetcher import process_group_matches, _extract_group_letter, find_group_match
 from src.groups import (
     compute_standings,
     rank_third_placed,
