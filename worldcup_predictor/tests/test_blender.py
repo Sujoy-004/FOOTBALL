@@ -9,7 +9,6 @@ Comprehensive test coverage for all blender functions including:
 - Blend weights (TestBlendWeights)
 - Blend predictions (TestBlend)
 - Rolling Brier (TestRollingBrier)
-- LOO-CV (TestLOOCV)
 - Poisson base rate (TestPoissonBaseRate)
 """
 
@@ -23,7 +22,6 @@ from src.blender import (
     apply_calibration,
     compute_blend_weights,
     blend_predictions,
-    loo_cv_blended_brier,
     compute_poisson_base_rate,
     compute_rolling_brier,
     calibrate_and_blend,
@@ -308,46 +306,6 @@ class TestRollingBrier:
         # Should only use last 5 entries (i=5 to i=9)
         expected = sum(((0.5 + i * 0.01 - 1.0) ** 2 for i in range(5, 10))) / 5
         assert abs(result - expected) < 0.000001
-
-
-class TestLOOCV:
-    """Tests for loo_cv_blended_brier function."""
-    
-    def test_perfect_predictions(self):
-        """all preds=actuals → LOO-CV Brier near 0."""
-        histories = {
-            "signal1": ([0.8, 0.7, 0.9], [1.0, 1.0, 1.0]),
-            "signal2": ([0.6, 0.5, 0.7], [1.0, 1.0, 1.0])
-        }
-        result = loo_cv_blended_brier(histories)
-        assert result < 0.1
-    
-    def test_worse_than_climatology(self):
-        """all preds=0.5, actuals vary → LOO-CV Brier > 0."""
-        histories = {
-            "signal1": ([0.5, 0.5, 0.5], [1.0, 0.0, 1.0]),
-            "signal2": ([0.5, 0.5, 0.5], [0.0, 1.0, 0.0])
-        }
-        result = loo_cv_blended_brier(histories)
-        assert result > 0.0
-    
-    def test_two_signals(self):
-        """two signals with different accuracy → LOO-CV does not crash, returns float in [0,1]."""
-        histories = {
-            "signal1": ([0.8, 0.2, 0.9], [1.0, 0.0, 1.0]),
-            "signal2": ([0.3, 0.7, 0.2], [0.0, 1.0, 0.0])
-        }
-        result = loo_cv_blended_brier(histories)
-        assert isinstance(result, float)
-        assert 0.0 <= result <= 1.0
-    
-    def test_insufficient_data(self):
-        """n=1 → returns 1.0."""
-        histories = {
-            "signal1": ([0.5], [1.0])
-        }
-        result = loo_cv_blended_brier(histories)
-        assert result == 1.0
 
 
 class TestPoissonBaseRate:

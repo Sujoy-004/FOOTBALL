@@ -259,78 +259,7 @@ def blend_predictions(signal_preds: dict[str, float], weights: dict[str, float])
     return round(blended, 6)
 
 
-def loo_cv_blended_brier(histories: dict[str, tuple[list[float], list[float]]]) -> float:
-    """
-    Takes aligned per-signal prediction/actual pairs: {signal_name: (predictions_list, actuals_list)}
-    All signal lists must be the same length (aligned by match index).
-    
-    Per D-11: Leave-one-out cross-validation:
-    For each index i:
-      1. For each signal s: train on all indices except i via calibrate_signal(train_preds, train_actuals, threshold=1)
-      2. Compute train Brier for each signal via compute_metrics(train_preds, train_actuals)["brier"]
-      3. Compute calibration params (A_s, B_s) from training data
-      4. Compute calibrated probability for held-out sample i: apply_calibration(pred_i, A_s, B_s)
-      5. Compute blend weights from training Briers via compute_blend_weights(train_briers)
-      6. Blend calibrated probs via blend_predictions
-      7. Brier error: (p_blended - actual_i) ** 2
-    Return mean of all Brier errors.
-    
-    If n < 2 or no signals: return 1.0
-    """
-    if len(histories) < 2:
-        return 1.0
-    
-    # Get length from first signal
-    first_signal = next(iter(histories.values()))
-    n = len(first_signal[0])
-    
-    if n < 2:
-        return 1.0
-    
-    total_brier = 0.0
-    
-    for i in range(n):
-        # Collect training data for each signal
-        train_histories = {}
-        for signal, (preds, actuals) in histories.items():
-            train_preds = preds[:i] + preds[i+1:]
-            train_actuals = actuals[:i] + actuals[i+1:]
-            train_histories[signal] = (train_preds, train_actuals)
-        
-        # Compute calibration params for each signal
-        calibration_params = {}
-        train_briers = {}
-        
-        for signal, (train_preds, train_actuals) in train_histories.items():
-            # Fit calibration
-            A, B = calibrate_signal(train_preds, train_actuals, threshold=1)
-            calibration_params[signal] = (A, B)
-            
-            # Compute train Brier using simple Brier formula (avoid circular import)
-            if train_preds:
-                brier_sum = sum((p - a) ** 2 for p, a in zip(train_preds, train_actuals))
-                train_briers[signal] = brier_sum / len(train_preds)
-            else:
-                train_briers[signal] = 1.0
-        
-        # Compute blend weights
-        weights = compute_blend_weights(train_briers)
-        
-        # Compute calibrated probabilities for held-out sample
-        calibrated_probs = {}
-        for signal, (preds, actuals) in histories.items():
-            A, B = calibration_params[signal]
-            calibrated_probs[signal] = apply_calibration(preds[i], A, B)
-        
-        # Blend calibrated probabilities
-        blended_prob = blend_predictions(calibrated_probs, weights)
-        
-        # Compute Brier error - get actual_i from first signal (all aligned)
-        actual_i = histories[next(iter(histories.keys()))][1][i]
-        brier_error = (blended_prob - actual_i) ** 2
-        total_brier += brier_error
-    
-    return total_brier / n
+
 
 
 def compute_poisson_base_rate(match_data_path: str | None = None) -> float:
