@@ -913,21 +913,6 @@ def migrate_prediction_history(data_dir: Path | str | None = None) -> int:
     return n_migrated
 
 
-def load_eval_baseline_report(data_dir: Path | str | None = None) -> dict | None:
-    """Load evaluation baseline report.
-
-    Args:
-        data_dir: Directory containing the JSON files. Defaults to constants.DATA_DIR.
-
-    Returns:
-        Baseline report dict, or None if file doesn't exist.
-    """
-    path = _resolve_data_dir(data_dir) / "eval_baseline_report.json"
-    if not path.exists():
-        return None
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
 
 def save_eval_baseline_report(
     report: dict,
