@@ -992,12 +992,7 @@ class TestPerIterationHistory:
 
 
 class TestGatherSignalData:
-    """Tests for _gather_signal_data (display blend logic).
-
-    These capture the current (flawed) sequential-averaging behavior.
-    After Commit 4.5 fixes the blend logic, expected values will change
-    to reflect proper Brier-weighted blending.
-    """
+    """Tests for _gather_signal_data (display blend logic)."""
 
     def _make_cache(self, mid: str, prob: float | None) -> dict:
         return {"matches": {mid: {"probability": prob}}}
@@ -1005,7 +1000,7 @@ class TestGatherSignalData:
     def _make_blend_params(self, match_probs: dict[str, float]) -> dict:
         return {
             "calibration_params": {},
-            "blend_weights": {"elo": 0.25, "market_odds": 0.25, "catboost": 0.5},
+            "blend_weights": {},
             "match_probs": match_probs,
         }
 
@@ -1035,96 +1030,69 @@ class TestGatherSignalData:
     def played_groups(self):
         return {}
 
-    def test_all_three_signals_sequential_average(self, teams, groups, bracket, played, played_groups):
-        """All 3 signals (elo, odds, cb) — current logic does sequential averaging."""
+    def test_uses_blend_params_when_available(self, teams, groups, bracket, played, played_groups):
+        """blend_params.match_probs is used instead of raw Elo."""
         from main import _gather_signal_data
 
-        odds_cache = self._make_cache("GS_A_01", 0.7)
-        cb_cache = self._make_cache("GS_A_01", 0.5)
-
+        blend_params = self._make_blend_params({"GS_A_01": 0.723})
         result = _gather_signal_data(
             teams=teams, groups=groups, bracket=bracket,
-            odds_cache=odds_cache, cb_cache=cb_cache,
+            odds_cache=None, cb_cache=None,
             form_cache=None, lineup_cache=None,
             xg_overrides=None, played=played, played_groups=played_groups,
+            blend_params=blend_params,
         )
         assert len(result) == 1
-        entry = result[0]
-        assert entry["match_id"] == "GS_A_01"
-        # Sequential: elo≈0.6401, (0.6401+0.7)/2=0.6700, (0.6700+0.5)/2=0.5850
-        assert entry["blended"] == 0.585
+        assert result[0]["blended"] == 0.723
 
-    def test_two_signals_elo_and_odds(self, teams, groups, bracket, played, played_groups):
-        """Only elo + odds — sequential average of two."""
-        from main import _gather_signal_data
-
-        odds_cache = self._make_cache("GS_A_01", 0.7)
-        cb_cache = None
-
-        result = _gather_signal_data(
-            teams=teams, groups=groups, bracket=bracket,
-            odds_cache=odds_cache, cb_cache=cb_cache,
-            form_cache=None, lineup_cache=None,
-            xg_overrides=None, played=played, played_groups=played_groups,
-        )
-        assert len(result) == 1
-        entry = result[0]
-        # Sequential: elo≈0.6401, (0.6401+0.7)/2=0.6700
-        assert entry["blended"] == 0.67
-
-    def test_one_signal_fallback_to_elo(self, teams, groups, bracket, played, played_groups):
-        """Only elo available — blended == elo."""
-        import math
+    def test_falls_back_to_elo_without_blend_params(self, teams, groups, bracket, played, played_groups):
+        """Without blend_params, falls back to Elo expected_score."""
         from main import _gather_signal_data
         from src.elo import expected_score
 
+        result = _gather_signal_data(
+            teams=teams, groups=groups, bracket=bracket,
+            odds_cache=None, cb_cache=None,
+            form_cache=None, lineup_cache=None,
+            xg_overrides=None, played=played, played_groups=played_groups,
+        )
+        assert len(result) == 1
         elo_p = expected_score(2000, 1900)
-        result = _gather_signal_data(
-            teams=teams, groups=groups, bracket=bracket,
-            odds_cache=None, cb_cache=None,
-            form_cache=None, lineup_cache=None,
-            xg_overrides=None, played=played, played_groups=played_groups,
-        )
-        assert len(result) == 1
-        entry = result[0]
-        assert entry["blended"] == round(elo_p, 4)
+        assert result[0]["blended"] == round(elo_p, 4)
 
-    def test_missing_team_fallback_to_05(self, groups, bracket, played, played_groups):
-        """If team missing from teams, elo falls back to 0.5."""
-        from main import _gather_signal_data
-
-        teams = {"Arg": {"elo": 2000}}  # Bra missing
-        result = _gather_signal_data(
-            teams=teams, groups=groups, bracket=bracket,
-            odds_cache=None, cb_cache=None,
-            form_cache=None, lineup_cache=None,
-            xg_overrides=None, played=played, played_groups=played_groups,
-        )
-        assert len(result) == 1
-        entry = result[0]
-        assert entry["blended"] == 0.5
-
-    def test_form_and_lineup_not_in_blend(self, teams, groups, bracket, played, played_groups):
-        """form and lineup_strength are collected in signals dict but excluded from blend."""
+    def test_blend_params_per_match_fallback(self, teams, groups, bracket, played, played_groups):
+        """Match absent from match_probs falls back to Elo."""
         from main import _gather_signal_data
         from src.elo import expected_score
 
-        form_cache = self._make_cache("GS_A_01", 0.55)
-        lineup_cache = self._make_cache("GS_A_01", 0.52)
-
+        blend_params = self._make_blend_params({"OTHER_MATCH": 0.8})
         result = _gather_signal_data(
             teams=teams, groups=groups, bracket=bracket,
             odds_cache=None, cb_cache=None,
-            form_cache=form_cache, lineup_cache=lineup_cache,
+            form_cache=None, lineup_cache=None,
             xg_overrides=None, played=played, played_groups=played_groups,
+            blend_params=blend_params,
         )
         assert len(result) == 1
-        entry = result[0]
-        # Only elo available: blended == elo
         elo_p = expected_score(2000, 1900)
-        assert entry["blended"] == round(elo_p, 4)
-        assert entry["signals"]["form"] == 0.55
-        assert entry["signals"]["lineup"] == 0.52
+        assert result[0]["blended"] == round(elo_p, 4)
+
+    def test_no_match_probs_fallback_to_elo(self, teams, groups, bracket, played, played_groups):
+        """blend_params without match_probs key falls back to Elo."""
+        from main import _gather_signal_data
+        from src.elo import expected_score
+
+        blend_params = {"calibration_params": {}, "blend_weights": {}}
+        result = _gather_signal_data(
+            teams=teams, groups=groups, bracket=bracket,
+            odds_cache=None, cb_cache=None,
+            form_cache=None, lineup_cache=None,
+            xg_overrides=None, played=played, played_groups=played_groups,
+            blend_params=blend_params,
+        )
+        assert len(result) == 1
+        elo_p = expected_score(2000, 1900)
+        assert result[0]["blended"] == round(elo_p, 4)
 
     def test_signals_dict_structure(self, teams, groups, bracket, played, played_groups):
         """Verify all signals are present in the output dict."""
@@ -1150,3 +1118,18 @@ class TestGatherSignalData:
         assert signals["catboost"] == 0.5
         assert signals["form"] == 0.55
         assert signals["lineup"] == 0.52
+
+    def test_missing_team_fallback_to_05(self, groups, bracket, played, played_groups):
+        """If team missing from teams, elo falls back to 0.5."""
+        from main import _gather_signal_data
+
+        teams = {"Arg": {"elo": 2000}}  # Bra missing
+        result = _gather_signal_data(
+            teams=teams, groups=groups, bracket=bracket,
+            odds_cache=None, cb_cache=None,
+            form_cache=None, lineup_cache=None,
+            xg_overrides=None, played=played, played_groups=played_groups,
+        )
+        assert len(result) == 1
+        entry = result[0]
+        assert entry["blended"] == 0.5

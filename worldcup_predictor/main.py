@@ -650,6 +650,7 @@ def _gather_signal_data(
     xg_overrides: dict | None,
     played: dict,
     played_groups: dict | None = None,
+    blend_params: dict | None = None,
 ) -> list[dict]:
     """Build per-match signal data for the match detail table.
 
@@ -664,6 +665,9 @@ def _gather_signal_data(
         xg_overrides: xG overrides dict.
         played: Played knockout matches.
         played_groups: Played group matches.
+        blend_params: Optional result from calibrate_and_blend() for
+                      correct Brier-weighted blend. Falls back to Elo
+                      when unavailable.
 
     Returns:
         List of match data dicts with signals.
@@ -709,12 +713,10 @@ def _gather_signal_data(
         if xg_overrides and mid in xg_overrides:
             xg_val = xg_overrides[mid]
 
-        # Compute blended from available signals (same logic as blender)
-        blended = elo_prob
-        if odds_prob is not None:
-            blended = (blended + odds_prob) / 2
-        if cb_prob is not None:
-            blended = (blended + cb_prob) / 2
+        # Compute blended from calibrate_and_blend match_probs when available
+        # Falls back to Elo if no blend_params (same as simulation does).
+        match_probs = (blend_params or {}).get("match_probs", {})
+        blended = match_probs.get(mid, elo_prob)
 
         result.append({
             "match_id": mid,
@@ -1108,6 +1110,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                 teams, groups, bracket,
                 odds_cache, cb_cache, form_cache, lineup_cache,
                 xg_overrides, played, played_groups,
+                blend_params=blend_params,
             )
             if _match_detail_enabled == "table":
                 output.print_match_detail_table(matches_data, _prev_signal_data)
