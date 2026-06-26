@@ -271,7 +271,7 @@ class TestSimulateGroupMatches:
         elo_ratings["South Korea"] = 1650
         elo_ratings["Czech Republic"] = 1468
         rng = random.Random(42)
-        results = simulate_group_matches(sample_groups, sample_teams, elo_ratings, rng, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        results = simulate_group_matches(sample_groups, sample_teams, elo_ratings, rng)
         assert len(results) == 1, f"Expected 1 group, got {len(results)}"
         assert "A" in results, "Missing group A"
         assert len(results["A"]) == 6, (
@@ -287,7 +287,7 @@ class TestSimulateGroupMatches:
         teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = random.Random(42)
-        results = simulate_group_matches(groups, teams, elo, rng, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        results = simulate_group_matches(groups, teams, elo, rng)
         assert len(results) == 12
         for g in "ABCDEFGHIJKL":
             assert g in results, f"Missing group {g}"
@@ -306,8 +306,7 @@ class TestSimulateGroupMatches:
         sample_teams_dict = {n: {"elo": e} for n, e in elo_ratings.items()}
         rng = random.Random(42)
         results = simulate_group_matches(
-            sample_groups, sample_teams_dict, elo_ratings, rng,
-            base_rate=constants.EXPECTED_GOALS_BASE_RATE,
+            sample_groups, sample_teams_dict, elo_ratings, rng
         )
         teams_seen = set()
         for mid, match in results["A"].items():
@@ -333,7 +332,7 @@ class TestSimulateGroupMatches:
                 original_winners[match["match_id"]] = match.get("winner")
 
         rng = random.Random(42)
-        _ = simulate_group_matches(sample_groups, sample_teams_dict, elo_ratings, rng, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        _ = simulate_group_matches(sample_groups, sample_teams_dict, elo_ratings, rng)
 
         # Verify no mutation
         for g, gdata in sample_groups["groups"].items():
@@ -350,8 +349,8 @@ class TestSimulateGroupMatches:
         groups = json.load(open(data_dir / "groups.json", encoding="utf-8"))
         teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
-        r1 = simulate_group_matches(groups, teams, elo, random.Random(42), base_rate=constants.EXPECTED_GOALS_BASE_RATE)
-        r2 = simulate_group_matches(groups, teams, elo, random.Random(42), base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        r1 = simulate_group_matches(groups, teams, elo, random.Random(42))
+        r2 = simulate_group_matches(groups, teams, elo, random.Random(42))
         assert r1 == r2, "Same seed should produce identical results"
 
 
@@ -376,7 +375,7 @@ class TestFairPlayCards:
 
         for iteration in range(1000):
             rng = random.Random(iteration)
-            results = simulate_group_matches(groups, teams, elo, rng, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+            results = simulate_group_matches(groups, teams, elo, rng)
             for g, matches in results.items():
                 for mid, m in matches.items():
                     total_yc += m["yellow_cards_a"] + m["yellow_cards_b"]
@@ -1162,7 +1161,7 @@ class TestResolveR32:
         annex_c = json.load(open(data_dir / "annex_c.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
-        results = simulate_group_matches(groups, teams, elo, rng, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        results = simulate_group_matches(groups, teams, elo, rng)
         standings = compute_standings(results, elo)
         third = rank_third_placed(standings)
         advancers = select_advancers(standings, third)
@@ -1186,7 +1185,7 @@ class TestResolveR32:
         teams = json.load(open(data_dir / "teams.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
-        results = simulate_group_matches(groups, teams, elo, rng, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        results = simulate_group_matches(groups, teams, elo, rng)
         standings = compute_standings(results, elo)
         third = rank_third_placed(standings)
         # Verify the key built from advancing groups
@@ -1246,7 +1245,7 @@ class TestResolveR32:
         annex_c = json.load(open(data_dir / "annex_c.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
-        results = simulate_group_matches(groups, teams, elo, rng, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        results = simulate_group_matches(groups, teams, elo, rng)
         standings = compute_standings(results, elo)
         third = rank_third_placed(standings)
         advancers = select_advancers(standings, third)
@@ -1275,7 +1274,7 @@ class TestResolveR32:
         annex_c = json.load(open(data_dir / "annex_c.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
-        results = simulate_group_matches(groups, teams, elo, rng, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        results = simulate_group_matches(groups, teams, elo, rng)
         standings = compute_standings(results, elo)
         third = rank_third_placed(standings)
         advancers = select_advancers(standings, third)
@@ -1306,7 +1305,7 @@ class TestResolveR32:
         annex_c = json.load(open(data_dir / "annex_c.json", encoding="utf-8"))
         elo = {n: v["elo"] for n, v in teams.items()}
         rng = __import__("random").Random(42)
-        results = simulate_group_matches(groups, teams, elo, rng, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        results = simulate_group_matches(groups, teams, elo, rng)
         # Invariant 1: 12 groups, 6 matches each
         assert len(results) == 12, f"Expected 12 groups, got {len(results)}"
         for g in "ABCDEFGHIJKL":
