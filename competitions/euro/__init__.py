@@ -1,7 +1,5 @@
-"""Euro 2024 Predictor — uses worldcup_predictor.src for generic modules."""
+"""Euro 2024 Predictor — uses football_core for generic tournament primitives."""
 import sys
 from pathlib import Path
 
-_wc_path = str(Path(__file__).resolve().parent.parent.parent / "worldcup_predictor")
-if _wc_path not in sys.path:
-    sys.path.insert(0, _wc_path)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "worldcup_predictor"))

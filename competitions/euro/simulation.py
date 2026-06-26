@@ -3,9 +3,8 @@
 import random
 from collections import defaultdict
 
-import competitions.euro  # noqa: F401 — ensures worldcup_predictor is on sys.path
-from src import constants as wc_constants
-from src.elo import expected_score
+from football_core import constants
+from football_core.elo import expected_score
 from src.groups import (
     compute_standings,
     precompute_matchup_lambdas,
@@ -21,7 +20,7 @@ def expected_goals(rating_a: float, rating_b: float, base_rate: float) -> float:
     adj_base = base_rate * config.HOME_ADVANTAGE_MULTIPLIER
     return min(
         adj_base * (10.0 ** ((rating_a - rating_b) / 400.0)),
-        wc_constants.MAX_EXPECTED_GOALS,
+        constants.MAX_EXPECTED_GOALS,
     )
 
 

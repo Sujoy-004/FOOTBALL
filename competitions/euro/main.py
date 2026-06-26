@@ -18,16 +18,16 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-import competitions.euro  # noqa: F401 — ensures worldcup_predictor is on sys.path
-from src import elo, state
-from src.constants import (
+from football_core import elo
+from football_core import state
+from football_core.constants import (
     API_TIMEOUT, POLL_INTERVAL,
     ODDS_CACHE_TTL_HOURS, CATBOOST_CACHE_TTL_HOURS,
     ODDS_CACHE_FILE, CATBOOST_CACHE_FILE,
 )
-from src.fetcher import fetch_raw_matches, process_group_matches, process_matches
-from src.predictors.odds import fetch_and_cache_odds
-from src.predictors.catboost import fetch_and_cache_catboost
+from football_core.fetcher import fetch_raw_matches, process_group_matches, process_matches
+from football_core.predictors.odds import fetch_and_cache_odds
+from football_core.predictors.catboost import fetch_and_cache_catboost
 
 from competitions.euro import config, display
 from competitions.euro.simulation import run_full_simulation, resolve_knockout_slot_teams
