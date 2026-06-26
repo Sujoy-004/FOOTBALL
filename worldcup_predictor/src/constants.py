@@ -1,7 +1,27 @@
-"""Constants for the World Cup predictor."""
+"""Constants for the World Cup predictor.
+
+Extends football_core.constants with WC-specific values."""
 
 import os
 from pathlib import Path
+
+from football_core.constants import (
+    K_FACTOR,
+    DEFAULT_ELO,
+    MAX_EXPECTED_GOALS,
+    HOME_ADVANTAGE_MULTIPLIER,
+    POISSON_TABLE_BITS,
+    POISSON_TABLE_SIZE,
+    EXPECTED_GOALS_BASE_RATE,
+    ELO_SYNC_RETRY_BACKOFFS,
+    ELO_SYNC_TIMEOUT,
+    ELO_DRIFT_TOLERANCE,
+    ELO_BLEND_THRESHOLD,
+    ELO_BLEND_FACTOR,
+    ELO_STALENESS_WARN_HOURS,
+    ELORATINGS_TSV_URL,
+    API_TIMEOUT,
+)
 
 # ─── Multi-League Framework (Phase 19) ─────────────────────────────────────
 
@@ -19,33 +39,19 @@ def api_url_for_league(league_id: int) -> str:
     return f"https://sports.bzzoiro.com/api/events/?league_id={league_id}&limit=200"
 
 
-def predictions_url_for_league(league_id: int) -> str:
-    """Build BSD predictions API URL for a given league ID."""
-    return f"https://sports.bzzoiro.com/api/predictions/?league={league_id}"
-
-
-# ─── Core Constants ────────────────────────────────────────────────────────
-
-K_FACTOR: int = 60
-"""Default K-factor for World Cup finals matches (eloratings.net standard)."""
-
-DEFAULT_ELO: int = 1500
-"""Starting Elo rating for new teams not yet in the system."""
+# ─── World-Cup-specific Constants ───────────────────────────────────────────
 
 DATA_DIR: Path = Path(__file__).resolve().parent.parent / "data"
 """Directory containing JSON state files (teams.json, bracket.json, played.json)."""
 
 API_URL: str = "https://sports.bzzoiro.com/api/events/?league_id=27&limit=200"
-"""BSD (Bzzoiro Sports Data) API endpoint for World Cup matches (post-filtered for finished status in fetcher)."""
+"""BSD API endpoint for World Cup matches."""
 
 WC_START_DATE: str = "2026-06-11"
 """Tournament start date for historical catch-up URL construction."""
 
-API_TIMEOUT: int = 10
-"""HTTP request timeout in seconds for Football-Data.org API calls."""
-
 POLL_INTERVAL: int = int(os.environ.get("POLL_INTERVAL", "60"))
-"""Default polling interval in seconds between API fetch cycles (overridable via POLL_INTERVAL env var)."""
+"""Default polling interval in seconds between API fetch cycles."""
 
 GROUP_COUNT: int = 12
 """Number of groups in the 48-team format (A–L)."""
@@ -60,56 +66,18 @@ ANNEX_C_ENTRIES: int = 495
 """Number of entries in Annex C third-place lookup table = C(12,8)."""
 
 ANNEX_C_WINNER_GROUPS: tuple[str, ...] = ("A", "B", "D", "E", "G", "I", "K", "L")
-"""Group winners that host third-place teams in R32 (derivable from Annex C structure; hardcoded for convenience)."""
-
-EXPECTED_GOALS_BASE_RATE: float = 1.25
-"""Base expected goals per team per match at Elo-neutral conditions (Elo=1500 vs Elo=1500).
-Used by groups.py Poisson model. Historical World Cup group stage average."""
-
-MAX_EXPECTED_GOALS: float = 8.0
-"""Maximum expected goals per team per match (Poisson lambda cap).
-Prevents unrealistically high expectations from extreme Elo gaps."""
-
-HOME_ADVANTAGE_MULTIPLIER: float = 1.05
-"""Home advantage multiplier applied to expected goals (∼+5% boost)."""
-
-POISSON_TABLE_BITS: int = 10
-"""Number of random bits for Poisson inverse-CDF lookup table (2^10 = 1024)."""
-
-POISSON_TABLE_SIZE: int = 1 << POISSON_TABLE_BITS
-"""Number of entries in the precomputed Poisson lookup table (1024)."""
+"""Group winners that host third-place teams in R32."""
 
 TREND_THRESHOLD: float = 0.005
 """Minimum probability change (0.5 pp) to display a trend arrow in the probability table."""
 
 # ─── Elo Sync Constants ──────────────────────────────────────────────────
 
-ELORATINGS_TSV_URL: str = "https://www.eloratings.net/World.tsv"
-"""URL for eloratings.net World Cup Elo data in TSV format (D-05)."""
-
 ELO_SYNC_INTERVAL_HOURS: int = 24
 """How often to re-sync from eloratings.net in hours (D-02)."""
 
 ELO_SYNC_CATCHUP_HOURS: int = 36
 """If last sync older than this, catch up immediately instead of waiting for next window (D-03)."""
-
-ELO_SYNC_RETRY_BACKOFFS: tuple[float, ...] = (1.0, 2.0, 4.0)
-"""Exponential backoff in seconds between eloratings.net fetch retries (D-17)."""
-
-ELO_SYNC_TIMEOUT: int = 15
-"""HTTP timeout in seconds for eloratings.net fetch requests."""
-
-ELO_DRIFT_TOLERANCE: int = 10
-"""Drift below this threshold in points is ignored during sync (D-11)."""
-
-ELO_BLEND_THRESHOLD: int = 30
-"""Drift above this threshold triggers overwrite+flag; below triggers 50%% blend (D-11)."""
-
-ELO_BLEND_FACTOR: float = 0.5
-"""Blend factor when drift is between tolerance and threshold (D-11)."""
-
-ELO_STALENESS_WARN_HOURS: tuple[int, ...] = (24, 48, 72, 168)
-"""Staleness thresholds in hours for graduated warnings: green, info, yellow, red, critical (D-16)."""
 
 ELORATINGS_TEAM_CODES: dict[str, str] = {
     "AR": "Argentina",

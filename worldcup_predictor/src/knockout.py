@@ -7,52 +7,22 @@ from src import constants
 from src.elo import expected_score
 from src.groups import (
     compute_standings,
-    precompute_matchup_lambdas,
     rank_third_placed,
     select_advancers,
     resolve_r32_matchups,
+)
+from football_core.groups import (
+    precompute_matchup_lambdas,
     simulate_group_matches,
+)
+from football_core.knockout import (
+    _build_round_map,
+    _simulate_knockout_round,
+    _get_blended_prob,
 )
 
 ROUND_ORDER = ["R16", "QF", "SF", "FINAL"]
 ROUND_KEYS = {"QF": "qf", "SF": "sf", "FINAL": "final"}
-
-
-def _get_blended_prob(
-    match_id: str,
-    team_a: str,
-    team_b: str,
-    blend_params: dict | None,
-    elo_ratings: dict[str, float],
-) -> float:
-    """Return blended win probability or fall back to Elo expected_score.
-
-    blend_params is None or dict with optional keys:
-        "match_probs": dict[str, float]  # match_id -> blended_prob
-    If match_id found in match_probs, returns that probability.
-    Otherwise falls back to expected_score(team_a_elo, team_b_elo).
-    This provides graceful degradation when signal data is unavailable
-    for dynamically-determined matchups (R32+).
-    """
-    if blend_params:
-        match_probs = blend_params.get("match_probs", {})
-        if match_id in match_probs:
-            return match_probs[match_id]
-    return expected_score(elo_ratings[team_a], elo_ratings[team_b])
-
-
-def _build_round_map(bracket: list[dict]) -> dict[str, list[dict]]:
-    round_map: dict[str, list[dict]] = {}
-    for match in bracket:
-        r = match["round"]
-        if r == "R32":
-            continue
-        if r not in round_map:
-            round_map[r] = []
-        round_map[r].append(match)
-    for r in round_map:
-        round_map[r].sort(key=lambda m: m["match_id"])
-    return round_map
 
 
 def _simulate_r32_resolved(
@@ -97,40 +67,6 @@ def _simulate_r16(
             winner_progression[mid] = team_a if rng.random() < p_a else team_b
 
 
-def _simulate_knockout_round(
-    round_map: dict[str, list[dict]],
-    round_name: str,
-    played: dict[str, dict],
-    winner_progression: dict[str, str],
-    sf_losers: dict[str, str | None] | None,
-    rng: random.Random,
-    elo_ratings: dict[str, float],
-    blend_params: dict | None = None,
-) -> None:
-    for match in round_map.get(round_name, []):
-        mid = match["match_id"]
-        if mid in played:
-            winner_progression[mid] = played[mid]["winner"]
-            if sf_losers is not None and round_name == "SF":
-                sf_losers[mid] = None
-            continue
-        sources = match["source_matches"]
-        teams_in_match = [winner_progression[s] for s in sources]
-        if len(teams_in_match) == 1:
-            winner_progression[mid] = teams_in_match[0]
-        else:
-            team_a, team_b = teams_in_match[0], teams_in_match[1]
-            p_a = _get_blended_prob(mid, team_a, team_b, blend_params, elo_ratings)
-            if rng.random() < p_a:
-                winner_progression[mid] = team_a
-                if sf_losers is not None and round_name == "SF":
-                    sf_losers[mid] = team_b
-            else:
-                winner_progression[mid] = team_b
-                if sf_losers is not None and round_name == "SF":
-                    sf_losers[mid] = team_a
-
-
 def _simulate_tpp(
     round_map: dict[str, list[dict]],
     played: dict[str, dict],
@@ -162,36 +98,7 @@ def resolve_knockout_slot_teams(
     annex_c: dict,
     known_winners: dict[str, str],
 ) -> dict[str, dict]:
-    """Resolve all resolvable knockout bracket slots to team names.
-
-    Uses real group results (played_groups) + simulation for unplayed group
-    matches to determine group standings. Resolves R32 via Annex C. Walks
-    source_matches for R16+ using known winners. Returns only slots where
-    both team_a and team_b are determinable.
-
-    Args:
-        groups: Group definitions dict (with 'groups' wrapper key).
-        teams: Dict mapping team name to team data.
-        played_groups: Dict of played group match results (from played_groups.json).
-        bracket: Full knockout bracket from bracket.json.
-        annex_c: Annex C third-place lookup table.
-        known_winners: Dict of match_id -> winner team name for already-known
-                       knockout results (from played.json).
-
-    Returns:
-        Dict of {match_id: {"team_a": str, "team_b": str}} for every
-        bracket slot where both teams are currently known.
-    """
     import random
-
-    from src.groups import (
-        compute_standings,
-        precompute_matchup_lambdas,
-        rank_third_placed,
-        select_advancers,
-        resolve_r32_matchups,
-        simulate_group_matches,
-    )
 
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
     rng = random.Random(0)
@@ -262,36 +169,12 @@ def run_full_simulation(
     blend_params: dict | None = None,
     xg_overrides: dict[str, tuple[float, float]] | None = None,
 ) -> dict[str, dict[str, float]]:
-    """Run full tournament simulation: group stage -> Annex C -> knockout.
-
-    Args:
-        teams: Dict of team name -> team data.
-        groups: Group definitions dict.
-        bracket: Knockout bracket match list.
-        annex_c: Annex C third-place lookup table.
-        played: Dict of played knockout matches.
-        iterations: Number of Monte Carlo iterations (default 50000).
-        seed: Random seed for reproducibility.
-        played_groups: Dict of played group match results. Forwarded to
-                       simulate_group_matches() so real results are used
-                       instead of simulating.
-        blend_params: Optional dict with "match_probs" for blended
-                      probability injection. Falls back to Elo expected_score
-                      when match data is unavailable.
-        xg_overrides: Optional dict mapping match_id → (lambda_a, lambda_b)
-                      from BSD xG predictions. Forwarded to
-                      precompute_matchup_lambdas().
-
-    Returns:
-        Dict mapping team name to dict of probabilities for each round.
-    """
     rng = random.Random(seed)
     round_map = _build_round_map(bracket)
     elo_ratings = {name: data["elo"] for name, data in teams.items()}
 
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    # Precompute λ values once (Elo ratings don't change across iterations)
     matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings, base_rate=constants.EXPECTED_GOALS_BASE_RATE, xg_overrides=xg_overrides)
 
     for _ in range(iterations):

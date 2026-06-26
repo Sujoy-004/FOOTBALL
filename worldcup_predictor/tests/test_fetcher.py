@@ -79,7 +79,7 @@ def test_fetch_success(monkeypatch):
         return MockResponse(200, {"results": SAMPLE_MATCHES})
     monkeypatch.setattr(requests, "get", mock_get)
 
-    result = fetch_raw_matches("fake_key")
+    result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert len(result) == 1
     assert result[0]["id"] == 12345
 
@@ -89,7 +89,7 @@ def test_fetch_empty_response(monkeypatch):
         return MockResponse(200, {"results": []})
     monkeypatch.setattr(requests, "get", mock_get)
 
-    result = fetch_raw_matches("fake_key")
+    result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert result == []
 
 
@@ -101,7 +101,7 @@ def test_fetch_all_retries_exhausted(monkeypatch):
         return MockResponse(500, {})
     monkeypatch.setattr(requests, "get", mock_get)
 
-    result = fetch_raw_matches("fake_key")
+    result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert result == []
     assert len(calls) == 3
 
@@ -111,7 +111,7 @@ def test_fetch_401_returns_empty(monkeypatch):
         return MockResponse(401, {})
     monkeypatch.setattr(requests, "get", mock_get)
 
-    result = fetch_raw_matches("fake_key")
+    result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert result == []
 
 
@@ -123,7 +123,7 @@ def test_fetch_timeout_retry(monkeypatch):
         raise requests.exceptions.Timeout()
     monkeypatch.setattr(requests, "get", mock_get)
 
-    result = fetch_raw_matches("fake_key")
+    result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert result == []
     assert len(calls) == 3
 
@@ -137,7 +137,7 @@ def test_fetch_malformed_json(monkeypatch):
         lambda url, **kwargs: BadJSONResponse(200, {}),
     )
 
-    result = fetch_raw_matches("fake_key")
+    result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert result == []
 
 
