@@ -430,29 +430,13 @@ def _run_governance(
         "blended_brier": blended_brier,
         "drift_status": drift_status,
         "drift_details": drift_details if drift_details else None,
+        "backtest_summary": backtest_summary,
     }
 
     # 9. Save snapshot via state.py
     from src.state import save_run_snapshot
 
     save_run_snapshot(snapshot, data_dir)
-
-    # 10. Print governance dashlet
-    from src.output import print_governance_dashlet
-
-    drift_results_dict: dict[str, dict] = {}
-    for d in drift_details:
-        drift_results_dict[d.get("signal", "?")] = d
-
-    print_governance_dashlet(
-        versions=versions,
-        status=drift_status.replace("_", " "),
-        n_matches=n_matches,
-        per_signal_brier=per_signal_brier,
-        blend_weights=blend_weights,
-        drift_results=drift_results_dict if drift_results_dict else None,
-        backtest_summary=backtest_summary,
-    )
 
     return snapshot
 

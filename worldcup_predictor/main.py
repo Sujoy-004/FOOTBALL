@@ -571,9 +571,10 @@ def _record_eval_baseline(
         data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
     """
     from src.evaluation import evaluate_all_matches
-    from src.state import save_eval_baseline_report
+    from src.state import save_eval_baseline_report, load_prediction_history
 
-    report = evaluate_all_matches(teams, played, played_groups, signal_name="elo")
+    history = load_prediction_history(data_dir=data_dir)
+    report = evaluate_all_matches(teams, played, played_groups, signal_name="elo", history=history)
     save_eval_baseline_report(report, data_dir)
 
     if report["n_matches"] > 0:
@@ -1050,6 +1051,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
         try:
             from src.governance import _run_governance
             from src.state import load_versions, load_prediction_history
+            from src.output import print_governance_dashlet
 
             gov_entries = load_prediction_history(data_dir)
             gov_versions = load_versions(data_dir)
@@ -1059,12 +1061,24 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                 for k in entry["signals"]
             ) if gov_entries else ["elo", "market_odds", "catboost", "form", "lineup_strength"]
 
-            _run_governance(
+            snapshot = _run_governance(
                 entries=gov_entries,
                 versions=gov_versions,
                 signal_keys=list(set(gov_signal_keys)),
                 blend_weights=blend_params.get("blend_weights", {}) if blend_params else {},
                 data_dir=data_dir,
+            )
+            drift_details = snapshot.get("drift_details") or []
+            drift_results_dict: dict[str, dict] = {}
+            for d in drift_details:
+                drift_results_dict[d.get("signal", "?")] = d
+            print_governance_dashlet(
+                versions=gov_versions,
+                status=snapshot.get("drift_status", "HEALTHY").replace("_", " "),
+                n_matches=len(gov_entries),
+                per_signal_brier=snapshot.get("per_signal_brier", {}),
+                blend_weights=blend_params.get("blend_weights", {}) if blend_params else {},
+                drift_results=drift_results_dict if drift_results_dict else None,
             )
             _state.last_gov_time = time.time()
         except Exception as e:
@@ -1457,10 +1471,11 @@ def main() -> None:
         # ── Governance startup ──
         from src.state import load_versions, load_prediction_history
         from src.governance import _run_governance
+        from src.output import print_governance_dashlet
 
         gov_entries = load_prediction_history(data_dir=league_data_dir)
         gov_versions = load_versions(data_dir=league_data_dir)
-        _run_governance(
+        startup_snapshot = _run_governance(
             entries=gov_entries,
             versions=gov_versions,
             signal_keys=["elo", "market_odds", "catboost", "form", "lineup_strength"],
@@ -1468,6 +1483,19 @@ def main() -> None:
             startup=True,
             teams=teams,
             data_dir=league_data_dir,
+        )
+        startup_drift = startup_snapshot.get("drift_details") or []
+        startup_drift_dict: dict[str, dict] = {}
+        for d in startup_drift:
+            startup_drift_dict[d.get("signal", "?")] = d
+        print_governance_dashlet(
+            versions=gov_versions,
+            status=startup_snapshot.get("drift_status", "COLD_START").replace("_", " "),
+            n_matches=len(gov_entries),
+            per_signal_brier=startup_snapshot.get("per_signal_brier", {}),
+            blend_weights={},
+            drift_results=startup_drift_dict if startup_drift_dict else None,
+            backtest_summary=startup_snapshot.get("backtest_summary"),
         )
         _state.last_gov_time = time.time()
 
