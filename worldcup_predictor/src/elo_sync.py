@@ -278,6 +278,7 @@ def apply_graduated_correction(
 def sync_elo_from_eloratings(
     teams: dict[str, dict],
     data_dir: Path | str | None = None,
+    url: str = "",
 ) -> list[dict] | None:
     """Full Elo sync pipeline: fetch -> parse -> validate -> resolve -> correct -> persist.
 
@@ -293,13 +294,14 @@ def sync_elo_from_eloratings(
         teams: Dict mapping canonical team name to team data.
                Mutated in-place by apply_graduated_correction().
         data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
+        url: eloratings.net TSV URL. Defaults to ELORATINGS_TSV_URL.
 
     Returns:
         List of correction log entries if drift was found, empty list [] if
         no drift detected, or None if the fetch failed (caller handles cache
         fallback per D-15/D-19/D-20).
     """
-    tsv_raw = fetch_eloratings_tsv()
+    tsv_raw = fetch_eloratings_tsv(url=url)
     if tsv_raw is None:
         logger.warning("eloratings.net fetch failed — skipped")
         return None
