@@ -380,6 +380,7 @@ class TestStandingsWithPlayedGroups:
             group_a_fixture, teams_dict, elo_ratings, rng,
             played_groups=played_groups,
             matchup_lambdas=lambdas,
+            base_rate=constants.EXPECTED_GOALS_BASE_RATE,
         )
         # GS_A_01 should be played result
         assert results["A"]["GS_A_01"]["winner"] == "Mexico"

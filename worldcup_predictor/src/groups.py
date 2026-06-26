@@ -204,10 +204,10 @@ def simulate_group_matches(
     teams: dict[str, dict],
     elo_ratings: dict[str, float],
     rng: random.Random,
+    base_rate: float,
     fair_play: bool = True,
     matchup_lambdas: dict[str, tuple[float, float]] | None = None,
     played_groups: dict[str, dict] | None = None,
-    base_rate: float = constants.EXPECTED_GOALS_BASE_RATE,
 ) -> dict[str, dict[str, dict]]:
     """Simulate all unplayed group matches across all 12 groups.
 
