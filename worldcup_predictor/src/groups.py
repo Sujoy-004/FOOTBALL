@@ -204,10 +204,10 @@ def simulate_group_matches(
     teams: dict[str, dict],
     elo_ratings: dict[str, float],
     rng: random.Random,
+    base_rate: float,
     fair_play: bool = True,
     matchup_lambdas: dict[str, tuple[float, float]] | None = None,
     played_groups: dict[str, dict] | None = None,
-    base_rate: float = constants.EXPECTED_GOALS_BASE_RATE,
 ) -> dict[str, dict[str, dict]]:
     """Simulate all unplayed group matches across all 12 groups.
 
@@ -221,6 +221,7 @@ def simulate_group_matches(
         teams: Dict mapping team names to their data dicts (contains "elo").
         elo_ratings: Pre-computed dict mapping team names to Elo ratings.
         rng: Seeded random.Random instance for reproducibility.
+        base_rate: Base expected goals at Elo-neutral conditions.
         fair_play: If True, simulate yellow/red cards. If False, all cards
                    set to 0 (avoids 66% of Poisson draws for performance).
         matchup_lambdas: Precomputed λ values for each match. If None,
@@ -228,7 +229,6 @@ def simulate_group_matches(
         played_groups: Dict of real group match results keyed by match_id.
                        Matches in this dict use real results instead of
                        simulation. Defaults to empty dict.
-        base_rate: Base expected goals at Elo-neutral conditions.
 
     Returns:
         Nested dict: {group_letter: {match_id: match_result_dict}}
