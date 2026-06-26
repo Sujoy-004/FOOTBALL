@@ -3,6 +3,7 @@
 import os
 import signal
 import subprocess
+import threading
 
 import pytest
 import sys
@@ -159,10 +160,7 @@ def test_main_loop_runs_iterations(tmp_path):
 
 
 def test_main_loop_clean_shutdown(tmp_path):
-    """Ctrl+C should print final probabilities banner before exit.
-
-    Current main.py has no loop and no shutdown banner -> fails.
-    """
+    """Ctrl+C should print final probabilities banner before exit."""
     import shutil
     src_dir = MAIN_DIR / "data"
     for f in ["teams.json", "groups.json", "bracket.json", "annex_c.json", "played.json", "team_aliases.json"]:
@@ -172,20 +170,37 @@ def test_main_loop_clean_shutdown(tmp_path):
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     proc = subprocess.Popen(
         [sys.executable, "-u", "-c", _runner_code(data_dir=tmp_path)],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
         **kwargs,
     )
-    time.sleep(2)  # Let first iteration complete
+    # Read stdout in background thread to avoid blocking
+    stdout_lines = []
+    def _reader():
+        try:
+            for line in iter(proc.stdout.readline, ''):
+                stdout_lines.append(line)
+        except ValueError:
+            pass
+    reader = threading.Thread(target=_reader, daemon=True)
+    reader.start()
+    # Wait for first iteration's heartbeat before sending shutdown signal
+    start = time.time()
+    while time.time() - start < 10:
+        time.sleep(0.1)
+        if any("Polling" in line for line in stdout_lines):
+            break
     sig = signal.CTRL_BREAK_EVENT if sys.platform == "win32" else signal.SIGINT
     try:
         proc.send_signal(sig)
     except ProcessLookupError:
-        pass  # Process already exited
+        pass
     try:
-        stdout, _ = proc.communicate(timeout=6)
+        proc.wait(timeout=6)
     except subprocess.TimeoutExpired:
         proc.kill()
-        stdout, _ = proc.communicate()
+        proc.wait()
+    reader.join(timeout=2)
+    stdout = ''.join(stdout_lines)
     assert "FINAL CHAMPIONSHIP PROBABILITIES" in stdout, (
         f"Missing shutdown banner: {stdout!r}"
     )
