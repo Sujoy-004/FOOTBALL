@@ -13,18 +13,9 @@ from src import constants
 
 MAX_EXPECTED_GOALS = constants.MAX_EXPECTED_GOALS
 
-_POISSON_BASE_RATE_CACHE: float | None = None
-"""Cached Poisson base rate computed from historical data to avoid re-reading file every call."""
-
-
-def _reset_poisson_base_rate_cache() -> None:
-    """Reset cached Poisson base rate. Used in tests between test cases."""
-    global _POISSON_BASE_RATE_CACHE
-    _POISSON_BASE_RATE_CACHE = None
-
 
 def expected_goals(
-    rating_a: float, rating_b: float, base_rate: float | None = None
+    rating_a: float, rating_b: float, base_rate: float
 ) -> float:
     """Expected goals for team A against team B using the Elo-to-goals formula.
 
@@ -38,25 +29,12 @@ def expected_goals(
         rating_a: Elo rating of team A (the "home" side in the fixture).
         rating_b: Elo rating of team B (the "away" side).
         base_rate: Base expected goals at Elo-neutral conditions.
-                   Defaults to constants.EXPECTED_GOALS_BASE_RATE.
 
     Returns:
         Float >= 0 representing team A's expected goals (Poisson lambda),
         capped at MAX_EXPECTED_GOALS.
     """
-    global _POISSON_BASE_RATE_CACHE
-    if _POISSON_BASE_RATE_CACHE is None:
-        try:
-            from src.blender import compute_poisson_base_rate
-            rate = compute_poisson_base_rate()
-            if rate != constants.EXPECTED_GOALS_BASE_RATE:
-                _POISSON_BASE_RATE_CACHE = rate
-        except Exception:
-            pass
-    effective_base = base_rate
-    if effective_base is None:
-        effective_base = _POISSON_BASE_RATE_CACHE if _POISSON_BASE_RATE_CACHE is not None else constants.EXPECTED_GOALS_BASE_RATE
-    adj_base = effective_base * constants.HOME_ADVANTAGE_MULTIPLIER
+    adj_base = base_rate * constants.HOME_ADVANTAGE_MULTIPLIER
     return min(adj_base * (10.0 ** ((rating_a - rating_b) / 400.0)), MAX_EXPECTED_GOALS)
 
 
@@ -122,6 +100,7 @@ def _simulate_single_match(
     team_a: str, team_b: str, elo_a: float, elo_b: float, rng: random.Random,
     lambda_a: float | None = None, lambda_b: float | None = None,
     fair_play: bool = True,
+    base_rate: float = constants.EXPECTED_GOALS_BASE_RATE,
 ) -> dict:
     """Simulate a single group match, returning scores, winner, and card counts.
 
@@ -137,15 +116,17 @@ def _simulate_single_match(
         rng: Seeded random.Random instance.
         lambda_a: Precomputed expected goals for team A. If None, computed.
         lambda_b: Precomputed expected goals for team B. If None, computed.
+        fair_play: If True, simulate yellow/red cards.
+        base_rate: Base expected goals at Elo-neutral conditions.
 
     Returns:
         Dict with keys: team_a, team_b, score_a, score_b, winner,
         yellow_cards_a, red_cards_a, yellow_cards_b, red_cards_b.
     """
     if lambda_a is None:
-        lambda_a = expected_goals(elo_a, elo_b)
+        lambda_a = expected_goals(elo_a, elo_b, base_rate)
     if lambda_b is None:
-        lambda_b = expected_goals(elo_b, elo_a)
+        lambda_b = expected_goals(elo_b, elo_a, base_rate)
 
     score_a = _poisson_sample(lambda_a, rng)
     score_b = _poisson_sample(lambda_b, rng)
@@ -182,6 +163,7 @@ def precompute_matchup_lambdas(
     groups: dict,
     elo_ratings: dict[str, float],
     xg_overrides: dict[str, tuple[float, float]] | None = None,
+    base_rate: float = constants.EXPECTED_GOALS_BASE_RATE,
 ) -> dict[str, tuple[float, float]]:
     """Precompute expected goals (λ) for every group match.
 
@@ -197,6 +179,7 @@ def precompute_matchup_lambdas(
         xg_overrides: Optional dict mapping match_id → (lambda_a, lambda_b)
                       from BSD xG predictions. When provided and mid present,
                       overrides Elo-derived expected_goals.
+        base_rate: Base expected goals at Elo-neutral conditions.
 
     Returns:
         Dict mapping match_id → (lambda_a, lambda_b).
@@ -212,7 +195,7 @@ def precompute_matchup_lambdas(
             else:
                 ta, tb = match["team_a"], match["team_b"]
                 ea, eb = elo_ratings[ta], elo_ratings[tb]
-                lambdas[mid] = (expected_goals(ea, eb), expected_goals(eb, ea))
+                lambdas[mid] = (expected_goals(ea, eb, base_rate), expected_goals(eb, ea, base_rate))
     return lambdas
 
 
@@ -224,6 +207,7 @@ def simulate_group_matches(
     fair_play: bool = True,
     matchup_lambdas: dict[str, tuple[float, float]] | None = None,
     played_groups: dict[str, dict] | None = None,
+    base_rate: float = constants.EXPECTED_GOALS_BASE_RATE,
 ) -> dict[str, dict[str, dict]]:
     """Simulate all unplayed group matches across all 12 groups.
 
@@ -244,6 +228,7 @@ def simulate_group_matches(
         played_groups: Dict of real group match results keyed by match_id.
                        Matches in this dict use real results instead of
                        simulation. Defaults to empty dict.
+        base_rate: Base expected goals at Elo-neutral conditions.
 
     Returns:
         Nested dict: {group_letter: {match_id: match_result_dict}}
@@ -254,7 +239,7 @@ def simulate_group_matches(
     played_groups = played_groups or {}
 
     if matchup_lambdas is None:
-        matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings)
+        matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings, base_rate=base_rate)
 
     getrandbits = rng.getrandbits
     poisson_tables = _POISSON_TABLES

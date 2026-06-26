@@ -8,6 +8,7 @@ import random
 
 import pytest
 
+from src import constants
 from src.groups import (
     _compute_conduct_score,
     _poisson_sample,
@@ -30,21 +31,21 @@ class TestExpectedGoals:
 
     def test_expected_goals_home_advantage(self):
         """At equal Elo, team_a gets home advantage multiplier (1.05x)."""
-        val = expected_goals(1500, 1500)
+        val = expected_goals(1500, 1500, constants.EXPECTED_GOALS_BASE_RATE)
         assert abs(val - 1.3125) < 0.001, f"Expected ~1.3125, got {val}"
 
     def test_expected_goals_stronger_team(self):
         """A stronger team (higher Elo) gets a higher expected goals lambda."""
-        strong = expected_goals(2000, 1500)
-        neutral = expected_goals(1500, 1500)
+        strong = expected_goals(2000, 1500, constants.EXPECTED_GOALS_BASE_RATE)
+        neutral = expected_goals(1500, 1500, constants.EXPECTED_GOALS_BASE_RATE)
         assert strong > neutral, (
             f"Stronger team should get higher lambda: {strong} <= {neutral}"
         )
 
     def test_expected_goals_weaker_team(self):
         """A weaker team (lower Elo) gets a lower expected goals lambda."""
-        weak = expected_goals(1500, 2000)
-        neutral = expected_goals(1500, 1500)
+        weak = expected_goals(1500, 2000, constants.EXPECTED_GOALS_BASE_RATE)
+        neutral = expected_goals(1500, 1500, constants.EXPECTED_GOALS_BASE_RATE)
         assert weak < neutral, (
             f"Weaker team should get lower lambda: {weak} >= {neutral}"
         )
@@ -56,15 +57,12 @@ class TestExpectedGoals:
 
     def test_expected_goals_very_strong_dominates(self):
         """Huge Elo gap produces MAX_EXPECTED_GOALS=8.0 capped lambda."""
-        # MAX_EXPECTED_GOALS=8.0 cap prevents unbounded Knuth iterations
-        # from extreme Elo gaps. The function returns exactly 8.0 for
-        # Elo(2500) vs Elo(1000) — this is correct behavior.
-        val = expected_goals(2500, 1000)
+        val = expected_goals(2500, 1000, constants.EXPECTED_GOALS_BASE_RATE)
         assert val == 8.0, f"Expected MAX_EXPECTED_GOALS=8.0 cap, got {val}"
 
     def test_expected_goals_very_weak_minimal(self):
         """Very weak team against very strong team gets near-zero lambda."""
-        val = expected_goals(1000, 2500)
+        val = expected_goals(1000, 2500, constants.EXPECTED_GOALS_BASE_RATE)
         assert val < 0.1, f"Expected tiny lambda for huge disadvantage, got {val}"
 
 
