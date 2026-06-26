@@ -28,26 +28,12 @@ from datetime import datetime, timedelta, timezone
 
 from src import constants
 from src.elo import expected_score
+from src.math_utils import sigmoid as _sigmoid
 
 logger = logging.getLogger(__name__)
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
-
-
-def _sigmoid(x: float) -> float:
-    """Compute sigmoid function using math.exp (pure stdlib).
-
-    Args:
-        x: Input value (real number).
-
-    Returns:
-        Sigmoid output in (0, 1).
-    """
-    try:
-        return 1.0 / (1.0 + math.exp(-x))
-    except OverflowError:
-        return 0.0 if x < 0 else 1.0
 
 
 def _compute_residual(match: dict, teams: dict) -> tuple[float, float, str | None]:
