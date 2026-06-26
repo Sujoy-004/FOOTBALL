@@ -4,6 +4,7 @@ computes standings with FIFA 2026 7-step tiebreaker, ranks third-placed teams,
 and resolves Annex C R32 matchups.
 """
 
+import functools
 import math
 import random
 from collections import defaultdict
@@ -38,11 +39,11 @@ def expected_goals(
     return min(adj_base * (10.0 ** ((rating_a - rating_b) / 400.0)), MAX_EXPECTED_GOALS)
 
 
-_POISSON_TABLES: dict[float, list[int]] = {}
 _TABLE_BITS = constants.POISSON_TABLE_BITS
 _TABLE_SIZE = constants.POISSON_TABLE_SIZE
 
 
+@functools.lru_cache(maxsize=None)
 def _build_poisson_table(lam: float) -> list[int]:
     """Build a precomputed inverse-CDF lookup table for Poisson(lam).
 
@@ -89,10 +90,7 @@ def _poisson_sample(lam: float, rng: random.Random) -> int:
     """
     if lam <= 0.0:
         return 0
-    table = _POISSON_TABLES.get(lam)
-    if table is None:
-        table = _build_poisson_table(lam)
-        _POISSON_TABLES[lam] = table
+    table = _build_poisson_table(lam)
     return table[rng.getrandbits(_TABLE_BITS)]
 
 
@@ -242,7 +240,6 @@ def simulate_group_matches(
         matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings, base_rate=base_rate)
 
     getrandbits = rng.getrandbits
-    poisson_tables = _POISSON_TABLES
     build_table = _build_poisson_table
     table_bits = _TABLE_BITS
 
@@ -276,20 +273,14 @@ def simulate_group_matches(
             if la <= 0.0:
                 score_a = 0
             else:
-                table = poisson_tables.get(la)
-                if table is None:
-                    table = build_table(la)
-                    poisson_tables[la] = table
+                table = build_table(la)
                 score_a = table[getrandbits(table_bits)]
 
             # Inlined _poisson_sample for score_b
             if lb <= 0.0:
                 score_b = 0
             else:
-                table = poisson_tables.get(lb)
-                if table is None:
-                    table = build_table(lb)
-                    poisson_tables[lb] = table
+                table = build_table(lb)
                 score_b = table[getrandbits(table_bits)]
 
             if score_a > score_b:
@@ -300,14 +291,8 @@ def simulate_group_matches(
                 winner = None
 
             if fair_play:
-                yc_table = poisson_tables.get(2.0)
-                if yc_table is None:
-                    yc_table = build_table(2.0)
-                    poisson_tables[2.0] = yc_table
-                rc_table = poisson_tables.get(0.05)
-                if rc_table is None:
-                    rc_table = build_table(0.05)
-                    poisson_tables[0.05] = rc_table
+                yc_table = build_table(2.0)
+                rc_table = build_table(0.05)
                 yc_a = yc_table[getrandbits(table_bits)]
                 rc_a = rc_table[getrandbits(table_bits)]
                 yc_b = yc_table[getrandbits(table_bits)]
