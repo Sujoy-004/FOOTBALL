@@ -616,6 +616,9 @@ def _collect_matches_from_groups(groups: dict) -> list[dict]:
 def _collect_matches_from_bracket(bracket: list[dict], played: dict) -> list[dict]:
     """Collect upcoming knockout matches from bracket.
 
+    Only includes matches with resolved team names (string team_a/team_b).
+    Unresolved slot references (dict placeholders) are skipped.
+
     Args:
         bracket: Bracket match list.
         played: Dict of played knockout matches.
@@ -626,9 +629,13 @@ def _collect_matches_from_bracket(bracket: list[dict], played: dict) -> list[dic
     matches = []
     for m in bracket:
         if isinstance(m, dict) and m.get("match_id", "") not in played:
+            home = m.get("home", "")
+            away = m.get("away", "")
+            if not isinstance(home, str) or not isinstance(away, str):
+                continue
             m = dict(m)
-            m["team_a"] = m.get("home", "")
-            m["team_b"] = m.get("away", "")
+            m["team_a"] = home
+            m["team_b"] = away
             matches.append(m)
     return matches
 
