@@ -11,14 +11,13 @@ Uses ONLY Python stdlib (math module). No numpy, no sklearn per D-01.
 import json
 import math
 
+from src import constants
 from src.elo import expected_score
 
 EPS = 1e-15
 RIDGE = 1e-6
 MAX_ITER = 50
 CONV_TOL = 1e-6
-COLD_START_THRESHOLD = 30
-BRIER_WINDOW_SIZE = 50
 
 
 def _sigmoid(x: float) -> float:
@@ -56,7 +55,7 @@ def _platt_targets(actuals: list[float]) -> list[float]:
     return targets
 
 
-def calibrate_signal(predictions: list[float], actuals: list[float], threshold: int = COLD_START_THRESHOLD) -> tuple[float, float]:
+def calibrate_signal(predictions: list[float], actuals: list[float], threshold: int = constants.COLD_START_THRESHOLD) -> tuple[float, float]:
     """
     Fits Platt scaling on log-odds of predictions vs actual outcomes (0/0.5/1).
     
@@ -163,7 +162,7 @@ def apply_calibration(p_raw: float, A: float, B: float) -> float:
     return round(result, 6)
 
 
-def compute_rolling_brier(entries: list[dict], signal_key: str, window: int = BRIER_WINDOW_SIZE) -> float:
+def compute_rolling_brier(entries: list[dict], signal_key: str, window: int = constants.BRIER_WINDOW_SIZE) -> float:
     """
     Pure function — accepts prediction_history entries as a parameter (no I/O).
     
@@ -299,8 +298,8 @@ def compute_poisson_base_rate(match_data_path: str | None = None) -> float:
 def calibrate_and_blend(history: list[dict], signal_keys: list[str], elo_ratings: dict[str, float],
                         groups_data: dict, bracket_data: list[dict],
                         odds_cache: dict, cb_cache: dict,
-                        brier_window: int = BRIER_WINDOW_SIZE,
-                        cold_start_threshold: int = COLD_START_THRESHOLD,
+                        brier_window: int = constants.BRIER_WINDOW_SIZE,
+                        cold_start_threshold: int = constants.COLD_START_THRESHOLD,
                         form_cache: dict | None = None,
                         lineup_cache: dict | None = None) -> dict | None:
     """
