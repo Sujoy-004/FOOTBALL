@@ -639,14 +639,6 @@ def _collect_matches_from_bracket(bracket: list[dict], played: dict) -> list[dic
     return matches
 
 
-def _expected_score_for_match(t_a: str, t_b: str, teams: dict) -> float:
-    """Elo expected score for team_a vs team_b."""
-    from src.elo import expected_score
-    if t_a in teams and t_b in teams:
-        return expected_score(teams[t_a]["elo"], teams[t_b]["elo"])
-    return 0.5
-
-
 def _gather_signal_data(
     teams: dict,
     groups: dict,
@@ -699,7 +691,7 @@ def _gather_signal_data(
         if not mid or not t_a or not t_b:
             continue
 
-        elo_prob = _expected_score_for_match(t_a, t_b, teams)
+        elo_prob = elo.expected_score(teams[t_a]["elo"], teams[t_b]["elo"]) if t_a in teams and t_b in teams else 0.5
         odds_prob = None
         if mid in odds_m and isinstance(odds_m[mid], dict):
             odds_prob = odds_m[mid].get("probability")
