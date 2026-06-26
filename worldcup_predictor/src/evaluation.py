@@ -7,7 +7,6 @@ import math
 from datetime import datetime, timezone
 
 from src.elo import apply_elo_update, expected_score
-from src.state import append_prediction_history, load_prediction_history
 
 
 def brier_score(prediction: float, actual: float) -> float:
@@ -74,6 +73,7 @@ def evaluate_all_matches(
     played: dict[str, dict],
     played_groups: dict[str, dict],
     signal_name: str | None = None,
+    history: list[dict] | None = None,
 ) -> dict:
     """Evaluate prediction performance for one or all signals.
 
@@ -85,6 +85,8 @@ def evaluate_all_matches(
             - None (default, D-11): Multi-signal report with all available signal keys.
             - "elo": Replay through Elo pipeline (existing behavior), produce compound entries.
             - "market_odds", "catboost", "blended": Read from prediction_history compound entries.
+        history: Prediction history entries. Required for signal_name=None and non-elo signals.
+            Not used for signal_name="elo" (which replays from played/played_groups).
 
     Returns:
         Report dict with metrics, calibration, and model info.
@@ -93,7 +95,6 @@ def evaluate_all_matches(
 
     # ── Case: signal_name is None (D-11 default — all available signals) ──
     if signal_name is None:
-        history = load_prediction_history()
         if not history:
             return {
                 "model": "all_signals",
@@ -219,7 +220,7 @@ def evaluate_all_matches(
                 "generated_at": now_iso, "n_matches": 0,
                 "metrics": {"brier": 0.0, "log_loss": 0.0, "accuracy": 0.0, "n": 0},
                 "calibration": {"bins": [], "ece": 0.0},
-                "history_file": "data/prediction_history.json", "n_history_entries": 0,
+                "n_history_entries": 0,
             }
         metrics = compute_metrics(predictions, actuals)
         cal = calibration_curve(predictions, actuals)
@@ -234,26 +235,20 @@ def evaluate_all_matches(
                 "n": metrics["n"],
             },
             "calibration": cal,
-            "history_file": "data/prediction_history.json",
             "n_history_entries": len(history_entries),
         }
-        for entry in history_entries:
-            try:
-                append_prediction_history(entry)
-            except Exception:
-                pass
+        # Caller is responsible for persisting history_entries if desired
         return report
 
     # ── Case: Other signal_name (market_odds, catboost, blended) ──
-    # Read from prediction_history compound entries
-    history = load_prediction_history()
+    # Read from prediction_history compound entries (caller provides via history param)
     if not history:
         return {
             "model": signal_name, "phase": "13",
             "generated_at": now_iso, "n_matches": 0,
             "metrics": {"brier": 0.0, "log_loss": 0.0, "accuracy": 0.0, "n": 0},
             "calibration": {"bins": [], "ece": 0.0},
-            "history_file": "data/prediction_history.json", "n_history_entries": 0,
+            "n_history_entries": 0,
         }
     signal_preds: list[float] = []
     signal_actuals: list[float] = []
@@ -280,7 +275,6 @@ def evaluate_all_matches(
             "generated_at": now_iso, "n_matches": 0,
             "metrics": {"brier": 0.0, "log_loss": 0.0, "accuracy": 0.0, "n": 0},
             "calibration": {"bins": [], "ece": 0.0},
-            "history_file": "data/prediction_history.json",
             "n_history_entries": len(history),
         }
     metrics = compute_metrics(signal_preds, signal_actuals)
@@ -296,7 +290,6 @@ def evaluate_all_matches(
             "n": metrics["n"],
         },
         "calibration": cal,
-        "history_file": "data/prediction_history.json",
         "n_history_entries": len(history),
     }
 

@@ -166,40 +166,21 @@ class TestEvaluateAllMatchesSignalName:
                         "winner": "A", "home_score": 2, "away_score": 0,
                         "completed_at": "2026-06-15T20:00:00Z"}}
 
-    def test_evaluate_signal_elo(self, teams, played_basic, tmp_path, monkeypatch):
+    def test_evaluate_signal_elo(self, teams, played_basic):
         """signal_name='elo' replays through Elo pipeline and produces compound entries."""
-        monkeypatch.setattr("src.constants.DATA_DIR", tmp_path)
         result = evaluate_all_matches(teams, played_basic, {}, signal_name="elo")
         assert result["n_matches"] == 1
         assert 0 < result["metrics"]["brier"] < 1
-        # Load history to check compound entry format
-        from src.state import load_prediction_history
-        h = load_prediction_history()
-        compound_entries = [e for e in h if e.get("signals", {}).get("elo")]
-        assert len(compound_entries) >= 1
-        entry = compound_entries[-1]
-        assert "signals" in entry, "Must produce compound entry"
-        assert "prediction" not in entry, "No top-level prediction"
-        assert "signal" not in entry, "No top-level signal"
-        assert entry["signals"]["elo"]["available"] is True
+        # The elo path no longer persists entries; caller manages persistence
 
     def test_evaluate_signal_none(self, teams, played_basic):
-        """signal_name=None returns multi-signal report with 'signals' key (D-11)."""
+        """signal_name=None with no history returns empty multi-signal report."""
         result = evaluate_all_matches(teams, played_basic, {}, signal_name=None)
-        assert "signals" in result, "Multi-signal report must have 'signals' key"
-        assert isinstance(result["signals"], dict)
-        assert len(result["signals"]) > 0, "Should have at least one signal"
-        # At minimum should have 'elo' from the replay
-        assert "elo" in result["signals"]
-        assert result["signals"]["elo"]["n_matches"] > 0
+        assert "signals" in result
+        assert result["n_history_entries"] == 0
 
-    def test_evaluate_signal_none_with_compound_history(self, tmp_path):
-        """signal_name=None with pre-existing compound entries reads all signal keys."""
-        from src.state import save_prediction_history, load_prediction_history
-        from src import constants
-        import copy
-
-        # Save compound entries with multiple signals
+    def test_evaluate_signal_none_with_history(self):
+        """signal_name=None with history param reads all signal keys."""
         entries = [
             {
                 "match_id": "M01",
@@ -222,25 +203,15 @@ class TestEvaluateAllMatchesSignalName:
                 },
             },
         ]
-        orig_dir = constants.DATA_DIR
-        try:
-            constants.DATA_DIR = tmp_path
-            save_prediction_history(entries)
-            # signal_name=None with empty played/played_groups -> reads from history
-            result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name=None)
-            assert "signals" in result
-            assert "elo" in result["signals"]
-            assert "market_odds" in result["signals"]
-            assert result["signals"]["elo"]["n_matches"] >= 1
-            assert result["signals"]["market_odds"]["n_matches"] >= 1
-        finally:
-            constants.DATA_DIR = orig_dir
+        result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name=None, history=entries)
+        assert "signals" in result
+        assert "elo" in result["signals"]
+        assert "market_odds" in result["signals"]
+        assert result["signals"]["elo"]["n_matches"] >= 1
+        assert result["signals"]["market_odds"]["n_matches"] >= 1
 
-    def test_evaluate_signal_market_odds(self, tmp_path):
-        """signal_name='market_odds' reads from prediction_history compound entries."""
-        from src.state import save_prediction_history
-        from src import constants
-
+    def test_evaluate_signal_market_odds(self):
+        """signal_name='market_odds' reads from history param."""
         entries = [
             {
                 "match_id": "M01",
@@ -252,33 +223,18 @@ class TestEvaluateAllMatchesSignalName:
                 },
             },
         ]
-        orig_dir = constants.DATA_DIR
-        try:
-            constants.DATA_DIR = tmp_path
-            save_prediction_history(entries)
-            result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name="market_odds")
-            assert result["n_matches"] == 1
-            assert "metrics" in result
-            assert result["metrics"]["n"] == 1
-        finally:
-            constants.DATA_DIR = orig_dir
+        result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name="market_odds", history=entries)
+        assert result["n_matches"] == 1
+        assert "metrics" in result
+        assert result["metrics"]["n"] == 1
 
-    def test_evaluate_signal_nonexistent(self, tmp_path):
+    def test_evaluate_signal_nonexistent(self):
         """Unknown signal name returns n_matches=0 report (graceful, no crash)."""
-        from src import constants
-        orig_dir = constants.DATA_DIR
-        try:
-            constants.DATA_DIR = tmp_path
-            result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name="nonexistent")
-            assert result["n_matches"] == 0
-        finally:
-            constants.DATA_DIR = orig_dir
+        result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name="nonexistent")
+        assert result["n_matches"] == 0
 
-    def test_evaluate_signal_empty_history(self, tmp_path):
+    def test_evaluate_signal_empty_history(self):
         """No entries have the requested signal -> report with n_matches=0."""
-        from src.state import save_prediction_history
-        from src import constants
-
         entries = [
             {
                 "match_id": "M01",
@@ -290,20 +246,11 @@ class TestEvaluateAllMatchesSignalName:
                 },
             },
         ]
-        orig_dir = constants.DATA_DIR
-        try:
-            constants.DATA_DIR = tmp_path
-            save_prediction_history(entries)
-            result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name="market_odds")
-            assert result["n_matches"] == 0
-        finally:
-            constants.DATA_DIR = orig_dir
+        result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name="market_odds", history=entries)
+        assert result["n_matches"] == 0
 
-    def test_evaluate_signal_catboost(self, tmp_path):
-        """signal_name='catboost' reads from prediction_history compound entries."""
-        from src.state import save_prediction_history
-        from src import constants
-
+    def test_evaluate_signal_catboost(self):
+        """signal_name='catboost' reads from history param."""
         entries = [
             {
                 "match_id": "M01",
@@ -315,14 +262,8 @@ class TestEvaluateAllMatchesSignalName:
                 },
             },
         ]
-        orig_dir = constants.DATA_DIR
-        try:
-            constants.DATA_DIR = tmp_path
-            save_prediction_history(entries)
-            result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name="catboost")
-            assert result["n_matches"] == 1
-        finally:
-            constants.DATA_DIR = orig_dir
+        result = evaluate_all_matches({"A": {"elo": 2000}}, {}, {}, signal_name="catboost", history=entries)
+        assert result["n_matches"] == 1
 
 
 class TestBacktestTournament:
