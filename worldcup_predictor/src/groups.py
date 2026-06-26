@@ -162,8 +162,8 @@ def _simulate_single_match(
 def precompute_matchup_lambdas(
     groups: dict,
     elo_ratings: dict[str, float],
+    base_rate: float,
     xg_overrides: dict[str, tuple[float, float]] | None = None,
-    base_rate: float = constants.EXPECTED_GOALS_BASE_RATE,
 ) -> dict[str, tuple[float, float]]:
     """Precompute expected goals (λ) for every group match.
 
@@ -176,10 +176,10 @@ def precompute_matchup_lambdas(
     Args:
         groups: Groups dict (with or without "groups" wrapper key).
         elo_ratings: Dict mapping team name → Elo rating.
+        base_rate: Base expected goals at Elo-neutral conditions.
         xg_overrides: Optional dict mapping match_id → (lambda_a, lambda_b)
                       from BSD xG predictions. When provided and mid present,
                       overrides Elo-derived expected_goals.
-        base_rate: Base expected goals at Elo-neutral conditions.
 
     Returns:
         Dict mapping match_id → (lambda_a, lambda_b).

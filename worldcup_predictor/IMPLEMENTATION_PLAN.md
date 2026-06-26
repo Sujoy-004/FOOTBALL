@@ -1,6 +1,13 @@
 # Implementation Plan (Revised)
 
 > **Policy:** Each commit = one logical change. Independently reviewable. Independently revertible. Project must pass tests after every commit.
+> Never intentionally leave the repo in a broken intermediate state.
+>
+> **API Migration Pattern:** For any API or function signature change:
+> 1. Update every caller first while backward compatibility still exists (default arg, alias, wrapper, or deprecated path).
+> 2. Verify the full repository remains green.
+> 3. Remove compatibility only after all callers have migrated.
+> 4. Never leave the repo in a broken intermediate state if a callers-first migration can avoid it.
 >
 > **Style:** Casual commit messages. No Conventional Commits. No AI-sounding formality.
 >

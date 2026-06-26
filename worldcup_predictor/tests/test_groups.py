@@ -96,7 +96,7 @@ class TestPrecomputeMatchupLambdas:
         groups = self._make_group_a()
         elo = self._make_elo()
         lambdas = precompute_matchup_lambdas(
-            groups, elo, xg_overrides={"GS_A_01": (2.5, 0.8)}
+            groups, elo, base_rate=constants.EXPECTED_GOALS_BASE_RATE, xg_overrides={"GS_A_01": (2.5, 0.8)}
         )
         assert lambdas["GS_A_01"] == (2.5, 0.8)
 
@@ -104,7 +104,7 @@ class TestPrecomputeMatchupLambdas:
         """Without xg_overrides, Elo-derived values are used."""
         groups = self._make_group_a()
         elo = self._make_elo()
-        lambdas = precompute_matchup_lambdas(groups, elo)
+        lambdas = precompute_matchup_lambdas(groups, elo, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
         la, lb = lambdas["GS_A_01"]
         assert la > 0 and lb > 0
         assert la > lb
@@ -114,7 +114,7 @@ class TestPrecomputeMatchupLambdas:
         groups = self._make_group_a()
         elo = self._make_elo()
         lambdas = precompute_matchup_lambdas(
-            groups, elo, xg_overrides={"GS_B_01": (3.0, 1.0)}
+            groups, elo, base_rate=constants.EXPECTED_GOALS_BASE_RATE, xg_overrides={"GS_B_01": (3.0, 1.0)}
         )
         la, lb = lambdas["GS_A_01"]
         assert la > lb
@@ -123,7 +123,7 @@ class TestPrecomputeMatchupLambdas:
         """Default None for xg_overrides uses Elo (same as no param)."""
         groups = self._make_group_a()
         elo = self._make_elo()
-        lambdas = precompute_matchup_lambdas(groups, elo, xg_overrides=None)
+        lambdas = precompute_matchup_lambdas(groups, elo, base_rate=constants.EXPECTED_GOALS_BASE_RATE, xg_overrides=None)
         la, lb = lambdas["GS_A_01"]
         assert la > 0 and lb > 0
 

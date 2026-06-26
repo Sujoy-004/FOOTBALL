@@ -196,7 +196,7 @@ def resolve_knockout_slot_teams(
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
     rng = random.Random(0)
 
-    lambdas = precompute_matchup_lambdas(groups, elo_ratings)
+    lambdas = precompute_matchup_lambdas(groups, elo_ratings, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
     results = simulate_group_matches(
         groups, teams, elo_ratings, rng,
         played_groups=played_groups, matchup_lambdas=lambdas,
@@ -292,7 +292,7 @@ def run_full_simulation(
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
     # Precompute λ values once (Elo ratings don't change across iterations)
-    matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings, xg_overrides=xg_overrides)
+    matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings, base_rate=constants.EXPECTED_GOALS_BASE_RATE, xg_overrides=xg_overrides)
 
     for _ in range(iterations):
         winner_progression: dict[str, str] = {}

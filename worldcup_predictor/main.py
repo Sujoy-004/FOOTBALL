@@ -319,7 +319,7 @@ def _compute_group_display(groups, teams, played_groups):
         precompute_matchup_lambdas, simulate_group_matches,
     )
     elo = {n: d["elo"] for n, d in teams.items()}
-    lambdas = precompute_matchup_lambdas(groups, elo)
+    lambdas = precompute_matchup_lambdas(groups, elo, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
     results = simulate_group_matches(
         groups, teams, elo, random.Random(0),
         fair_play=False, matchup_lambdas=lambdas,

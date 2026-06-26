@@ -375,7 +375,7 @@ class TestStandingsWithPlayedGroups:
             },
         }
         rng = random.Random(42)
-        lambdas = precompute_matchup_lambdas(group_a_fixture, elo_ratings)
+        lambdas = precompute_matchup_lambdas(group_a_fixture, elo_ratings, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
         results = simulate_group_matches(
             group_a_fixture, teams_dict, elo_ratings, rng,
             played_groups=played_groups,
