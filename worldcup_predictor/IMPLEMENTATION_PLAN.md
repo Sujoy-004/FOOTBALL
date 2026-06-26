@@ -278,7 +278,9 @@ Remove the duplicate definitions of `COLD_START_THRESHOLD = 30` and `BRIER_WINDO
 
 > **Planning note:** The original roadmap referenced `BASE_RATING` — that constant never existed. The actual WP-1 oversight was these two blender.py duplicates, which were added to `constants.py` but never removed from `blender.py`. This commit fixes that oversight.
 
----### Commit 4.5 — fix duplicate blend logic
+---
+
+### Commit 4.5 — fix duplicate blend logic
 
 | Field | Value |
 |---|---|
@@ -341,28 +343,33 @@ If every caller passes the same `base_rate` value that the old code would have r
 
 ---
 
-### Commit 5.2 — thread base_rate through simulate_group_matches
+### Commit 5.2a — update all callers to pass base_rate explicitly (function keeps default)
 
 | Field | Value |
 |---|---|
-| **Classification** | BEHAVIORAL |
-| **Files touched** | `src/groups.py`, `test_groups.py` |
-| **LOC** | ~+2 |
-| **Tests to run** | `pytest test_groups.py` |
+| **Classification** | MECHANICAL |
+| **Expected runtime behavior** | IDENTICAL |
+| **Files touched** | `main.py`, `src/knockout.py`, `benchmarks/benchmark_groups.py`, `tests/test_groups.py`, `tests/test_group_integration.py` |
+| **LOC** | ~+14 |
+| **Tests to run** | `pytest` |
 
-**Why runtime behavior changes:**
-`simulate_group_matches()` must now accept and forward `base_rate` to every `expected_goals()` call. Signature changes from `simulate_group_matches(groups, teams, elo, rng, ...)` to `simulate_group_matches(groups, teams, elo, rng, base_rate, ...)`.
+Every caller of `simulate_group_matches()` is updated to pass `base_rate=constants.EXPECTED_GOALS_BASE_RATE`. The function itself still has `base_rate: float = constants.EXPECTED_GOALS_BASE_RATE` — so any missed caller silently uses the default. Full suite must be green.
 
-**Expected before/after difference:** IDENTICAL (if base_rate is forwarded correctly from the caller in main.py — which doesn't happen until commit 5.3).
+**Migration pattern:** callers-first, signature-last. This ensures every intermediate commit is independently testable. All future API/signature changes should follow this pattern unless there's a compelling technical reason not to.
 
-**Regression risk:** Low. This is a pass-through. The function itself does not compute or interpret the value.
+---
 
-**Verification steps:**
-- No independent verification possible until 5.3 completes
+### Commit 5.2b — remove default, make base_rate a required positional parameter
 
-**Tests required before merge:**
-- Update all test calls to `simulate_group_matches()` to include `base_rate`
-- The tests in 5.2 will be in a temporarily broken state if `main.py` tests reference the old signature. Order of commits matters — 5.2 must be followed by 5.3 before `pytest` passes on main.py tests.
+| Field | Value |
+|---|---|
+| **Classification** | MECHANICAL |
+| **Expected runtime behavior** | IDENTICAL |
+| **Files touched** | `src/groups.py` |
+| **LOC** | ~-1 / ~+1 |
+| **Tests to run** | `pytest` |
+
+Remove `= constants.EXPECTED_GOALS_BASE_RATE` from `simulate_group_matches()`'s `base_rate` parameter. Move `base_rate` before `fair_play` (5th positional slot, after `rng`) to resolve Python's "non-default follows default" constraint. Every caller already passes `base_rate` explicitly via keyword, so nothing breaks.
 
 ---
 
@@ -376,7 +383,7 @@ If every caller passes the same `base_rate` value that the old code would have r
 | **Tests to run** | `pytest` |
 
 **Why runtime behavior changes:**
-main.py must now compute or obtain the base rate and pass it to group simulation functions. The cache and balender import in `groups.py` are removed. This completes the dependency inversion.
+main.py must now compute or obtain the base rate and pass it to group simulation functions. The cache and blender import in `groups.py` are removed. This completes the dependency inversion.
 
 **Expected before/after difference:** IDENTICAL — main.py must pass the exact same value that `_POISSON_BASE_RATE_CACHE` would have provided.
 
@@ -716,16 +723,16 @@ A new `--backtest` flag is added. When present, runs `backtest_tournament()` fro
 ## Summary
 
 | Package | Commits | Mechanical | Behavioral | Phase |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 | WP-1: Constants | 4 | 4 | 0 | 1 |
 | WP-2: Private API | 3 | 3 | 0 | 1 |
 | WP-3: Dead Code | 6 | 6 | 0 | 1 |
 | WP-4: Duplicates | 5 | 4 | 1 | 2 |
-| WP-5: Boundaries | 8 | 4 | 4 | 3 |
+| WP-5: Boundaries | 10 | 6 | 4 | 3 |
 | WP-6: State | 2 | 1 | 1 | 4 |
 | WP-7: Decompose | 6 | 6 | 0 | 5 |
 | WP-8: CLI (opt) | 2 | 0 | 2 | 6 |
-| **Total** | **36** | **28** | **8** | — |
+| **Total** | **38** | **30** | **8** | — |
 
-28 mechanical commits (behavior: IDENTICAL).
+30 mechanical commits (behavior: IDENTICAL).
 8 behavioral commits requiring explicit verification before merge.

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from src import constants
 from src.fetcher import process_group_matches, _extract_group_letter, find_group_match
 from src.groups import (
     compute_standings,
@@ -349,6 +350,7 @@ class TestStandingsWithPlayedGroups:
         results = simulate_group_matches(
             group_a_fixture, teams_dict, elo_ratings, rng,
             played_groups=played_groups,
+            base_rate=constants.EXPECTED_GOALS_BASE_RATE,
         )
         # Verify played results are injected
         assert results["A"]["GS_A_01"]["winner"] == "Mexico"
@@ -456,6 +458,7 @@ class TestFullPipeline:
         results = simulate_group_matches(
             group_a_fixture, teams_dict, elo_ratings, rng,
             played_groups=loaded,
+            base_rate=constants.EXPECTED_GOALS_BASE_RATE,
         )
 
         # Step 7: Compute standings

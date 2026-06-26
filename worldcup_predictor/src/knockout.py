@@ -3,6 +3,7 @@
 import random
 from collections import defaultdict
 
+from src import constants
 from src.elo import expected_score
 from src.groups import (
     compute_standings,
@@ -199,6 +200,7 @@ def resolve_knockout_slot_teams(
     results = simulate_group_matches(
         groups, teams, elo_ratings, rng,
         played_groups=played_groups, matchup_lambdas=lambdas,
+        base_rate=constants.EXPECTED_GOALS_BASE_RATE,
     )
     standings = compute_standings(results, elo_ratings)
     third_ranked = rank_third_placed(standings)
@@ -296,7 +298,7 @@ def run_full_simulation(
         winner_progression: dict[str, str] = {}
         sf_losers: dict[str, str | None] = {}
 
-        results = simulate_group_matches(groups, teams, elo_ratings, rng, fair_play=False, matchup_lambdas=matchup_lambdas, played_groups=played_groups)
+        results = simulate_group_matches(groups, teams, elo_ratings, rng, fair_play=False, matchup_lambdas=matchup_lambdas, played_groups=played_groups, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
         standings = compute_standings(results, elo_ratings)
         third_ranked = rank_third_placed(standings)
         advancers = select_advancers(standings, third_ranked)

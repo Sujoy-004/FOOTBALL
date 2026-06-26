@@ -324,6 +324,7 @@ def _compute_group_display(groups, teams, played_groups):
         groups, teams, elo, random.Random(0),
         fair_play=False, matchup_lambdas=lambdas,
         played_groups=played_groups or {},
+        base_rate=constants.EXPECTED_GOALS_BASE_RATE,
     )
     standings = compute_standings(results, elo)
     return standings, rank_third_placed(standings)

@@ -109,6 +109,7 @@ def benchmark_pipeline(
 
     # Local variable bindings for hot-loop performance
     _simulate = simulate_group_matches
+    _base_rate = constants.EXPECTED_GOALS_BASE_RATE
     _standings_fn = compute_standings
     _rank = rank_third_placed
     _select = select_advancers
@@ -117,7 +118,7 @@ def benchmark_pipeline(
     start = time.perf_counter()
 
     for _ in range(iterations):
-        results = _simulate(groups, teams, elo_ratings, rng)
+        results = _simulate(groups, teams, elo_ratings, rng, base_rate=_base_rate)
         standings = _standings_fn(results, elo_ratings)
         third_ranked = _rank(standings)
         advancers = _select(standings, third_ranked)
