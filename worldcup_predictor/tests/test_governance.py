@@ -628,21 +628,21 @@ class TestShouldRunGov:
     def test_startup_returns_true(self):
         """When _last_gov_time == 0.0, should return True."""
         import main as main_mod
-        main_mod._last_gov_time = 0.0
+        main_mod._state.last_gov_time = 0.0
         assert main_mod._should_run_gov() is True
 
     def test_hourly_trigger(self):
         """After 3600s, should return True."""
         import main as main_mod
         import time
-        main_mod._last_gov_time = time.time() - 3601  # 1s over hourly
+        main_mod._state.last_gov_time = time.time() - 3601  # 1s over hourly
         assert main_mod._should_run_gov() is True
 
     def test_within_hour_returns_false(self):
         """Within 3600s of last run, should return False."""
         import main as main_mod
         import time
-        main_mod._last_gov_time = time.time() - 1800  # 30 min ago
+        main_mod._state.last_gov_time = time.time() - 1800  # 30 min ago
         assert main_mod._should_run_gov() is False
 
 

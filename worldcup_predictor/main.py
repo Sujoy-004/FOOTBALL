@@ -14,6 +14,7 @@ import random
 import signal
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,43 +34,37 @@ from src.predictors.lineup import compute_lineup_signal
 from src.constants import FORM_CACHE_FILE, LINEUP_CACHE_FILE
 
 
-_running = True
-_elo_last_sync_time: float = 0.0
-"""Tracks when Elo sync last completed. 0.0 = never synced. Used for 24h interval checks and wake-from-sleep detection (D-02, D-03)."""
+@dataclass
+class RunState:
+    """Mutable state for the polling loop.
 
-_last_gov_time: float = 0.0
-"""Tracks when governance last ran. 0.0 = never. Used for hourly check (D-16)."""
+    Replaces 8 module-level globals and all ``global`` keywords.
+    A single module-level instance ``_state`` is shared by all functions.
+    """
+    running: bool = True
+    elo_last_sync_time: float = 0.0
+    last_gov_time: float = 0.0
+    ai_preview_enabled: bool = False
+    match_detail_enabled: str | None = None
+    prev_signal_data: dict | None = None
 
-_ai_preview_enabled: bool = False
-"""Module-level flag for --ai-preview CLI flag. Set in main() after parse_args (Phase 18)."""
 
-_match_detail_enabled: str | None = None
-"""Stores --match-detail arg value. None=disabled, 'table'=match table, MATCH_ID=focus card (Phase 20)."""
-
-_prev_signal_data: dict | None = None
-"""Snapshot of per-match signal DATA from previous iteration for per-signal Δ (Phase 20, D-04)."""
-
-_prev_history: list[dict] | None = None
-"""Snapshot of prediction_history BEFORE merge. Captured for data_version detection (Architecture Q4)."""
-
-_prev_cal_params: dict | None = None
-"""Snapshot of calibration_params BEFORE calibrate_and_blend. Captured for model_version detection (Architecture Q5)."""
+_state = RunState()
 
 
 def _should_run_gov() -> bool:
     """Check if governance should run this cycle.
 
-    Governance runs at startup (when _last_gov_time == 0.0) and
+    Governance runs at startup (when last_gov_time == 0.0) and
     hourly thereafter (D-16).
 
     Returns:
         True if governance should run, False otherwise.
     """
-    global _last_gov_time
     now = time.time()
-    if _last_gov_time == 0.0:
+    if _state.last_gov_time == 0.0:
         return True
-    if now - _last_gov_time >= constants.GOVERNANCE_INTERVAL_SECONDS:
+    if now - _state.last_gov_time >= constants.GOVERNANCE_INTERVAL_SECONDS:
         return True
     return False
 
@@ -182,14 +177,13 @@ def _run_elo_sync(
     and continues with teams.json fallback (D-20). On subsequent failures,
     falls back to cached values (D-19).
 
-    Updates _elo_last_sync_time on any successful sync, even if no corrections
+    Updates elo_last_sync_time on any successful sync, even if no corrections
     were needed, so the periodic 24h timer advances correctly.
 
     Args:
         teams: Team data dict.
         data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
     """
-    global _elo_last_sync_time
     start = time.time()
     corrections = elo_sync.sync_elo_from_eloratings(teams, data_dir=data_dir)
     elapsed = time.time() - start
@@ -197,7 +191,7 @@ def _run_elo_sync(
     if corrections is None:
         # Fetch failed (D-15, D-19, D-20)
         cache = state.load_eloratings_cache(data_dir)
-        if not cache and _elo_last_sync_time == 0.0:
+        if not cache and _state.elo_last_sync_time == 0.0:
             # D-20: First run, no cache, network failure
             output.print_error(
                 "Cannot initialize Elo ratings — eloratings.net unreachable "
@@ -206,7 +200,7 @@ def _run_elo_sync(
         return
 
     # Sync succeeded — update timer even if no drift (D-02, D-03)
-    _elo_last_sync_time = time.time()
+    _state.elo_last_sync_time = time.time()
 
     if corrections:
         print_sync_results(corrections, elapsed)
@@ -284,16 +278,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _signal_handler(signum, frame):
     """Set running flag to False — loop will finish current iteration then exit."""
-    global _running
-    _running = False
+    _state.running = False
     print()
     print("Shutdown requested — finishing current iteration...")
 
 
 def _next_poll_sleep(interval: float) -> None:
-    """Sleep for interval seconds in 0.5s increments, checking _running flag."""
+    """Sleep for interval seconds in 0.5s increments, checking running flag."""
     deadline = time.time() + interval
-    while _running and time.time() < deadline:
+    while _state.running and time.time() < deadline:
         time.sleep(0.5)
 
 
@@ -761,15 +754,14 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     played_groups = played_groups or {}
 
     # ── Periodic Elo sync check (D-02, D-03) ──
-    global _elo_last_sync_time
-    if _elo_last_sync_time > 0:
-        hours_since_sync = (time.time() - _elo_last_sync_time) / 3600
+    if _state.elo_last_sync_time > 0:
+        hours_since_sync = (time.time() - _state.elo_last_sync_time) / 3600
         if hours_since_sync >= ELO_SYNC_INTERVAL_HOURS:
             _run_elo_sync(teams, data_dir=data_dir)
 
     # ── Staleness warning (D-16) ──
-    if _elo_last_sync_time > 0:
-        staleness_hours = (time.time() - _elo_last_sync_time) / 3600
+    if _state.elo_last_sync_time > 0:
+        staleness_hours = (time.time() - _state.elo_last_sync_time) / 3600
         if staleness_hours >= 24:
             print_staleness_warning(staleness_hours)
 
@@ -1067,7 +1059,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                 blend_weights=blend_params.get("blend_weights", {}) if blend_params else {},
                 data_dir=data_dir,
             )
-            _last_gov_time = time.time()
+            _state.last_gov_time = time.time()
         except Exception as e:
             print(f"Governance check failed: {e}", file=sys.stderr)
 
@@ -1090,7 +1082,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
         output.print_third_place_bubble(third_ranked)
 
     output.print_probability_table(probs, prev_probs)
-    if _ai_preview_enabled:
+    if _state.ai_preview_enabled:
         output.print_ai_previews(played, played_groups)
     if prev_probs is not None:
         output.print_delta_summary(probs, prev_probs)
@@ -1104,8 +1096,7 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
         print("Warning: Failed to save probability log snapshot", file=_sys.stderr)
 
     # ── Match detail table / focus card display (Phase 20-03) ──
-    global _match_detail_enabled, _prev_signal_data
-    if _match_detail_enabled:
+    if _state.match_detail_enabled:
         try:
             matches_data = _gather_signal_data(
                 teams, groups, bracket,
@@ -1113,10 +1104,10 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                 xg_overrides, played, played_groups,
                 blend_params=blend_params,
             )
-            if _match_detail_enabled == "table":
-                output.print_match_detail_table(matches_data, _prev_signal_data)
+            if _state.match_detail_enabled == "table":
+                output.print_match_detail_table(matches_data, _state.prev_signal_data)
             else:
-                target_mid = _match_detail_enabled
+                target_mid = _state.match_detail_enabled
                 for md in matches_data:
                     if md["match_id"] == target_mid:
                         # Find match entry for context/stats if played
@@ -1127,15 +1118,15 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                             match_entry = (played_groups or {}).get(target_mid)
                         # Build prev_signals for delta
                         prev_data = None
-                        if _prev_signal_data:
-                            prev_data = next((d for d in _prev_signal_data if d["match_id"] == target_mid), None)
+                        if _state.prev_signal_data:
+                            prev_data = next((d for d in _state.prev_signal_data if d["match_id"] == target_mid), None)
                         focus_data = dict(md)
                         if prev_data:
                             focus_data["prev_signals"] = prev_data["signals"]
                             focus_data["blended_delta"] = md["blended"] - prev_data["blended"]
                         output.print_focus_card(focus_data, match_entry)
                         break
-            _prev_signal_data = matches_data
+            _state.prev_signal_data = matches_data
         except Exception:
             import sys as _sys2
             print("Warning: Failed to display match detail table", file=_sys2.stderr)
@@ -1356,9 +1347,8 @@ def main() -> None:
     """Load state, then enter continuous polling loop until signal."""
     args = _parse_args()
 
-    global _ai_preview_enabled, _match_detail_enabled
-    _ai_preview_enabled = args.ai_preview
-    _match_detail_enabled = args.match_detail
+    _state.ai_preview_enabled = args.ai_preview
+    _state.match_detail_enabled = args.match_detail
 
     # Handle --list-leagues early: print catalog and exit (D-02)
     if args.list_leagues:
@@ -1472,7 +1462,7 @@ def main() -> None:
             teams=teams,
             data_dir=league_data_dir,
         )
-        _last_gov_time = time.time()
+        _state.last_gov_time = time.time()
 
         # ── --once mode: single iteration, immediate exit (D-01, D-02) ──
         if args.once:
@@ -1502,9 +1492,9 @@ def main() -> None:
         )
 
         # Continuous polling loop
-        while _running:
+        while _state.running:
             _next_poll_sleep(POLL_INTERVAL)
-            if not _running:
+            if not _state.running:
                 break
             last_sim_time, last_request_time, prev_probs = _run_iteration(
                 teams, groups, bracket, annex_c, played, played_groups, api_key, aliases,
