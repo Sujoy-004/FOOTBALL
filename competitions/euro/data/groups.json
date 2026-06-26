@@ -1,0 +1,70 @@
+{
+  "groups": {
+    "A": {
+      "teams": ["Germany", "Scotland", "Hungary", "Switzerland"],
+      "matches": [
+        {"match_id": "GS_A_01", "team_a": "Germany", "team_b": "Scotland", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_A_02", "team_a": "Germany", "team_b": "Hungary", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_A_03", "team_a": "Germany", "team_b": "Switzerland", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_A_04", "team_a": "Scotland", "team_b": "Hungary", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_A_05", "team_a": "Scotland", "team_b": "Switzerland", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_A_06", "team_a": "Hungary", "team_b": "Switzerland", "winner": null, "score_a": null, "score_b": null}
+      ]
+    },
+    "B": {
+      "teams": ["Spain", "Croatia", "Italy", "Albania"],
+      "matches": [
+        {"match_id": "GS_B_01", "team_a": "Spain", "team_b": "Croatia", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_B_02", "team_a": "Spain", "team_b": "Italy", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_B_03", "team_a": "Spain", "team_b": "Albania", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_B_04", "team_a": "Croatia", "team_b": "Italy", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_B_05", "team_a": "Croatia", "team_b": "Albania", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_B_06", "team_a": "Italy", "team_b": "Albania", "winner": null, "score_a": null, "score_b": null}
+      ]
+    },
+    "C": {
+      "teams": ["Slovenia", "Denmark", "Serbia", "England"],
+      "matches": [
+        {"match_id": "GS_C_01", "team_a": "Slovenia", "team_b": "Denmark", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_C_02", "team_a": "Slovenia", "team_b": "Serbia", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_C_03", "team_a": "Slovenia", "team_b": "England", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_C_04", "team_a": "Denmark", "team_b": "Serbia", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_C_05", "team_a": "Denmark", "team_b": "England", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_C_06", "team_a": "Serbia", "team_b": "England", "winner": null, "score_a": null, "score_b": null}
+      ]
+    },
+    "D": {
+      "teams": ["Poland", "Netherlands", "Austria", "France"],
+      "matches": [
+        {"match_id": "GS_D_01", "team_a": "Poland", "team_b": "Netherlands", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_D_02", "team_a": "Poland", "team_b": "Austria", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_D_03", "team_a": "Poland", "team_b": "France", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_D_04", "team_a": "Netherlands", "team_b": "Austria", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_D_05", "team_a": "Netherlands", "team_b": "France", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_D_06", "team_a": "Austria", "team_b": "France", "winner": null, "score_a": null, "score_b": null}
+      ]
+    },
+    "E": {
+      "teams": ["Belgium", "Slovakia", "Romania", "Ukraine"],
+      "matches": [
+        {"match_id": "GS_E_01", "team_a": "Belgium", "team_b": "Slovakia", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_E_02", "team_a": "Belgium", "team_b": "Romania", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_E_03", "team_a": "Belgium", "team_b": "Ukraine", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_E_04", "team_a": "Slovakia", "team_b": "Romania", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_E_05", "team_a": "Slovakia", "team_b": "Ukraine", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_E_06", "team_a": "Romania", "team_b": "Ukraine", "winner": null, "score_a": null, "score_b": null}
+      ]
+    },
+    "F": {
+      "teams": ["Türkiye", "Georgia", "Portugal", "Czech Republic"],
+      "matches": [
+        {"match_id": "GS_F_01", "team_a": "Türkiye", "team_b": "Georgia", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_F_02", "team_a": "Türkiye", "team_b": "Portugal", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_F_03", "team_a": "Türkiye", "team_b": "Czech Republic", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_F_04", "team_a": "Georgia", "team_b": "Portugal", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_F_05", "team_a": "Georgia", "team_b": "Czech Republic", "winner": null, "score_a": null, "score_b": null},
+        {"match_id": "GS_F_06", "team_a": "Portugal", "team_b": "Czech Republic", "winner": null, "score_a": null, "score_b": null}
+      ]
+    }
+  }
+}

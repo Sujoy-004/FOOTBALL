@@ -808,17 +808,8 @@ class TestDrawBackfillIntegration:
         assert 0 <= d["metrics"]["brier"] <= 1
         assert d["metrics"]["brier"] > 0
 
-        hist_path = tmp_path / "prediction_history.json"
-        assert hist_path.exists()
-        hist = json.loads(hist_path.read_text(encoding="utf-8"))
-        assert len(hist) == 1
-        assert hist[0]["match_id"] == "M01"
-        # Compound format (Phase 13)
-        assert "signals" in hist[0], "Entry should have signals dict"
-        assert "prediction" not in hist[0], "No flat prediction key"
-        assert hist[0]["signals"]["elo"]["available"] is True
-        assert hist[0]["signals"]["elo"]["team_a_elo"] == 2100
-        assert hist[0]["signals"]["elo"]["team_b_elo"] == 2000
+        # Prediction history is no longer populated by evaluation (I/O leak fix).
+        # The main loop handles prediction history creation during match ingestion.
 
 
 class TestPerIterationHistory:
