@@ -10,30 +10,31 @@ See: .planning/PROJECT.md (updated 2026-06-27)
 ## Current Position
 
 Phase: 1 of 4 (UCL League Table Engine)
-Plan: 2 of 3 in current phase
-Status: Executing
-Last activity: 2026-06-27 — Completed Plan 02: ClubElo fetcher, Swiss match simulation, 10-step tiebreaker standings
+Plan: 3 of 3 in current phase
+Status: Complete
+Last activity: 2026-06-27 — Completed Plan 03: Monte Carlo simulation engine with 10K iteration verification
 
-Progress: [######              ] 30%
+Progress: [########            ] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 36 min
-- Total execution time: 72 min
+- Total plans completed: 3
+- Average duration: 29 min
+- Total execution time: 87 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-ucl-league-table-engine | 2 | 72 min | 36 min |
+| 01-ucl-league-table-engine | 3 | 87 min | 29 min |
 
 **Recent Trend:**
 - Last 5 plans:
   1. 01-ucl-league-table-engine/01: 40 min (module scaffold, fixture data, validation)
   2. 01-ucl-league-table-engine/02: 32 min (ClubElo fetcher, match sim, 10-step tiebreaker standings)
-- Trend: Steady velocity
+  3. 01-ucl-league-table-engine/03: 15 min (MC simulation engine)
+- Trend: Steady velocity, faster as modules build on prior work
 
 ## Accumulated Context
 
@@ -52,6 +53,9 @@ Recent decisions affecting current work:
 - (Phase 1/Plan 02): Opponent stats from pre-tiebreak raw aggregates, not post-rank values
 - (Phase 1/Plan 02): Defensive copy pattern to prevent input mutation
 - (Phase 1/Plan 02): No H2H tiebreaker confirmed for Swiss system
+- (Phase 1/Plan 03): Post-aggregation pattern — collect per-iteration results in flat lists, aggregate once after loop
+- (Phase 1/Plan 03): Matchup lambdas precomputed once before iteration loop for ~2x performance gain
+- (Phase 1/Plan 03): aggregate_mc_results() separated for isolated unit testing without running simulation
 
 ### Pending Todos
 
@@ -69,6 +73,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-27T11:52:37Z
-Stopped at: Completed 01-02-PLAN.md (ClubElo fetcher, Swiss match sim, 10-step standings)
-Resume file: .planning/phases/01-ucl-league-table-engine/01-02-SUMMARY.md
+Last session: 2026-06-27
+Stopped at: Completed 01-03-PLAN.md (Monte Carlo simulation engine with 10K verification)
+Resume file: .planning/phases/01-ucl-league-table-engine/01-03-SUMMARY.md
