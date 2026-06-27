@@ -329,6 +329,16 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture
+def sample_elo_dict(sample_36_teams):
+    """Returns a flat {team_name: elo} dict for all 36 teams.
+
+    Useful for Monte Carlo tests that need elo ratings matching
+    the full 36-team fixture schedule.
+    """
+    return {n: d["elo"] for n, d in sample_36_teams.items()}
+
+
+@pytest.fixture
 def sample_elo_ratings():
     """Returns Elo ratings for 4 sample teams."""
     return {

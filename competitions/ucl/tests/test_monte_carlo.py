@@ -30,15 +30,15 @@ class TestMonteCarlo:
     """Tests for the Monte Carlo simulation loop."""
 
     def test_run_monte_carlo_n1(
-        self, sample_fixture_schedule, sample_elo_ratings,
+        self, sample_fixture_schedule, sample_elo_dict,
     ):
         """N=1 produces deterministic output (same seed = identical)."""
         result1 = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=1, seed=42,
         )
         result2 = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=1, seed=42,
         )
         assert result1["teams"] == result2["teams"]
@@ -46,11 +46,11 @@ class TestMonteCarlo:
         assert result1["seed"] == 42
 
     def test_run_monte_carlo_n2(
-        self, sample_fixture_schedule, sample_elo_ratings,
+        self, sample_fixture_schedule, sample_elo_dict,
     ):
         """N=2 produces averaged probabilities (values are 0, 0.5, or 1.0)."""
         result = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=2, seed=42,
         )
         for team_data in result["teams"].values():
@@ -60,11 +60,11 @@ class TestMonteCarlo:
                 )
 
     def test_run_monte_carlo_output_keys(
-        self, sample_fixture_schedule, sample_elo_ratings,
+        self, sample_fixture_schedule, sample_elo_dict,
     ):
         """Output dict has all required top-level keys."""
         result = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=5, seed=42,
         )
         assert "snapshot_date" in result
@@ -75,11 +75,11 @@ class TestMonteCarlo:
         assert result["seed"] == 42
 
     def test_run_monte_carlo_team_keys(
-        self, sample_fixture_schedule, sample_elo_ratings,
+        self, sample_fixture_schedule, sample_elo_dict,
     ):
         """Each team entry has all 10 required keys per D-06/D-07."""
         result = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=5, seed=42,
         )
         sample_team = list(result["teams"].keys())[0]
@@ -95,11 +95,11 @@ class TestMonteCarlo:
             assert key in team_data, f"Missing key: {key}"
 
     def test_run_monte_carlo_zones_sum_to_1(
-        self, sample_fixture_schedule, sample_elo_ratings,
+        self, sample_fixture_schedule, sample_elo_dict,
     ):
         """Zone probabilities sum to 1.0 for each team."""
         result = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=10, seed=42,
         )
         for team_name, team_data in result["teams"].items():
@@ -113,11 +113,11 @@ class TestMonteCarlo:
             )
 
     def test_run_monte_carlo_champion_prob(
-        self, sample_fixture_schedule, sample_elo_ratings,
+        self, sample_fixture_schedule, sample_elo_dict,
     ):
         """At least one team has champion_prob > 0 with N >= 100."""
         result = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=100, seed=42,
         )
         champ_probs = [
@@ -134,41 +134,33 @@ class TestMonteCarlo:
         )
 
     def test_run_monte_carlo_different_seed(
-        self, sample_fixture_schedule, sample_elo_ratings,
+        self, sample_fixture_schedule, sample_elo_dict,
     ):
         """Different seed produces different results."""
         result1 = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=10, seed=42,
         )
         result2 = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=10, seed=123,
         )
 
-        # Extract comparable values (champion_prob for a specific team)
-        team_a = list(result1["teams"].keys())[0]
-        val1 = result1["teams"][team_a]["champion_prob"]
-        val2 = result2["teams"][team_a]["champion_prob"]
-        # With different seeds, it's vanishingly unlikely for 10 iterations
-        # to produce exactly the same champion probability for the first team.
-        # But if they happen to be equal, that's OK — we just need to verify
-        # the seed parameter is respected.
         assert result1["seed"] == 42
         assert result2["seed"] == 123
 
     def test_run_monte_carlo_100_iterations_smoke(
-        self, sample_fixture_schedule, sample_elo_ratings,
+        self, sample_fixture_schedule, sample_elo_dict,
     ):
         """Smoke test with 100 iterations completes in reasonable time."""
         import time
         start = time.time()
         result = run_monte_carlo(
-            sample_fixture_schedule, sample_elo_ratings,
+            sample_fixture_schedule, sample_elo_dict,
             n_iterations=100, seed=42,
         )
         elapsed = time.time() - start
-        assert len(result["teams"]) == len(sample_elo_ratings)
+        assert len(result["teams"]) == len(sample_elo_dict)
         assert elapsed < 30, (
             f"100 iterations took {elapsed:.1f}s (expected < 30s)"
         )
