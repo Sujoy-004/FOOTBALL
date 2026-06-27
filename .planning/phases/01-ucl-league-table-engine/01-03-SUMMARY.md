@@ -68,7 +68,7 @@ Each task was committed atomically:
 3. **Task 2: Monte Carlo loop (TDD: GREEN)** — `a25d1cb` (feat)
 4. **Task 2: Monte Carlo loop (TDD: REFACTOR)** — `db98db2` (refactor)
 
-**Plan metadata:** [pending — current commit]
+**Plan metadata:** `093082a` (docs: complete Summary), `85a8794` (docs: update STATE.md)
 
 ## Files Created/Modified
 
