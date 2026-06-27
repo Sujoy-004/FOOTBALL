@@ -1,0 +1,1248 @@
+{
+  "schedule": {
+    "teams": [
+      {
+        "name": "Man City",
+        "pot": 1,
+        "clubelo_name": "Man City",
+        "coefficient": 123.0
+      },
+      {
+        "name": "Bayern",
+        "pot": 1,
+        "clubelo_name": "Bayern",
+        "coefficient": 120.0
+      },
+      {
+        "name": "Real Madrid",
+        "pot": 1,
+        "clubelo_name": "Real Madrid",
+        "coefficient": 119.0
+      },
+      {
+        "name": "PSG",
+        "pot": 1,
+        "clubelo_name": "Paris SG",
+        "coefficient": 116.0
+      },
+      {
+        "name": "Liverpool",
+        "pot": 1,
+        "clubelo_name": "Liverpool",
+        "coefficient": 114.0
+      },
+      {
+        "name": "Inter",
+        "pot": 1,
+        "clubelo_name": "Inter",
+        "coefficient": 112.0
+      },
+      {
+        "name": "Dortmund",
+        "pot": 1,
+        "clubelo_name": "Dortmund",
+        "coefficient": 111.0
+      },
+      {
+        "name": "RB Leipzig",
+        "pot": 1,
+        "clubelo_name": "RB Leipzig",
+        "coefficient": 108.0
+      },
+      {
+        "name": "Barcelona",
+        "pot": 1,
+        "clubelo_name": "Barcelona",
+        "coefficient": 117.0
+      },
+      {
+        "name": "Bayer Leverkusen",
+        "pot": 2,
+        "clubelo_name": "Leverkusen",
+        "coefficient": 105.0
+      },
+      {
+        "name": "Atletico Madrid",
+        "pot": 2,
+        "clubelo_name": "Atletico",
+        "coefficient": 107.0
+      },
+      {
+        "name": "Juventus",
+        "pot": 2,
+        "clubelo_name": "Juventus",
+        "coefficient": 103.0
+      },
+      {
+        "name": "Sporting",
+        "pot": 2,
+        "clubelo_name": "Sporting",
+        "coefficient": 95.0
+      },
+      {
+        "name": "Benfica",
+        "pot": 2,
+        "clubelo_name": "Benfica",
+        "coefficient": 97.0
+      },
+      {
+        "name": "Arsenal",
+        "pot": 2,
+        "clubelo_name": "Arsenal",
+        "coefficient": 110.0
+      },
+      {
+        "name": "AC Milan",
+        "pot": 2,
+        "clubelo_name": "Milan",
+        "coefficient": 101.0
+      },
+      {
+        "name": "Club Brugge",
+        "pot": 2,
+        "clubelo_name": "Brugge",
+        "coefficient": 65.0
+      },
+      {
+        "name": "Shakhtar Donetsk",
+        "pot": 2,
+        "clubelo_name": "Shakhtar",
+        "coefficient": 63.0
+      },
+      {
+        "name": "Feyenoord",
+        "pot": 3,
+        "clubelo_name": "Feyenoord",
+        "coefficient": 70.0
+      },
+      {
+        "name": "PSV",
+        "pot": 3,
+        "clubelo_name": "PSV",
+        "coefficient": 72.0
+      },
+      {
+        "name": "Celtic",
+        "pot": 3,
+        "clubelo_name": "Celtic",
+        "coefficient": 58.0
+      },
+      {
+        "name": "Young Boys",
+        "pot": 3,
+        "clubelo_name": "Young Boys",
+        "coefficient": 45.0
+      },
+      {
+        "name": "Salzburg",
+        "pot": 3,
+        "clubelo_name": "Salzburg",
+        "coefficient": 50.0
+      },
+      {
+        "name": "Dinamo Zagreb",
+        "pot": 3,
+        "clubelo_name": "Dinamo Zagreb",
+        "coefficient": 42.0
+      },
+      {
+        "name": "Olympiacos",
+        "pot": 3,
+        "clubelo_name": "Olympiacos",
+        "coefficient": 48.0
+      },
+      {
+        "name": "Lille",
+        "pot": 3,
+        "clubelo_name": "Lille",
+        "coefficient": 55.0
+      },
+      {
+        "name": "Red Star Belgrade",
+        "pot": 3,
+        "clubelo_name": "Crvena Zvezda",
+        "coefficient": 38.0
+      },
+      {
+        "name": "Aston Villa",
+        "pot": 4,
+        "clubelo_name": "Aston Villa",
+        "coefficient": 68.0
+      },
+      {
+        "name": "Stuttgart",
+        "pot": 4,
+        "clubelo_name": "Stuttgart",
+        "coefficient": 52.0
+      },
+      {
+        "name": "Bologna",
+        "pot": 4,
+        "clubelo_name": "Bologna",
+        "coefficient": 35.0
+      },
+      {
+        "name": "Girona",
+        "pot": 4,
+        "clubelo_name": "Girona",
+        "coefficient": 30.0
+      },
+      {
+        "name": "Monaco",
+        "pot": 4,
+        "clubelo_name": "Monaco",
+        "coefficient": 62.0
+      },
+      {
+        "name": "Sparta Prague",
+        "pot": 4,
+        "clubelo_name": "Sparta Praha",
+        "coefficient": 40.0
+      },
+      {
+        "name": "Slovan Bratislava",
+        "pot": 4,
+        "clubelo_name": "Slovan Bratislava",
+        "coefficient": 25.0
+      },
+      {
+        "name": "Maccabi Tel Aviv",
+        "pot": 4,
+        "clubelo_name": "M Tel Aviv",
+        "coefficient": 22.0
+      },
+      {
+        "name": "Bodo/Glimt",
+        "pot": 4,
+        "clubelo_name": "Bodoe Glimt",
+        "coefficient": 28.0
+      }
+    ],
+    "matchdays": [
+      [
+        {
+          "match_id": "MD01_01",
+          "team_a": "Barcelona",
+          "team_b": "Aston Villa",
+          "home_pot": 1,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD01_02",
+          "team_a": "Sporting",
+          "team_b": "Stuttgart",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD01_03",
+          "team_a": "Celtic",
+          "team_b": "Bayern",
+          "home_pot": 3,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD01_04",
+          "team_a": "Monaco",
+          "team_b": "Feyenoord",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD01_05",
+          "team_a": "Red Star Belgrade",
+          "team_b": "Bayer Leverkusen",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD01_06",
+          "team_a": "Bodo/Glimt",
+          "team_b": "Olympiacos",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD01_07",
+          "team_a": "Benfica",
+          "team_b": "Salzburg",
+          "home_pot": 2,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD01_08",
+          "team_a": "Dortmund",
+          "team_b": "Liverpool",
+          "home_pot": 1,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD01_09",
+          "team_a": "Sparta Prague",
+          "team_b": "Inter",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD01_10",
+          "team_a": "Shakhtar Donetsk",
+          "team_b": "Arsenal",
+          "home_pot": 2,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD01_11",
+          "team_a": "Bologna",
+          "team_b": "PSG",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD01_12",
+          "team_a": "Man City",
+          "team_b": "Dinamo Zagreb",
+          "home_pot": 1,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD01_13",
+          "team_a": "Real Madrid",
+          "team_b": "Slovan Bratislava",
+          "home_pot": 1,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD01_14",
+          "team_a": "Young Boys",
+          "team_b": "Maccabi Tel Aviv",
+          "home_pot": 3,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD01_15",
+          "team_a": "Girona",
+          "team_b": "Lille",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD01_16",
+          "team_a": "Club Brugge",
+          "team_b": "Juventus",
+          "home_pot": 2,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD01_17",
+          "team_a": "RB Leipzig",
+          "team_b": "PSV",
+          "home_pot": 1,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD01_18",
+          "team_a": "Atletico Madrid",
+          "team_b": "AC Milan",
+          "home_pot": 2,
+          "away_pot": 2
+        }
+      ],
+      [
+        {
+          "match_id": "MD02_01",
+          "team_a": "Dinamo Zagreb",
+          "team_b": "Bologna",
+          "home_pot": 3,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD02_02",
+          "team_a": "Bayer Leverkusen",
+          "team_b": "Atletico Madrid",
+          "home_pot": 2,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD02_03",
+          "team_a": "Maccabi Tel Aviv",
+          "team_b": "Bodo/Glimt",
+          "home_pot": 4,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD02_04",
+          "team_a": "Club Brugge",
+          "team_b": "AC Milan",
+          "home_pot": 2,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD02_05",
+          "team_a": "Salzburg",
+          "team_b": "Dortmund",
+          "home_pot": 3,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD02_06",
+          "team_a": "Inter",
+          "team_b": "Juventus",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD02_07",
+          "team_a": "Liverpool",
+          "team_b": "Arsenal",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD02_08",
+          "team_a": "PSG",
+          "team_b": "Monaco",
+          "home_pot": 1,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD02_09",
+          "team_a": "Sporting",
+          "team_b": "Benfica",
+          "home_pot": 2,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD02_10",
+          "team_a": "Stuttgart",
+          "team_b": "Red Star Belgrade",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD02_11",
+          "team_a": "Real Madrid",
+          "team_b": "Shakhtar Donetsk",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD02_12",
+          "team_a": "Feyenoord",
+          "team_b": "Young Boys",
+          "home_pot": 3,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD02_13",
+          "team_a": "Aston Villa",
+          "team_b": "Girona",
+          "home_pot": 4,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD02_14",
+          "team_a": "Barcelona",
+          "team_b": "Man City",
+          "home_pot": 1,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD02_15",
+          "team_a": "Sparta Prague",
+          "team_b": "Lille",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD02_16",
+          "team_a": "Slovan Bratislava",
+          "team_b": "Celtic",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD02_17",
+          "team_a": "RB Leipzig",
+          "team_b": "Olympiacos",
+          "home_pot": 1,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD02_18",
+          "team_a": "Bayern",
+          "team_b": "PSV",
+          "home_pot": 1,
+          "away_pot": 3
+        }
+      ],
+      [
+        {
+          "match_id": "MD03_01",
+          "team_a": "Olympiacos",
+          "team_b": "Club Brugge",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD03_02",
+          "team_a": "Dortmund",
+          "team_b": "Benfica",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD03_03",
+          "team_a": "Man City",
+          "team_b": "Juventus",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD03_04",
+          "team_a": "Shakhtar Donetsk",
+          "team_b": "Inter",
+          "home_pot": 2,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD03_05",
+          "team_a": "Maccabi Tel Aviv",
+          "team_b": "Sparta Prague",
+          "home_pot": 4,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD03_06",
+          "team_a": "Bayern",
+          "team_b": "Girona",
+          "home_pot": 1,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD03_07",
+          "team_a": "Lille",
+          "team_b": "Liverpool",
+          "home_pot": 3,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD03_08",
+          "team_a": "Monaco",
+          "team_b": "Red Star Belgrade",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD03_09",
+          "team_a": "Young Boys",
+          "team_b": "Celtic",
+          "home_pot": 3,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD03_10",
+          "team_a": "Dinamo Zagreb",
+          "team_b": "Feyenoord",
+          "home_pot": 3,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD03_11",
+          "team_a": "Real Madrid",
+          "team_b": "Salzburg",
+          "home_pot": 1,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD03_12",
+          "team_a": "Atletico Madrid",
+          "team_b": "Bodo/Glimt",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD03_13",
+          "team_a": "Bayer Leverkusen",
+          "team_b": "RB Leipzig",
+          "home_pot": 2,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD03_14",
+          "team_a": "Arsenal",
+          "team_b": "PSG",
+          "home_pot": 2,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD03_15",
+          "team_a": "Aston Villa",
+          "team_b": "Slovan Bratislava",
+          "home_pot": 4,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD03_16",
+          "team_a": "PSV",
+          "team_b": "Sporting",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD03_17",
+          "team_a": "Bologna",
+          "team_b": "Stuttgart",
+          "home_pot": 4,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD03_18",
+          "team_a": "AC Milan",
+          "team_b": "Barcelona",
+          "home_pot": 2,
+          "away_pot": 1
+        }
+      ],
+      [
+        {
+          "match_id": "MD04_01",
+          "team_a": "Aston Villa",
+          "team_b": "Dinamo Zagreb",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD04_02",
+          "team_a": "Maccabi Tel Aviv",
+          "team_b": "Dortmund",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD04_03",
+          "team_a": "Bayern",
+          "team_b": "RB Leipzig",
+          "home_pot": 1,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD04_04",
+          "team_a": "Shakhtar Donetsk",
+          "team_b": "Lille",
+          "home_pot": 2,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD04_05",
+          "team_a": "Sporting",
+          "team_b": "Real Madrid",
+          "home_pot": 2,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD04_06",
+          "team_a": "Celtic",
+          "team_b": "Bologna",
+          "home_pot": 3,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD04_07",
+          "team_a": "Feyenoord",
+          "team_b": "Atletico Madrid",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD04_08",
+          "team_a": "Bodo/Glimt",
+          "team_b": "Sparta Prague",
+          "home_pot": 4,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD04_09",
+          "team_a": "Girona",
+          "team_b": "Barcelona",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD04_10",
+          "team_a": "Red Star Belgrade",
+          "team_b": "Liverpool",
+          "home_pot": 3,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD04_11",
+          "team_a": "PSV",
+          "team_b": "Club Brugge",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD04_12",
+          "team_a": "Benfica",
+          "team_b": "Stuttgart",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD04_13",
+          "team_a": "Bayer Leverkusen",
+          "team_b": "Monaco",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD04_14",
+          "team_a": "Inter",
+          "team_b": "PSG",
+          "home_pot": 1,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD04_15",
+          "team_a": "Salzburg",
+          "team_b": "Arsenal",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD04_16",
+          "team_a": "Olympiacos",
+          "team_b": "AC Milan",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD04_17",
+          "team_a": "Juventus",
+          "team_b": "Slovan Bratislava",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD04_18",
+          "team_a": "Man City",
+          "team_b": "Young Boys",
+          "home_pot": 1,
+          "away_pot": 3
+        }
+      ],
+      [
+        {
+          "match_id": "MD05_01",
+          "team_a": "Girona",
+          "team_b": "Club Brugge",
+          "home_pot": 4,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD05_02",
+          "team_a": "Sparta Prague",
+          "team_b": "Salzburg",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD05_03",
+          "team_a": "Shakhtar Donetsk",
+          "team_b": "Maccabi Tel Aviv",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD05_04",
+          "team_a": "Young Boys",
+          "team_b": "Arsenal",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD05_05",
+          "team_a": "Lille",
+          "team_b": "Real Madrid",
+          "home_pot": 3,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD05_06",
+          "team_a": "Bologna",
+          "team_b": "Dortmund",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD05_07",
+          "team_a": "Dinamo Zagreb",
+          "team_b": "Juventus",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD05_08",
+          "team_a": "Monaco",
+          "team_b": "Bayern",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD05_09",
+          "team_a": "Celtic",
+          "team_b": "Bayer Leverkusen",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD05_10",
+          "team_a": "Slovan Bratislava",
+          "team_b": "Liverpool",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD05_11",
+          "team_a": "Sporting",
+          "team_b": "Red Star Belgrade",
+          "home_pot": 2,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD05_12",
+          "team_a": "RB Leipzig",
+          "team_b": "Man City",
+          "home_pot": 1,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD05_13",
+          "team_a": "Inter",
+          "team_b": "Aston Villa",
+          "home_pot": 1,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD05_14",
+          "team_a": "PSG",
+          "team_b": "Atletico Madrid",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD05_15",
+          "team_a": "Bodo/Glimt",
+          "team_b": "PSV",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD05_16",
+          "team_a": "AC Milan",
+          "team_b": "Feyenoord",
+          "home_pot": 2,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD05_17",
+          "team_a": "Olympiacos",
+          "team_b": "Stuttgart",
+          "home_pot": 3,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD05_18",
+          "team_a": "Barcelona",
+          "team_b": "Benfica",
+          "home_pot": 1,
+          "away_pot": 2
+        }
+      ],
+      [
+        {
+          "match_id": "MD06_01",
+          "team_a": "Young Boys",
+          "team_b": "Shakhtar Donetsk",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD06_02",
+          "team_a": "Bayern",
+          "team_b": "Real Madrid",
+          "home_pot": 1,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD06_03",
+          "team_a": "Atletico Madrid",
+          "team_b": "Dinamo Zagreb",
+          "home_pot": 2,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD06_04",
+          "team_a": "Slovan Bratislava",
+          "team_b": "Bayer Leverkusen",
+          "home_pot": 4,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD06_05",
+          "team_a": "Salzburg",
+          "team_b": "Aston Villa",
+          "home_pot": 3,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD06_06",
+          "team_a": "Olympiacos",
+          "team_b": "Inter",
+          "home_pot": 3,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD06_07",
+          "team_a": "AC Milan",
+          "team_b": "Bodo/Glimt",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD06_08",
+          "team_a": "Arsenal",
+          "team_b": "Girona",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD06_09",
+          "team_a": "Stuttgart",
+          "team_b": "RB Leipzig",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD06_10",
+          "team_a": "PSG",
+          "team_b": "Barcelona",
+          "home_pot": 1,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD06_11",
+          "team_a": "Liverpool",
+          "team_b": "Club Brugge",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD06_12",
+          "team_a": "Feyenoord",
+          "team_b": "Dortmund",
+          "home_pot": 3,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD06_13",
+          "team_a": "Lille",
+          "team_b": "Celtic",
+          "home_pot": 3,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD06_14",
+          "team_a": "Red Star Belgrade",
+          "team_b": "PSV",
+          "home_pot": 3,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD06_15",
+          "team_a": "Juventus",
+          "team_b": "Monaco",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD06_16",
+          "team_a": "Maccabi Tel Aviv",
+          "team_b": "Man City",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD06_17",
+          "team_a": "Benfica",
+          "team_b": "Bologna",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD06_18",
+          "team_a": "Sparta Prague",
+          "team_b": "Sporting",
+          "home_pot": 4,
+          "away_pot": 2
+        }
+      ],
+      [
+        {
+          "match_id": "MD07_01",
+          "team_a": "Bologna",
+          "team_b": "Monaco",
+          "home_pot": 4,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD07_02",
+          "team_a": "Dortmund",
+          "team_b": "Sporting",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD07_03",
+          "team_a": "Bodo/Glimt",
+          "team_b": "RB Leipzig",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD07_04",
+          "team_a": "PSG",
+          "team_b": "Celtic",
+          "home_pot": 1,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD07_05",
+          "team_a": "Lille",
+          "team_b": "Dinamo Zagreb",
+          "home_pot": 3,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD07_06",
+          "team_a": "Stuttgart",
+          "team_b": "Girona",
+          "home_pot": 4,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD07_07",
+          "team_a": "Real Madrid",
+          "team_b": "Sparta Prague",
+          "home_pot": 1,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD07_08",
+          "team_a": "Arsenal",
+          "team_b": "Maccabi Tel Aviv",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD07_09",
+          "team_a": "Club Brugge",
+          "team_b": "Bayern",
+          "home_pot": 2,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD07_10",
+          "team_a": "Red Star Belgrade",
+          "team_b": "Salzburg",
+          "home_pot": 3,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD07_11",
+          "team_a": "Slovan Bratislava",
+          "team_b": "Feyenoord",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD07_12",
+          "team_a": "Man City",
+          "team_b": "Atletico Madrid",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD07_13",
+          "team_a": "Juventus",
+          "team_b": "Shakhtar Donetsk",
+          "home_pot": 2,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD07_14",
+          "team_a": "Barcelona",
+          "team_b": "Young Boys",
+          "home_pot": 1,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD07_15",
+          "team_a": "PSV",
+          "team_b": "Olympiacos",
+          "home_pot": 3,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD07_16",
+          "team_a": "AC Milan",
+          "team_b": "Aston Villa",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD07_17",
+          "team_a": "Benfica",
+          "team_b": "Bayer Leverkusen",
+          "home_pot": 2,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD07_18",
+          "team_a": "Liverpool",
+          "team_b": "Inter",
+          "home_pot": 1,
+          "away_pot": 1
+        }
+      ],
+      [
+        {
+          "match_id": "MD08_01",
+          "team_a": "Feyenoord",
+          "team_b": "Barcelona",
+          "home_pot": 3,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD08_02",
+          "team_a": "Atletico Madrid",
+          "team_b": "Bologna",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD08_03",
+          "team_a": "Liverpool",
+          "team_b": "Bodo/Glimt",
+          "home_pot": 1,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD08_04",
+          "team_a": "Salzburg",
+          "team_b": "Olympiacos",
+          "home_pot": 3,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD08_05",
+          "team_a": "Dortmund",
+          "team_b": "Real Madrid",
+          "home_pot": 1,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD08_06",
+          "team_a": "RB Leipzig",
+          "team_b": "AC Milan",
+          "home_pot": 1,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD08_07",
+          "team_a": "Girona",
+          "team_b": "Young Boys",
+          "home_pot": 4,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD08_08",
+          "team_a": "Monaco",
+          "team_b": "Slovan Bratislava",
+          "home_pot": 4,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD08_09",
+          "team_a": "Celtic",
+          "team_b": "Benfica",
+          "home_pot": 3,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD08_10",
+          "team_a": "Bayer Leverkusen",
+          "team_b": "Bayern",
+          "home_pot": 2,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD08_11",
+          "team_a": "PSV",
+          "team_b": "Maccabi Tel Aviv",
+          "home_pot": 3,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD08_12",
+          "team_a": "Club Brugge",
+          "team_b": "Sparta Prague",
+          "home_pot": 2,
+          "away_pot": 4
+        },
+        {
+          "match_id": "MD08_13",
+          "team_a": "Aston Villa",
+          "team_b": "Shakhtar Donetsk",
+          "home_pot": 4,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD08_14",
+          "team_a": "Inter",
+          "team_b": "Red Star Belgrade",
+          "home_pot": 1,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD08_15",
+          "team_a": "Juventus",
+          "team_b": "Lille",
+          "home_pot": 2,
+          "away_pot": 3
+        },
+        {
+          "match_id": "MD08_16",
+          "team_a": "Arsenal",
+          "team_b": "Sporting",
+          "home_pot": 2,
+          "away_pot": 2
+        },
+        {
+          "match_id": "MD08_17",
+          "team_a": "Stuttgart",
+          "team_b": "Man City",
+          "home_pot": 4,
+          "away_pot": 1
+        },
+        {
+          "match_id": "MD08_18",
+          "team_a": "Dinamo Zagreb",
+          "team_b": "PSG",
+          "home_pot": 3,
+          "away_pot": 1
+        }
+      ]
+    ]
+  }
+}
