@@ -1,3 +1,0 @@
-# Euro Predictor
-
-Coming soon.
