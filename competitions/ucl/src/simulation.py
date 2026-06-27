@@ -13,7 +13,6 @@ Consumes the match simulation and standings functions from
 from __future__ import annotations
 
 import random
-from collections import defaultdict
 
 from competitions.ucl.src.groups import (
     compute_swiss_standings,
