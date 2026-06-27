@@ -161,3 +161,17 @@ def simulate_swiss_matches(
             }
 
     return results
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── Swiss standings (STUB — RED phase)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def compute_swiss_standings(
+    matches: dict[str, dict],
+    elo_ratings: dict[str, float] | None = None,
+    uefa_coefficients: dict[str, float] | None = None,
+) -> list[dict]:
+    """STUB — returns empty list (will fail RED tests)."""
+    return []
