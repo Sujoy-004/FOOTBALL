@@ -1,4 +1,4 @@
-"""UCL Predictor — Swiss league phase simulation and standings computation."""
+"""UCL Predictor — Swiss league phase simulation, standings, and Monte Carlo."""
 
 from competitions.ucl.src.elo_fetcher import (
     fetch_team_elos,
@@ -10,6 +10,11 @@ from competitions.ucl.src.groups import (
     precompute_swiss_matchup_lambdas,
     simulate_swiss_matches,
 )
+from competitions.ucl.src.simulation import (
+    aggregate_mc_results,
+    run_monte_carlo,
+    simulate_league_phase,
+)
 
 __all__ = [
     "fetch_team_elos",
@@ -18,4 +23,7 @@ __all__ = [
     "precompute_swiss_matchup_lambdas",
     "simulate_swiss_matches",
     "compute_swiss_standings",
+    "simulate_league_phase",
+    "run_monte_carlo",
+    "aggregate_mc_results",
 ]

@@ -28,7 +28,7 @@ Build a UEFA Champions League competition module for the existing football predi
 
 Plans:
 - [x] 01-01-PLAN.md — Fixture schedule loading and validation (data files, pot distribution validation, duplicate detection)
-- [ ] 01-02-PLAN.md — Match simulation + 36-team standings engine (ClubElo fetcher, football_core Poisson reuse, UCL 10-step tiebreaker chain, zone classification)
+- [x] 01-02-PLAN.md — Match simulation + 36-team standings engine (ClubElo fetcher, football_core Poisson reuse, UCL 10-step tiebreaker chain, zone classification)
 - [ ] 01-03-PLAN.md — Monte Carlo simulation + advancement probabilities (N-iteration loop, zone/champion probabilities, per-team tiebreaker stat averages)
 
 ### Phase 2: UCL Knockout Phase
@@ -92,7 +92,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. UCL League Table Engine | 1/3 | In Progress|  |
+| 1. UCL League Table Engine | 2/3 | In Progress|  |
 | 2. UCL Knockout Phase | 0/4 | Not started | - |
 | 3. UCL Simulation Orchestration + Display | 0/3 | Not started | - |
 | 4. Validation & Production Readiness | 0/4 | Not started | - |

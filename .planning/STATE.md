@@ -10,29 +10,30 @@ See: .planning/PROJECT.md (updated 2026-06-27)
 ## Current Position
 
 Phase: 1 of 4 (UCL League Table Engine)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: Executing
-Last activity: 2026-06-27 — Completed Plan 01: Module scaffold, fixture data files, fixture validation
+Last activity: 2026-06-27 — Completed Plan 02: ClubElo fetcher, Swiss match simulation, 10-step tiebreaker standings
 
-Progress: [###                 ] 15%
+Progress: [######              ] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 40 min
-- Total execution time: 40 min
+- Total plans completed: 2
+- Average duration: 36 min
+- Total execution time: 72 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-ucl-league-table-engine | 1 | 40 min | 40 min |
+| 01-ucl-league-table-engine | 2 | 72 min | 36 min |
 
 **Recent Trend:**
 - Last 5 plans:
   1. 01-ucl-league-table-engine/01: 40 min (module scaffold, fixture data, validation)
-- Trend: Baseline established
+  2. 01-ucl-league-table-engine/02: 32 min (ClubElo fetcher, match sim, 10-step tiebreaker standings)
+- Trend: Steady velocity
 
 ## Accumulated Context
 
@@ -46,6 +47,11 @@ Recent decisions affecting current work:
 - (Roadmap): All 22 v1 requirements covered across 4 phases
 - (Phase 1): ClubElo as Elo source for UCL teams — fetch-once, cache, snapshot reproducibility
 - (Phase 1): MC output = zone probabilities + champion + all tiebreaker-chain averages
+- (Phase 1/Plan 02): Single-request date-based ClubElo fetch instead of 36 individual requests
+- (Phase 1/Plan 02): logging.warning() on ClubElo fallback for silent-failure prevention
+- (Phase 1/Plan 02): Opponent stats from pre-tiebreak raw aggregates, not post-rank values
+- (Phase 1/Plan 02): Defensive copy pattern to prevent input mutation
+- (Phase 1/Plan 02): No H2H tiebreaker confirmed for Swiss system
 
 ### Pending Todos
 
@@ -63,6 +69,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-27T10:58:06Z
-Stopped at: Completed 01-01-PLAN.md (module scaffold, fixture data, fixture validation)
-Resume file: .planning/phases/01-ucl-league-table-engine/01-01-SUMMARY.md
+Last session: 2026-06-27T11:52:37Z
+Stopped at: Completed 01-02-PLAN.md (ClubElo fetcher, Swiss match sim, 10-step standings)
+Resume file: .planning/phases/01-ucl-league-table-engine/01-02-SUMMARY.md

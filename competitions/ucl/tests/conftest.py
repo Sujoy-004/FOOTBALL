@@ -431,3 +431,84 @@ def sample_standings_results():
             "elo": t["elo"],
         })
     return standings
+
+
+# ── Monte Carlo test fixtures (Plan 03, Task 1) ─────────────────────────────
+
+
+@pytest.fixture
+def sample_full_fixture_path(tmp_path):
+    """Writes the real fixtures.json to a temp path and returns the path.
+
+    Uses the on-disk fixture data (36 teams, 8 matchdays, 144 matches)
+    so tests that need the full schedule can load from a file path.
+    """
+    import json
+    import os
+
+    fixtures_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "data",
+        "fixtures.json",
+    )
+    dest = tmp_path / "fixtures.json"
+    with open(fixtures_path) as src:
+        data = json.load(src)
+    with open(dest, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    return str(dest)
+
+
+@pytest.fixture
+def sample_mc_output():
+    """Returns a minimal pre-formatted MC output dict with 3 teams.
+
+    Matches the D-06/D-07 output schema for testing aggregation
+    format independently from simulation logic.
+    """
+    return {
+        "snapshot_date": "2026-06-27",
+        "n_iterations": 1000,
+        "seed": 42,
+        "teams": {
+            "Man City": {
+                "top_8_prob": 0.85,
+                "playoff_prob": 0.13,
+                "eliminated_prob": 0.02,
+                "champion_prob": 0.12,
+                "avg_position": 4.2,
+                "avg_pts": 16.8,
+                "avg_gd": 5.3,
+                "avg_gs": 12.1,
+                "avg_away_gs": 5.8,
+                "avg_wins": 5.1,
+                "avg_away_wins": 2.4,
+            },
+            "Bayern": {
+                "top_8_prob": 0.78,
+                "playoff_prob": 0.19,
+                "eliminated_prob": 0.03,
+                "champion_prob": 0.09,
+                "avg_position": 5.1,
+                "avg_pts": 15.9,
+                "avg_gd": 4.8,
+                "avg_gs": 11.5,
+                "avg_away_gs": 5.3,
+                "avg_wins": 4.8,
+                "avg_away_wins": 2.1,
+            },
+            "Slovan Bratislava": {
+                "top_8_prob": 0.01,
+                "playoff_prob": 0.12,
+                "eliminated_prob": 0.87,
+                "champion_prob": 0.0001,
+                "avg_position": 31.8,
+                "avg_pts": 3.2,
+                "avg_gd": -4.1,
+                "avg_gs": 4.5,
+                "avg_away_gs": 1.8,
+                "avg_wins": 0.8,
+                "avg_away_wins": 0.3,
+            },
+        },
+    }
