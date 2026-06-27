@@ -20,6 +20,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+import competitions.worldcup  # noqa: F401 — sets up sys.path for football_core + src
+
 from src import constants
 from src import elo, elo_sync, output, state
 from src.constants import API_TIMEOUT, ELO_SYNC_INTERVAL_HOURS, POLL_INTERVAL
