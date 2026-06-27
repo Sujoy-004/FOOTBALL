@@ -342,12 +342,12 @@ class TestSwissTiebreakers:
         b_stats = next(s for s in st if s["team"] == "B")
 
         # Pre-tiebreak raw aggregates:
-        # C's raw stats (before any tiebreak): 3pts (W vs D), +1 GD, 2GS
-        # D's raw stats: 0pts, -3 GD, 0GS
-        # A's opponent C has: pts=3, gd=+1, gs=2
+        # C's raw stats: 3pts (W vs D 2-0), -1 GD (lost 3-0 to A, won 2-0 vs D), 2 GS
+        # D's raw stats: 0pts, -3 GD (lost 1-0 to B, 2-0 to C), 0 GS
+        # A's opponent C has: pts=3, gd=-1, gs=2
         # B's opponent D has: pts=0, gd=-3, gs=0
         assert a_stats["opp_pts"] == 3
-        assert a_stats["opp_gd"] == 1
+        assert a_stats["opp_gd"] == -1
         assert a_stats["opp_gs"] == 2
         assert b_stats["opp_pts"] == 0
         assert b_stats["opp_gd"] == -3
