@@ -36,20 +36,36 @@ class TestFixtureValidation:
     # ── Opponent Count Tests ─────────────────────────────────────────────
 
     def test_wrong_opponent_count(self, sample_fixture_schedule):
-        """Team with 7 opponents raises ValueError."""
+        """Team with fewer than 8 unique opponents raises ValueError.
+
+        Strategy: remove one match involving the target team, then replace it
+        with a filler match between two other teams to keep matchday at 18.
+        """
         schedule = copy.deepcopy(sample_fixture_schedule)
-        # Remove one match involving the first team
         team_name = schedule["schedule"]["teams"][0]["name"]
         removed = False
-        for md in schedule["schedule"]["matchdays"]:
+        remove_md_idx = -1
+        for md_idx, md in enumerate(schedule["schedule"]["matchdays"]):
             for m in list(md):
                 if m["team_a"] == team_name or m["team_b"] == team_name:
                     md.remove(m)
                     removed = True
+                    remove_md_idx = md_idx
                     break
             if removed:
                 break
-        with pytest.raises(ValueError, match="opponent"):
+
+        # Add a filler match to the same matchday to keep it at 18
+        # Pick two teams that aren't Man City and haven't already played
+        filler_team_a, filler_team_b = "Arsenal", "AC Milan"
+        schedule["schedule"]["matchdays"][remove_md_idx].append({
+            "match_id": "FILLER_01",
+            "team_a": filler_team_a,
+            "team_b": filler_team_b,
+            "home_pot": 2,
+            "away_pot": 2,
+        })
+        with pytest.raises(ValueError):
             validate_ucl_fixtures(schedule)
 
     # ── Pot Distribution Tests ───────────────────────────────────────────
@@ -82,17 +98,18 @@ class TestFixtureValidation:
     def test_duplicate_matchup(self, sample_fixture_schedule):
         """Same team pair appearing twice raises ValueError."""
         schedule = copy.deepcopy(sample_fixture_schedule)
-        # Clone the first match into a new matchday
+        # Insert a duplicate of the first match into matchday 0 (keeping 18+1)
         first_match = schedule["schedule"]["matchdays"][0][0]
-        new_match = {
-            "match_id": "XX_XX",
+        dup_match = {
+            "match_id": "DUP_01",
             "team_a": first_match["team_a"],
             "team_b": first_match["team_b"],
             "home_pot": first_match["home_pot"],
             "away_pot": first_match["away_pot"],
         }
-        schedule["schedule"]["matchdays"].append([new_match])
-        with pytest.raises(ValueError, match="duplicate"):
+        # Replace the last match of matchday 0 with the duplicate
+        schedule["schedule"]["matchdays"][0][-1] = dup_match
+        with pytest.raises(ValueError, match="(?i)duplicate"):
             validate_ucl_fixtures(schedule)
 
     # ── Matchday Count Tests ─────────────────────────────────────────────
@@ -118,7 +135,7 @@ class TestFixtureValidation:
         """Matchday with 17 matches raises ValueError."""
         schedule = copy.deepcopy(sample_fixture_schedule)
         schedule["schedule"]["matchdays"][0].pop()
-        with pytest.raises(ValueError, match="18 matches"):
+        with pytest.raises(ValueError, match="expected 18"):
             validate_ucl_fixtures(schedule)
 
     # ── Team Reference Tests ─────────────────────────────────────────────

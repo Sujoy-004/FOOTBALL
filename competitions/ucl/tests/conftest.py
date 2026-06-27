@@ -1,6 +1,7 @@
 """Shared pytest fixtures for UCL predictor tests."""
 
 import json
+import os
 
 import pytest
 
@@ -109,12 +110,23 @@ _POT_MAP.update({name: 2 for name in _REAL_TEAMS_POT2})
 _POT_MAP.update({name: 3 for name in _REAL_TEAMS_POT3})
 _POT_MAP.update({name: 4 for name in _REAL_TEAMS_POT4})
 
-# Subset of 16 teams (4 per pot) for sample fixtures
+# Subset of 16 teams (4 per pot) for minimal sample fixtures
 _SUB_POT1 = ["Man City", "Bayern", "Real Madrid", "PSG"]
 _SUB_POT2 = ["Bayer Leverkusen", "Atletico Madrid", "Juventus", "Arsenal"]
 _SUB_POT3 = ["Feyenoord", "PSV", "Celtic", "Salzburg"]
 _SUB_POT4 = ["Aston Villa", "Stuttgart", "Monaco", "Bodo/Glimt"]
 _SUB_ALL = _SUB_POT1 + _SUB_POT2 + _SUB_POT3 + _SUB_POT4
+
+# ── Path helpers ─────────────────────────────────────────────────────────
+
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+
+
+def _load_real_fixtures():
+    """Load the full 36-team, 8-matchday fixture schedule from disk."""
+    fixtures_path = os.path.join(_DATA_DIR, "fixtures.json")
+    with open(fixtures_path) as f:
+        return json.load(f)
 
 _CLUBELO_NAMES = {
     "Man City": "Man City",
@@ -210,48 +222,20 @@ def sample_36_teams():
 
 @pytest.fixture
 def sample_fixture_schedule():
-    """Returns a fixture schedule dict with 16 teams (4 per pot) and 2 matchdays.
+    """Returns the real 36-team, 8-matchday fixture schedule loaded from fixtures.json.
 
     Structure matches the fixtures.json schema::
         {"schedule": {"teams": [...], "matchdays": [[...], ...]}}
     """
-    pots = {
-        "Man City": 1, "Bayern": 1, "Real Madrid": 1, "PSG": 1,
-        "Bayer Leverkusen": 2, "Atletico Madrid": 2, "Juventus": 2, "Arsenal": 2,
-        "Feyenoord": 3, "PSV": 3, "Celtic": 3, "Salzburg": 3,
-        "Aston Villa": 4, "Stuttgart": 4, "Monaco": 4, "Bodo/Glimt": 4,
-    }
-
-    teams = []
-    for name in _SUB_ALL:
-        teams.append({
-            "name": name,
-            "pot": pots[name],
-            "clubelo_name": _CLUBELO_NAMES[name],
-            "coefficient": _UEFA_COEFFICIENTS[name],
-        })
-
-    matchday1 = _build_sample_matchday(_SUB_ALL, pots, 1, 0)
-    matchday2 = _build_sample_matchday(_SUB_ALL, pots, 2, 2)
-
-    return {
-        "schedule": {
-            "teams": teams,
-            "matchdays": [matchday1, matchday2],
-        }
-    }
+    return _load_real_fixtures()
 
 
 @pytest.fixture
-def sample_fixture_path(tmp_path):
-    """Writes a sample fixture schedule to a temp JSON file and returns the path.
-
-    Uses the same 16-team, 2-matchday structure as sample_fixture_schedule.
-    """
-    schedule = sample_fixture_schedule()
+def sample_fixture_path(tmp_path, sample_fixture_schedule):
+    """Writes the real fixture schedule to a temp JSON file and returns the path."""
     path = tmp_path / "fixtures.json"
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(schedule, f, indent=2)
+        json.dump(sample_fixture_schedule, f, indent=2)
     return str(path)
 
 
@@ -262,77 +246,66 @@ def sample_invalid_fixtures():
     Each entry has the structure:
         {"schedule": {...}, "expected_error": "..."}
 
+    Builds on top of the real 36-team schedule, then corrupts a copy for each
+    failure case to minimize fixture generation code.
+
     Covers:
     1. Wrong opponent count — one team plays only 7 matches
     2. Duplicate matchup — same pair appears twice
     3. Wrong pot distribution — team faces 3 opponents from pot 1
     """
-    pots = {
-        "Man City": 1, "Bayern": 1, "Real Madrid": 1, "PSG": 1,
-        "Bayer Leverkusen": 2, "Atletico Madrid": 2, "Juventus": 2, "Arsenal": 2,
-        "Feyenoord": 3, "PSV": 3, "Celtic": 3, "Salzburg": 3,
-        "Aston Villa": 4, "Stuttgart": 4, "Monaco": 4, "Bodo/Glimt": 4,
-    }
+    import copy
 
-    def _make_teams():
-        return [
-            {"name": n, "pot": pots[n], "clubelo_name": _CLUBELO_NAMES.get(n, n), "coefficient": _UEFA_COEFFICIENTS.get(n, 0.0)}
-            for n in _SUB_ALL
-        ]
+    base = _load_real_fixtures()
+
+    def _team_names(schedule):
+        return [t["name"] for t in schedule["schedule"]["teams"]]
+
+    def _flatten_matches(schedule):
+        result = []
+        for md in schedule["schedule"]["matchdays"]:
+            result.extend(md)
+        return result
 
     # --- Invalid fixture 1: Man City plays only 7 matches (8 required) ---
-    teams1 = _make_teams()
-    valid_matches = _build_sample_matchday(_SUB_ALL, pots, 1, 0) + _build_sample_matchday(_SUB_ALL, pots, 2, 2)
-    # Remove one match involving Man City
-    match_to_remove = None
-    for m in valid_matches:
+    invalid1 = copy.deepcopy(base)
+    all_matches = _flatten_matches(invalid1)
+    for m in all_matches:
         if "Man City" in (m["team_a"], m["team_b"]):
-            match_to_remove = m
+            # Remove from whichever matchday it belongs to
+            for md in invalid1["schedule"]["matchdays"]:
+                if m in md:
+                    md.remove(m)
+                    break
             break
-    if match_to_remove:
-        valid_matches.remove(match_to_remove)
 
-    invalid1 = {
-        "schedule": {
-            "teams": teams1,
-            "matchdays": [valid_matches],
-        },
-        "expected_error": "opponent",
+    # --- Invalid fixture 2: Duplicate matchup ---
+    invalid2 = copy.deepcopy(base)
+    first_match = invalid2["schedule"]["matchdays"][0][0]
+    dup = {
+        "match_id": "DUPE_01",
+        "team_a": first_match["team_a"],
+        "team_b": first_match["team_b"],
+        "home_pot": first_match["home_pot"],
+        "away_pot": first_match["away_pot"],
     }
-
-    # --- Invalid fixture 2: Duplicate matchup (Man City vs Bayern twice) ---
-    teams2 = _make_teams()
-    md1 = _build_sample_matchday(_SUB_ALL, pots, 1, 0)
-    # Add duplicate: Man City vs Bayern again in a third matchday
-    duplicate_match = {"match_id": "MD03_01", "team_a": "Man City", "team_b": "Bayern", "home_pot": 1, "away_pot": 1}
-    invalid2 = {
-        "schedule": {
-            "teams": teams2,
-            "matchdays": [md1 + [duplicate_match], _build_sample_matchday(_SUB_ALL, pots, 2, 2)],
-        },
-        "expected_error": "duplicate",
-    }
+    invalid2["schedule"]["matchdays"].append([dup])
 
     # --- Invalid fixture 3: Wrong pot distribution ---
-    teams3 = _make_teams()
-    # Replace one of Man City's pot-4 opponents with a pot-1 team
-    md_pot3 = _build_sample_matchday(_SUB_ALL, pots, 1, 0)
-    for m in md_pot3:
-        if m["team_a"] == "Man City" and m["away_pot"] == 4:
-            m["team_b"] = "Real Madrid"
-            m["away_pot"] = 1
-            break
-        if m["team_b"] == "Man City" and m["home_pot"] == 4:
-            m["team_a"] = "Real Madrid"
-            m["home_pot"] = 1
-            break
+    invalid3 = copy.deepcopy(base)
+    # Find Man City's first match and change opponent's pot to match own pot
+    team_a_name = "Man City"
+    for md in invalid3["schedule"]["matchdays"]:
+        for m in md:
+            if m["team_a"] == team_a_name and m["away_pot"] != 1:
+                m["away_pot"] = 1  # Now 3 from pot 1 instead of 2
+                break
+        else:
+            continue
+        break
 
-    invalid3 = {
-        "schedule": {
-            "teams": teams3,
-            "matchdays": [md_pot3, _build_sample_matchday(_SUB_ALL, pots, 2, 2)],
-        },
-        "expected_error": "pot",
-    }
-
-    return [invalid1, invalid2, invalid3]
+    return [
+        {"schedule": invalid1["schedule"], "expected_error": "opponent"},
+        {"schedule": invalid2["schedule"], "expected_error": "duplicate"},
+        {"schedule": invalid3["schedule"], "expected_error": "pot"},
+    ]
