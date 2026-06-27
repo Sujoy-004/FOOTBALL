@@ -179,6 +179,7 @@ def test_main_runs_successfully(tmp_path):
         f"os.environ['POLL_INTERVAL'] = '1'\n"
         f"os.environ['BSD_API_KEY'] = 'test_dummy_key'\n"
         f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
+        f"sys.path.insert(0, {str(MAIN_DIR.parent.parent)!r})\n"
         f"os.chdir({str(MAIN_DIR)!r})\n"
         f"import src.constants\n"
         f"src.constants.DATA_DIR = {str(tmp_path)!r}\n"
@@ -228,6 +229,7 @@ def test_main_fails_on_duplicate_bracket(tmp_path):
     # Run a helper script that overrides DATA_DIR and calls main
     runner_code = f"""import sys, os
 sys.path.insert(0, {str(MAIN_DIR)!r})
+sys.path.insert(0, {str(MAIN_DIR.parent.parent)!r})
 os.chdir({str(MAIN_DIR)!r})
 import src.constants
 src.constants.DATA_DIR = {str(tmp_path)!r}
@@ -263,6 +265,7 @@ def test_main_fails_on_circular_dependency(tmp_path):
 
     runner_code = f"""import sys, os
 sys.path.insert(0, {str(MAIN_DIR)!r})
+sys.path.insert(0, {str(MAIN_DIR.parent.parent)!r})
 os.chdir({str(MAIN_DIR)!r})
 import src.constants
 src.constants.DATA_DIR = {str(tmp_path)!r}
@@ -292,6 +295,7 @@ def test_main_fails_on_missing_teams(tmp_path):
 
     runner_code = f"""import sys, os
 sys.path.insert(0, {str(MAIN_DIR)!r})
+sys.path.insert(0, {str(MAIN_DIR.parent.parent)!r})
 os.chdir({str(MAIN_DIR)!r})
 import src.constants
 src.constants.DATA_DIR = {str(tmp_path)!r}

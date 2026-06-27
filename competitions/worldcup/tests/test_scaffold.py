@@ -10,6 +10,7 @@ import pytest
 def test_constants_module_importable():
     """Test 1: src.constants defines K_FACTOR=60, DEFAULT_ELO=1500, DATA_DIR as Path."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
     try:
         from src.constants import K_FACTOR, DEFAULT_ELO, DATA_DIR  # noqa
     except ImportError:
@@ -64,10 +65,15 @@ def test_conftest_has_fixtures():
 def test_constants_import_works():
     """Test 5: 'from src.constants import K_FACTOR, DEFAULT_ELO' succeeds."""
     import subprocess
+    import os
+    repo_root = str(Path(__file__).resolve().parent.parent.parent.parent)
+    env = os.environ.copy()
+    env.setdefault("PYTHONPATH", "")
+    env["PYTHONPATH"] = repo_root + os.pathsep + env["PYTHONPATH"]
     result = subprocess.run(
         [sys.executable, "-c", "from src.constants import K_FACTOR, DEFAULT_ELO; print(K_FACTOR, DEFAULT_ELO)"],
         cwd=Path(__file__).resolve().parent.parent,
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=env,
     )
     assert result.returncode == 0, f"Import failed: {result.stderr}"
     parts = result.stdout.strip().split()
