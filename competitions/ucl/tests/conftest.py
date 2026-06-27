@@ -2,6 +2,7 @@
 
 import json
 import os
+import random
 
 import pytest
 
@@ -153,7 +154,7 @@ _CLUBELO_NAMES = {
     "Young Boys": "Young Boys",
     "Salzburg": "Salzburg",
     "Dinamo Zagreb": "Dinamo Zagreb",
-    "Olympiacos": "Olympiacos",
+    "Olympiacos": "Olympiakos",
     "Lille": "Lille",
     "Red Star Belgrade": "Crvena Zvezda",
     "Aston Villa": "Aston Villa",
@@ -309,3 +310,124 @@ def sample_invalid_fixtures():
         {"schedule": invalid2["schedule"], "expected_error": "duplicate"},
         {"schedule": invalid3["schedule"], "expected_error": "pot"},
     ]
+
+
+# ── Live API test marker ────────────────────────────────────────────────────
+
+
+def pytest_addoption(parser):
+    """Add a ``--live`` flag to run live ClubElo API tests."""
+    parser.addoption(
+        "--live",
+        action="store_true",
+        default=False,
+        help="Run live ClubElo API integration tests",
+    )
+
+
+# ── Match simulation fixtures (Plan 02, Tasks 3 & 4) ──────────────────────
+
+
+@pytest.fixture
+def sample_elo_ratings():
+    """Returns Elo ratings for 4 sample teams."""
+    return {
+        "Man City": 1970.0,
+        "Bayern": 1900.0,
+        "Barcelona": 1850.0,
+        "Slovan Bratislava": 1550.0,
+    }
+
+
+@pytest.fixture
+def sample_match_results():
+    """Returns a pre-built match results dict with 2 matches.
+
+    Structure matches the output of ``simulate_swiss_matches()``.
+    """
+    return {
+        "MD01_01": {
+            "team_a": "Man City",
+            "team_b": "Slovan Bratislava",
+            "score_a": 4,
+            "score_b": 0,
+            "winner": "Man City",
+            "yellow_cards_a": 1,
+            "red_cards_a": 0,
+            "yellow_cards_b": 2,
+            "red_cards_b": 0,
+        },
+        "MD01_02": {
+            "team_a": "Bayern",
+            "team_b": "Barcelona",
+            "score_a": 2,
+            "score_b": 1,
+            "winner": "Bayern",
+            "yellow_cards_a": 0,
+            "red_cards_a": 0,
+            "yellow_cards_b": 1,
+            "red_cards_b": 0,
+        },
+    }
+
+
+@pytest.fixture
+def sample_rng():
+    """Returns a seeded ``random.Random(42)`` for deterministic tests."""
+    return random.Random(42)
+
+
+@pytest.fixture
+def sample_uefa_coefficients():
+    """Returns UEFA club coefficients for 4 sample teams."""
+    return {
+        "Man City": 123.0,
+        "Bayern": 120.0,
+        "Barcelona": 117.0,
+        "Slovan Bratislava": 25.0,
+    }
+
+
+@pytest.fixture
+def sample_standings_results():
+    """Returns a pre-built 36-team standings list for zone classification tests.
+
+    Teams are already sorted by position (1-36) with zone assignments.
+    Only the first and last few are fully populated; middle entries are
+    minimal stubs for position/zone checks.
+    """
+    teams = []
+    for name in _ALL_36_TEAMS:
+        teams.append({
+            "team": name,
+            "elo": _ELO_RATINGS[name],
+        })
+    # Sort by descending Elo to create a plausible ranking
+    teams.sort(key=lambda t: -t["elo"])
+    standings = []
+    for i, t in enumerate(teams):
+        pos = i + 1
+        if pos <= 8:
+            zone = "top_8"
+        elif pos <= 24:
+            zone = "playoff"
+        else:
+            zone = "eliminated"
+        standings.append({
+            "team": t["team"],
+            "position": pos,
+            "zone": zone,
+            "pts": 0,
+            "gd": 0,
+            "gs": 0,
+            "away_gs": 0,
+            "wins": 0,
+            "away_wins": 0,
+            "opp_pts": 0,
+            "opp_gd": 0,
+            "opp_gs": 0,
+            "conduct_score": 0,
+            "uefa_coefficient": _UEFA_COEFFICIENTS.get(t["team"], 0.0),
+            "elo": t["elo"],
+        })
+    return standings
