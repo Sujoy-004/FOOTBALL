@@ -55,16 +55,16 @@ Plans:
 **Depends on**: Phase 2
 **Requirements**: UCLO-01, UCLO-02, UCLO-03, UCLO-04
 **Success Criteria** (what must be TRUE):
-  1. User can run `ucl-predict` CLI with configurable iteration count and random seed
-  2. User can view a formatted 36-row league table showing position, team, points, GD, GS, and qualification zone highlighting
-  3. User can view the knockout bracket with round matchups and per-team stage probabilities
-  4. User can view champion probabilities, final odds, and top-4 qualification odds
+   1. User can run `ucl-predict` CLI with configurable iteration count and random seed
+   2. User can view a formatted 36-row league table showing position, team, points, GD, GS, and qualification zone highlighting
+   3. User can view the knockout bracket with round matchups and per-team stage probabilities
+   4. User can view champion probabilities, final odds, and top-4 qualification odds
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: CLI entry point (`ucl-predict`) with argparse options for iterations, seed, and output flags
-- [ ] 03-02: League table display with qualification zone formatting (36-row table, zone highlighting)
-- [ ] 03-03: Knockout bracket display and odds output (matchups, stage probabilities, champion odds)
+- [ ] 03-01-PLAN.md — CLI entry point (`ucl-predict`) + SimulationResult dataclass + conftest fixture + argparse unit tests
+- [ ] 03-02-PLAN.md — League table display with ANSI zone coloring + print_summary + display tests
+- [ ] 03-03-PLAN.md — Knockout bracket display + champion/qualification odds + JSON export + full display tests
 
 ### Phase 4: Validation & Production Readiness
 **Goal**: Users can validate UCL predictions against real match results, measure accuracy (Brier, Log Loss, calibration), benchmark performance, and verify regression — the engine is proven correct before v2 features
@@ -94,5 +94,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. UCL League Table Engine | 3/3 | ✓ Complete | 2026-06-27 |
 | 2. UCL Knockout Phase | 4/4 | ✓ Complete | 2026-06-28 |
-| 3. UCL Simulation Orchestration + Display | 0/3 | Not started | - |
+| 3. UCL Simulation Orchestration + Display | 3/3 | Plans created | - |
 | 4. Validation & Production Readiness | 0/4 | Not started | - |
