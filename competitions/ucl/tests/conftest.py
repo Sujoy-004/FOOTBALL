@@ -723,11 +723,17 @@ def sample_result():
         playoff_prob = max(0.0, min(0.9, (1.0 - top_8_prob) * 0.8))
         eliminated_prob = max(0.0, 1.0 - top_8_prob - playoff_prob)
         champion_prob = max(0.0, strength * 0.12)
+        stage_final_prob = max(0.0, champion_prob * 1.5)
+        stage_sf_prob = max(0.0, stage_final_prob * 1.4)
+        stage_qf_prob = max(0.0, stage_sf_prob * 1.3)
         teams_data[name] = {
             "top_8_prob": round(top_8_prob, 3),
             "playoff_prob": round(playoff_prob, 3),
             "eliminated_prob": round(eliminated_prob, 3),
             "champion_prob": round(champion_prob, 4),
+            "stage_final_prob": round(stage_final_prob, 4),
+            "stage_sf_prob": round(stage_sf_prob, 4),
+            "stage_qf_prob": round(stage_qf_prob, 4),
             "avg_position": round(37.0 - strength * 18.0, 1),
             "avg_pts": round(strength * 18.0, 1),
             "avg_gd": round(strength * 6.0 - 4.0, 1),

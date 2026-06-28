@@ -129,3 +129,146 @@ def print_league_table(result: SimulationResult) -> None:
         print(f"{pos_str}  {team_str} {pts_str} {gd_str} {gs_str} {zone_str}")
 
     print()
+
+
+# ── Playoff display (D-06 position 3) ──────────────────────────────────
+
+
+def print_playoff_rounds(result: SimulationResult) -> None:
+    """Print 8 playoff ties with aggregate scores and advancing winners (D-06 position 3).
+
+    ET/Pens shown only when triggered (D-08).
+    """
+    print()
+    print("==== Playoff Results ====")
+    print()
+
+    for tie_num in sorted(result.playoff_ties):
+        tie = result.playoff_ties[tie_num]
+        winner = result.playoff_winners[tie_num]
+        team_a = tie["winner"]
+        team_b = tie["loser"]
+        agg_a = tie["aggregate_a"]
+        agg_b = tie["aggregate_b"]
+
+        # Build aggregate display with optional ET/Pens suffix
+        agg_display = f"{agg_a}-{agg_b} agg"
+        if tie.get("et_played"):
+            agg_display = f"{agg_a}-{agg_b} agg ({tie['et_a']}-{tie['et_b']} ET)"
+        if tie.get("penalties_played"):
+            if tie.get("et_played"):
+                agg_display = f"{agg_a}-{agg_b} agg ({tie['et_a']}-{tie['et_b']} ET, {tie['penalty_a']}-{tie['penalty_b']} pens)"
+            else:
+                agg_display = f"{agg_a}-{agg_b} agg ({tie['penalty_a']}-{tie['penalty_b']} pens)"
+
+        print(f"  Tie {tie_num}: {team_a} {agg_display}  {team_b} → {winner} advances")
+
+    print()
+
+
+# ── Bracket display (D-06 position 4, D-08 format) ─────────────────────
+
+
+def print_knockout_bracket(result: SimulationResult) -> None:
+    """Print round-by-round match list (NOT ASCII tree — D-08).
+
+    Rounds in order: R16 → QF → SF → FINAL.
+    Two-legged ties show aggregate scores; FINAL shows single score.
+    """
+    print()
+    print("==== Knockout Bracket ====")
+    print()
+
+    round_order = ["R16", "QF", "SF", "FINAL"]
+    for round_name in round_order:
+        print(f"  {_bold(f'--- {round_name} ---')}")
+
+        matches = result.bracket_rounds.get(round_name, [])
+        for m in matches:
+            team_a = m["team_a"]
+            team_b = m["team_b"]
+            r = m["result"]
+
+            if r.get("is_final"):
+                # Single-match final
+                score_line = f"{r['score_a']}-{r['score_b']}"
+                suffix = ""
+                if r.get("et_played"):
+                    suffix = f" ({r['et_a']}-{r['et_b']} ET"
+                    if r.get("penalties_played"):
+                        suffix += f", {r['penalty_a']}-{r['penalty_b']} pens)"
+                    else:
+                        suffix += ")"
+                elif r.get("penalties_played"):
+                    suffix = f" ({r['penalty_a']}-{r['penalty_b']} pens)"
+                print(f"    {team_a} {score_line}{suffix} {team_b}")
+            else:
+                # Two-legged tie with aggregate scores
+                agg_a = r["aggregate_a"]
+                agg_b = r["aggregate_b"]
+                score_line = f"{agg_a}-{agg_b} agg"
+                suffix = ""
+                if r.get("et_played"):
+                    suffix = f" ({r['et_a']}-{r['et_b']} ET"
+                    if r.get("penalties_played"):
+                        suffix += f", {r['penalty_a']}-{r['penalty_b']} pens)"
+                    else:
+                        suffix += ")"
+                elif r.get("penalties_played"):
+                    suffix = f" ({r['penalty_a']}-{r['penalty_b']} pens)"
+                print(f"    {team_a} {score_line}{suffix}  {team_b}")
+
+        print()
+
+    print()
+
+
+# ── Odds display (D-06 position 5, D-09 format) ────────────────────────
+
+
+def print_odds(result: SimulationResult) -> None:
+    """Print champion/qualification odds for all 36 teams (D-06 position 5).
+
+    Columns per D-09: Rank, Team, Champion %, Final %, SF %, QF %.
+    Sorted by champion probability descending, with alphabetical tie-break.
+    """
+    print()
+    print("==== Champion / Qualification Odds ====")
+    print()
+
+    # Sort teams by champion_prob descending, then alphabetically
+    sorted_teams = sorted(
+        result.teams.items(),
+        key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]),
+    )
+
+    # Header row (bold)
+    print(
+        f"  {_bold('Rank'):>4}  "
+        f"{_bold('Team'):<24} "
+        f"{_bold('Champion'):>8} "
+        f"{_bold('Final'):>8} "
+        f"{_bold('SF'):>8} "
+        f"{_bold('QF'):>8}"
+    )
+
+    # Separator
+    print("  " + "-" * 64)
+
+    # Data rows
+    for rank, (team_name, team_data) in enumerate(sorted_teams, start=1):
+        champ = team_data.get("champion_prob", 0.0)
+        final = team_data.get("stage_final_prob", 0.0)
+        sf = team_data.get("stage_sf_prob", 0.0)
+        qf = team_data.get("stage_qf_prob", 0.0)
+
+        print(
+            f"  {rank:>4}  "
+            f"{team_name:<24} "
+            f"{champ:>7.1%} "
+            f"{final:>7.1%} "
+            f"{sf:>7.1%} "
+            f"{qf:>7.1%}"
+        )
+
+    print()
