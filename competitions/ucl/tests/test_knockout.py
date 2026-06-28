@@ -9,6 +9,7 @@ import pytest
 from competitions.ucl.src.knockout import (
     _simulate_penalty_shootout,
     build_r16_bracket,
+    simulate_knockout_tree,
     simulate_playoff_round,
     simulate_two_legged_tie,
 )
@@ -432,3 +433,56 @@ class TestR16Bracket:
                 r16_teams.add(m["team_a"])
                 r16_teams.add(m["team_b"])
         assert r16_teams == (top8 | pw)
+
+
+class TestKnockoutTree:
+    """Full knockout tree simulation (R16 -> QF -> SF -> Final)."""
+
+    def test_knockout_tree_15_matches(self, sample_tie_standings, sample_playoff_winners, sample_elo_dict):
+        """All 15 matches are resolved with a winner."""
+        bracket = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        import random
+        result = simulate_knockout_tree(bracket, sample_elo_dict, random.Random(42))
+        total = sum(len(matches) for matches in result["rounds"].values())
+        assert total == 15
+
+    def test_knockout_tree_one_champion(self, sample_tie_standings, sample_playoff_winners, sample_elo_dict):
+        """Exactly one champion emerges."""
+        bracket = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        import random
+        result = simulate_knockout_tree(bracket, sample_elo_dict, random.Random(42))
+        assert result["champion"] is not None
+        assert result["champion"] in [r["team_a"] for r in result["rounds"]["R16"]] + \
+                                      [r["team_b"] for r in result["rounds"]["R16"]]
+
+    def test_knockout_tree_deterministic(self, sample_tie_standings, sample_playoff_winners, sample_elo_dict):
+        """Same seed produces identical bracket results."""
+        import random
+        bracket = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        r1 = simulate_knockout_tree(bracket, sample_elo_dict, random.Random(42))
+        r2 = simulate_knockout_tree(bracket, sample_elo_dict, random.Random(42))
+        assert r1["champion"] == r2["champion"]
+        for round_name in r1["rounds"]:
+            for m1, m2 in zip(r1["rounds"][round_name], r2["rounds"][round_name]):
+                assert m1["winner"] == m2["winner"]
+
+    def test_knockout_tree_stage_tracking_present(self, sample_tie_standings, sample_playoff_winners, sample_elo_dict):
+        """Every R16 team has a stage_reached entry."""
+        import random
+        bracket = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        result = simulate_knockout_tree(bracket, sample_elo_dict, random.Random(42))
+        r16_teams = set()
+        for m in result["rounds"]["R16"]:
+            r16_teams.add(m["team_a"])
+            r16_teams.add(m["team_b"])
+        for team in r16_teams:
+            assert team in result["stage"]
+            assert result["stage"][team] in ("R16", "QF", "SF", "FINAL", "CHAMPION")
+
+    def test_knockout_tree_final_single_match(self, sample_tie_standings, sample_playoff_winners, sample_elo_dict):
+        """Final is a single match (no leg1/leg2 structure)."""
+        import random
+        bracket = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        result = simulate_knockout_tree(bracket, sample_elo_dict, random.Random(42))
+        final_result = result["rounds"]["FINAL"][0]["result"]
+        assert final_result.get("is_final", False) or "leg1" not in final_result
