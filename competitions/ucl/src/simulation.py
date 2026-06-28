@@ -12,6 +12,8 @@ Consumes the match simulation and standings functions from
 
 from __future__ import annotations
 
+import json
+import os
 import random
 
 from competitions.ucl.src.groups import (
@@ -251,6 +253,18 @@ def run_monte_carlo(
     # Pre-build Elo dict lookup for knockout pipeline (T-02-13)
     elo_dict: dict[str, float] = dict(elo_ratings)
 
+    # ── 4b. Load competition data files ONCE (perf: avoid O(n) disk I/O) ─
+    data_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "data",
+    )
+    pairings_path = os.path.join(data_dir, "playoff_pairings.json")
+    with open(pairings_path) as f:
+        _pairings_data = json.load(f)
+    bracket_path = os.path.join(data_dir, "bracket_rules.json")
+    with open(bracket_path) as f:
+        _bracket_data = json.load(f)
+
     # ── 5. Main iteration loop ──────────────────────────────────────────
     for _ in range(n_iterations):
         standings = simulate_league_phase(
@@ -264,8 +278,12 @@ def run_monte_carlo(
         # ── Knockout pipeline (Phase 2) ─────────────────────────────────
         playoff_result = simulate_playoff_round(
             standings, elo_dict, rng,
+            pairings_data=_pairings_data,
         )
-        bracket = build_r16_bracket(standings, playoff_result)
+        bracket = build_r16_bracket(
+            standings, playoff_result,
+            bracket_data=_bracket_data,
+        )
         tree_result = simulate_knockout_tree(
             bracket, elo_dict, rng,
         )

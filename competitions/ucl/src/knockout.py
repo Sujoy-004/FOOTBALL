@@ -216,6 +216,7 @@ def simulate_playoff_round(
     standings: list[dict],
     elo_ratings: dict[str, float],
     rng: random.Random,
+    pairings_data: dict | None = None,
     playoff_pairings_path: str | None = None,
     base_rate: float = EXPECTED_GOALS_BASE_RATE,
     et_lambda_factor: float = 0.25,
@@ -240,10 +241,14 @@ def simulate_playoff_round(
         ``{team_name: Elo}`` dict for Elo-based Poisson simulation.
     rng:
         Seeded ``random.Random`` for deterministic results.
+    pairings_data:
+        Pre-loaded pairings data dict (with ``pairings`` key).  If provided,
+        bypasses file loading.  Useful when calling from a tight loop to
+        avoid redundant disk I/O.
     playoff_pairings_path:
-        Path to the playoff pairings data file.  Defaults to a
-        conventional path under ``competitions/ucl/data/`` using
-        the ``*playoff*`` glob pattern.
+        Path to the playoff pairings data file.  Ignored if *pairings_data*
+        is provided.  Defaults to a conventional path under
+        ``competitions/ucl/data/`` using the ``*playoff*`` glob pattern.
     base_rate, et_lambda_factor, penalty_conversion_rate:
         Passed through to :func:`simulate_two_legged_tie`.
 
@@ -262,19 +267,20 @@ def simulate_playoff_round(
         position is missing from standings (T-02-05, T-02-06).
     """
     # ── 1. Load pairings ─────────────────────────────────────────────────
-    if playoff_pairings_path is None:
-        data_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "data",
-        )
-        candidates = _glob.glob(os.path.join(data_dir, "*playoff*"))
-        playoff_pairings_path = (
-            candidates[0] if candidates
-            else os.path.join(data_dir, "playoff_pairings.json")
-        )
+    if pairings_data is None:
+        if playoff_pairings_path is None:
+            data_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "data",
+            )
+            candidates = _glob.glob(os.path.join(data_dir, "*playoff*"))
+            playoff_pairings_path = (
+                candidates[0] if candidates
+                else os.path.join(data_dir, "playoff_pairings.json")
+            )
 
-    with open(playoff_pairings_path) as f:
-        pairings_data = json.load(f)
+        with open(playoff_pairings_path) as f:
+            pairings_data = json.load(f)
     pairings = pairings_data["pairings"]
 
     # ── 2. Threat model validation (T-02-06) ────────────────────────────
@@ -463,6 +469,7 @@ def _validate_bracket_entry(entry: dict) -> None:
 def build_r16_bracket(
     standings: list[dict],
     playoff_results: dict,
+    bracket_data: dict | None = None,
     bracket_rules_path: str | None = None,
 ) -> dict:
     """Construct the seeded R16 bracket from league standings and playoff results.
@@ -484,9 +491,14 @@ def build_r16_bracket(
     playoff_results:
         Output from :func:`simulate_playoff_round` — must contain
         a ``winners`` dict mapping tie_number to team_name.
+    bracket_data:
+        Pre-loaded bracket rules data dict (with ``matches`` key).  If
+        provided, bypasses file loading.  Useful when calling from a tight
+        loop to avoid redundant disk I/O.
     bracket_rules_path:
-        Path to the bracket rules data file.  Defaults to a
-        conventional path under ``competitions/ucl/data/``.
+        Path to the bracket rules data file.  Ignored if *bracket_data* is
+        provided.  Defaults to a conventional path under
+        ``competitions/ucl/data/``.
 
     Returns
     -------
@@ -502,19 +514,20 @@ def build_r16_bracket(
         or if fewer than 8 seeds found in standings.
     """
     # ── 1. Load bracket rules ─────────────────────────────────────────────
-    if bracket_rules_path is None:
-        data_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "data",
-        )
-        candidates = _glob.glob(os.path.join(data_dir, "*bracket*"))
-        bracket_rules_path = (
-            candidates[0] if candidates
-            else os.path.join(data_dir, _DEFAULT_BRACKET_FILENAME)
-        )
+    if bracket_data is None:
+        if bracket_rules_path is None:
+            data_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "data",
+            )
+            candidates = _glob.glob(os.path.join(data_dir, "*bracket*"))
+            bracket_rules_path = (
+                candidates[0] if candidates
+                else os.path.join(data_dir, _DEFAULT_BRACKET_FILENAME)
+            )
 
-    with open(bracket_rules_path) as f:
-        bracket_data = json.load(f)
+        with open(bracket_rules_path) as f:
+            bracket_data = json.load(f)
 
     # ── 2. Validate bracket entries (T-02-08) ─────────────────────────────
     for entry in bracket_data["matches"]:
