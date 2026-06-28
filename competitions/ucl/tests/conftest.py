@@ -675,3 +675,228 @@ def sample_knockout_stage_result():
         },
         "champion": "Man City",
     }
+
+
+@pytest.fixture
+def sample_result():
+    """Returns a populated SimulationResult with all 36 teams and full match data.
+
+    Builds a realistic simulation result using pre-existing fixture data:
+    - 36 teams sorted by Elo for standings
+    - 8 playoff ties with mock two-legged tie results
+    - 4 bracket rounds (R16, QF, SF, FINAL)
+    - All 36 stage entries
+    """
+    from competitions.ucl.result import SimulationResult
+
+    # ── Standings: 36 teams sorted by descending Elo ──
+    ranked_teams = sorted(_ALL_36_TEAMS, key=lambda t: -_ELO_RATINGS[t])
+    standings = []
+    for i, name in enumerate(ranked_teams):
+        pos = i + 1
+        if pos <= 8:
+            zone = "top_8"
+        elif pos <= 24:
+            zone = "playoff"
+        else:
+            zone = "eliminated"
+        # Realistic stats: top teams score more, bottom teams less
+        pts = max(18 - i * 0.45, 0)  # ~18 pts for pos 1, ~2 pts for pos 36
+        gd = max(10 - i * 0.5, -8)
+        gs = max(14 - i * 0.3, 3)
+        standings.append({
+            "team": name,
+            "position": pos,
+            "zone": zone,
+            "pts": round(pts, 1),
+            "gd": round(gd, 1),
+            "gs": round(gs, 1),
+        })
+
+    # ── Teams: per-team probabilities from MC ──
+    teams_data = {}
+    for name in _ALL_36_TEAMS:
+        elo = _ELO_RATINGS.get(name, 1500.0)
+        # Scale probabilities by Elo strength
+        strength = (elo - 1500.0) / 500.0  # 0.0 to ~0.94
+        top_8_prob = max(0.0, min(0.95, strength * 0.9))
+        playoff_prob = max(0.0, min(0.9, (1.0 - top_8_prob) * 0.8))
+        eliminated_prob = max(0.0, 1.0 - top_8_prob - playoff_prob)
+        champion_prob = max(0.0, strength * 0.12)
+        teams_data[name] = {
+            "top_8_prob": round(top_8_prob, 3),
+            "playoff_prob": round(playoff_prob, 3),
+            "eliminated_prob": round(eliminated_prob, 3),
+            "champion_prob": round(champion_prob, 4),
+            "avg_position": round(37.0 - strength * 18.0, 1),
+            "avg_pts": round(strength * 18.0, 1),
+            "avg_gd": round(strength * 6.0 - 4.0, 1),
+            "avg_gs": round(strength * 8.0 + 2.0, 1),
+        }
+
+    # ── Playoff ties: 8 ties with mock two-legged results ──
+    # Playoff participants are positions 9-24
+    playoff_teams_9_16 = ranked_teams[8:16]   # seeded (9-16)
+    playoff_teams_17_24 = ranked_teams[16:24]  # challengers (17-24)
+    playoff_ties = {}
+    playoff_winners = {}
+    for tie_num in range(1, 9):
+        seeded = playoff_teams_9_16[tie_num - 1]
+        challenger = playoff_teams_17_24[tie_num - 1]
+        mock_result = {
+            "winner": seeded,
+            "loser": challenger,
+            "aggregate_a": 2,
+            "aggregate_b": 1,
+            "agg_a_full": 2,
+            "agg_b_full": 1,
+            "leg1": {"team_a": challenger, "team_b": seeded, "score_a": 1, "score_b": 2},
+            "leg2": {"team_a": challenger, "team_b": seeded, "score_a": 1, "score_b": 0},
+            "et_played": False,
+            "et_a": 0,
+            "et_b": 0,
+            "penalties_played": False,
+            "penalty_a": 0,
+            "penalty_b": 0,
+        }
+        playoff_ties[tie_num] = mock_result
+        playoff_winners[tie_num] = seeded
+
+    # ── Bracket rounds: R16 → QF → SF → FINAL ──
+    bracket_rounds = {}
+
+    # R16: 8 matches — top 8 seeds vs playoff winners
+    r16_matches = []
+    for match_num in range(8):
+        seed_team = ranked_teams[match_num]  # top 8
+        pw_team = playoff_winners[match_num + 1]
+        r16_matches.append({
+            "match_id": f"r16_{match_num + 1:02d}",
+            "team_a": seed_team,
+            "team_b": pw_team,
+            "winner": seed_team,
+            "result": {
+                "winner": seed_team,
+                "loser": pw_team,
+                "aggregate_a": 3,
+                "aggregate_b": 1,
+                "agg_a_full": 3,
+                "agg_b_full": 1,
+                "leg1": {"team_a": seed_team, "team_b": pw_team, "score_a": 2, "score_b": 0},
+                "leg2": {"team_a": seed_team, "team_b": pw_team, "score_a": 1, "score_b": 1},
+                "et_played": False,
+                "et_a": 0,
+                "et_b": 0,
+                "penalties_played": False,
+                "penalty_a": 0,
+                "penalty_b": 0,
+            },
+        })
+    bracket_rounds["R16"] = r16_matches
+
+    # QF: 4 matches — top 4 R16 winners vs bottom 4 R16 winners
+    qf_matches = []
+    for match_num in range(4):
+        team_a = ranked_teams[match_num]
+        team_b = ranked_teams[match_num + 4]
+        qf_matches.append({
+            "match_id": f"qf_{match_num + 1:02d}",
+            "team_a": team_a,
+            "team_b": team_b,
+            "winner": team_a,
+            "result": {
+                "winner": team_a,
+                "loser": team_b,
+                "aggregate_a": 2,
+                "aggregate_b": 0,
+                "agg_a_full": 2,
+                "agg_b_full": 0,
+                "leg1": {"team_a": team_a, "team_b": team_b, "score_a": 1, "score_b": 0},
+                "leg2": {"team_a": team_a, "team_b": team_b, "score_a": 1, "score_b": 0},
+                "et_played": False,
+                "et_a": 0,
+                "et_b": 0,
+                "penalties_played": False,
+                "penalty_a": 0,
+                "penalty_b": 0,
+            },
+        })
+    bracket_rounds["QF"] = qf_matches
+
+    # SF: 2 matches
+    sf_matches = []
+    for match_num in range(2):
+        team_a = ranked_teams[match_num]
+        team_b = ranked_teams[match_num + 2]
+        sf_matches.append({
+            "match_id": f"sf_{match_num + 1:02d}",
+            "team_a": team_a,
+            "team_b": team_b,
+            "winner": team_a,
+            "result": {
+                "winner": team_a,
+                "loser": team_b,
+                "aggregate_a": 3,
+                "aggregate_b": 2,
+                "agg_a_full": 3,
+                "agg_b_full": 2,
+                "leg1": {"team_a": team_a, "team_b": team_b, "score_a": 2, "score_b": 1},
+                "leg2": {"team_a": team_a, "team_b": team_b, "score_a": 1, "score_b": 1},
+                "et_played": False,
+                "et_a": 0,
+                "et_b": 0,
+                "penalties_played": False,
+                "penalty_a": 0,
+                "penalty_b": 0,
+            },
+        })
+    bracket_rounds["SF"] = sf_matches
+
+    # FINAL: 1 match
+    champion = "Man City"
+    final_match = {
+        "match_id": "final_01",
+        "team_a": ranked_teams[0],
+        "team_b": ranked_teams[1],
+        "winner": champion,
+        "result": {
+            "winner": champion,
+            "loser": ranked_teams[1],
+            "is_final": True,
+            "score_a": 2,
+            "score_b": 1,
+        },
+    }
+    bracket_rounds["FINAL"] = [final_match]
+
+    # ── Stages: all 36 teams mapped to stage strings ──
+    stages = {}
+    for i, name in enumerate(ranked_teams):
+        pos = i + 1
+        if pos >= 25:
+            stages[name] = "eliminated"
+        elif pos >= 17:
+            stages[name] = "playoff"
+        elif name == "Man City":
+            stages[name] = "champion"
+        elif name in ("Bayern", "Real Madrid"):
+            stages[name] = "final"
+        elif pos <= 4:
+            stages[name] = "sf"
+        elif pos <= 8:
+            stages[name] = "qf"
+        else:
+            stages[name] = "r16"
+
+    return SimulationResult(
+        snapshot_date="2026-06-28",
+        n_iterations=10000,
+        seed=42,
+        standings=standings,
+        teams=teams_data,
+        playoff_ties=playoff_ties,
+        playoff_winners=playoff_winners,
+        bracket_rounds=bracket_rounds,
+        bracket_champion=champion,
+        stages=stages,
+    )

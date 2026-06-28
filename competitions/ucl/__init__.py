@@ -9,3 +9,9 @@ if _repo_root not in sys.path:
 _pkg_dir = str(Path(__file__).resolve().parent)
 if _pkg_dir not in sys.path:
     sys.path.insert(0, _pkg_dir)
+
+from competitions.ucl.result import SimulationResult
+
+__all__ = [
+    "SimulationResult",
+]
