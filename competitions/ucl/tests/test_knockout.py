@@ -53,7 +53,7 @@ class TestTwoLeggedTie:
         for seed in range(500):
             rng = random.Random(seed)
             result = simulate_two_legged_tie("Team A", "Team B", elos, rng)
-            if result["et_played"] and result["aggregate_a"] != result["aggregate_b"]:
+            if result["et_played"] and result["agg_a_full"] != result["agg_b_full"]:
                 assert result["penalties_played"] is False
                 et_winner_found = True
                 break
