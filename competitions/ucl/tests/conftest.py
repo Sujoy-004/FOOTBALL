@@ -617,3 +617,18 @@ def sample_mc_output():
             },
         },
     }
+
+
+@pytest.fixture
+def sample_playoff_winners():
+    """Returns mock playoff winners for bracket construction tests.
+
+    8 winners, one per playoff tie (1-8), using team names
+    from the Elo-sorted playoff standings.
+    """
+    from competitions.ucl.tests.conftest import _ALL_36_TEAMS, _ELO_RATINGS
+    teams = sorted(_ALL_36_TEAMS, key=lambda t: -_ELO_RATINGS[t])
+    # Teams at positions 17-24 — these would be the playoff winners
+    # (lower seeded teams advancing as upset examples)
+    winners_pool = [teams[i] for i in range(16, 24)]
+    return {i + 1: winners_pool[i] for i in range(8)}

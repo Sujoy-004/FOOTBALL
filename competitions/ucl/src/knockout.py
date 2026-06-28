@@ -35,6 +35,9 @@ from football_core.groups import _build_poisson_table, expected_goals
 
 PENALTY_SHOTS_PER_SIDE: int = 5
 
+# Default expected goals base rate for single-match finals
+_DEFAULT_BRACKET_FILENAME = "bracket_rules.json"
+
 
 def _simulate_penalty_shootout(
     rng: random.Random,
@@ -358,3 +361,230 @@ def simulate_playoff_round(
         "ties": tie_results,
         "standings": standings,
     }
+
+
+def _simulate_single_knockout_match(
+    team_a: str,
+    team_b: str,
+    elo_ratings: dict[str, float],
+    rng: random.Random,
+    is_final: bool = False,
+    base_rate: float = EXPECTED_GOALS_BASE_RATE,
+    et_lambda_factor: float = 0.25,
+    penalty_conversion_rate: float = 0.76,
+) -> dict:
+    """Simulate a single knockout match or tie.
+
+    For finals (is_final=True): single match at neutral venue
+    (no home advantage).  Extra time and penalties as needed.
+
+    For non-finals: two-legged tie via simulate_two_legged_tie().
+    team_a hosts leg 1, team_b hosts leg 2.
+
+    Returns a result dict compatible with simulate_two_legged_tie
+    output (winner, loser, aggregate scores, leg details).
+    """
+    if is_final:
+        # Neutral venue — no home advantage for either team
+        lam_a = expected_goals(elo_ratings[team_a], elo_ratings[team_b], base_rate)
+        lam_b = expected_goals(elo_ratings[team_b], elo_ratings[team_a], base_rate)
+        score_a = _build_poisson_table(lam_a)[rng.getrandbits(POISSON_TABLE_BITS)] if lam_a > 0 else 0
+        score_b = _build_poisson_table(lam_b)[rng.getrandbits(POISSON_TABLE_BITS)] if lam_b > 0 else 0
+
+        if score_a != score_b:
+            winner = team_a if score_a > score_b else team_b
+            loser = team_b if score_a > score_b else team_a
+            et_played = penalties_played = False
+            et_a = et_b = pen_a = pen_b = 0
+        else:
+            # Extra time — neutral venue (both lambdas reduced equally)
+            et_played = True
+            et_lam_a = lam_a * et_lambda_factor
+            et_lam_b = lam_b * et_lambda_factor
+            et_a = _build_poisson_table(et_lam_a)[rng.getrandbits(POISSON_TABLE_BITS)] if et_lam_a > 0 else 0
+            et_b = _build_poisson_table(et_lam_b)[rng.getrandbits(POISSON_TABLE_BITS)] if et_lam_b > 0 else 0
+
+            if (score_a + et_a) != (score_b + et_b):
+                winner = team_a if (score_a + et_a) > (score_b + et_b) else team_b
+                loser = team_b if (score_a + et_a) > (score_b + et_b) else team_a
+                penalties_played = False
+                pen_a = pen_b = 0
+            else:
+                penalties_played = True
+                pen_a, pen_b = _simulate_penalty_shootout(rng, penalty_conversion_rate)
+                winner = team_a if pen_a > pen_b else team_b
+                loser = team_b if pen_a > pen_b else team_a
+
+        return {
+            "winner": winner,
+            "loser": loser,
+            "score_a": score_a + et_a,
+            "score_b": score_b + et_b,
+            "et_played": et_played,
+            "penalties_played": penalties_played,
+            "is_final": True,
+        }
+    else:
+        return simulate_two_legged_tie(
+            team_a, team_b, elo_ratings, rng,
+            base_rate=base_rate,
+            et_lambda_factor=et_lambda_factor,
+            penalty_conversion_rate=penalty_conversion_rate,
+        )
+
+
+def _validate_bracket_entry(entry: dict) -> None:
+    """Validate a bracket rules entry against threat model T-02-08.
+
+    Raises ValueError if required keys are missing or invalid.
+    """
+    if "match_id" not in entry:
+        raise ValueError(f"Bracket entry missing 'match_id': {entry}")
+    if "round" not in entry:
+        raise ValueError(f"Bracket entry {entry.get('match_id', '?')} missing 'round'")
+
+    rnd = entry["round"]
+    if rnd == "R16":
+        if "home_seed" not in entry:
+            raise ValueError(f"R16 match {entry['match_id']} missing 'home_seed'")
+        if "away_playoff_tie" not in entry:
+            raise ValueError(f"R16 match {entry['match_id']} missing 'away_playoff_tie'")
+        if "quarter" not in entry:
+            raise ValueError(f"R16 match {entry['match_id']} missing 'quarter'")
+        if not isinstance(entry["home_seed"], int) or not (1 <= entry["home_seed"] <= 8):
+            raise ValueError(f"R16 match {entry['match_id']}: invalid home_seed")
+        if not isinstance(entry["away_playoff_tie"], int) or not (1 <= entry["away_playoff_tie"] <= 8):
+            raise ValueError(f"R16 match {entry['match_id']}: invalid away_playoff_tie")
+    else:
+        if "source_matches" not in entry:
+            raise ValueError(f"{rnd} match {entry['match_id']} missing 'source_matches'")
+
+
+def build_r16_bracket(
+    standings: list[dict],
+    playoff_results: dict,
+    bracket_rules_path: str | None = None,
+) -> dict:
+    """Construct the seeded R16 bracket from league standings and playoff results.
+
+    Reads the bracket structure from a dedicated competition data file
+    (D-06), matches each league seed (positions 1-8) against the
+    corresponding playoff winner, and produces a bracket dict with all
+    R16 matchups.
+
+    Per D-06: bracket structure is data-driven (dedicated competition
+    data file), not hardcoded in Python.
+    Per D-12: competition structure is replaceable data.
+
+    Parameters
+    ----------
+    standings:
+        List of 36 team standings dicts from :func:`compute_swiss_standings`.
+        Top 8 (zone='top_8') become seeds.
+    playoff_results:
+        Output from :func:`simulate_playoff_round` — must contain
+        a ``winners`` dict mapping tie_number to team_name.
+    bracket_rules_path:
+        Path to the bracket rules data file.  Defaults to a
+        conventional path under ``competitions/ucl/data/``.
+
+    Returns
+    -------
+    dict
+        ``{matchups: [{match_id, round, quarter, team_a, team_b, ...}],
+          tree: {round: [match_ids]}}``
+
+    Raises
+    ------
+    ValueError
+        If bracket data has missing/invalid keys (T-02-08), if
+        source_matches reference nonexistent match_ids (T-02-09),
+        or if fewer than 8 seeds found in standings.
+    """
+    # ── 1. Load bracket rules ─────────────────────────────────────────────
+    if bracket_rules_path is None:
+        data_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data",
+        )
+        candidates = _glob.glob(os.path.join(data_dir, "*bracket*"))
+        bracket_rules_path = (
+            candidates[0] if candidates
+            else os.path.join(data_dir, _DEFAULT_BRACKET_FILENAME)
+        )
+
+    with open(bracket_rules_path) as f:
+        bracket_data = json.load(f)
+
+    # ── 2. Validate bracket entries (T-02-08) ─────────────────────────────
+    for entry in bracket_data["matches"]:
+        _validate_bracket_entry(entry)
+
+    # ── 3. Verify source_matches references resolve (T-02-09) ─────────────
+    all_match_ids = {m["match_id"] for m in bracket_data["matches"]}
+    for entry in bracket_data["matches"]:
+        if entry["round"] != "R16":
+            for src in entry.get("source_matches", []):
+                if src not in all_match_ids:
+                    raise ValueError(
+                        f"{entry['round']} match {entry['match_id']} references "
+                        f"unknown source_match '{src}'"
+                    )
+
+    # ── 4. Build seed-to-team lookup from standings ───────────────────────
+    seed_to_team: dict[int, str] = {}
+    for entry in standings:
+        if entry["zone"] == "top_8":
+            seed_to_team[entry["position"]] = entry["team"]
+
+    if len(seed_to_team) != 8:
+        raise ValueError(
+            f"Expected 8 seeds (zone='top_8'), got {len(seed_to_team)}"
+        )
+
+    # ── 5. Build playoff winner lookup ────────────────────────────────────
+    playoff_winners: dict[int, str] = playoff_results["winners"]
+
+    # ── 6. Construct matchups ─────────────────────────────────────────────
+    matchups = []
+    tree: dict[str, list[str]] = {}
+
+    for match in bracket_data["matches"]:
+        if match["round"] == "R16":
+            seed_pos = match["home_seed"]
+            playoff_tie = match["away_playoff_tie"]
+            team_seed = seed_to_team[seed_pos]
+            team_pw = playoff_winners[playoff_tie]
+            matchups.append({
+                "match_id": match["match_id"],
+                "round": "R16",
+                "quarter": match["quarter"],
+                "team_a": team_seed,       # home leg 1
+                "team_b": team_pw,          # away leg 1
+                "seed_position": seed_pos,
+                "playoff_tie": playoff_tie,
+                "resolved": False,
+                "winner": None,
+            })
+            tree.setdefault("R16", []).append(match["match_id"])
+
+        elif match.get("source_matches"):
+            # QF, SF, FINAL — teams TBD (resolved during simulation)
+            matchups.append({
+                "match_id": match["match_id"],
+                "round": match["round"],
+                "quarter": match.get("quarter"),
+                "source_matches": match["source_matches"],
+                "team_a": None,
+                "team_b": None,
+                "resolved": False,
+                "winner": None,
+            })
+            tree.setdefault(match["round"], []).append(match["match_id"])
+
+    return {"matchups": matchups, "tree": tree}
+
+
+def simulate_knockout_tree(*args, **kwargs):
+    """Stub — full implementation in Task 2."""
+    raise NotImplementedError("Implemented in Task 2")

@@ -8,6 +8,7 @@ import pytest
 
 from competitions.ucl.src.knockout import (
     _simulate_penalty_shootout,
+    build_r16_bracket,
     simulate_playoff_round,
     simulate_two_legged_tie,
 )
@@ -373,3 +374,61 @@ class TestPlayoffRound:
                 leg = tie_result[leg_key]
                 for k in ("team_a", "team_b", "score_a", "score_b"):
                     assert k in leg, f"Tie {tie_num}, {leg_key}: missing '{k}'"
+
+
+class TestR16Bracket:
+    """UCLK-02, UCLK-03: Seeded R16 bracket construction."""
+
+    def test_bracket_8_r16_matchups(self, sample_tie_standings, sample_playoff_winners):
+        """Exactly 8 R16 matchups constructed."""
+        result = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        r16 = [m for m in result["matchups"] if m["round"] == "R16"]
+        assert len(r16) == 8
+
+    def test_bracket_seeds_correct(self, sample_tie_standings, sample_playoff_winners):
+        """Each seed position maps to correct team from standings."""
+        seed_map = {e["position"]: e["team"] for e in sample_tie_standings if e["zone"] == "top_8"}
+        result = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        for match in result["matchups"]:
+            if match["round"] == "R16":
+                assert match["team_a"] == seed_map[match["seed_position"]]
+
+    def test_bracket_playoff_winners_mapped(self, sample_tie_standings, sample_playoff_winners):
+        """Each playoff tie winner appears in correct bracket slot."""
+        result = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        for match in result["matchups"]:
+            if match["round"] == "R16":
+                expected = sample_playoff_winners[match["playoff_tie"]]
+                assert match["team_b"] == expected
+
+    def test_top4_protection_separate_quarters(self, sample_tie_standings, sample_playoff_winners):
+        """Seeds 1-4 are in quarters 1-2 (different SF halves)."""
+        result = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        r16 = [m for m in result["matchups"] if m["round"] == "R16"]
+        quarters_of_seeds_1_4 = [m["quarter"] for m in r16 if m["seed_position"] in (1, 2, 3, 4)]
+        assert all(q in (1, 2) for q in quarters_of_seeds_1_4)
+        # Seeds 1-2 in quarter 1, seeds 3-4 in quarter 2
+        q1_seeds = [m["seed_position"] for m in r16 if m["quarter"] == 1]
+        q2_seeds = [m["seed_position"] for m in r16 if m["quarter"] == 2]
+        assert set(q1_seeds) == {1, 2}
+        assert set(q2_seeds) == {3, 4}
+
+    def test_bracket_tree_structure(self, sample_tie_standings, sample_playoff_winners):
+        """Tree dict has all 4 rounds with correct match counts."""
+        result = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        assert len(result["tree"]["R16"]) == 8
+        assert len(result["tree"]["QF"]) == 4
+        assert len(result["tree"]["SF"]) == 2
+        assert len(result["tree"]["FINAL"]) == 1
+
+    def test_bracket_teams_from_standings(self, sample_tie_standings, sample_playoff_winners):
+        """All R16 teams come from top 8 seeds and playoff winners."""
+        result = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
+        top8 = {e["team"] for e in sample_tie_standings if e["zone"] == "top_8"}
+        pw = set(sample_playoff_winners.values())
+        r16_teams = set()
+        for m in result["matchups"]:
+            if m["round"] == "R16":
+                r16_teams.add(m["team_a"])
+                r16_teams.add(m["team_b"])
+        assert r16_teams == (top8 | pw)
