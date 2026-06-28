@@ -21,7 +21,13 @@ import random
 import sys
 from dataclasses import asdict
 
-from competitions.ucl.display import print_summary, print_league_table
+from competitions.ucl.display import (
+    print_summary,
+    print_league_table,
+    print_playoff_rounds,
+    print_knockout_bracket,
+    print_odds,
+)
 from competitions.ucl.result import SimulationResult
 from competitions.ucl.src.simulation import run_monte_carlo, simulate_league_phase
 from competitions.ucl.src.knockout import (
@@ -159,9 +165,12 @@ def main() -> None:
         fixtures, elo_ratings, seed, args.iterations,
     )
 
-    # Display results in D-06 order: summary first, league table second
+    # Display results in D-06 tournament chronology order
     print_summary(result)
     print_league_table(result)
+    print_playoff_rounds(result)
+    print_knockout_bracket(result)
+    print_odds(result)
 
     # JSON export (if --output given)
     if args.output:
