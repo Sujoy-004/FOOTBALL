@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-06-27)
 
 ## Current Position
 
-Phase: 1 of 4 (UCL League Table Engine)
-Plan: 3 of 3 in current phase
-Status: Complete
-Last activity: 2026-06-27 — Completed Plan 03: Monte Carlo simulation engine with 10K iteration verification
+Phase: 2 of 4 (UCL Knockout Phase)
+Plan: 0 of 4 in current phase
+Status: Waiting to start
+Last activity: 2026-06-27 — Phase 1 complete: 3/3 plans, 7/7 requirements satisfied, WC regression clean
 
-Progress: [########            ] 40%
+Progress: [#####               ] 25%
 
 ## Performance Metrics
 
@@ -48,6 +48,11 @@ Recent decisions affecting current work:
 - (Roadmap): All 22 v1 requirements covered across 4 phases
 - (Phase 1): ClubElo as Elo source for UCL teams — fetch-once, cache, snapshot reproducibility
 - (Phase 1): MC output = zone probabilities + champion + all tiebreaker-chain averages
+- (Phase 1): Single date-based ClubElo ranking fetch (not 36 per-team requests) — faster, same snapshot guarantee
+- (Phase 1): Randomized greedy + BFS fixture generation (deterministic edge-coloring infeasible for 8-regular graph)
+- (Phase 1): Olympiacos → Olympiakos alias fix for ClubElo compatibility
+- (Phase 1): DEFAULT_ELO=1500 fallback with logging.warning() for unresolvable team names
+- (Phase 1): Conduct score uses RC×4 (WC convention) per accepted Research pitfall — negligible MC impact
 - (Phase 1/Plan 02): Single-request date-based ClubElo fetch instead of 36 individual requests
 - (Phase 1/Plan 02): logging.warning() on ClubElo fallback for silent-failure prevention
 - (Phase 1/Plan 02): Opponent stats from pre-tiebreak raw aggregates, not post-rank values

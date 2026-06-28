@@ -6,7 +6,7 @@ Build a UEFA Champions League competition module for the existing football predi
 
 ## Phases
 
-- [ ] **Phase 1: UCL League Table Engine** — 36-team Swiss-system standings with correct tiebreaker chain, fixture validation, Monte Carlo advancement probabilities
+- [x] **Phase 1: UCL League Table Engine** — 36-team Swiss-system standings with correct tiebreaker chain, fixture validation, Monte Carlo advancement probabilities *(completed 2026-06-27)*
 - [ ] **Phase 2: UCL Knockout Phase** — Two-legged playoff, seeded R16 bracket, top-4 protection, full knockout tree through final
 - [ ] **Phase 3: UCL Simulation Orchestration + Display** — `ucl-predict` CLI, formatted league table and bracket display, champion/qualification odds
 - [ ] **Phase 4: Validation & Production Readiness** — Live BSD API validation, accuracy metrics (Brier, Log Loss), performance benchmarking, regression verification, documentation
@@ -29,7 +29,7 @@ Build a UEFA Champions League competition module for the existing football predi
 Plans:
 - [x] 01-01-PLAN.md — Fixture schedule loading and validation (data files, pot distribution validation, duplicate detection)
 - [x] 01-02-PLAN.md — Match simulation + 36-team standings engine (ClubElo fetcher, football_core Poisson reuse, UCL 10-step tiebreaker chain, zone classification)
-- [ ] 01-03-PLAN.md — Monte Carlo simulation + advancement probabilities (N-iteration loop, zone/champion probabilities, per-team tiebreaker stat averages)
+- [x] 01-03-PLAN.md — Monte Carlo simulation + advancement probabilities (N-iteration loop, zone/champion probabilities, per-team tiebreaker stat averages)
 
 ### Phase 2: UCL Knockout Phase
 **Goal**: Users can simulate the complete UCL knockout pipeline — two-legged playoff (9–24), seeded R16 bracket construction with exact UEFA pairings, top-4 seeding protection, and full knockout tree (R16 → QF → SF → Final) with per-team stage probabilities
@@ -92,7 +92,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. UCL League Table Engine | 2/3 | In Progress|  |
+| 1. UCL League Table Engine | 3/3 | ✓ Complete | 2026-06-27 |
 | 2. UCL Knockout Phase | 0/4 | Not started | - |
 | 3. UCL Simulation Orchestration + Display | 0/3 | Not started | - |
 | 4. Validation & Production Readiness | 0/4 | Not started | - |
