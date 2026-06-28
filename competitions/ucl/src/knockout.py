@@ -585,6 +585,124 @@ def build_r16_bracket(
     return {"matchups": matchups, "tree": tree}
 
 
-def simulate_knockout_tree(*args, **kwargs):
-    """Stub — full implementation in Task 2."""
-    raise NotImplementedError("Implemented in Task 2")
+def simulate_knockout_tree(
+    bracket: dict,
+    elo_ratings: dict[str, float],
+    rng: random.Random,
+    base_rate: float = EXPECTED_GOALS_BASE_RATE,
+    et_lambda_factor: float = 0.25,
+    penalty_conversion_rate: float = 0.76,
+) -> dict:
+    """Simulate the full knockout tree: R16 -> QF -> SF -> Final.
+
+    Traverses the bracket produced by :func:`build_r16_bracket`,
+    simulating each match in round order.  R16, QF, and SF are
+    two-legged aggregate ties.  The Final is a single match at
+    neutral venue.
+
+    Tracks which round each team reaches (D-09: stage granularity).
+
+    Parameters
+    ----------
+    bracket:
+        Bracket dict from :func:`build_r16_bracket` with ``matchups``
+        and ``tree``.
+    elo_ratings:
+        ``{team_name: Elo}`` dict.
+    rng:
+        Seeded ``random.Random`` for deterministic results.
+    base_rate, et_lambda_factor, penalty_conversion_rate:
+        Passed to match simulation functions.
+
+    Returns
+    -------
+    dict
+        ``{matchups: [updated match dicts with results],
+          rounds: {round_name: [{match_id, team_a, team_b, winner, ...}]},
+          stage: {team_name: stage_string},
+          champion: team_name | None}``
+    """
+    # ── 1. Build winner_progression lookup ────────────────────────────────
+    winner_progression: dict[str, str] = {}
+    # Defensive copy of bracket matchups (T-02-09)
+    updated_matchups = list(bracket["matchups"])
+    rounds_output: dict[str, list[dict]] = {}
+    stage: dict[str, str] = {}
+
+    # ── 2. Traverse rounds in order ───────────────────────────────────────
+    round_order = ["R16", "QF", "SF", "FINAL"]
+
+    for round_name in round_order:
+        round_matches = [m for m in updated_matchups if m["round"] == round_name]
+        is_final = (round_name == "FINAL")
+        round_results: list[dict] = []
+
+        for match in round_matches:
+            if round_name == "R16":
+                # Teams already assigned from bracket construction
+                team_a = match["team_a"]
+                team_b = match["team_b"]
+            else:
+                # QF/SF/FINAL: look up winners from source matches
+                source_winners = [
+                    winner_progression[src] for src in match["source_matches"]
+                ]
+                team_a, team_b = source_winners[0], source_winners[1]
+
+            # Simulate the match/tie
+            result = _simulate_single_knockout_match(
+                team_a, team_b, elo_ratings, rng,
+                is_final=is_final,
+                base_rate=base_rate,
+                et_lambda_factor=et_lambda_factor,
+                penalty_conversion_rate=penalty_conversion_rate,
+            )
+
+            winner = result["winner"]
+            loser = result["loser"]
+            winner_progression[match["match_id"]] = winner
+
+            # Record stage reached for loser (D-09)
+            if round_name == "R16":
+                stage[loser] = "R16"
+                stage[winner] = "R16"
+            elif round_name == "QF":
+                stage[loser] = "QF"
+            elif round_name == "SF":
+                stage[loser] = "SF"
+            elif round_name == "FINAL":
+                stage[loser] = "FINAL"
+                stage[winner] = "CHAMPION"
+
+            # Build round entry
+            round_entry = {
+                "match_id": match["match_id"],
+                "team_a": team_a,
+                "team_b": team_b,
+                "winner": winner,
+                "result": result,
+            }
+            round_results.append(round_entry)
+
+        # Promote winners to next round stage label
+        if round_name == "R16":
+            for r in round_results:
+                stage[r["winner"]] = "QF"
+        elif round_name == "QF":
+            for r in round_results:
+                stage[r["winner"]] = "SF"
+        elif round_name == "SF":
+            for r in round_results:
+                stage[r["winner"]] = "FINAL"
+
+        rounds_output[round_name] = round_results
+
+    # ── 3. Determine champion ─────────────────────────────────────────────
+    champion = winner_progression.get("final_01")
+
+    return {
+        "matchups": updated_matchups,
+        "rounds": rounds_output,
+        "stage": stage,
+        "champion": champion,
+    }
