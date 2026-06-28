@@ -469,6 +469,75 @@ def sample_full_fixture_path(tmp_path):
     return str(dest)
 
 
+# ── Knockout test fixtures (Plan 02-01) ──────────────────────────────────
+
+
+@pytest.fixture
+def sample_playoff_pairings():
+    """Returns the playoff pairings data for testing.
+
+    Loads from the dedicated competition data file created
+    alongside the implementation (exact filename chosen during
+    implementation).
+    """
+    import json, os, glob
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    # Discover the playoff pairings file by convention
+    pairings_files = glob.glob(os.path.join(data_dir, "*playoff*"))
+    path = pairings_files[0] if pairings_files else os.path.join(data_dir, "playoff_pairings.json")
+    with open(path) as f:
+        return json.load(f)
+
+
+@pytest.fixture
+def sample_bracket_rules():
+    """Returns the bracket rules data for testing.
+
+    Loads from the dedicated competition data file created
+    alongside the implementation (exact filename chosen during
+    implementation).
+    """
+    import json, os, glob
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    bracket_files = glob.glob(os.path.join(data_dir, "*bracket*"))
+    path = bracket_files[0] if bracket_files else os.path.join(data_dir, "bracket_rules.json")
+    with open(path) as f:
+        return json.load(f)
+
+
+@pytest.fixture
+def sample_knockout_elos():
+    """Returns Elo dict for 2 teams used in standalone tie tests."""
+    return {"Man City": 1970.0, "Real Madrid": 1943.0}
+
+
+@pytest.fixture
+def sample_tie_standings():
+    """Returns a minimal 24-entry standings list (positions 1-24) for playoff/bracket tests.
+
+    Teams are sorted by descending Elo to create a plausible ranking.
+    Only position, team, and zone fields are populated; tiebreaker
+    stats are zeroed.
+    """
+    import copy
+    from competitions.ucl.tests.conftest import _ALL_36_TEAMS, _ELO_RATINGS
+    teams = [{"team": t, "elo": _ELO_RATINGS[t]} for t in _ALL_36_TEAMS]
+    teams.sort(key=lambda t: -t["elo"])
+    standings = []
+    for i, t in enumerate(teams[:24]):
+        pos = i + 1
+        standings.append({
+            "team": t["team"],
+            "position": pos,
+            "zone": "top_8" if pos <= 8 else "playoff",
+            "pts": 0, "gd": 0, "gs": 0, "away_gs": 0,
+            "wins": 0, "away_wins": 0, "opp_pts": 0, "opp_gd": 0,
+            "opp_gs": 0, "conduct_score": 0, "uefa_coefficient": 0.0,
+            "elo": t["elo"],
+        })
+    return standings
+
+
 @pytest.fixture
 def sample_mc_output():
     """Returns a minimal pre-formatted MC output dict with 3 teams.

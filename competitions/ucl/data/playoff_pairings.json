@@ -1,0 +1,14 @@
+{
+  "pairings": [
+    {"tie": 1, "position_a": 9, "position_b": 24},
+    {"tie": 2, "position_a": 10, "position_b": 23},
+    {"tie": 3, "position_a": 11, "position_b": 22},
+    {"tie": 4, "position_a": 12, "position_b": 21},
+    {"tie": 5, "position_a": 13, "position_b": 20},
+    {"tie": 6, "position_a": 14, "position_b": 19},
+    {"tie": 7, "position_a": 15, "position_b": 18},
+    {"tie": 8, "position_a": 16, "position_b": 17}
+  ],
+  "seeded_teams_home_second_leg": "lower position number (9-16)",
+  "description": "UCL knockout phase playoff pairings per official draw. Teams 9-16 seeded (second leg at home) vs teams 17-24."
+}
