@@ -539,6 +539,32 @@ def sample_tie_standings():
 
 
 @pytest.fixture
+def sample_playoff_standings():
+    """Returns 36-team standings sorted by Elo for playoff round tests.
+
+    Teams are ranked by descending Elo and assigned zones per standard
+    UCL league phase rules: top_8 (1-8), playoff (9-24), eliminated (25-36).
+    Only position, team, zone, and elo fields are substantive; tiebreaker
+    stats are zeroed.
+    """
+    teams = [{"team": t, "elo": _ELO_RATINGS[t]} for t in _ALL_36_TEAMS]
+    teams.sort(key=lambda t: -t["elo"])
+    standings = []
+    for i, t in enumerate(teams):
+        pos = i + 1
+        standings.append({
+            "team": t["team"],
+            "position": pos,
+            "zone": "top_8" if pos <= 8 else ("playoff" if pos <= 24 else "eliminated"),
+            "pts": 0, "gd": 0, "gs": 0, "away_gs": 0,
+            "wins": 0, "away_wins": 0, "opp_pts": 0, "opp_gd": 0,
+            "opp_gs": 0, "conduct_score": 0, "uefa_coefficient": 0.0,
+            "elo": t["elo"],
+        })
+    return standings
+
+
+@pytest.fixture
 def sample_mc_output():
     """Returns a minimal pre-formatted MC output dict with 3 teams.
 
