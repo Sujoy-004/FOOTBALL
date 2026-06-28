@@ -7,7 +7,7 @@ Build a UEFA Champions League competition module for the existing football predi
 ## Phases
 
 - [x] **Phase 1: UCL League Table Engine** — 36-team Swiss-system standings with correct tiebreaker chain, fixture validation, Monte Carlo advancement probabilities *(completed 2026-06-27)*
-- [ ] **Phase 2: UCL Knockout Phase** — Two-legged playoff, seeded R16 bracket, top-4 protection, full knockout tree through final
+- [x] **Phase 2: UCL Knockout Phase** — Two-legged playoff, seeded R16 bracket, top-4 protection, full knockout tree through final *(completed 2026-06-28)*
 - [ ] **Phase 3: UCL Simulation Orchestration + Display** — `ucl-predict` CLI, formatted league table and bracket display, champion/qualification odds
 - [ ] **Phase 4: Validation & Production Readiness** — Live BSD API validation, accuracy metrics (Brier, Log Loss), performance benchmarking, regression verification, documentation
 
@@ -44,10 +44,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 02-01: Two-legged tie simulation with extra time and penalties (dedicated `simulate_two_legged_tie()` with aggregate → ET → pens)
-- [ ] 02-02: Playoff round simulation (pairs 9–16 vs 17–24, two-legged aggregate resolution)
-- [ ] 02-03: Seeded R16 bracket construction with exact UEFA pairing table and top-4 protection
-- [ ] 02-04: Full knockout tree simulation (R16 → QF → SF → Final) with per-team stage probability tracking
+- [x] 02-01-PLAN.md — Two-legged tie simulation + data files (`simulate_two_legged_tie()`, dedicated competition data files)
+- [x] 02-02-PLAN.md — Playoff round simulation (`simulate_playoff_round()`, 8 ties from positions 9-24)
+- [x] 02-03-PLAN.md — R16 bracket construction + knockout tree (`build_r16_bracket()`, `simulate_knockout_tree()`, top-4 protection)
+- [x] 02-04-PLAN.md — MC integration + stage probabilities (extend `run_monte_carlo()`, D-09 stage tracking)
 
 ### Phase 3: UCL Simulation Orchestration + Display
 **Goal**: Users can run complete UCL simulations from the CLI (`ucl-predict`) with configurable parameters and view formatted results — league table with qualification zones, knockout bracket with matchups, champion/top-4 odds
@@ -93,6 +93,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. UCL League Table Engine | 3/3 | ✓ Complete | 2026-06-27 |
-| 2. UCL Knockout Phase | 0/4 | Not started | - |
+| 2. UCL Knockout Phase | 4/4 | ✓ Complete | 2026-06-28 |
 | 3. UCL Simulation Orchestration + Display | 0/3 | Not started | - |
 | 4. Validation & Production Readiness | 0/4 | Not started | - |

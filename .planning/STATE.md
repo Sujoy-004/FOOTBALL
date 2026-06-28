@@ -5,36 +5,39 @@
 See: .planning/PROJECT.md (updated 2026-06-27)
 
 **Core value:** Adding a new competition requires only a new competition module — not changes to `football_core`
-**Current focus:** UCL League Table Engine
+**Current focus:** UCL Simulation Orchestration + Display
 
 ## Current Position
 
-Phase: 2 of 4 (UCL Knockout Phase)
-Plan: 0 of 4 in current phase
-Status: Waiting to start
-Last activity: 2026-06-27 — Phase 1 complete: 3/3 plans, 7/7 requirements satisfied, WC regression clean
+Phase: 3 of 4 (UCL Simulation Orchestration + Display)
+Plan: 0 of 3 in current phase
+Status: Not started
+Last activity: 2026-06-28 — Phase 2 complete: playoff/bracket/tree MC pipeline with D-09 stage probabilities
 
-Progress: [#####               ] 25%
+Progress: [##########          ] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 7
 - Average duration: 29 min
-- Total execution time: 87 min
+- Total execution time: 202 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-ucl-league-table-engine | 3 | 87 min | 29 min |
+| 02-ucl-knockout-phase | 4 | 115 min | 29 min |
 
 **Recent Trend:**
 - Last 5 plans:
-  1. 01-ucl-league-table-engine/01: 40 min (module scaffold, fixture data, validation)
-  2. 01-ucl-league-table-engine/02: 32 min (ClubElo fetcher, match sim, 10-step tiebreaker standings)
-  3. 01-ucl-league-table-engine/03: 15 min (MC simulation engine)
-- Trend: Steady velocity, faster as modules build on prior work
+   1. 01-ucl-league-table-engine/03: 15 min (MC simulation engine)
+   2. 02-ucl-knockout-phase/01: 40 min (two-legged tie sim + data files)
+   3. 02-ucl-knockout-phase/02: 25 min (playoff round simulation)
+   4. 02-ucl-knockout-phase/03: 33 min (bracket construction + knockout tree)
+   5. 02-ucl-knockout-phase/04: 17 min (MC integration + stage probs)
+- Trend: Consistent velocity; dev tooling overhead offset by Phase 1 patterns
 
 ## Accumulated Context
 
@@ -62,6 +65,14 @@ Recent decisions affecting current work:
 - (Phase 1/Plan 03): Matchup lambdas precomputed once before iteration loop for ~2x performance gain
 - (Phase 1/Plan 03): aggregate_mc_results() separated for isolated unit testing without running simulation
 - (ADR-002): Synthetic schedules OK for dev, mandatory official before validation — applies to all competitions
+- (Phase 2): ET simulated locally using reduced Poisson — BSD API does not expose ET scores (extra_time_score always null)
+- (Phase 2): Penalties simulated locally with fixed ~76% conversion — BSD penalty data for validation only
+- (Phase 2): Playoff pairings in dedicated data file (playoff_draw.json), not computed/randomized
+- (Phase 2): R16 bracket structure in JSON data file (bracket_rules.json), not hardcoded
+- (Phase 2): Knockout pipeline extends Phase 1 MC loop (single loop, post-aggregation pattern)
+- (Phase 2): Stage tracking: Eliminated → Playoff → R16 → QF → SF → Final → Champion
+- (Phase 2): BSD API authoritative for validation, not simulation
+- (Phase 2): BSD UCL league_id = 7, season_id = 268 (UEFA Champions League 25/26)
 
 ### Pending Todos
 
@@ -79,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-27
-Stopped at: Completed 01-03-PLAN.md (Monte Carlo simulation engine with 10K verification)
-Resume file: .planning/phases/01-ucl-league-table-engine/01-03-SUMMARY.md
+Last session: 2026-06-28
+Stopped at: Phase 2 complete
+Resume file: .planning/phases/03-ucl-orchestration-display/
