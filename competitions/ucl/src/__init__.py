@@ -15,6 +15,7 @@ from competitions.ucl.src.knockout import (
     simulate_knockout_tree,
     simulate_playoff_round,
     simulate_two_legged_tie,
+    track_knockout_stages,
 )
 from competitions.ucl.src.simulation import (
     aggregate_mc_results,
@@ -33,6 +34,7 @@ __all__ = [
     "simulate_knockout_tree",
     "simulate_playoff_round",
     "simulate_two_legged_tie",
+    "track_knockout_stages",
     "simulate_league_phase",
     "run_monte_carlo",
     "aggregate_mc_results",

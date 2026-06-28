@@ -632,3 +632,33 @@ def sample_playoff_winners():
     # (lower seeded teams advancing as upset examples)
     winners_pool = [teams[i] for i in range(16, 24)]
     return {i + 1: winners_pool[i] for i in range(8)}
+
+
+@pytest.fixture
+def sample_knockout_stage_result():
+    """Returns a minimal mock knockout_result for stage tracking tests.
+
+    Simulates a tree where Man City wins and Bayern reaches SF.
+    """
+    return {
+        "stage": {
+            "Man City": "CHAMPION",
+            "Real Madrid": "FINAL",
+            "Bayern": "SF",
+            "PSG": "SF",
+            "Inter": "QF",
+            "Dortmund": "QF",
+            "RB Leipzig": "QF",
+            "Barcelona": "QF",
+            "Arsenal": "R16",
+            "Bayer Leverkusen": "R16",
+            "Juventus": "R16",
+            "Atletico Madrid": "R16",
+            "Sporting": "R16",
+            "Benfica": "R16",
+            "AC Milan": "R16",
+            "Club Brugge": "R16",
+            # Teams 17-24 (playoff losers) are NOT in stage dict
+        },
+        "champion": "Man City",
+    }

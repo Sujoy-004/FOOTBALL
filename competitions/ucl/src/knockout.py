@@ -705,4 +705,63 @@ def simulate_knockout_tree(
         "rounds": rounds_output,
         "stage": stage,
         "champion": champion,
-    }
+}
+
+
+def track_knockout_stages(
+    standings: list[dict],
+    knockout_result: dict,
+) -> dict[str, str]:
+    """Map every league phase team to its final stage (D-09).
+
+    Parameters
+    ----------
+    standings:
+        36-team standings from :func:`compute_swiss_standings`.
+        Used to determine who was eliminated in league phase (25-36)
+        and who reached the playoff (9-24).
+    knockout_result:
+        Output from :func:`simulate_knockout_tree` containing
+        ``stage`` dict (teams that reached R16 or beyond) and
+        ``champion``.
+
+    Returns
+    -------
+    dict[str, str]
+        ``{team_name: stage}`` for all 36 teams, where stage is one of:
+        ``eliminated``, ``playoff``, ``r16``, ``qf``, ``sf``,
+        ``final``, ``champion`` (D-09).
+    """
+    stages: dict[str, str] = {}
+
+    for entry in standings:
+        team = entry["team"]
+        position = entry["position"]
+        zone = entry["zone"]
+
+        if position >= 25:
+            stages[team] = "eliminated"
+        elif zone == "top_8":
+            # Top 8 auto-qualify for R16; may be overridden by knockout_result
+            stages[team] = "r16"
+        elif zone == "playoff":
+            # 9-24: could be playoff exit or better if they advanced
+            stages[team] = "playoff"
+
+    # Override with knockout stages for teams that advanced
+    # Normalise to lowercase D-09 format
+    knockout_stages = knockout_result.get("stage", {})
+    champion = knockout_result.get("champion")
+
+    for team, stage in knockout_stages.items():
+        stages[team] = stage.lower()
+
+    if champion and champion not in knockout_stages:
+        stages[champion] = "champion"
+
+    # Ensure all 36 teams have a stage
+    for entry in standings:
+        if entry["team"] not in stages:
+            stages[entry["team"]] = "eliminated"
+
+    return stages

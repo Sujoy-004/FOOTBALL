@@ -12,6 +12,7 @@ from competitions.ucl.src.knockout import (
     simulate_knockout_tree,
     simulate_playoff_round,
     simulate_two_legged_tie,
+    track_knockout_stages,
 )
 
 
@@ -486,3 +487,45 @@ class TestKnockoutTree:
         result = simulate_knockout_tree(bracket, sample_elo_dict, random.Random(42))
         final_result = result["rounds"]["FINAL"][0]["result"]
         assert final_result.get("is_final", False) or "leg1" not in final_result
+
+
+class TestStageTracking:
+    """D-09: Per-team stage granularity."""
+
+    def test_stage_tracking_all_36_teams(self, sample_standings_results, sample_knockout_stage_result):
+        """All 36 teams receive a stage assignment."""
+        stages = track_knockout_stages(sample_standings_results, sample_knockout_stage_result)
+        assert len(stages) == 36
+
+    def test_stage_tracking_eliminated(self, sample_standings_results, sample_knockout_stage_result):
+        """Teams at positions 25-36 are eliminated."""
+        eliminated_teams = {e["team"] for e in sample_standings_results if e["position"] >= 25}
+        stages = track_knockout_stages(sample_standings_results, sample_knockout_stage_result)
+        for team in eliminated_teams:
+            assert stages[team] in ("eliminated",)
+
+    def test_stage_tracking_top8_have_r16_or_better(self, sample_standings_results, sample_knockout_stage_result):
+        """Top 8 seeds reach at least R16."""
+        top8 = {e["team"] for e in sample_standings_results if e["position"] <= 8}
+        stages = track_knockout_stages(sample_standings_results, sample_knockout_stage_result)
+        for team in top8:
+            assert stages[team] in ("r16", "qf", "sf", "final", "champion")
+
+    def test_stage_tracking_playoff_zone(self, sample_standings_results, sample_knockout_stage_result):
+        """Playoff zone teams have 'playoff' or better."""
+        playoff_zone = {e["team"] for e in sample_standings_results if e["zone"] == "playoff"}
+        stages = track_knockout_stages(sample_standings_results, sample_knockout_stage_result)
+        for team in playoff_zone:
+            assert stages[team] in ("playoff", "r16", "qf", "sf", "final", "champion")
+
+    def test_stage_tracking_champion_set(self, sample_standings_results, sample_knockout_stage_result):
+        """Champion from knockout_result is recorded."""
+        stages = track_knockout_stages(sample_standings_results, sample_knockout_stage_result)
+        assert stages.get("Man City") == "champion"
+
+    def test_stage_tracking_valid_values(self, sample_standings_results, sample_knockout_stage_result):
+        """All stage values are valid D-09 stages."""
+        valid_stages = {"eliminated", "playoff", "r16", "qf", "sf", "final", "champion"}
+        stages = track_knockout_stages(sample_standings_results, sample_knockout_stage_result)
+        for stage in stages.values():
+            assert stage in valid_stages, f"Invalid stage: {stage}"
