@@ -11,6 +11,7 @@ from competitions.ucl.src.groups import (
     simulate_swiss_matches,
 )
 from competitions.ucl.src.knockout import (
+    simulate_playoff_round,
     simulate_two_legged_tie,
 )
 from competitions.ucl.src.simulation import (
@@ -26,6 +27,7 @@ __all__ = [
     "precompute_swiss_matchup_lambdas",
     "simulate_swiss_matches",
     "compute_swiss_standings",
+    "simulate_playoff_round",
     "simulate_two_legged_tie",
     "simulate_league_phase",
     "run_monte_carlo",
