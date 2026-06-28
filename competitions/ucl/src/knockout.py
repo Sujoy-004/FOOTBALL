@@ -14,6 +14,7 @@ import random
 
 from football_core.constants import (
     EXPECTED_GOALS_BASE_RATE,
+    HOME_ADVANTAGE_MULTIPLIER,
     POISSON_TABLE_BITS,
 )
 from football_core.groups import _build_poisson_table, expected_goals
@@ -151,8 +152,10 @@ def simulate_two_legged_tie(
     if agg_a == agg_b:
         et_played = True
         # ET: reduced lambda — home advantage to leg 2 host (team_b per D-03)
-        et_lam_a = expected_goals(ea, eb, base_rate) * et_lambda_factor   # team_a away in ET
-        et_lam_b = expected_goals(eb, ea, base_rate) * et_lambda_factor   # team_b home in ET
+        # Team_b (second-leg host) gets an extra HOME_ADVANTAGE_MULTIPLIER boost
+        # on top of the base factor already applied by expected_goals().
+        et_lam_a = expected_goals(ea, eb, base_rate) * et_lambda_factor   # team_a away
+        et_lam_b = expected_goals(eb, ea, base_rate) * et_lambda_factor * HOME_ADVANTAGE_MULTIPLIER  # team_b home (D-03)
         et_a = _build_poisson_table(et_lam_a)[rng.getrandbits(POISSON_TABLE_BITS)] if et_lam_a > 0 else 0
         et_b = _build_poisson_table(et_lam_b)[rng.getrandbits(POISSON_TABLE_BITS)] if et_lam_b > 0 else 0
         agg_a += et_a
