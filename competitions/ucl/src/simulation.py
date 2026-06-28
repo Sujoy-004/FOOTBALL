@@ -19,7 +19,30 @@ from competitions.ucl.src.groups import (
     precompute_swiss_matchup_lambdas,
     simulate_swiss_matches,
 )
+from competitions.ucl.src.knockout import (
+    build_r16_bracket,
+    simulate_knockout_tree,
+    simulate_playoff_round,
+    track_knockout_stages,
+)
 from football_core.constants import EXPECTED_GOALS_BASE_RATE
+
+
+# ── D-09 stage constants ──────────────────────────────────────────────────────
+
+STAGE_ORDER = [
+    "eliminated",
+    "playoff",
+    "r16",
+    "qf",
+    "sf",
+    "final",
+    "champion",
+]
+"""Ordered list of D-09 stages; index equals numeric value for post-aggregation."""
+
+STAGE_TO_VALUE: dict[str, int] = {s: i for i, s in enumerate(STAGE_ORDER)}
+"""Map stage name to its numeric value (0–6) for per-iteration stage tracking."""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -87,34 +110,40 @@ def aggregate_mc_results(
     champions: dict[str, int],
     stat_collectors: dict[str, dict[str, list[int | float]]],
     n_iterations: int,
+    stage_collectors: dict[str, list[int]] | None = None,
 ) -> dict[str, dict]:
-    """Aggregate per-iteration results into per-team D-06/D-07 output.
+    """Aggregate per-iteration results into per-team D-06/D-07/D-09 output.
 
     Computes zone probabilities, champion probability, and averages
     for all 6 tiebreaker stats plus position.
+
+    If *stage_collectors* is provided, also computes D-09 stage
+    probabilities (stage_eliminated_prob, stage_playoff_prob, …).
 
     Parameters
     ----------
     positions:
         ``{team_name: [per-iteration position]}`` for all N iterations.
     champions:
-        ``{team_name: count_of_iterations_where_position==1}``.
+        ``{team_name: count_of_iterations_where_team_was_champion}``.
     stat_collectors:
         ``{team_name: {stat: [per-iteration values]}}``.
     n_iterations:
         Total number of Monte Carlo iterations.
+    stage_collectors:
+        ``{team_name: [per-iteration stage values]}``, where values
+        are ints from 0 (eliminated) to 6 (champion) per STAGE_ORDER.
+        If None, stage probabilities are skipped (backward compat).
 
     Returns
     -------
     dict[str, dict]
-        Per-team dict matching the D-06/D-07 output schema:
-        ``{team_name: {top_8_prob, playoff_prob, eliminated_prob,
-                       champion_prob, avg_position, avg_pts, avg_gd,
-                       avg_gs, avg_away_gs, avg_wins, avg_away_wins}}``
+        Per-team dict with D-06/D-07 fields plus D-09 stage probability
+        fields if *stage_collectors* was provided.
     """
     teams: dict[str, dict] = {}
     for team in positions:
-        teams[team] = {
+        entry = {
             "top_8_prob": sum(1 for p in positions[team] if p <= 8) / n_iterations,
             "playoff_prob": sum(1 for p in positions[team] if 9 <= p <= 24) / n_iterations,
             "eliminated_prob": sum(1 for p in positions[team] if p >= 25) / n_iterations,
@@ -127,6 +156,21 @@ def aggregate_mc_results(
             "avg_wins": sum(stat_collectors[team]["wins"]) / n_iterations,
             "avg_away_wins": sum(stat_collectors[team]["away_wins"]) / n_iterations,
         }
+
+        if stage_collectors and team in stage_collectors:
+            stages = stage_collectors[team]
+            # T-02-11: Verify stage values in range [0, 6], clamp invalid to 0
+            clamped = [s if 0 <= s <= 6 else 0 for s in stages]
+            entry["stage_eliminated_prob"] = sum(1 for s in clamped if s == 0) / n_iterations
+            entry["stage_playoff_prob"] = sum(1 for s in clamped if s == 1) / n_iterations
+            entry["stage_r16_prob"] = sum(1 for s in clamped if s == 2) / n_iterations
+            entry["stage_qf_prob"] = sum(1 for s in clamped if s == 3) / n_iterations
+            entry["stage_sf_prob"] = sum(1 for s in clamped if s == 4) / n_iterations
+            entry["stage_final_prob"] = sum(1 for s in clamped if s == 5) / n_iterations
+            # champion_prob already set above from champions dict
+
+        teams[team] = entry
+
     return teams
 
 
@@ -199,6 +243,13 @@ def run_monte_carlo(
             "wins": [], "away_wins": []}
         for t in team_names
     }
+    # D-09: stage tracking collector (value 0-6 per iteration)
+    stage_collectors: dict[str, list[int]] = {
+        t: [] for t in team_names
+    }
+
+    # Pre-build Elo dict lookup for knockout pipeline (T-02-13)
+    elo_dict: dict[str, float] = dict(elo_ratings)
 
     # ── 5. Main iteration loop ──────────────────────────────────────────
     for _ in range(n_iterations):
@@ -210,6 +261,17 @@ def run_monte_carlo(
             matchup_lambdas=matchup_lambdas,
         )
 
+        # ── Knockout pipeline (Phase 2) ─────────────────────────────────
+        playoff_result = simulate_playoff_round(
+            standings, elo_dict, rng,
+        )
+        bracket = build_r16_bracket(standings, playoff_result)
+        tree_result = simulate_knockout_tree(
+            bracket, elo_dict, rng,
+        )
+        stages = track_knockout_stages(standings, tree_result)
+        # ── end knockout pipeline ──────────────────────────────────────
+
         for entry in standings:
             team = entry["team"]
             pos = entry["position"]
@@ -220,8 +282,11 @@ def run_monte_carlo(
             stat_collectors[team]["away_gs"].append(entry["away_gs"])
             stat_collectors[team]["wins"].append(entry["wins"])
             stat_collectors[team]["away_wins"].append(entry["away_wins"])
-            if pos == 1:
+            # D-09: champion determined by knockout tree, not league position 1
+            if stages[team] == "champion":
                 champions[team] += 1
+            # D-09: track stage value for post-aggregation
+            stage_collectors[team].append(STAGE_TO_VALUE[stages[team]])
 
     # ── 6. Aggregate and return ─────────────────────────────────────────
     from competitions.ucl.src.elo_fetcher import get_clubelo_snapshot_date
@@ -230,5 +295,9 @@ def run_monte_carlo(
         "snapshot_date": get_clubelo_snapshot_date(),
         "n_iterations": n_iterations,
         "seed": seed,
-        "teams": aggregate_mc_results(positions, champions, stat_collectors, n_iterations),
+        "teams": aggregate_mc_results(
+            positions, champions, stat_collectors, n_iterations,
+            stage_collectors=stage_collectors,
+        ),
+        "stage_order": STAGE_ORDER,  # D-09 metadata for consumers
     }

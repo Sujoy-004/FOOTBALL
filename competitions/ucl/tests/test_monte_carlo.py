@@ -353,8 +353,9 @@ class TestMonteCarloKnockout:
                 + data["stage_sf_prob"] + data["stage_final_prob"]
                 + data["champion_prob"]
             )
-            assert abs(data["top_8_prob"] - knockout_reached) < 1e-10, \
-                f"{team}: top_8={data['top_8_prob']} != knockout_reached={knockout_reached}"
+            # Top 8 auto-qualify for R16; teams can also reach R16 via playoff win
+            assert data["top_8_prob"] <= knockout_reached + 1e-10, \
+                f"{team}: top_8={data['top_8_prob']} > knockout_reached={knockout_reached}"
 
     def test_mc_knockout_deterministic_n1(self, sample_fixture_schedule, sample_elo_dict):
         """N=1 with same seed produces identical stage probabilities."""
