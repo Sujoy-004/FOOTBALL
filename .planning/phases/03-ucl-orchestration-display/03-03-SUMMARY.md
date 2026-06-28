@@ -108,3 +108,7 @@ None — no external service configuration required.
 - JSON export schema stable with 11 top-level keys (snapshot_date, n_iterations, seed, standings, teams, playoff_ties, playoff_winners, bracket_rounds, bracket_champion, stages, stage_order)
 - Ready for Phase 4 (BSD validation) which will consume JSON schema and may enrich data with live match results
 - Full UCL test suite at 129 passed (1 skipped for live API guard)
+
+## Self-Check: PASSED
+
+All 5 files exist, all 4 commits verified, full test suite green (129/130), both modules load correctly.
