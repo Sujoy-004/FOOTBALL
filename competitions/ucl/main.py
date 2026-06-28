@@ -21,6 +21,7 @@ import random
 import sys
 from dataclasses import asdict
 
+from competitions.ucl.display import print_summary, print_league_table
 from competitions.ucl.result import SimulationResult
 from competitions.ucl.src.simulation import run_monte_carlo, simulate_league_phase
 from competitions.ucl.src.knockout import (
@@ -158,11 +159,9 @@ def main() -> None:
         fixtures, elo_ratings, seed, args.iterations,
     )
 
-    # Print summary line
-    print(
-        f"ucl-predict: {result.n_iterations} iterations, "
-        f"seed {result.seed}, snapshot {result.snapshot_date}"
-    )
+    # Display results in D-06 order: summary first, league table second
+    print_summary(result)
+    print_league_table(result)
 
     # JSON export (if --output given)
     if args.output:
