@@ -29,13 +29,13 @@ This phase extends Phase 2's frozen interfaces: `run_monte_carlo()`, `aggregate_
   3. Playoff Results (8 ties, aggregate scores, advancing winners)
   4. Knockout Bracket (R16 → QF → SF → Final, round-by-round match list)
   5. Champion / Qualification Odds (all 36 teams)
-- **D-07:** League table default columns: Position, Team, Pts, GD, GS, Zone (color-coded). Full tiebreaker chain available via `--verbose`.
+- **D-07:** League table default columns: Position, Team, Pts, GD, GS, Zone (color-coded). The full tiebreaker information remains available internally and may be exposed by a future diagnostic mode.
 - **D-08:** Knockout bracket displayed as round-by-round match list (not ASCII tree). Playoff ties shown individually with aggregate scores; ET/Pens displayed only when they occur. ASCII tree considered a future enhancement.
 - **D-09:** Odds display shows all 36 teams sorted by champion probability descending. Columns: Rank, Team, Champion %, Final %, SF %, QF %. Full 7-stage probabilities (eliminated → champion) available in JSON export only.
 
 ### Display Formatting
 - **D-10:** ANSI color only — green for top-8 zone, yellow for playoff zone, red for eliminated zone. Bold for headings. No Unicode box-drawing borders.
-- **D-11:** Auto-detect ANSI support (same `_supports_color()` pattern as WC output.py). Fall back to plain text automatically. No `--color` flag unless future requirement demands it.
+- **D-11:** Auto-detect terminal color capability using the existing project pattern. Fall back to plain text automatically. No `--color` flag unless future requirement demands it.
 - **D-12:** Section headers with separator lines (`==== League Table ====`), blank lines between sections.
 
 ### Data Export
@@ -45,6 +45,7 @@ This phase extends Phase 2's frozen interfaces: `run_monte_carlo()`, `aggregate_
 ### Architecture — Display Layer Abstraction
 - **D-15:** Display layer depends on an abstract `SimulationResult` contract (dataclass/protocol), not on `run_monte_carlo()` directly. Phase 3 creates it from simulation output. Phase 4 normalizes BSD-enriched data into the same schema. Display code is unchanged between phases.
 - **D-16:** The `SimulationResult` schema is owned by the orchestration (Phase 3) layer — neither by the simulation engine nor by BSD. BSD data normalizes into this contract before reaching the display.
+- **D-17:** The display layer consumes only the `SimulationResult` contract. It must not import or depend directly on simulation internals or BSD-specific structures.
 
 ### agent's Discretion
 - File/function naming for CLI entry point (`main.py` vs `cli.py` etc.)
