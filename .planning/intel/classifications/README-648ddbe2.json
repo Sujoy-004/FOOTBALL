@@ -1,0 +1,13 @@
+{
+  "source_path": "C:\\Users\\KIIT0001\\Documents\\antigravity skills\\FOOTBALL\\competitions\\worldcup\\README.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "World Cup Dynamic Predictor",
+  "summary": "Live tournament odds for FIFA World Cup 2026 — in your terminal.",
+  "scope": ["World Cup Dynamic Predictor", "Elo ratings", "CatBoost ML predictions", "Monte Carlo simulation", "BSD API"],
+  "cross_refs": ["requirements.txt", ".env.example"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

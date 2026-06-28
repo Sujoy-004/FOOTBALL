@@ -1,0 +1,13 @@
+{
+  "source_path": "C:/Users/KIIT0001/Documents/antigravity skills/FOOTBALL/competitions/worldcup/docs/archive/refactor/CHANGELOG.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Changelog",
+  "summary": "Changelog for v1.2.0-refactor documenting 6 work packages of systematic refactoring.",
+  "scope": ["constants", "fetcher", "odds", "catboost", "blender", "main", "evaluation", "governance"],
+  "cross_refs": ["docs/archive/refactor/"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

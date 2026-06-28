@@ -1,0 +1,25 @@
+{
+  "source_path": "C:/Users/KIIT0001/Documents/antigravity skills/FOOTBALL/competitions/worldcup/docs/archive/refactor/HANDOVER.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Handover",
+  "summary": "Handover document summarizing completed 6-work-package refactor with remaining follow-ups and next steps.",
+  "scope": ["main.py", "evaluation.py", "governance.py", "output.py", "codebase architecture", "refactoring"],
+  "cross_refs": [
+    "docs/archive/refactor/REFACTORING_ROADMAP.md",
+    "docs/archive/refactor/IMPLEMENTATION_PLAN.md",
+    "docs/archive/refactor/WP5_ARCHITECTURE_SUMMARY.md",
+    "docs/archive/refactor/WP6_ARCHITECTURE_SUMMARY.md",
+    "docs/archive/refactor/FINAL_REFACTOR_AUDIT.md",
+    "docs/archive/refactor/RELEASE_READINESS.md",
+    "docs/archive/refactor/ARCHITECTURE_VALIDATION.md",
+    "docs/archive/refactor/BASE_RATING_INVESTIGATION.md",
+    "docs/archive/refactor/FLAKY_TEST_REMEDIATION.md",
+    "docs/archive/refactor/LIVE_VALIDATION_REPORT.md",
+    "docs/archive/refactor/SHUTDOWN_EQUIVALENCE.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

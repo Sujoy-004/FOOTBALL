@@ -6,6 +6,7 @@ See: .planning/PROJECT.md (updated 2026-06-27)
 
 **Core value:** Adding a new competition requires only a new competition module — not changes to `football_core`
 **Current focus:** UCL Simulation Orchestration + Display
+**Frozen interfaces:** Phase 2 public signatures are contractually stable. Any change to signature, return schema, or stage model requires architecture review before implementation.
 
 ## Current Position
 

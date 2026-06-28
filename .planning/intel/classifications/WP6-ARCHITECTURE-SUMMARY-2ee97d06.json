@@ -1,0 +1,13 @@
+{
+  "source_path": "C:\\Users\\KIIT0001\\Documents\\antigravity skills\\FOOTBALL\\competitions\\worldcup\\docs\\archive\\refactor\\WP6_ARCHITECTURE_SUMMARY.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "WP-6 Architecture Summary: Hidden State Encapsulation",
+  "summary": "Documents WP-6 refactoring that encapsulated module-level hidden state into an explicit dataclass-based state.",
+  "scope": ["main.py", "groups.py", "RunState", "hidden state encapsulation", "governance timer", "poisson tables"],
+  "cross_refs": ["FINAL_REFACTOR_AUDIT.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

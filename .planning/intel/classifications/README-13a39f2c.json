@@ -1,0 +1,13 @@
+{
+  "source_path": "C:/Users/KIIT0001/Documents/antigravity skills/FOOTBALL/competitions/ucl/README.md",
+  "type": "DOC",
+  "confidence": "low",
+  "manifest_override": false,
+  "title": "UCL Predictor",
+  "summary": "Placeholder README for the UCL Predictor project — coming soon.",
+  "scope": ["UCL Predictor"],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": "Only 3 lines of content (# UCL Predictor, blank, 'Coming soon.'). No frontmatter, no sections, no decisions, requirements, or specs. Classified as DOC (placeholder documentation) with low confidence due to thin signals."
+}

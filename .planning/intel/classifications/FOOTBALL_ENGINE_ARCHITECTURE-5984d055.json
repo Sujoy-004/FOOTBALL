@@ -1,0 +1,31 @@
+{
+  "source_path": "C:\\Users\\KIIT0001\\Documents\\antigravity skills\\FOOTBALL\\docs\\FOOTBALL_ENGINE_ARCHITECTURE.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Football Engine Architecture",
+  "summary": "Current and aspirational architecture of the football prediction engine with technical contracts and API schemas.",
+  "scope": [
+    "football_core",
+    "competitions",
+    "worldcup",
+    "euro",
+    "ucl",
+    "Elo rating system",
+    "BSD API",
+    "prediction pipeline",
+    "group stage simulation",
+    "knockout stage simulation",
+    "signal predictors",
+    "state persistence",
+    "governance",
+    "blender"
+  ],
+  "cross_refs": [
+    "docs/COMMONALITY_REPORT.md",
+    "competitions/ucl/README.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

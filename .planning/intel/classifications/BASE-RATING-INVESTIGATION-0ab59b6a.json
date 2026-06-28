@@ -1,0 +1,21 @@
+{
+  "source_path": "C:\\Users\\KIIT0001\\Documents\\antigravity skills\\FOOTBALL\\competitions\\worldcup\\docs\\archive\\refactor\\BASE_RATING_INVESTIGATION.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "BASE_RATING Investigation",
+  "summary": "Investigates whether BASE_RATING constant exists in the codebase and documents duplicated constants.",
+  "scope": [
+    "BASE_RATING",
+    "COLD_START_THRESHOLD",
+    "BRIER_WINDOW_SIZE",
+    "blender.py",
+    "constants.py",
+    "MAX_EXPECTED_GOALS",
+    "groups.py"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

@@ -1,0 +1,30 @@
+{
+  "source_path": "C:\\Users\\KIIT0001\\Documents\\antigravity skills\\FOOTBALL\\competitions\\worldcup\\CHANGELOG.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Changelog",
+  "summary": "Documents v1.2.0 refactoring with 6 work packages of code improvements across the codebase.",
+  "scope": [
+    "worldcup project",
+    "groups.py",
+    "output.py",
+    "main.py",
+    "fetcher.py",
+    "odds.py",
+    "catboost.py",
+    "blender.py",
+    "math_utils.py",
+    "form.py",
+    "lineup.py",
+    "evaluation.py",
+    "governance.py",
+    "tests"
+  ],
+  "cross_refs": [
+    "docs/archive/refactor/"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}
