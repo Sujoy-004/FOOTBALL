@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-06-27)
 Phase: 3 of 4 (UCL Simulation Orchestration + Display)
 Plan: 0 of 3 in current phase
 Status: Not started
-Last activity: 2026-06-28 — Phase 2 complete: playoff/bracket/tree MC pipeline with D-09 stage probabilities
+Last activity: 2026-06-28 — Phase 2 verified, audited, frozen: playoff/bracket/tree MC pipeline with D-09 stage probabilities
 
 Progress: [##########          ] 50%
 
