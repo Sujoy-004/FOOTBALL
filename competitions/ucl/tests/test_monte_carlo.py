@@ -295,3 +295,101 @@ def test_simulation_module_imports():
     assert callable(simulate_league_phase)
     assert callable(run_monte_carlo)
     assert callable(aggregate_mc_results)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── Monte Carlo + Knockout Integration Tests (UCLK-05)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestMonteCarloKnockout:
+    """UCLK-05: Full MC with knockout pipeline and D-09 stage probabilities."""
+
+    def test_mc_knockout_output_keys(self, sample_fixture_schedule, sample_elo_dict):
+        """Output teams dict has stage probability keys."""
+        from competitions.ucl.src.simulation import run_monte_carlo
+        result = run_monte_carlo(
+            sample_fixture_schedule, sample_elo_dict,
+            n_iterations=10, seed=42,
+        )
+        sample_team = list(result["teams"].keys())[0]
+        team_data = result["teams"][sample_team]
+        expected_keys = [
+            "stage_eliminated_prob", "stage_playoff_prob", "stage_r16_prob",
+            "stage_qf_prob", "stage_sf_prob", "stage_final_prob",
+        ]
+        for key in expected_keys:
+            assert key in team_data, f"Missing key: {key}"
+
+    def test_mc_knockout_probs_sum_to_1(self, sample_fixture_schedule, sample_elo_dict):
+        """Stage probabilities sum to 1.0 for each team."""
+        from competitions.ucl.src.simulation import run_monte_carlo
+        result = run_monte_carlo(
+            sample_fixture_schedule, sample_elo_dict,
+            n_iterations=10, seed=42,
+        )
+        for team, data in result["teams"].items():
+            stage_sum = (
+                data["stage_eliminated_prob"]
+                + data["stage_playoff_prob"]
+                + data["stage_r16_prob"]
+                + data["stage_qf_prob"]
+                + data["stage_sf_prob"]
+                + data["stage_final_prob"]
+                + data["champion_prob"]
+            )
+            assert abs(stage_sum - 1.0) < 1e-10, f"{team}: stage probs sum to {stage_sum}"
+
+    def test_mc_knockout_top8_always_r16(self, sample_fixture_schedule, sample_elo_dict):
+        """Top 8 seeds have stage_r16_prob + stage_qf_prob + ... = zone top_8 probabilities."""
+        from competitions.ucl.src.simulation import run_monte_carlo
+        result = run_monte_carlo(
+            sample_fixture_schedule, sample_elo_dict,
+            n_iterations=10, seed=42,
+        )
+        for team, data in result["teams"].items():
+            knockout_reached = (
+                data["stage_r16_prob"] + data["stage_qf_prob"]
+                + data["stage_sf_prob"] + data["stage_final_prob"]
+                + data["champion_prob"]
+            )
+            assert abs(data["top_8_prob"] - knockout_reached) < 1e-10, \
+                f"{team}: top_8={data['top_8_prob']} != knockout_reached={knockout_reached}"
+
+    def test_mc_knockout_deterministic_n1(self, sample_fixture_schedule, sample_elo_dict):
+        """N=1 with same seed produces identical stage probabilities."""
+        from competitions.ucl.src.simulation import run_monte_carlo
+        r1 = run_monte_carlo(sample_fixture_schedule, sample_elo_dict, n_iterations=1, seed=42)
+        r2 = run_monte_carlo(sample_fixture_schedule, sample_elo_dict, n_iterations=1, seed=42)
+        assert r1["teams"] == r2["teams"]
+
+    def test_mc_knockout_smoke_n10(self, sample_fixture_schedule, sample_elo_dict):
+        """N=10 smoke test completes without error."""
+        from competitions.ucl.src.simulation import run_monte_carlo
+        result = run_monte_carlo(
+            sample_fixture_schedule, sample_elo_dict,
+            n_iterations=10, seed=42,
+        )
+        assert result["n_iterations"] == 10
+        assert "stage_order" in result
+        assert len(result["teams"]) == len(sample_fixture_schedule["schedule"]["teams"])
+
+    def test_mc_knockout_aggregation_correct(self, sample_stage_collectors):
+        """aggregate_mc_results with stage_collectors produces correct probabilities."""
+        from competitions.ucl.src.simulation import aggregate_mc_results
+        n = 10
+        positions = {"Man City": [4]*10, "Bayern": [5]*10, "Slovan Bratislava": [32]*10}
+        champions = {"Man City": 7, "Bayern": 0, "Slovan Bratislava": 0}
+        stat_collectors = {
+            t: {"pts": [10]*n, "gd": [3]*n, "gs": [8]*n, "away_gs": [4]*n,
+                "wins": [3]*n, "away_wins": [1]*n}
+            for t in positions
+        }
+        result = aggregate_mc_results(
+            positions, champions, stat_collectors, n,
+            stage_collectors=sample_stage_collectors,
+        )
+        assert abs(result["Man City"]["stage_final_prob"] - 0.3) < 1e-10
+        assert abs(result["Man City"]["champion_prob"] - 0.7) < 1e-10
+        assert abs(result["Bayern"]["stage_sf_prob"] - 0.7) < 1e-10
+        assert abs(result["Slovan Bratislava"]["stage_eliminated_prob"] - 0.8) < 1e-10

@@ -635,6 +635,19 @@ def sample_playoff_winners():
 
 
 @pytest.fixture
+def sample_stage_collectors():
+    """Returns per-team stage collector data for 3 teams over 10 iterations.
+
+    Stage values: 0=eliminated, 1=playoff, 2=r16, 3=qf, 4=sf, 5=final, 6=champion
+    """
+    return {
+        "Man City": [6, 6, 6, 5, 5, 6, 6, 5, 6, 6],       # champion 7/10, final 3/10
+        "Bayern": [4, 4, 3, 4, 2, 4, 4, 3, 4, 4],          # sf 7/10, qf 2/10, r16 1/10
+        "Slovan Bratislava": [0, 0, 0, 0, 1, 0, 0, 0, 1, 0],  # eliminated 8/10, playoff 2/10
+    }
+
+
+@pytest.fixture
 def sample_knockout_stage_result():
     """Returns a minimal mock knockout_result for stage tracking tests.
 
