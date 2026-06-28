@@ -61,6 +61,7 @@ Recent decisions affecting current work:
 - (Phase 1/Plan 03): Post-aggregation pattern — collect per-iteration results in flat lists, aggregate once after loop
 - (Phase 1/Plan 03): Matchup lambdas precomputed once before iteration loop for ~2x performance gain
 - (Phase 1/Plan 03): aggregate_mc_results() separated for isolated unit testing without running simulation
+- (ADR-002): Synthetic schedules OK for dev, mandatory official before validation — applies to all competitions
 
 ### Pending Todos
 
