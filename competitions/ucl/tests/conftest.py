@@ -3,6 +3,7 @@
 import json
 import os
 import random
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -940,3 +941,34 @@ def sample_36_teams_data():
         }
         for name in _ALL_36_TEAMS
     ]
+
+
+@pytest.fixture
+def sample_cached_fixtures(tmp_path, sample_fixture_schedule):
+    """Pre-seeds a valid BSD cache file and returns the cache directory path.
+
+    Writes a cache dict with ``expires_at`` 2 hours in the future and
+    the full fixture schedule serialised via dataclasses.asdict().
+    """
+    from dataclasses import asdict
+    from datetime import timezone
+    from football_core.provider import Team, Match, FixtureSchedule
+
+    schedule_dict = sample_fixture_schedule["schedule"]
+    teams = [Team(**t) for t in schedule_dict["teams"]]
+    matchdays = []
+    for md in schedule_dict["matchdays"]:
+        matches = [Match(**m) for m in md]
+        matchdays.append(matches)
+    schedule = FixtureSchedule(teams=teams, matchdays=matchdays)
+
+    cache_data = {
+        "expires_at": (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
+        "cached_at": datetime.now(timezone.utc).isoformat(),
+        "schedule": asdict(schedule),
+    }
+
+    cache_path = tmp_path / "cached_fixtures.json"
+    with open(cache_path, "w") as f:
+        json.dump(cache_data, f, indent=2)
+    return tmp_path
