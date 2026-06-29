@@ -30,10 +30,16 @@ competitions/worldcup/data/calibration_params.json
 competitions/worldcup/data/played.json
 competitions/worldcup/data/played_groups.json
 competitions/worldcup/data/probability_log.json
+competitions/worldcup/data/prediction_history.json
 
 # World Cup — TTL-based signal caches (regeneratable by re-fetching)
 competitions/worldcup/data/odds_cache.json
 competitions/worldcup/data/catboost_cache.json
 competitions/worldcup/data/form_cache.json
 competitions/worldcup/data/lineup_cache.json
+competitions/worldcup/data/eloratings_cache.json
+competitions/worldcup/data/elo_update_log.json
+
+# AI-generated responses
+RESPONSE.md
 
