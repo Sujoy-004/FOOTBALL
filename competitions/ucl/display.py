@@ -165,7 +165,7 @@ def print_playoff_rounds(result: SimulationResult) -> None:
             else:
                 agg_display = f"{agg_a}-{agg_b} agg ({tie['penalty_a']}-{tie['penalty_b']} pens)"
 
-        print(f"  Tie {tie_num}: {team_a} {agg_display}  {team_b} → {winner} advances")
+        print(f"  Tie {tie_num}: {team_a} {agg_display}  {team_b} -> {winner} advances")
 
     print()
 
