@@ -10,3 +10,7 @@ __pycache__/
 # Environment secrets
 .env
 
+# OS-generated files
+Thumbs.db
+.DS_Store
+
