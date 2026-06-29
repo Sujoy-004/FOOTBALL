@@ -1,127 +1,148 @@
 # Football Engine Architecture
 
-## 1. Current Architecture
+## 1. Current Architecture (as-built)
 
 ```
-worldcup_predictor/          ← single-competition monolith
-├── main.py                  ← god object (1538 LOC, 21 functions)
-├── src/
-│   ├── constants.py         ← mixed: 70% WC, 30% generic
-│   ├── elo.py               ← generic
-│   ├── elo_sync.py          ← mostly generic (URL is WC-specific)
-│   ├── fetcher.py           ← generic (accepts league_id)
-│   ├── state.py             ← generic (all functions accept data_dir)
-│   ├── groups.py            ← WC-specific (12 groups, Annex C, R32 definition)
-│   ├── knockout.py          ← WC-specific (R32→R16→QF→SF→FINAL, M73-M88)
-│   ├── blender.py           ← generic (pure computation, no I/O)
-│   ├── evaluation.py        ← generic (pure computation, but has I/O leak)
-│   ├── governance.py        ← generic (pure computation, but has display leak)
-│   ├── enrichment.py        ← generic
-│   ├── math_utils.py        ← generic
-│   ├── output.py            ← mostly generic (some WC branding)
+FOOTBALL/
+├── football_core/                ← SHARED ENGINE (flat package)
+│   ├── __init__.py
+│   ├── constants.py              ← generic constants only (K_FACTOR, DEFAULT_ELO, etc.)
+│   ├── elo.py                    ← Elo math (expected_score, update_ratings, compute_k_factor)
+│   ├── elo_sync.py               ← eloratings sync (URL parameterized)
+│   ├── fetcher.py                ← BSD API fetch+dedup (accepts league_id)
+│   ├── groups.py                 ← poisson engine + 7-step FIFA tiebreaker chain
+│   ├── knockout.py               ← generic round simulation primitive
+│   ├── math_utils.py             ← sigmoid
+│   ├── state.py                  ← generic I/O (all functions accept data_dir)
 │   └── predictors/
-│       ├── odds.py          ← generic
-│       ├── catboost.py      ← generic
-│       ├── form.py          ← generic
-│       └── lineup.py        ← generic
-└── data/
-    ├── group.json           ← WC: 12 groups A–L, 48 teams
-    ├── bracket.json         ← WC: 104-match bracket
-    ├── annex_c.json         ← WC: third-place advancement table
-    ├── teams.json           ← WC: 48 teams with Elo
-    └── historical/          ← WC: [2018, 2022]
+│       ├── __init__.py
+│       ├── odds.py               ← market odds fetch
+│       └── catboost.py           ← CatBoost prediction fetch
+│
+├── competitions/
+│   ├── worldcup/                 ← World Cup 2026
+│   │   ├── main.py               ← WC orchestrator (live loop, governance, blending)
+│   │   ├── __init__.py           ← sys.path bootstrap
+│   │   ├── src/
+│   │   │   ├── constants.py      ← extends football_core.constants
+│   │   │   ├── groups.py         ← extends football_core.groups (WC compute_standings etc.)
+│   │   │   ├── state.py          ← extends football_core.state (WC validate + governance I/O)
+│   │   │   ├── elo.py            ← re-exports football_core.elo
+│   │   │   ├── elo_sync.py       ← re-exports football_core.elo_sync
+│   │   │   ├── fetcher.py        ← re-exports football_core.fetcher
+│   │   │   ├── math_utils.py     ← re-exports football_core.math_utils
+│   │   │   ├── knockout.py       ← WC-only (R32, TPP, full simulation orchestrator)
+│   │   │   ├── output.py         ← WC-only display
+│   │   │   ├── blender.py        ← WC-only (calibrate_and_blend)
+│   │   │   ├── evaluation.py     ← WC-only (evaluate_all_matches)
+│   │   │   ├── governance.py     ← WC-only (_run_governance)
+│   │   │   ├── enrichment.py     ← WC-only (stats/context extraction)
+│   │   │   └── predictors/
+│   │   │       ├── form.py       ← WC-only
+│   │   │       └── lineup.py     ← WC-only
+│   │   ├── tests/                ← 613 tests, 1 skip
+│   │   └── data/                 ← WC teams, groups, bracket, historical
+│   │
+│   ├── euro/                     ← Euro 2024
+│   │   ├── main.py               ← thin orchestrator
+│   │   ├── __init__.py           ← sys.path bootstrap (repo root + worldcup/)
+│   │   ├── simulation.py         ← Euro simulation engine
+│   │   ├── display.py            ← Euro display
+│   │   ├── config.py             ← Euro constants
+│   │   └── data/                 ← Euro teams, groups, bracket
+│   │
+│   └── ucl/                      ← placeholder (README only)
+│       └── README.md
+│
+├── docs/
+│   ├── COMMONALITY_REPORT.md
+│   └── FOOTBALL_ENGINE_ARCHITECTURE.md
+├── .gitignore
+└── RESPONSE.md
 ```
 
-### Cross-cutting problem
+### Import strategy
 
-`main.py` is the **sole orchestrator**. Every signal pipeline, simulation flow, and display decision is hard-wired in one 1538-line module. To add a new competition you must fork the entire repo (as `euro_predictor/` and `ucl_predictor/` are currently empty README stubs).
+**Sys.path bootstrap**: `competitions/worldcup/__init__.py` adds the repo root (for `football_core`) and the worldcup package dir (for `src`) to `sys.path`. This allows `from football_core.elo import *` and `from src import constants` to work regardless of CWD.
+
+**Re-export pattern**: Shared modules in `competitions/worldcup/src/` are thin re-export wrappers:
+```python
+# competitions/worldcup/src/elo.py
+from football_core.elo import *  # noqa: F401,F403
+```
+
+**Extension pattern**: Modules with both shared and WC-specific code import selectively from `football_core` then add WC-only functions:
+```python
+# competitions/worldcup/src/groups.py
+from football_core.groups import expected_goals, _tiebreak_group, ...
+# then WC-specific compute_standings(), rank_third_placed(), etc.
+```
 
 ---
 
 ## 2. Module Classification
 
-### 2.1 Already Generic — zero WC assumptions in logic
+### 2.1 Extracted to `football_core/` (dual-proven by WC + Euro)
 
 | Module | Functions | Reason |
 |---|---|---|
-| `src/elo.py` | `expected_score`, `update_ratings`, `apply_elo_update`, `compute_k_factor` | Pure Elo math; `K_FACTOR` and `HOME_ADVANTAGE` come from caller/config |
-| `src/blender.py` | `calibrate_signal`, `apply_calibration`, `compute_rolling_brier`, `compute_blend_weights`, `blend_predictions`, `calibrate_and_blend` | Pure computation; signal keys, window sizes, thresholds passed as parameters |
-| `src/evaluation.py` | `brier_score`, `log_loss`, `compute_metrics`, `calibration_curve`, `expected_calibration_error`, `evaluate_all_matches`, `backtest_tournament` | Pure math — **but**: I/O leak via `load_prediction_history` and `append_prediction_history` from `state` |
-| `src/governance.py` | Version computation, drift detection, `_run_governance` | Pure computation — **but**: display leak via `print_governance_dashlet` from `output` |
-| `src/enrichment.py` | `extract_stats`, `extract_context` | Stateless BSD field extraction |
-| `src/math_utils.py` | `sigmoid` | Trivial utility |
-| `src/predictors/odds.py` | `remove_vig`, `parse_odds_response`, `fetch_and_cache_odds` | League-agnostic; accepts `groups`, `bracket`, `alias_lookup` as parameters |
-| `src/predictors/catboost.py` | `parse_catboost_response`, `fetch_and_cache_catboost` | League-agnostic; accepts `league_id` |
-| `src/predictors/form.py` | `compute_form_signal` | League-agnostic; accepts `played`, `played_groups`, `teams` as parameters |
-| `src/predictors/lineup.py` | `compute_lineup_signal` | League-agnostic; accepts `team_values` as parameter |
-| `src/state.py` | All load/save/validate functions | Generic; every function accepts `data_dir` parameter |
-| `src/fetcher.py` | `fetch_raw_matches`, `process_matches`, `process_group_matches` | Accepts `league_id`; BSD API URLs built via `constants.api_url_for_league(league_id)` |
+| `football_core/elo.py` | `expected_score`, `update_ratings`, `apply_elo_update`, `compute_k_factor` | Pure Elo math; `K_FACTOR` and `HOME_ADVANTAGE` come from caller/config |
+| `football_core/fetcher.py` | `fetch_raw_matches`, `process_matches`, `process_group_matches` | Accepts `league_id`; BSD API URLs built via `constants.api_url_for_league(league_id)` |
+| `football_core/state.py` | All load/save/validate functions | Generic; every function accepts `data_dir` parameter |
+| `football_core/groups.py` (core) | `expected_goals`, `_build_poisson_table`, `_poisson_sample`, `_simulate_single_match`, `precompute_matchup_lambdas`, `simulate_group_matches`, tiebreaker chain | Pure math; iterates whatever groups dict is given |
+| `football_core/knockout.py` (core) | `_simulate_knockout_round`, `_get_blended_prob` | Identical implementation in WC and Euro |
+| `football_core/elo_sync.py` | `sync_elo_from_eloratings` | URL already parameterized; team code map is the remaining WC-specific part |
+| `football_core/math_utils.py` | `sigmoid` | Trivial utility |
+| `football_core/predictors/odds.py` | `remove_vig`, `parse_odds_response`, `fetch_and_cache_odds` | League-agnostic; accepts `groups`, `bracket`, `alias_lookup` as parameters |
+| `football_core/predictors/catboost.py` | `parse_catboost_response`, `fetch_and_cache_catboost` | League-agnostic; accepts `league_id` |
 
-### 2.2 World-Cup-Specific
+### 2.2 Remains WC-Specific (single-proven)
 
 | Module | WC Assumption | Severity |
 |---|---|---|
-| `src/constants.py` | `GROUP_COUNT=12`, `TEAMS_PER_GROUP=4`, `MATCHES_PER_GROUP=6`, `ANNEX_C_ENTRIES=495`, `ANNEX_C_WINNER_GROUPS`, `WC_START_DATE`, `ELORATINGS_TSV_URL`, `ELORATINGS_TEAM_CODES` (48 codes), `K_FACTOR=60`, `EXPECTED_GOALS_BASE_RATE=1.25`, `HOME_ADVANTAGE_MULTIPLIER=1.05`, `GOV_BACKTEST_TOURNAMENTS=["2018","2022"]`, `DEFAULT_LEAGUE_ID=27`, `LEAGUES` dict only has WC 2026 | Deep |
-| `src/groups.py` | 12 groups A–L hardcoded (`"ABCDEFGHIJKL"`), FIFA 7-step tiebreaker (steps 1-7), Annex C C(12,8)=495 lookup, R32 matchups M73–M88 hardcoded in `resolve_r32_matchups` | Deep |
-| `src/knockout.py` | `ROUND_ORDER = ["R16", "QF", "SF", "FINAL"]`, `ROUND_KEYS = {"QF": "qf", "SF": "sf", "FINAL": "final"}`, 3rd-place playoff (`TPP`), bracket source-match wiring | Deep |
-| `src/output.py` | Header prints "WORLD CUP DYNAMIC PREDICTOR — v1.1" | Shallow |
-| `main.py` | Orchestrates WC-specific pipeline; `_parse_args` sets `prog="wc-predict"`; `_run_iteration` is WC pipeline; signal key list `["elo", "market_odds", "catboost", "form", "lineup_strength"]` | Deep |
-| `data/groups.json` | 12 groups of 4 = 48 WC teams | Data |
-| `data/bracket.json` | WC 2026 bracket structure (R32→R16→…) | Data |
-| `data/annex_c.json` | WC 2026 third-place advancement | Data |
-| `data/teams.json` | 48 WC teams with Elo ratings | Data |
-| `data/historical/2018.json`, `2022.json` | Historical WC data | Data |
+| `competitions/worldcup/src/constants.py` | `GROUP_COUNT=12`, `TEAMS_PER_GROUP=4`, `MATCHES_PER_GROUP=6`, `ANNEX_C_*`, `WC_START_DATE`, `ELORATINGS_TEAM_CODES` (48 codes), `GOV_BACKTEST_TOURNAMENTS=["2018","2022"]`, `DEFAULT_LEAGUE_ID=27`, `LEAGUES` dict only has WC 2026 | Deep |
+| `competitions/worldcup/src/groups.py` (WC extras) | `compute_standings` — hardcodes `"ABCDEFGHIJKL"`, `rank_third_placed` — picks top 8 of 12, `select_advancers` — top8_groups, `resolve_r32_matchups` — Annex C R32 logic | Deep |
+| `competitions/worldcup/src/state.py` (WC extras) | `validate_groups` — 12 groups A–L, `validate_annex_c` — 495-entry table, `migrate_prediction_history`, `ledger_upsert`, governance I/O | Medium |
+| `competitions/worldcup/src/knockout.py` | `ROUND_ORDER = ["R16", "QF", "SF", "FINAL"]`, `ROUND_KEYS = {"QF": "qf", "SF": "sf", "FINAL": "final"}`, 3rd-place playoff (`TPP`), R32 Annex C resolution | Deep |
+| `competitions/worldcup/src/output.py` | Header prints "WORLD CUP DYNAMIC PREDICTOR — v1.1", 12-group standings, Annex C refs | Shallow |
+| `competitions/worldcup/main.py` | WC-specific pipeline; `_parse_args` sets `prog="wc-predict"`; signal key list `["elo", "market_odds", "catboost", "form", "lineup_strength"]` | Deep |
+| `competitions/worldcup/src/blender.py` | Signal key list, calibration params file names | Medium |
+| `competitions/worldcup/src/evaluation.py` | I/O leak via `load_prediction_history` from state | Medium |
+| `competitions/worldcup/src/governance.py` | Display leak via `print_governance_dashlet` from output | Medium |
+| `competitions/worldcup/src/enrichment.py` | BSD field extraction (not used by Euro) | Low |
+| `competitions/worldcup/src/predictors/form.py` | WC-specific form window size | Low |
+| `competitions/worldcup/src/predictors/lineup.py` | WC-specific lineup K-factor | Low |
+| `competitions/worldcup/data/` | WC 2026 specific data files | Data |
 
-### 2.3 Destination: `football_core` Package (Rule of Two — not yet extracted)
+### 2.3 Remains Euro-Specific
 
-All modules in 2.1 are candidates for eventual extraction into `football_core`, but **no extraction happens until at least two competitions prove the abstractions are right**.
-
-- **Pure computation layer** → `football_core/compute/`
-  - `elo.py`
-  - `blender.py`
-  - `evaluation.py`
-  - `governance.py`
-  - `math_utils.py`
-
-- **Signal ingestion layer** → `football_core/signals/`
-  - `predictors/odds.py` → `signals/odds.py`
-  - `predictors/catboost.py` → `signals/catboost.py`
-  - `predictors/form.py` → `signals/form.py`
-  - `predictors/lineup.py` → `signals/lineup.py`
-
-- **BSD integration layer** → `football_core/bsd/`
-  - `fetcher.py`
-  - `enrichment.py`
-
-- **State layer** → `football_core/state/`
-  - `state.py`
-
-**Rule of Two**: Extraction happens only after the Euro and World Cup implementations are both running and their common patterns are proven. The architecture diagram in §3 is the *destination*, not the *starting path*.
-
-### 2.4 Remains Competition-Specific
-
-| Item | Reason |
+| Module | Purpose |
 |---|---|
-| `worldcup_predictor/` | Competition entry point, CLI, WC-specific orchestrator, WC data files |
-| `competitions/euro/` | Competition entry point, Euro-specific constants/simulation/data |
-| `competitions/ucl/` | Competition entry point, UCL-specific constants/simulation/data |
-| **Future:** `competitions/laliga/` | League-style simulation (double round-robin, no groups/knockout) |
-| **Future:** `competitions/premier_league/` | Same as La Liga with different constants/data |
+| `competitions/euro/main.py` | Thin orchestrator, different CLI |
+| `competitions/euro/simulation.py` | 6-group → R16 (top 2 + 4 best 3rd) → QF → SF → FINAL |
+| `competitions/euro/display.py` | Simpler probability table, no trend arrows, no signal detail |
+| `competitions/euro/config.py` | 6 groups, 4 third-placed advancers, Euro league ID |
+| `competitions/euro/data/` | Euro 2024 teams, groups, bracket |
 
-Each competition directory owns:
-- Its own `main.py` (thin orchestrator using `football_core`)
-- Its own `config.py` (competition-specific constants)
-- Its own `simulation.py` (competition-specific engine)
-- Its own `output.py` (competition-specific display)
-- Its own `data/` directory (teams, fixtures, etc.)
+### 2.4 Aspirational Destination (not yet implemented)
+
+The following is the *ideal* end state — `football_core` with subpackages (`compute/`, `signals/`, `bsd/`, `state/`). Currently `football_core` is flat (all modules at top level). The subpackage layout is deferred until a third competition justifies the reorganization.
+
+```
+football_core/                       ← CURRENT: flat
+    compute/                         ← FUTURE: subpackages
+    signals/
+    bsd/
+    state/
+```
 
 ---
 
-## 3. Destination Architecture (after Rule of Two extraction)
+## 3. Destination Architecture (aspirational)
 
 ```
 football-engine/
-├── football_core/              ← pip-installable package (extracted in Phase 3)
+├── football_core/              ← pip-installable package
 │   ├── __init__.py              ← public API exports
 │   ├── compute/
 │   │   ├── __init__.py
@@ -147,17 +168,11 @@ football-engine/
 │
 ├── competitions/
 │   ├── worldcup/
-│   │   ├── main.py              ← thin CLI (20-50 LOC, was 1538)
+│   │   ├── main.py              ← thin CLI (was ~1500 LOC)
 │   │   ├── config.py            ← WC-specific constants
 │   │   ├── simulation.py        ← groups.py + knockout.py (WC-specific)
 │   │   ├── display.py           ← WC-specific output
-│   │   ├── data/
-│   │   │   ├── teams.json
-│   │   │   ├── groups.json
-│   │   │   ├── bracket.json
-│   │   │   ├── annex_c.json
-│   │   │   └── historical/
-│   │   └── tests/
+│   │   └── data/
 │   │
 │   ├── euro/
 │   │   ├── main.py
@@ -174,11 +189,7 @@ football-engine/
 │   │   └── data/
 │   │
 │   ├── laliga/                  ← future
-│   │   ├── main.py
-│   │   ├── config.py
-│   │   ├── simulation.py        ← 38-matchday double round-robin
-│   │   ├── display.py           ← Final table, relegation zone
-│   │   └── data/
+│   │   └── … (same pattern)
 │   │
 │   └── premier_league/          ← future
 │       └── … (same pattern)
@@ -200,7 +211,7 @@ football-engine/
                    ┌────────────┼────────────┐
                    ▼            ▼            ▼
            football_core.   football_core.  football_core.
-           signals.odds     signals.catboost signs.form/lineup
+           signals.odds     signals.catboost signals.form/lineup
                    │            │            │
                    └────────────┼────────────┘
                                 ▼
@@ -211,7 +222,6 @@ football-engine/
                    football_core.compute.blender
                    (calibrate_and_blend)
                                 │
-                                ▼
             ┌───────────────────┴───────────────────┐
             │                                       │
             ▼                                       ▼
@@ -224,6 +234,8 @@ football-engine/
   display.py                                display.py
   (champion probabilities)                   (final table)
 ```
+
+**Current vs aspirational**: The data flow above is the end goal. Currently `blender.py`, `evaluation.py`, `governance.py`, `enrichment.py`, `form.py`, `lineup.py` remain in `competitions/worldcup/src/` (single-proven). They move into `football_core` only when a second competition uses them.
 
 ---
 
@@ -261,7 +273,6 @@ class MatchResult:
 ### 4.3 Signal Cache Schema
 
 ```python
-# Every signal cache follows this shape:
 SignalCache = {
     "fetched_at": str,       # ISO 8601
     "expires_at": str,       # ISO 8601
@@ -270,7 +281,7 @@ SignalCache = {
             "probability": Probability | None,
             "available": bool,
             "timestamp": str,
-            "reason": str | None,    # if not available
+            "reason": str | None,
         }
     }
 }
@@ -301,7 +312,7 @@ PredictionEntry = {
 ```python
 BlendParams = {
     "calibration_params": {SignalKey: {"A": float, "B": float, ...}},
-    "blend_weights": {SignalKey: float},    # sums to 1.0
+    "blend_weights": {SignalKey: float},
     "match_probs": {MatchId: Probability},
 }
 ```
@@ -325,148 +336,115 @@ GovSnapshot = {
 
 ---
 
-## 5. Public Interfaces
+## 5. Current `football_core` Public API
 
-### 5.1 `football_core.compute.elo`
+These are the actual imports supported by the current flat `football_core/` package:
 
 ```python
-def expected_score(rating_a: float, rating_b: float, home_advantage: int = 0) -> float
-def compute_k_factor(goal_diff: int, base_K: int = 60) -> float
-def update_ratings(team_a: str, team_b: str, winner: str | None,
-                   current_elos: dict[str, float], K: int = 60,
-                   pk_winner: str | None = None) -> dict[str, float]
-def apply_elo_update(match: dict, teams: dict[str, dict]) -> dict[str, dict[str, float]]
+# ─── Core math ───────────────────────────────────────────────────────────
+from football_core.elo import (
+    expected_score,               # rating_a, rating_b, home_advantage=0 → float
+    compute_k_factor,             # goal_diff, base_K=60 → int
+    update_ratings,               # team_a, team_b, winner, current_elos, K=60, pk_winner=None → dict
+    apply_elo_update,             # match, teams → dict
+)
+from football_core.math_utils import (
+    sigmoid,                      # x → float
+)
+
+# ─── BSD API integration ─────────────────────────────────────────────────
+from football_core.fetcher import (
+    fetch_raw_messages,           # api_key, api_url="", league_id=27, timeout=10 → list[dict]
+    process_matches,              # raw_matches, teams, bracket, aliases, played_ids → list[dict]
+    process_group_matches,        # raw_matches, teams, groups, aliases, played_group_ids, played_bsd_event_ids → list[dict]
+    find_bracket_match,           # home_norm, away_norm, bracket → str | None
+    find_group_match,             # home_norm, away_norm, group_letter, round_number, groups → str | None
+    normalize_team,               # api_name, alias_lookup → str | None
+)
+
+# ─── State persistence ───────────────────────────────────────────────────
+from football_core.state import (
+    load_teams,                   # data_dir=None → dict
+    save_teams,                   # teams, data_dir=None → None
+    load_played,                  # data_dir=None → dict
+    save_played,                  # played, data_dir=None → None
+    load_played_groups,           # data_dir=None → dict
+    save_played_groups,           # played_groups, data_dir=None → None
+    load_signal_cache,            # cache_filename, data_dir=None → dict
+    save_signal_cache,            # cache, cache_filename, data_dir=None → None
+    load_prediction_history,      # data_dir=None → list[dict]
+    append_prediction_history,    # entry, data_dir=None → None
+    load_eloratings_cache,        # data_dir=None → dict
+    save_eloratings_cache,        # cache, data_dir=None → None
+    load_elo_update_log,          # data_dir=None → list[dict]
+    save_elo_update_log,          # log, data_dir=None → None
+    load_probability_log,         # data_dir=None → list[dict]
+    append_probability_log,       # entry, data_dir=None → None
+    is_cache_valid,               # cache, ttl_hours=12 → bool
+    validate_bracket,             # bracket → None
+    _atomic_write_json,           # data, path → None
+    _resolve_data_dir,            # data_dir → Path
+)
+
+# ─── Group stage simulation ─────────────────────────────────────────────
+from football_core.groups import (
+    expected_goals,               # team_a, team_b, elo_ratings, base_rate=1.25, home_advantage=1.05 → tuple[float, float]
+    _build_poisson_table,         # → list[float]
+    _poisson_sample,              # table, rng → int
+    _simulate_single_match,       # team_a, team_b, lambda_a, lambda_b, rng → dict
+    precompute_matchup_lambdas,   # groups, elo_ratings, base_rate, home_advantage → dict
+    simulate_group_matches,       # groups, elo_ratings, rng, base_rate=1.25, home_advantage=1.05 → dict
+    _compute_conduct_score,       # yellow_cards, red_cards → float
+    _compute_h2h,                 # team_a, team_b, group_results → dict
+    _resolve_by_values,           # teams, group_results → list
+    _resolve_tied_cluster,        # cluster, group_results, remaining → list
+    _tiebreak_group,              # teams, group_results → list
+)
+
+# ─── Knockout stage simulation ──────────────────────────────────────────
+from football_core.knockout import (
+    _simulate_knockout_round,     # matches, teams, elo_ratings, probs, rng → dict
+    _get_blended_prob,            # team_a, team_b, elo_ratings, probs → float
+)
+
+# ─── Signal predictors ──────────────────────────────────────────────────
+from football_core.predictors.odds import (
+    remove_vig,                   # odds_home, odds_draw, odds_away → dict
+    parse_odds_response,          # bsd_events, alias_lookup, groups, bracket=None → dict
+    fetch_and_cache_odds,         # api_key, bsd_events, alias_lookup, groups, cache_ttl_hours=12, bracket=None → dict
+)
+from football_core.predictors.catboost import (
+    parse_catboost_response,      # bsd_predictions, alias_lookup, groups, bracket → dict
+    fetch_and_cache_catboost,     # api_key, alias_lookup, groups, bracket, cache_ttl_hours=24, league_id=27 → dict
+)
+
+# ─── Constants ───────────────────────────────────────────────────────────
+from football_core.constants import (
+    K_FACTOR, DEFAULT_ELO, MAX_EXPECTED_GOALS,
+    HOME_ADVANTAGE_MULTIPLIER, POISSON_TABLE_BITS, POISSON_TABLE_SIZE,
+    EXPECTED_GOALS_BASE_RATE, API_TIMEOUT,
+    ELO_SYNC_RETRY_BACKOFFS, ELO_SYNC_TIMEOUT,
+    ELO_DRIFT_TOLERANCE, ELO_BLEND_THRESHOLD, ELO_BLEND_FACTOR,
+    ELO_STALENESS_WARN_HOURS, ELORATINGS_TSV_URL,
+)
 ```
 
-### 5.2 `football_core.compute.blender`
+### What stays in `competitions/worldcup/src/` (not in `football_core`)
 
 ```python
-def calibrate_signal(predictions: list[float], actuals: list[float],
-                     threshold: int = 30) -> tuple[float, float]
-def apply_calibration(p_raw: float, A: float, B: float) -> float
-def compute_rolling_brier(entries: list[dict], signal_key: str,
-                          window: int = 50) -> float
-def compute_blend_weights(signal_briers: dict[str, float]) -> dict[str, float]
-def blend_predictions(signal_preds: dict[str, float],
-                      weights: dict[str, float]) -> float
-def calibrate_and_blend(history: list[dict], signal_keys: list[str],
-                        elo_ratings: dict[str, float],
-                        groups_data: dict, bracket_data: list[dict],
-                        odds_cache: dict, cb_cache: dict,
-                        brier_window: int = 50,
-                        cold_start_threshold: int = 30,
-                        form_cache: dict | None = None,
-                        lineup_cache: dict | None = None) -> dict | None
-def compute_poisson_base_rate(match_data_path: str | None = None) -> float
-```
+# WC-specific group stage functions
+from src.groups import compute_standings, rank_third_placed, select_advancers, resolve_r32_matchups
 
-### 5.3 `football_core.compute.evaluation`
+# WC-specific state functions
+from src.state import load_groups, validate_groups, load_annex_c, validate_annex_c, ...
 
-```python
-def brier_score(prediction: float, actual: float) -> float
-def log_loss(prediction: float, actual: float, eps: float = 1e-15) -> float
-def compute_metrics(predictions: list[float], actuals: list[float]) -> dict
-def calibration_curve(predictions: list[float], actuals: list[float],
-                      n_bins: int = 10) -> dict
-def expected_calibration_error(calibration: dict) -> float
-def evaluate_all_matches(teams: dict, played: dict, played_groups: dict,
-                         signal_name: str | None = None) -> dict
-def backtest_tournament(tournament_matches: list[dict], teams: dict,
-                        tournament_name: str = "") -> dict
-```
-
-### 5.4 `football_core.compute.governance`
-
-```python
-def check_drift(entries: list[dict], signal_key: str, reference_baseline: float,
-                window: int = 50, sigma_threshold: float = 2.0) -> dict | None
-def compute_reference_baselines(entries: list[dict],
-                                signal_keys: list[str]) -> dict[str, float]
-def _run_governance(entries: list[dict], versions: dict, signal_keys: list[str],
-                    blend_weights: dict[str, float], startup: bool = False,
-                    teams: dict | None = None,
-                    data_dir: Path | str | None = None) -> dict
-```
-
-### 5.5 `football_core.signals.*`
-
-```python
-# odds
-def remove_vig(odds_home: float, odds_draw: float, odds_away: float) -> dict[str, float]
-def parse_odds_response(bsd_events: list[dict], alias_lookup: dict[str, str],
-                        groups: dict, bracket: list[dict] | None = None) -> dict[str, dict]
-def fetch_and_cache_odds(api_key: str, bsd_events: list[dict],
-                         alias_lookup: dict[str, str], groups: dict,
-                         cache_ttl_hours: int = 12,
-                         bracket: list[dict] | None = None) -> dict
-
-# catboost
-def parse_catboost_response(bsd_predictions: list[dict],
-                            alias_lookup: dict[str, str],
-                            groups: dict, bracket: list[dict]) -> dict[str, dict]
-def fetch_and_cache_catboost(api_key: str, alias_lookup: dict[str, str],
-                             groups: dict, bracket: list[dict],
-                             cache_ttl_hours: int = 24,
-                             league_id: int = 27) -> dict
-
-# form
-def compute_form_signal(teams: dict, groups: dict, played: dict | None = None,
-                        played_groups: dict | None = None,
-                        bracket: list[dict] | None = None,
-                        k_factor: float | None = None,
-                        form_window: int | None = None) -> dict
-
-# lineup
-def compute_lineup_signal(groups: dict, team_values: dict | None = None,
-                          bracket: list[dict] | None = None,
-                          k_factor: float | None = None) -> dict
-```
-
-### 5.6 `football_core.state.persistence`
-
-```python
-def load_teams(data_dir: Path | str | None = None) -> dict[str, dict]
-def load_bracket(data_dir: Path | str | None = None) -> list[dict]
-def load_groups(data_dir: Path | str | None = None, teams: ... = None) -> dict
-def load_played(data_dir: Path | str | None = None) -> dict[str, dict]
-def load_played_groups(data_dir: Path | str | None = None) -> dict[str, dict]
-def load_aliases(data_dir: Path | str | None = None) -> dict[str, list[str]]
-def save_teams(teams: dict, data_dir: ... = None) -> None
-def save_played(played: dict, data_dir: ... = None) -> None
-def save_played_groups(played_groups: dict, data_dir: ... = None) -> None
-def load_prediction_history(data_dir: ... = None) -> list[dict]
-def append_prediction_history(entry: dict, data_dir: ... = None) -> None
-def load_signal_cache(cache_filename: str, data_dir: ... = None) -> dict
-def save_signal_cache(cache: dict, cache_filename: str, data_dir: ... = None) -> None
-def load_calibration_params(data_dir: ... = None) -> dict
-def save_calibration_params(params: dict, data_dir: ... = None) -> None
-def load_prediction_ledger(data_dir: ... = None) -> dict[str, dict]
-def save_prediction_ledger(ledger: dict, data_dir: ... = None) -> None
-def ledger_upsert(match_id: str, signal_name: str, entry: dict, data_dir: ... = None) -> None
-def is_cache_valid(cache: dict, ttl_hours: int = 12) -> bool
-def load_versions(data_dir: ... = None) -> dict
-def save_versions(versions: dict, data_dir: ... = None) -> None
-def save_run_snapshot(snapshot: dict, data_dir: ... = None) -> None
-def save_backtest_report(report: dict, data_dir: ... = None) -> None
-def load_probability_log(data_dir: ... = None) -> list[dict]
-def append_probability_log(snapshot: dict, data_dir: ... = None) -> None
-```
-
-### 5.7 `football_core.bsd.fetcher`
-
-```python
-def fetch_raw_matches(api_key: str, api_url: str = "", league_id: int = 27,
-                      timeout: int = 10) -> list[dict]
-def process_matches(raw_matches: list[dict], teams: dict, bracket: list[dict],
-                    aliases: dict, played_ids: set[str]) -> list[dict]
-def process_group_matches(raw_matches: list[dict], teams: dict, groups: dict,
-                          aliases: dict, played_group_ids: set[str],
-                          played_bsd_event_ids: set[str]) -> list[dict]
-def find_bracket_match(home_norm: str, away_norm: str,
-                       bracket: list[dict]) -> str | None
-def find_group_match(home_norm: str, away_norm: str, group_letter: str,
-                     round_number: int, groups: dict) -> str | None
-def normalize_team(api_name: str, alias_lookup: dict[str, str]) -> str | None
+# WC-only modules
+from src.knockout import run_full_simulation
+from src.output import print_header, print_probability_table, print_shutdown_banner
+from src.blender import calibrate_and_blend
+from src.evaluation import evaluate_all_matches
+from src.governance import _run_governance
+from src.constants import GROUP_COUNT, ELORATINGS_TEAM_CODES, ...
 ```
 
 ---
@@ -488,58 +466,39 @@ HOME_ADVANTAGE_MULTIPLIER: float # 1.05
 DATA_DIR: Path                   # path to competition data/
 
 # competitions/<name>/simulation.py
-def run_simulation(
-    teams: dict[str, dict],
-    groups: dict | None,
-    bracket: list[dict] | None,
-    annex_c: dict | None,
-    played: dict[str, dict],
-    iterations: int,
-    seed: int | None = None,
-    played_groups: dict[str, dict] | None = None,
-    blend_params: dict | None = None,
-    **competition_kwargs,
-) -> dict[str, dict[str, float]]:
-    """Return {team_name: {stage: probability}}.
-    
-    For tournaments: stages = {qf, sf, final, champion}.
-    For leagues: stages = {champion, ucl, relegation, avg_points}.
-    """
+def run_simulation(...) -> dict[str, dict[str, float]]:
+    """Return {team_name: {stage: probability}}."""
     ...
 
 # competitions/<name>/display.py
-def print_probability_table(probs: dict, prev_probs: dict | None = None,
-                            prob_log: list[dict] | None = None) -> None: ...
+def print_probability_table(probs, prev_probs=None, prob_log=None) -> None: ...
 def print_header(teams, bracket, played, aliases, groups, annex_c) -> None: ...
-def print_shutdown_banner(probs: dict) -> None: ...
+def print_shutdown_banner(probs) -> None: ...
 ```
 
 ### 6.2 What `football_core` provides to competitions
 
-The core exposes a **single orchestrator protocol**:
+The core exposes a single flat API:
 
 ```python
-from football_core.compute.blender import calibrate_and_blend
-from football_core.compute.elo import expected_score, apply_elo_update
-from football_core.compute.evaluation import evaluate_all_matches
-from football_core.compute.governance import _run_governance
-from football_core.bsd.fetcher import fetch_raw_matches, ...
-from football_core.bsd.enrichment import extract_stats, extract_context
-from football_core.signals.odds import fetch_and_cache_odds
-from football_core.signals.catboost import fetch_and_cache_catboost
-from football_core.signals.form import compute_form_signal
-from football_core.signals.lineup import compute_lineup_signal
-from football_core.state.persistence import (load_teams, save_teams, ...)
+from football_core.elo import expected_score, apply_elo_update
+from football_core.fetcher import fetch_raw_matches, ...
+from football_core.state import load_teams, save_teams, ...
+from football_core.groups import simulate_group_matches, _tiebreak_group, ...
+from football_core.knockout import _simulate_knockout_round, ...
+from football_core.constants import K_FACTOR, DEFAULT_ELO, ...
+from football_core.predictors.odds import fetch_and_cache_odds
+from football_core.predictors.catboost import fetch_and_cache_catboost
 ```
 
 ### 6.3 Data directory convention
 
 ```
-football_core/state/persistence.py  # functions use data_dir from caller
-competitions/worldcup/main.py       # passes data/<league_id> to every persistence call
+football_core/state.py           # functions use data_dir from caller
+competitions/worldcup/main.py    # passes data/<league_id> to every persistence call
 ```
 
-All state persists in `competitions/<name>/data/<league_id>/`. This already works — every `state.py` function accepts `data_dir`.
+All state persists in `competitions/<name>/data/`. Every `state.py` function accepts `data_dir`.
 
 ### 6.4 Adding a new competition
 
@@ -553,115 +512,29 @@ All state persists in `competitions/<name>/data/<league_id>/`. This already work
 
 ---
 
-## 7. Migration Strategy (Rule of Two)
+## 7. Migration Execution Summary
 
-The strategy follows the **Rule of Two**: extract nothing until at least two independent implementations prove the abstraction is right. Optimize for the minimum necessary abstraction at each step.
-
-```
-Phase 1: Build Euro (imports generic modules from worldcup_predictor.src/)
-           ↓
-Phase 2: Observe common patterns and document shared abstractions
-           ↓
-Phase 3: Extract proven common modules into football_core/
-           ↓
-Phase 4: Extract shared tournament simulation (if warranted)
-           ↓
-Phase 5: League abstraction + La Liga
-```
-
-### Phase 1 — Build Euro Predictor (minimum necessary duplication)
-
-Euro imports *generic* modules from `worldcup_predictor.src/` directly — no shared package exists yet. Only competition-specific code is newly created.
-
-| Step | Action | Risk |
+| Phase | Status | Description |
 |---|---|---|
-| 1.1 | Fix `evaluation.py` I/O leak and `governance.py` display leak in-place (benefits both competitors, zero extraction) | Low |
-| 1.2 | Make `elo_sync.py` `ELORATINGS_TSV_URL` a parameter (currently a constant import) | Low |
-| 1.3 | Create `competitions/euro/config.py` — 24 teams, 6 groups A–F, no Annex C, no 3rd place playoff, `K_FACTOR`, `EXPECTED_GOALS_BASE_RATE`, league_id for BSD | Low |
-| 1.4 | Create `competitions/euro/simulation.py` — 6 groups → R16 (top 2 + 4 best 3rd) → QF → SF → FINAL. No Annex C resolution needed (fewer groups). No 3rd place playoff match | Medium |
-| 1.5 | Create `competitions/euro/display.py` — Euro-specific header, probability table, shutdown banner | Low |
-| 1.6 | Create `competitions/euro/main.py` — thin Euro orchestrator; imports `state`, `elo`, `blender`, `predictors.*`, `fetcher`, `enrichment` from `worldcup_predictor.src.*` | Medium |
-| 1.7 | Create `competitions/euro/data/` — teams.json, groups.json, bracket.json, historical data | Low |
-| 1.8 | Add `euro_predictor` entry point / CLI alias | Low |
-| 1.9 | Verify Euro runs end-to-end (simulate, save, display) | — |
-| 1.10 | Verify WC runs unchanged (regression test: all 613 tests pass) | — |
+| Phase 1 — Build Euro | **Done** | Euro runs as `competitions/euro/`, imports generic modules |
+| Phase 2 — Observe common patterns | **Done** | `COMMONALITY_REPORT.md` documents dual-proven modules |
+| Phase 3 — Extract `football_core` | **Done** | Flat extraction; 12 shared modules at repo root; 613 WC tests pass; Euro sim unchanged |
+| Phase 4 — Shared tournament simulation | **Deferred** | WC and Euro simulation differ too much (R32 vs R16 entry, Annex C vs precomputed) |
+| Phase 5 — League abstraction | **Future** | Pending third competition (UCL or league) |
 
-**What Euro imports from worldcup_predictor.src/ (not duplicated):**
-`elo.py`, `blender.py`, `evaluation.py`, `governance.py`, `math_utils.py`, `predictors/`, `state.py`, `fetcher.py`, `enrichment.py`, core `constants.py` entries (generic subset).
+### Key decisions made during execution
 
-**What Euro creates anew (competition-specific):**
-`config.py`, `simulation.py`, `display.py`, `main.py`, `data/` files.
+- **Flat package over subpackages**: `football_core/` modules are flat to minimize friction. Subpackage split into `compute/`, `signals/`, `bsd/`, `state/` is deferred until a third competition justifies the reorganization.
+- **Sys.path bootstrap over absolute imports**: `from football_core import *` works via `sys.path` manipulation in `__init__.py` rather than rewriting all import paths to use `competitions.worldcup.src.elo`. This avoids touching every module.
+- **Re-export wrappers kept**: `competitions/worldcup/src/elo.py` remains as `from football_core.elo import *` to avoid changing all internal `from src import` references in WC-specific modules.
+- **Euro sys.path hack retained**: `competitions/euro/__init__.py` still adds `competitions/worldcup/` to path because Euro imports `from src.groups import compute_standings` for historical catch-up.
 
-### Phase 2 — Observe & Document Common Patterns
+### Remaining work
 
-| Step | Action | Risk |
-|---|---|---|
-| 2.1 | Compare WC `main.py` and Euro `main.py` — identify shared pipeline structure (fetch → predict → blend → simulate → display) | Low |
-| 2.2 | Compare simulation engines — parameterize group count, knockout depth, group advancement rules | Low |
-| 2.3 | Compare configs — distinguish competition-specific constants from generic defaults | Low |
-| 2.4 | Compare `output.py` / `display.py` — identify shared display patterns | Low |
-| 2.5 | Produce `COMMONALITY_REPORT.md` — documented shared abstractions with evidence from both competitors | Low |
-
-**Expected outcome:** A precise list of modules that were imported unchanged by both competitors. These are the *proven* candidates for `football_core`.
-
-### Phase 3 — Extract `football_core` (now proven by two implementations)
-
-| Step | Action | Risk |
-|---|---|---|
-| 3.1 | Create `football_core/` package with `pyproject.toml`, `__init__.py`, sub-package structure | Low |
-| 3.2 | Move proven generic modules from `worldcup_predictor/src/` to `football_core/compute/`, `signals/`, `bsd/`, `state/` | Low |
-| 3.3 | Create `football_core/exceptions.py` for core-specific error types | Low |
-| 3.4 | Update `worldcup_predictor/` imports to use `football_core` package | Medium |
-| 3.5 | Update `competitions/euro/main.py` imports to use `football_core` package | Low |
-| 3.6 | Move shared generic constants from `constants.py` into `football_core` | Low |
-| 3.7 | Verify all 613 WC tests + any Euro tests pass | — |
-
-**Key difference from pre-Rule-of-Two extraction:** The list of modules in `football_core` is now an *empirical fact* (both competitors used them unchanged) rather than a design guess.
-
-### Phase 4 — Extract Shared Tournament Simulation (if patterns from Phase 2 warrant it)
-
-| Step | Action | Risk |
-|---|---|---|
-| 4.1 | Extract tournament-generic simulation into `football_core/compute/tournament.py` | Medium |
-| 4.2 | WC and Euro `simulation.py` both call the shared function with different config | Low |
-| 4.3 | Verify both competitions produce identical results to pre-extraction | — |
-
-This phase is **optional** — only extract if Phase 2.2 reveals a clean shared abstraction. The WC R32→R16 and Euro R16→QF patterns differ in depth and advancement rules; the commonality may be too shallow to justify extraction.
-
-### Phase 5 — League Abstraction + La Liga (future)
-
-| Step | Action | Risk |
-|---|---|---|
-| 5.1 | Build `competitions/laliga/config.py`, `simulation.py` (38-matchday double round-robin), `display.py` | High |
-| 5.2 | Extract shared round-robin pattern into `football_core/compute/league.py` (only after 2+ leagues exist) | Medium |
-
----
-
-## 8. Estimates
-
-### Work packages
-
-| # | Phase | Description | Commits | Effort |
-|---|---|---|---|---|
-| WP-1 | Phase 1 | Build Euro predictor (fix leaks first, then Euro-specific code + data, import generic modules from WC) | ~12 | 3–4 days |
-| WP-2 | Phase 2 | Observe and document common patterns between WC and Euro | ~2 | 1 day |
-| WP-3 | Phase 3 | Extract `football_core` from proven commonalities, migrate both competitors | ~12 | 2–3 days |
-| WP-4 | Phase 4 | Extract shared tournament simulation (if warranted by Phase 2 findings) | ~5 | 1 day |
-| WP-5 | Phase 5 | League abstraction + La Liga | ~15 | 3–5 days |
-
-**Total: 5 work packages, ~46 commits**
-
-**Comparison with original plan:** The Rule of Two shifts the extraction (formerly WP-1) to Phase 3 (WP-3), after the Euro implementation has proven which abstractions are real. Total effort is roughly similar, but risk is lower because every extraction decision is empirically validated.
-
-### Technical risks
-
-| # | Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|---|---|
-| R1 | `worldcup_predictor/src/` changes during Phase 1.1 (I/O leak fixes) break WC tests | Medium | High | Fix leaks with backward-compatible signatures; run full test suite after each change |
-| R2 | Euro `simulation.py` reveals the WC groups/knockout split was actually clean and shareable — but we're not extracting yet (by design) | Low | Low | Accept duplication; document patterns in Phase 2; extract in Phase 3 |
-| R3 | BSD API key / league_id differences between WC and Euro require nontrivial changes to generic fetcher modules | Medium | Medium | Fix in `worldcup_predictor/src/` before Euro uses it; both benefit |
-| R4 | `evaluation.py` I/O leak has callers depending on side effects | Medium | Medium | Audit all callers; add data parameter with backward-compat default |
-| R5 | `governance.py` display leak hard to untangle | Medium | Medium | Return structured dict; migrate callers one at a time |
-| R6 | UCL 2024+ Swiss-system format doesn't fit tournament or league pattern | Medium | High | Design `simulation.py` protocol to accept arbitrary stage graph (deferred until UCL phase) |
-| R7 | BSD API contract changes break shared modules | Low | High | Version the API surface; integration tests with mock data |
-| R8 | Team name normalization is per-competition, creates friction | Low | Low | Each competition provides its own `alias_lookup` dict |
+| Item | Priority |
+|---|---|
+| Extract single-proven modules when second competition needs them (blender, evaluation, governance, form, lineup) | Low |
+| Reorganize `football_core` into subpackages when justified | Low |
+| Remove Euro sys.path hack by refactoring `resolve_knockout_slot_teams` | Low |
+| Parameterize `compute_standings`/`rank_third_placed`/`select_advancers` for group count/labels | Medium |
+| Build UCL or league competition to prove more abstractions | High |

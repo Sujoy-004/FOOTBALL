@@ -83,7 +83,6 @@ main.py ─→ output.py ─→ math_utils.py
 | `IMPLEMENTATION_PLAN.md` | Updated through WP-6 |
 | `ARCHITECTURE_VALIDATION.md` | Present (not reviewed) |
 | `WP5_ARCHITECTURE_SUMMARY.md` | Written |
-| `WP6_ARCHITECTURE_SUMMARY.md` | Written |
 
 ### Technical Debt
 

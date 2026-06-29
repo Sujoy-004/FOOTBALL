@@ -46,9 +46,13 @@ This phase extends Phase 2's frozen interfaces: `run_monte_carlo()`, `aggregate_
 - **D-15:** Display layer depends on an abstract `SimulationResult` contract (dataclass/protocol), not on `run_monte_carlo()` directly. Phase 3 creates it from simulation output. Phase 4 normalizes BSD-enriched data into the same schema. Display code is unchanged between phases.
 - **D-16:** The `SimulationResult` schema is owned by the orchestration (Phase 3) layer — neither by the simulation engine nor by BSD. BSD data normalizes into this contract before reaching the display.
 - **D-17:** The display layer consumes only the `SimulationResult` contract. It must not import or depend directly on simulation internals or BSD-specific structures.
+- **D-19:** `SimulationResult` is a stable public contract but may grow with backward-compatible fields in future phases. Future BSD enrichment should not require rewriting this contract. No implementation or plan may assert an exact field count.
+- **D-20:** `SimulationResult` fields use JSON-native types throughout (`list[dict]`, `dict[str, dict]`). Nested data is documented dict schemas with stable keys — display reads known dict keys, simulation internals write to these same keys. No intermediate typed wrappers. `dataclasses.asdict()` produces JSON directly with no custom serializers needed.
+
+### JSON Schema Stability
+- **D-18:** The JSON written by `--output` is the canonical public export schema. Future phases may add optional fields but must not rename or remove existing fields without an architecture review. This protects downstream consumers and Phase 4 integration.
 
 ### agent's Discretion
-- File/function naming for CLI entry point (`main.py` vs `cli.py` etc.)
 - `SimulationResult` dataclass field names and types (must capture all output fields display needs)
 - Column widths, ANSI color codes, separator line format
 - Whether to use `argparse.FileType` for `--output`

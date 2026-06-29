@@ -52,7 +52,7 @@ This phase consumes Phase 3's `SimulationResult` contract for prediction export 
 ### BSD API Integration Strategy
 - **D-01:** CLI `--validate` flag on `ucl-predict` — not a standalone script. The existing `ucl-predict` entry point gains validation capability. No new entry points.
 - **D-02:** Validation output is dual: a concise accuracy summary table printed to stdout (games played, Brier, Log Loss) AND the existing `--output` JSON enriched with validation results section.
-- **D-03:** Validation compares against both actual match outcomes (home win/draw/away win) AND pre-match market odds from BSD API.
+- **D-03:** Validation compares against both actual match outcomes (home win/draw/away win) AND pre-match market odds from BSD API. BSD data is an external reference for validation only. It must never overwrite or modify simulation outputs; all comparisons are performed against immutable simulation results.
 
 ### Accuracy Metrics — Extraction to football_core
 - **D-04:** Extract `brier_score()`, `log_loss()`, `calibration_curve()` to `football_core/evaluation.py`. The Rule of Two is satisfied — UCL is the second competition needing these functions.
@@ -60,10 +60,13 @@ This phase consumes Phase 3's `SimulationResult` contract for prediction export 
 
 ### Performance Benchmark Format
 - **D-06:** Standalone benchmark script at `competitions/ucl/benchmarks/benchmark_simulation.py` — matches WC pattern (`competitions/worldcup/benchmarks/`).
-- **D-07:** Measure wall-clock time only at 1K, 10K, and 50K iterations. No memory or iteration variance measurement (Phase 4 enhancements if needed later). Output to `BENCHMARK_RESULTS.md`.
+- **D-07:** Measure wall-clock time only at 1K, 10K, and 50K iterations. No memory or iteration variance measurement (Phase 4 enhancements if needed later). Output to `BENCHMARK_RESULTS.md`. Benchmarks must execute with a fixed random seed and record the iteration count and seed alongside timing results.
 
 ### Fixture Schedule
 - **D-08:** Proceed with synthetic fixture schedule for Phase 4 validation. The engine architecture is correct and the synthetic schedule exercises all code paths. Document the limitation: "Validation performed with synthetic fixtures — re-run with official UCL 25/26 schedule when available."
+
+### Validation JSON Contract Freeze
+- **D-09:** The validation section appended to `SimulationResult` is a backward-compatible public schema. Future phases may add optional fields but must not rename or remove existing validation fields without architecture review.
 
 ### agent's Discretion
 - BSD fetcher file name and location within `competitions/ucl/` (matching WC's fetcher.py pattern)
