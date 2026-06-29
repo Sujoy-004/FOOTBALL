@@ -1,48 +1,47 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
+milestone: v2.0
 milestone_name: milestone
-status: completed
-stopped_at: Phase 4 complete (4/4 plans executed)
-last_updated: "2026-06-29T09:37:00.000Z"
-last_activity: 2026-06-29 -- Phase 4 execution completed, milestone v1.0 complete
+status: planning
+stopped_at: Phase 5 context updated — FixtureProvider abstraction decisions locked (location, validation, BSD viability, testing) — ready for planning
+last_updated: "2026-06-29T23:45:00.000Z"
+last_activity: 2026-06-29 -- v2 planning refined: validation moved before calibration, football_core restriction removed
 progress:
-  total_phases: 4
+  total_phases: 11
   completed_phases: 4
+  planned_phases: 7
   total_plans: 22
   completed_plans: 22
-  percent: 100
+  percent: 36
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-29 after v1.0)
+See: .planning/PROJECT.md (updated 2026-06-29 after v2.0 planning)
 
 **Core value:** Adding a new competition requires only a new competition module — not changes to `football_core`
-**Current focus:** Milestone v1.0 shipped — planning next milestone
-**Frozen interfaces:** Phase 2 public signatures are contractually stable. Any change to signature, return schema, or stage model requires architecture review before implementation.
+**Current focus:** Milestone v2.0 — UCL Prediction Quality (planning complete, ready for execution)
 
 ## Current Position
 
-Phase: 4 of 4 — Validation & Production Readiness
-Plan: 4 of 4
-Plans: 4 plans in 3 waves (all complete)
-Status: Milestone v1.0 complete
-Last activity: 2026-06-29 -- Phase 4 execution completed, milestone v1.0 complete
+Milestone: v2.0 — UCL Prediction Quality
+Phase: 5 of 11 — Official Fixture Ingestion
+Plan: Not yet planned (CONTEXT written, execution phase pending)
+Status: v1.0 shipped, v2.0 planned
 
-Progress: [####################] 100%
+Progress: [########------------] 36% (4 completed phases, 7 planned)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 22
+- Total plans completed (v1.0): 22
 - Average duration: 16 min
 - Total execution time: 351 min
 
-**By Phase:**
+**By Phase (v1.0):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
@@ -53,7 +52,7 @@ Progress: [####################] 100%
 
 **Recent Trend:**
 
-- Last 5 plans:
+- Last 5 plans (v1.0):
    1. 03-01: 8 min (CLI entry point + SimulationResult dataclass)
    2. 03-02: 2 min (league table display + ANSI zone coloring)
    3. 03-03: 6 min (bracket display + odds + JSON export)
@@ -61,7 +60,6 @@ Progress: [####################] 100%
    5. 04-02: 18 min (evaluation extraction + validation cross-check)
    6. 04-03: 9 min (benchmark script + run)
    7. 04-04: 6 min (documentation + regression verification)
-- Trend: Phase 4 averaged 19.5 min/plan (slower than Phase 3 due to evaluation extraction complexity, faster than Phases 1-2)
 
 ## Accumulated Context
 
@@ -70,58 +68,53 @@ Progress: [####################] 100%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- (Roadmap): UCL-first build order confirmed — league table engine → knockout → orchestration → differentiators
-- (Roadmap): 4 phases at standard granularity — natural groups, no padding
-- (Roadmap): All 22 v1 requirements covered across 4 phases
-- (Phase 1): ClubElo as Elo source for UCL teams — fetch-once, cache, snapshot reproducibility
-- (Phase 1): MC output = zone probabilities + champion + all tiebreaker-chain averages
-- (Phase 1): Single date-based ClubElo ranking fetch (not 36 per-team requests) — faster, same snapshot guarantee
-- (Phase 1): Randomized greedy + BFS fixture generation (deterministic edge-coloring infeasible for 8-regular graph)
-- (Phase 1): Olympiacos → Olympiakos alias fix for ClubElo compatibility
-- (Phase 1): DEFAULT_ELO=1500 fallback with logging.warning() for unresolvable team names
-- (Phase 1): Conduct score uses RC×4 (WC convention) per accepted Research pitfall — negligible MC impact
-- (Phase 1/Plan 02): Single-request date-based ClubElo fetch instead of 36 individual requests
-- (Phase 1/Plan 02): logging.warning() on ClubElo fallback for silent-failure prevention
-- (Phase 1/Plan 02): Opponent stats from pre-tiebreak raw aggregates, not post-rank values
-- (Phase 1/Plan 02): Defensive copy pattern to prevent input mutation
-- (Phase 1/Plan 02): No H2H tiebreaker confirmed for Swiss system
-- (Phase 1/Plan 03): Post-aggregation pattern — collect per-iteration results in flat lists, aggregate once after loop
-- (Phase 1/Plan 03): Matchup lambdas precomputed once before iteration loop for ~2x performance gain
-- (Phase 1/Plan 03): aggregate_mc_results() separated for isolated unit testing without running simulation
-- (ADR-002): Synthetic schedules OK for dev, mandatory official before validation — applies to all competitions
-- (Phase 2): ET simulated locally using reduced Poisson — BSD API does not expose ET scores (extra_time_score always null)
-- (Phase 2): Penalties simulated locally with fixed ~76% conversion — BSD penalty data for validation only
-- (Phase 2): Playoff pairings in dedicated data file (playoff_draw.json), not computed/randomized
-- (Phase 2): R16 bracket structure in JSON data file (bracket_rules.json), not hardcoded
-- (Phase 2): Knockout pipeline extends Phase 1 MC loop (single loop, post-aggregation pattern)
-- (Phase 2): Stage tracking: Eliminated → Playoff → R16 → QF → SF → Final → Champion
-- (Phase 2): BSD API authoritative for validation, not simulation
-- (Phase 2): BSD UCL league_id = 7, season_id = 268 (UEFA Champions League 25/26)
-- (Phase 3): SimulationResult dataclass owned by orchestration (Phase 3), not by simulation engine or BSD
-- (Phase 3): Display layer (display.py) reads ONLY from SimulationResult — zero imports from competitions.ucl.src (D-17 enforced via static grep + runtime module audit)
-- (Phase 3): CLI flags: -n/--iterations=10000, -s/--seed=None, -o/--output=None — NOT argparse.FileType (avoids premature file truncation)
-- (Phase 3): Display order follows tournament chronology: Summary → League Table → Playoff → Bracket → Odds (D-06)
-- (Phase 3): League table has 6 columns (Pos, Team, Pts, GD, GS, Zone) with ANSI color highlighting (green=top_8, yellow=playoff, red=eliminated)
-- (Phase 3): Bracket displayed as round-by-round match list (not ASCII tree) — R16 → QF → SF → FINAL
-- (Phase 3): Odds sorted by champion_prob descending with tiebreaker by team name
-- (Phase 3): JSON export uses dataclasses.asdict() for complete schema stability (Phase 4 consumers depend on this)
+- (v2 Roadmap): 7 phases at standard granularity — natural groups of dependent research topics
+- (v2 Roadmap): 11 research topics consolidated into 7 implementation phases to avoid overhead
+- (v2 Roadmap): Phase order follows dependency chain — fixtures → modes → signals → blending → validation (baseline) → calibration (improvement) → production
+- (v2 Refinement): Validation moved before calibration — establishes uncalibrated baseline for objective before/after comparison
+- (v2 Refinement): `football_core` restriction removed — generic, competition-agnostic functionality belongs in football_core
+- (Phase 5, D-01): FixtureProvider abstraction with BSD primary, repo fallback
+- (Phase 5, D-03): Auto-provider selection — try BSD, fall back to repo on failure
+- (Phase 5, D-05): File-based TTL cache for BSD fixtures (1-hour)
+- (Phase 5, D-06): Pydantic schema validation at provider boundary
+- (Phase 6, D-01): Three-mode architecture — simulate, replay, live
+- (Phase 6, D-02): PlayedMatches dict override pattern (matching WC)
+- (Phase 6, D-05): Mode routing in orchestration layer, not engine
+- (Phase 7, D-01): Signal protocol — each signal is standalone, independently testable
+- (Phase 7, D-02): SignalRegistry plugin pattern
+- (Phase 7, D-03): Implementation order: refined Elo → market odds → form → squad value → rest days
+- (Phase 8, D-01): Weighted averaging (inverse log-loss weights) as primary method
+- (Phase 8, D-03): Weight calibration on held-out season
+- (Phase 8, D-04): 3-tier market integration — baseline → blended → value detection
+- (Phase 9, D-01): Temperature scaling over isotonic (limited data)
+- (Phase 9, D-04): Bayesian Elo (Glicko-style) with (μ, σ²) per team
+- (Phase 10, D-01): Three-tier validation — cross-tournament, walk-forward, replay
+- (Phase 11, D-01): Tiered explainability — signal breakdown (always-on) + counterfactual (on-demand)
 
 ### Pending Todos
 
-None yet.
+- Plan and execute Phase 5 (Official Fixture Ingestion)
 
 ### Blockers/Concerns
 
-None yet.
+- BSD API may require paid tier for 2025/26 UCL fixtures (league_id=7 may not return future fixtures) — Phase 5 risk
+- No multi-season UCL data currently collected — Phase 10 (cross-tournament backtest) requires sourcing historical data
+- Temperature scaling calibration data limited to ~1 season — Phase 9 risk
 
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| v1.0 deferred | 10 pre-existing WC test_knockout.py errors | documented, human-approved | v1.0 close |
+| v2 scope | xG model (R-03 medium-term signal) | deferred from Phase 7 | v2 planning |
+| v2 scope | Injury/lineup flags (R-03 long-term signal) | deferred from Phase 7 | v2 planning |
+| v2 scope | Stacked meta-learner (R-04 upgrade) | deferred until 5+ seasons of data | v2 planning |
+| v2 scope | Isotonic regression (R-05 upgrade) | deferred until >500 calibration samples | v2 planning |
+| v2 scope | Hierarchical Bayesian Poisson (R-06) | deferred until match database mature | v2 planning |
+| v2 scope | SHAP analysis (R-10 Tier 2) | deferred; weighted ensemble provides sufficient explanation | v2 planning |
 
 ## Session Continuity
 
 Last session: 2026-06-29
-Stopped at: Milestone v1.0 complete — all 4 phases delivered
-Next: `/gsd-new-milestone` for v1.1 or `/gsd-progress` to review
+Stopped at: v2.0 planning complete — 7 phases defined with CONTEXT docs. Ready for Phase 5 execution.
+Next: Execute Phase 5 (Official Fixture Ingestion) or `/gsd-progress` to review
