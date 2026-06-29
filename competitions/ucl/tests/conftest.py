@@ -906,3 +906,37 @@ def sample_result():
         bracket_champion=champion,
         stages=stages,
     )
+
+
+# ── BSD fixture data fixtures (Plan 05) ─────────────────────────────────────────
+
+
+bsd_live = pytest.mark.skipif(
+    not os.environ.get("BSD_API_KEY"),
+    reason="BSD_API_KEY not set — requires live BSD API access",
+)
+
+
+@pytest.fixture
+def bsd_response_data():
+    """Returns the BSD API snapshot response for offline unit tests."""
+    fixtures_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "tests", "fixtures", "bsd_response.json",
+    )
+    with open(fixtures_path) as f:
+        return json.load(f)
+
+
+@pytest.fixture
+def sample_36_teams_data():
+    """Returns list of team dicts matching the Team dataclass fields for all 36 teams."""
+    return [
+        {
+            "name": name,
+            "pot": _POT_MAP[name],
+            "clubelo_name": _CLUBELO_NAMES[name],
+            "coefficient": _UEFA_COEFFICIENTS[name],
+        }
+        for name in _ALL_36_TEAMS
+    ]
