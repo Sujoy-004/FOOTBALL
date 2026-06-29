@@ -8,7 +8,7 @@ Build a UEFA Champions League competition module for the existing football predi
 
 - [x] **Phase 1: UCL League Table Engine** — 36-team Swiss-system standings with correct tiebreaker chain, fixture validation, Monte Carlo advancement probabilities *(completed 2026-06-27)*
 - [x] **Phase 2: UCL Knockout Phase** — Two-legged playoff, seeded R16 bracket, top-4 protection, full knockout tree through final *(completed 2026-06-28)*
-- [ ] **Phase 3: UCL Simulation Orchestration + Display** — `ucl-predict` CLI, formatted league table and bracket display, champion/qualification odds
+- [x] **Phase 3: UCL Simulation Orchestration + Display** — `ucl-predict` CLI, formatted league table and bracket display, champion/qualification odds *(completed 2026-06-28)*
 - [ ] **Phase 4: Validation & Production Readiness** — Live BSD API validation, accuracy metrics (Brier, Log Loss), performance benchmarking, regression verification, documentation
 
 ## Phase Details
@@ -62,9 +62,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — CLI entry point (`ucl-predict`) + SimulationResult dataclass + conftest fixture + argparse unit tests
-- [ ] 03-02-PLAN.md — League table display with ANSI zone coloring + print_summary + display tests
-- [ ] 03-03-PLAN.md — Knockout bracket display + champion/qualification odds + JSON export + full display tests
+- [x] 03-01-PLAN.md — CLI entry point (`ucl-predict`) + SimulationResult dataclass + conftest fixture + argparse unit tests
+- [x] 03-02-PLAN.md — League table display with ANSI zone coloring + print_summary + display tests
+- [x] 03-03-PLAN.md — Knockout bracket display + champion/qualification odds + JSON export + full display tests
 
 ### Phase 4: Validation & Production Readiness
 **Goal**: Users can validate UCL predictions against real match results, measure accuracy (Brier, Log Loss, calibration), benchmark performance, and verify regression — the engine is proven correct before v2 features
@@ -80,10 +80,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 04-01: Live BSD API integration for fetching real UCL match results
-- [ ] 04-02: Prediction cross-check engine with accuracy metrics (Brier, Log Loss, calibration)
-- [ ] 04-03: Performance benchmarking suite
-- [ ] 04-04: Regression verification, documentation, and release readiness
+- [ ] 04-01-PLAN.md — BSD API fetcher for UCL match results (UCLV-01)
+- [ ] 04-02-PLAN.md — Prediction cross-check engine with accuracy metrics (UCLV-02, UCLV-03)
+- [ ] 04-03-PLAN.md — Performance benchmarking suite (UCLV-04)
+- [ ] 04-04-PLAN.md — Regression verification, documentation, release readiness (UCLV-05, UCLV-06)
 
 ## Progress
 
@@ -94,5 +94,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. UCL League Table Engine | 3/3 | ✓ Complete | 2026-06-27 |
 | 2. UCL Knockout Phase | 4/4 | ✓ Complete | 2026-06-28 |
-| 3. UCL Simulation Orchestration + Display | 3/3 | Plans created | - |
+| 3. UCL Simulation Orchestration + Display | 3/3 | ✓ Complete | 2026-06-28 |
 | 4. Validation & Production Readiness | 0/4 | Not started | - |
