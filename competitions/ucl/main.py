@@ -20,6 +20,7 @@ import os
 import random
 import sys
 from dataclasses import asdict
+from datetime import datetime, timezone
 
 from competitions.ucl.display import (
     print_summary,
@@ -59,6 +60,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-o", "--output", type=str, default=None,
         metavar="FILE", help="Write JSON output to FILE (stdout still prints text)",
+    )
+    parser.add_argument(
+        "--validate", action="store_true",
+        help="Cross-check predictions against real BSD match results",
+    )
+    parser.add_argument(
+        "--api-key", type=str, default=None,
+        metavar="KEY", help="BSD API key (default: BSD_API_KEY env var)",
     )
     return parser.parse_args(argv)
 
@@ -140,6 +149,96 @@ def build_simulation_result(
     )
 
 
+def run_validation(
+    simulation_result: SimulationResult,
+    real_matches: list[dict],
+    elo_ratings: dict[str, float],
+) -> dict:
+    """Cross-check simulation predictions against real match outcomes.
+
+    For each real match, computes home-win probability from Elo ratings
+    via expected_score() (same foundation as the simulation engine),
+    then computes Brier, Log Loss, accuracy, and calibration ECE.
+
+    Parameters
+    ----------
+    simulation_result:
+        Frozen SimulationResult from MC simulation (validation field will be set by caller).
+    real_matches:
+        List of normalized BSD match dicts from fetch_ucl_matches().
+    elo_ratings:
+        {team_name: Elo} dict used in the simulation.
+
+    Returns
+    -------
+    dict
+        Validation result dict matching D-09 schema, ready for JSON enrichment.
+    """
+    from football_core.evaluation import compute_metrics, calibration_curve
+    from football_core.elo import expected_score
+
+    predictions: list[float] = []
+    actuals: list[float] = []
+    odds_predictions: list[float] = []
+    odds_actuals: list[float] = []
+
+    for match in real_matches:
+        team_a = match["team_a"]
+        team_b = match["team_b"]
+
+        home_elo = elo_ratings.get(team_a, 1500.0)
+        away_elo = elo_ratings.get(team_b, 1500.0)
+        pred_home_win = expected_score(home_elo, away_elo)
+
+        # Determine actual outcome
+        if match.get("is_draw"):
+            actual = 0.5
+        elif match.get("winner") == team_a:
+            actual = 1.0
+        elif match.get("winner") == team_b:
+            actual = 0.0
+        else:
+            continue  # skip matches with undetermined outcome
+
+        predictions.append(pred_home_win)
+        actuals.append(actual)
+
+        # Extract market odds for comparison if available (D-03)
+        if "odds" in match:
+            odds_predictions.append(match["odds"]["home"])
+            odds_actuals.append(actual)
+
+    # Compute prediction metrics
+    prediction_metrics = compute_metrics(predictions, actuals)
+    calibration = calibration_curve(predictions, actuals)
+
+    # Build result dict matching D-09 schema
+    result: dict = {
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+        "n_matches_fetched": len(real_matches),
+        "n_matches_matched": len(predictions),
+        "n_odds_available": len(odds_predictions),
+        "prediction_metrics": {
+            "brier": round(prediction_metrics["brier"], 6),
+            "log_loss": round(prediction_metrics["log_loss"], 6),
+            "accuracy": round(prediction_metrics["accuracy"], 6),
+            "n": prediction_metrics["n"],
+        },
+        "calibration": calibration,
+    }
+
+    # Add market odds metrics if available
+    if odds_predictions:
+        odds_metrics = compute_metrics(odds_predictions, odds_actuals)
+        result["market_odds_metrics"] = {
+            "brier": round(odds_metrics["brier"], 6),
+            "log_loss": round(odds_metrics["log_loss"], 6),
+            "n": odds_metrics["n"],
+        }
+
+    return result
+
+
 def main() -> None:
     """Entry point: parse args, run simulation, display results, optionally export JSON."""
     args = _parse_args()
@@ -172,8 +271,39 @@ def main() -> None:
     print_knockout_bracket(result)
     print_odds(result)
 
-    # JSON export (if --output given)
-    if args.output:
+    # Validation (Phase 4, D-01 through D-03)
+    if args.validate:
+        api_key = args.api_key or os.environ.get("BSD_API_KEY")
+        if not api_key:
+            print("Error: BSD_API_KEY not set. Provide --api-key or set BSD_API_KEY env var.")
+            sys.exit(1)
+
+        from competitions.ucl.src.fetcher import fetch_ucl_matches
+
+        team_aliases_path = os.path.join(data_dir, "team_aliases.json")
+        with open(team_aliases_path) as f:
+            team_aliases = json.load(f)
+        real_matches = fetch_ucl_matches(api_key, team_aliases, fixtures["schedule"])
+
+        # Cross-check predictions vs real outcomes using expected_score from Elo
+        validation_result = run_validation(result, real_matches, elo_ratings)
+
+        # Store in result for JSON enrichment (frozen dataclass workaround)
+        object.__setattr__(result, "validation", validation_result)
+
+        # Print summary table to stdout
+        from competitions.ucl.display import print_validation_summary
+        print_validation_summary(validation_result)
+
+        # Enrich JSON if --output given
+        if args.output:
+            output = asdict(result)
+            with open(args.output, "w") as f:
+                json.dump(output, f, indent=2)
+            print(f"JSON enriched with validation: {args.output}")
+
+    # JSON export (existing) — only if NOT already written with validation
+    elif args.output:
         with open(args.output, "w") as f:
             json.dump(asdict(result), f, indent=2)
         print(f"JSON written to {args.output}")
