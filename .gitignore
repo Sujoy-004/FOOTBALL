@@ -43,3 +43,6 @@ competitions/worldcup/data/elo_update_log.json
 # AI-generated responses
 RESPONSE.md
 
+# Product validation reports
+reports/
+
