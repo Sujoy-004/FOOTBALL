@@ -58,3 +58,6 @@ class SimulationResult:
             "champion",
         ]
     )
+
+    # ── Validation results (Phase 4 — backward-compatible, D-09) ──
+    validation: dict | None = field(default=None)

@@ -6,6 +6,10 @@ No imports from competitions.ucl.src.
 Exports:
     - print_summary(result: SimulationResult) -> None
     - print_league_table(result: SimulationResult) -> None
+    - print_playoff_rounds(result: SimulationResult) -> None
+    - print_knockout_bracket(result: SimulationResult) -> None
+    - print_odds(result: SimulationResult) -> None
+    - print_validation_summary(validation_result: dict) -> None
     - _supports_color() -> bool
     - _ansi(code: str) -> callable
 """
@@ -218,7 +222,38 @@ def print_knockout_bracket(result: SimulationResult) -> None:
                     suffix = f" ({r['penalty_a']}-{r['penalty_b']} pens)"
                 print(f"    {team_a} {score_line}{suffix}  {team_b}")
 
+    print()
+
+
+# ── Validation display (Phase 4, D-02) ────────────────────────────────
+
+
+def print_validation_summary(validation_result: dict) -> None:
+    """Print validation accuracy summary table to stdout (Phase 4, D-02).
+
+    Shows games played, Brier score, Log Loss, accuracy, and calibration ECE.
+    Also shows market odds metrics if available.
+    """
+    print()
+    print(f"==== Validation Results ====")
+    print()
+
+    pm = validation_result["prediction_metrics"]
+    print(f"  Games matched: {pm['n']}")
+    print(f"  Brier Score:   {pm['brier']:.4f}")
+    print(f"  Log Loss:      {pm['log_loss']:.4f}")
+    print(f"  Accuracy:      {pm['accuracy']:.2%}")
+    print(f"  Calibration ECE: {validation_result['calibration']['ece']:.4f}")
+
+    if "market_odds_metrics" in validation_result:
+        om = validation_result["market_odds_metrics"]
         print()
+        print(f"  Market Odds Comparison:")
+        print(f"    Brier Score:   {om['brier']:.4f}")
+        print(f"    Log Loss:      {om['log_loss']:.4f}")
+        print(f"    Games with odds: {om['n']}")
+
+    print()
 
     print()
 
