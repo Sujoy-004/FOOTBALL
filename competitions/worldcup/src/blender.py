@@ -109,8 +109,7 @@ def calibrate_signal(predictions: list[float], actuals: list[float], threshold: 
         # Update A -= dA_step, B -= dB_step
         A -= dA_step
         B -= dB_step
-        
-        # If abs(dA_step) < CONV_TOL and abs(dB_step) < CONV_TOL: break
+
         if abs(dA_step) < CONV_TOL and abs(dB_step) < CONV_TOL:
             break
     
