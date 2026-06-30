@@ -45,7 +45,14 @@ calibration_params.json
 versions.json
 
 # Generated benchmark reports
-benchmarks/BENCHMARK_RESULTS_*.md
+benchmarks/BENCHMARK_RESULTS*.md
 
 # AI-generated responses
 RESPONSE.md
+RESEARCH.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo

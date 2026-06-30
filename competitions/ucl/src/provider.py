@@ -54,25 +54,7 @@ class RepoFixtureProvider:
 
     @staticmethod
     def _dict_to_schedule(schedule_dict: dict) -> FixtureSchedule:
-        """Convert a fixtures.json schedule dict to a FixtureSchedule dataclass.
-
-        Parameters
-        ----------
-        schedule_dict : dict
-            Dict with ``teams`` and ``matchdays`` keys matching the
-            fixtures.json schema.
-
-        Returns
-        -------
-        FixtureSchedule
-            Populated dataclass instance.
-        """
-        teams = [Team(**t) for t in schedule_dict["teams"]]
-        matchdays = []
-        for md in schedule_dict["matchdays"]:
-            matches = [Match(**m) for m in md]
-            matchdays.append(matches)
-        return FixtureSchedule(teams=teams, matchdays=matchdays)
+        return FixtureSchedule.from_dict(schedule_dict)
 
 
 class BSDFixtureProvider:
@@ -290,21 +272,4 @@ class BSDFixtureProvider:
 
     @staticmethod
     def _dict_to_schedule(schedule_dict: dict) -> FixtureSchedule:
-        """Convert a schedule dict to a FixtureSchedule dataclass.
-
-        Parameters
-        ----------
-        schedule_dict : dict
-            Dict with ``teams`` and ``matchdays`` keys.
-
-        Returns
-        -------
-        FixtureSchedule
-            Populated dataclass instance.
-        """
-        teams = [Team(**t) for t in schedule_dict["teams"]]
-        matchdays = []
-        for md in schedule_dict["matchdays"]:
-            matches = [Match(**m) for m in md]
-            matchdays.append(matches)
-        return FixtureSchedule(teams=teams, matchdays=matchdays)
+        return FixtureSchedule.from_dict(schedule_dict)

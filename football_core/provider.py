@@ -1,5 +1,7 @@
 """Fixture provider interface and shared types — competition-agnostic."""
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
@@ -36,6 +38,21 @@ class FixtureSchedule:
 
     teams: list[Team]
     matchdays: list[list[Match]]
+
+    @staticmethod
+    def from_dict(schedule_dict: dict) -> FixtureSchedule:
+        """Convert a schedule dict to a FixtureSchedule dataclass.
+
+        Expected dict structure: ``{teams: [...], matchdays: [...]}``
+        where each team dict is unpacked as ``Team(**t)`` and each
+        matchday is a list of match dicts unpacked as ``Match(**m)``.
+        """
+        teams = [Team(**t) for t in schedule_dict["teams"]]
+        matchdays = []
+        for md in schedule_dict["matchdays"]:
+            matches = [Match(**m) for m in md]
+            matchdays.append(matches)
+        return FixtureSchedule(teams=teams, matchdays=matchdays)
 
     def validate(self) -> None:
         """Validate schedule against UCL league phase constraints.

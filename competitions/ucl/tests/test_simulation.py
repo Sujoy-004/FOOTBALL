@@ -111,7 +111,7 @@ class TestClubEloFetcher:
     def test_fetch_team_elos_mocked(self, monkeypatch):
         """Fetch from mocked ranking CSV returns correct dict."""
         monkeypatch.setattr(
-            "competitions.ucl.src.elo_fetcher._fetch_ranking_csv",
+            "football_core.elo_fetcher._fetch_ranking_csv",
             lambda *a: self._RANKING_CSV,
         )
 
@@ -135,7 +135,7 @@ class TestClubEloFetcher:
             return self._RANKING_CSV
 
         monkeypatch.setattr(
-            "competitions.ucl.src.elo_fetcher._fetch_ranking_csv",
+            "football_core.elo_fetcher._fetch_ranking_csv",
             _mock_fetch,
         )
 
@@ -164,7 +164,7 @@ class TestClubEloFetcher:
         empty_csv = "Rank,Club,Country,Level,Elo,From,To\n"
 
         monkeypatch.setattr(
-            "competitions.ucl.src.elo_fetcher._fetch_ranking_csv",
+            "football_core.elo_fetcher._fetch_ranking_csv",
             lambda *a: empty_csv,
         )
 
@@ -176,8 +176,8 @@ class TestClubEloFetcher:
         import urllib.error
 
         # Clear cache on original function
-        import competitions.ucl.src.elo_fetcher as fetcher
-        fetcher._fetch_ranking_csv.cache_clear()
+        import football_core.elo_fetcher as _core_fetcher
+        _core_fetcher._fetch_ranking_csv.cache_clear()
 
         def _mock_error(*args):
             raise urllib.error.HTTPError(
@@ -189,7 +189,7 @@ class TestClubEloFetcher:
             )
 
         monkeypatch.setattr(
-            "competitions.ucl.src.elo_fetcher._fetch_ranking_csv",
+            "football_core.elo_fetcher._fetch_ranking_csv",
             _mock_error,
         )
 
@@ -199,7 +199,7 @@ class TestClubEloFetcher:
     def test_fetch_team_elos_resolves_alias(self, monkeypatch):
         """Team with alias resolves correctly in ranking."""
         monkeypatch.setattr(
-            "competitions.ucl.src.elo_fetcher._fetch_ranking_csv",
+            "football_core.elo_fetcher._fetch_ranking_csv",
             lambda *a: self._RANKING_CSV,
         )
 

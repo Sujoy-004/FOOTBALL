@@ -401,8 +401,12 @@ def _run_historical_catch_up(
         changed = True
         while changed:
             changed = False
+            known_winners = {
+                mid: data["winner"] for mid, data in played.items()
+                if data.get("winner")
+            }
             slot_teams = resolve_knockout_slot_teams(
-                groups, teams, played_groups, bracket, annex_c, dict(played)
+                groups, teams, played_groups, bracket, annex_c, known_winners
             )
             teams_to_id: dict[frozenset[str], str] = {}
             for mid, st in slot_teams.items():
@@ -1450,7 +1454,7 @@ def main() -> None:
 
         # ── Warm Poisson base rate cache (V2-09) ──
         try:
-            from src.blender import compute_poisson_base_rate
+            from football_core.blender import compute_poisson_base_rate
             rate = compute_poisson_base_rate()
             if rate != constants.EXPECTED_GOALS_BASE_RATE:
                 print(f"Poisson base rate: {rate:.4f} (from historical data)")

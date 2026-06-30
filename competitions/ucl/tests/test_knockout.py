@@ -7,12 +7,14 @@ import random
 import pytest
 
 from competitions.ucl.src.knockout import (
-    _simulate_penalty_shootout,
     build_r16_bracket,
     simulate_knockout_tree,
     simulate_playoff_round,
-    simulate_two_legged_tie,
     track_knockout_stages,
+)
+from football_core.knockout import (
+    _simulate_penalty_shootout,
+    simulate_two_legged_tie,
 )
 
 

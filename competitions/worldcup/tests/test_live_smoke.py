@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 MAIN_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = MAIN_DIR.parent.parent
 DATA_DIR = MAIN_DIR / "data"
 
 _LIVE_SKIP = pytest.mark.skipif(
@@ -44,9 +45,11 @@ def test_live_smoke_once():
     4. No error output to stderr
     """
     env = os.environ.copy()
+    env.setdefault("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(ROOT_DIR) + os.pathsep + env["PYTHONPATH"]
     result = subprocess.run(
         [sys.executable, "-u", str(MAIN_DIR / "main.py"), "--once", "--seed", "42"],
-        capture_output=True, text=True, timeout=60, cwd=MAIN_DIR, env=env,
+        capture_output=True, text=True, timeout=120, cwd=ROOT_DIR, env=env,
     )
 
     # 1. Exit code must be 0

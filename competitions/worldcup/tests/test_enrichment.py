@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.enrichment import extract_stats, extract_context
+from football_core.enrichment import extract_stats, extract_context
 
 
 FINISHED_EVENT = {

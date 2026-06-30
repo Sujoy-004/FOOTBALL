@@ -1,11 +1,14 @@
 """Shared pytest fixtures for UCL predictor tests."""
 
+from dotenv import load_dotenv
 import json
 import os
 import random
 from datetime import datetime, timedelta
 
 import pytest
+
+load_dotenv()
 
 # ── Fixture Data ────────────────────────────────────────────────────────
 
@@ -910,12 +913,6 @@ def sample_result():
 
 
 # ── BSD fixture data fixtures (Plan 05) ─────────────────────────────────────────
-
-
-bsd_live = pytest.mark.skipif(
-    not os.environ.get("BSD_API_KEY"),
-    reason="BSD_API_KEY not set — requires live BSD API access",
-)
 
 
 @pytest.fixture

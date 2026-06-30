@@ -3,6 +3,17 @@
 import random
 from collections import defaultdict
 
+__all__ = [
+    "_build_round_map",
+    "_simulate_knockout_round",
+    "_get_blended_prob",
+    "_simulate_r32_resolved",
+    "_simulate_r16",
+    "_simulate_tpp",
+    "resolve_knockout_slot_teams",
+    "run_full_simulation",
+]
+
 from src import constants
 from src.elo import expected_score
 from src.groups import (
@@ -34,7 +45,7 @@ def _simulate_r32_resolved(
 ) -> dict[str, str]:
     winner_progression: dict[str, str] = {}
     for mid, match in r32_matchups.items():
-        if mid in played:
+        if mid in played and played[mid].get("winner") is not None:
             winner_progression[mid] = played[mid]["winner"]
             continue
         team_a = match["team_a"]

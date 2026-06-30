@@ -13,7 +13,7 @@ from football_core.fetcher import (
 )
 
 from src import constants
-from src.enrichment import extract_stats, extract_context
+from football_core.enrichment import extract_stats, extract_context
 
 logger = logging.getLogger(__name__)
 

@@ -17,13 +17,7 @@ def _build_schedule_from_json(fixtures_path: str) -> FixtureSchedule:
     """Load a fixtures.json file and convert to FixtureSchedule dataclass."""
     with open(fixtures_path) as f:
         data = json.load(f)
-    schedule_dict = data["schedule"]
-    teams = [Team(**t) for t in schedule_dict["teams"]]
-    matchdays = []
-    for md in schedule_dict["matchdays"]:
-        matches = [Match(**m) for m in md]
-        matchdays.append(matches)
-    return FixtureSchedule(teams=teams, matchdays=matchdays)
+    return FixtureSchedule.from_dict(data["schedule"])
 
 
 class TestFixtureProviderProtocol:

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import io
+import os
 import sys
 
 import pytest
@@ -25,7 +26,8 @@ from competitions.ucl.result import SimulationResult
 # This is more robust than inspecting sys.modules because other test files in the
 # same session may have already loaded simulation modules.
 
-_DISPLAY_PATH = "competitions/ucl/display.py"
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_DISPLAY_PATH = os.path.join(_THIS_DIR, "..", "display.py")
 with open(_DISPLAY_PATH) as _f:
     _tree = ast.parse(_f.read())
 _SRC_IMPORTS = []

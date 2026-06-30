@@ -1,6 +1,9 @@
 """Shared pytest fixtures for World Cup predictor tests."""
 
+from dotenv import load_dotenv
 import pytest
+
+load_dotenv()
 
 
 @pytest.fixture

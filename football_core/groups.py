@@ -346,3 +346,114 @@ def _tiebreak_group(
         i = j
 
     return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── League-format (Swiss / round-robin league) functions
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def precompute_matchup_lambdas_league(
+    fixtures: dict,
+    elo_ratings: dict[str, float],
+    base_rate: float = constants.EXPECTED_GOALS_BASE_RATE,
+) -> dict[str, tuple[float, float]]:
+    """Pre-compute Poisson lambdas for every match in a league-format fixture schedule.
+
+    Expects *fixtures* to have a ``schedule`` key containing
+    ``{teams: [...], matchdays: [[{match_id, team_a, team_b}, ...], ...]}``.
+    """
+    lambdas: dict[str, tuple[float, float]] = {}
+    schedule = fixtures.get("schedule", fixtures)
+    for matchday in schedule["matchdays"]:
+        for match in matchday:
+            mid = match["match_id"]
+            ta, tb = match["team_a"], match["team_b"]
+            ea, eb = elo_ratings[ta], elo_ratings[tb]
+            lambdas[mid] = (
+                expected_goals(ea, eb, base_rate),
+                expected_goals(eb, ea, base_rate),
+            )
+    return lambdas
+
+
+def simulate_league_matches(
+    fixtures: dict,
+    elo_ratings: dict[str, float],
+    rng: random.Random,
+    base_rate: float = constants.EXPECTED_GOALS_BASE_RATE,
+    matchup_lambdas: dict[str, tuple[float, float]] | None = None,
+    fair_play: bool = True,
+) -> dict[str, dict]:
+    """Simulate all matches in a league-format fixture schedule.
+
+    Follows the same Poisson sampling pattern as
+    :func:`simulate_group_matches` but iterates matchday-based fixtures
+    rather than group-based matches.
+
+    Returns a flat dict keyed by ``match_id`` (NOT grouped by matchday).
+    Does NOT mutate the input *fixtures*.
+    """
+    fixtures = {"schedule": {
+        "teams": list(fixtures.get("schedule", fixtures).get("teams", [])),
+        "matchdays": [
+            list(md) for md in fixtures.get("schedule", fixtures).get("matchdays", [])
+        ],
+    }}
+
+    schedule = fixtures["schedule"]
+
+    if matchup_lambdas is None:
+        matchup_lambdas = precompute_matchup_lambdas_league(
+            fixtures, elo_ratings, base_rate=base_rate,
+        )
+
+    getrandbits = rng.getrandbits
+    table_bits = _TABLE_BITS
+    build_table = _build_poisson_table
+
+    results: dict[str, dict] = {}
+    for matchday in schedule["matchdays"]:
+        for match in matchday:
+            mid = match["match_id"]
+            ta: str = match["team_a"]
+            tb: str = match["team_b"]
+            la, lb = matchup_lambdas[mid]
+
+            score_a = (
+                0 if la <= 0.0 else build_table(la)[getrandbits(table_bits)]
+            )
+            score_b = (
+                0 if lb <= 0.0 else build_table(lb)[getrandbits(table_bits)]
+            )
+
+            if score_a > score_b:
+                winner = ta
+            elif score_b > score_a:
+                winner = tb
+            else:
+                winner = None
+
+            if fair_play:
+                yc_table = build_table(2.0)
+                rc_table = build_table(0.05)
+                yc_a = yc_table[getrandbits(table_bits)]
+                rc_a = rc_table[getrandbits(table_bits)]
+                yc_b = yc_table[getrandbits(table_bits)]
+                rc_b = rc_table[getrandbits(table_bits)]
+            else:
+                yc_a = rc_a = yc_b = rc_b = 0
+
+            results[mid] = {
+                "team_a": ta,
+                "team_b": tb,
+                "score_a": score_a,
+                "score_b": score_b,
+                "winner": winner,
+                "yellow_cards_a": yc_a,
+                "red_cards_a": rc_a,
+                "yellow_cards_b": yc_b,
+                "red_cards_b": rc_b,
+            }
+
+    return results

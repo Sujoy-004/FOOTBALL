@@ -17,18 +17,18 @@ import math
 import json
 import tempfile
 import os
-from src.blender import (
+from football_core.blender import (
     calibrate_signal,
     apply_calibration,
     compute_blend_weights,
     blend_predictions,
     compute_poisson_base_rate,
     compute_rolling_brier,
-    calibrate_and_blend,
     _sigmoid,
     _log_odds,
     _platt_targets
 )
+from src.blender import calibrate_and_blend
 from src.elo import expected_score
 
 

@@ -27,7 +27,6 @@ from football_core.state import (
     load_probability_log,
     append_probability_log,
     _atomic_write_json,
-    _resolve_data_dir as _resolve_data_dir_core,
 )
 
 from src import constants

@@ -371,7 +371,7 @@ def _run_governance(
 
     # 2. Compute per-signal rolling Brier
     per_signal_brier: dict[str, float] = {}
-    from src.blender import compute_rolling_brier
+    from football_core.blender import compute_rolling_brier
 
     for key in signal_keys:
         brier = compute_rolling_brier(deduped, key, window=50)

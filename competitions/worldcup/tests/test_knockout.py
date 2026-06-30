@@ -1,6 +1,7 @@
 """Tests for the full tournament simulation pipeline."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -10,7 +11,7 @@ from src.knockout import (
     run_full_simulation,
 )
 
-DATA_DIR = "data"
+DATA_DIR = str(Path(__file__).resolve().parent.parent / "data")
 
 
 @pytest.fixture

@@ -25,11 +25,9 @@ from src.output import (
     print_coverage_audit,
     print_match_detail_table,
     print_focus_card,
-    wilson_score_ci,
-    format_ci,
-    wilson_ci_from_prob,
     _supports_color,
 )
+from football_core.math_utils import wilson_score_ci, format_ci, wilson_ci_from_prob
 
 
 @pytest.fixture
