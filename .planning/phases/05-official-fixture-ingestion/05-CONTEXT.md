@@ -58,6 +58,9 @@ Provider boundary validation uses stdlib dataclasses with explicit `validate()` 
 - **Integration tests:** Conditional on `BSD_API_KEY` being set (`pytest.mark.skipif`). Hit the real BSD API to verify live connectivity and data format.
 - **CI:** Runs both. Local devs can run the full unit suite without an API key.
 
+### D-12: Type-Adaptation Boundary at build_simulation_result()
+`build_simulation_result()` accepts `FixtureSchedule` from the provider chain, converts it to the legacy dict format (via `dataclasses.asdict()`) immediately before invoking the simulation engine. `competitions/ucl/src/simulation.py` remains unchanged throughout Phase 5. This keeps the phase boundary clean — the engine still sees the `fixtures: dict` it expects, while every path above the adapter speaks `FixtureSchedule`.
+
 ### the agent's Discretion
 - Cache file path and naming within `competitions/ucl/data/`
 - Warning message format for BSD fallback

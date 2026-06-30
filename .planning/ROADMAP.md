@@ -57,6 +57,56 @@
 - [x] 04-04-PLAN.md — Regression verification, documentation, release readiness
 
 </details>
+<details>
+<summary>🔜 v2 Prediction Quality (Phases 5-11) — PLANNED</summary>
+
+### Phase 5: Official Fixture Ingestion
+
+**Goal**: Replace synthetic-only execution path with FixtureProvider abstraction — BSD as primary fixture source, repo JSON as fallback. Remove synthetic-only execution path.
+**Depends on**: Phase 4 (BSD fetcher for validation, now repurposed for simulation)
+**Plans**: 3 plans
+
+- [ ] 05-01-PLAN.md — Interface contracts: FixtureProvider Protocol, FixtureSchedule schema, validation wiring + test scaffold
+- [ ] 05-02-PLAN.md — Provider implementations: BSDFixtureProvider (BSD + cache) + RepoFixtureProvider (repo JSON) + provider tests
+- [ ] 05-03-PLAN.md — CLI integration: --fixture-source flag, provider resolution chain, remove synthetic path
+
+### Phase 6: Simulation Modes
+
+**Goal**: Three-mode simulator — Simulation (full synthetic), Replay (inject real results), Live Conditioning (fetch real completed results, simulate forward). Unlocks historical backtesting and mid-tournament predictions.
+**Depends on**: Phase 5 (FixtureProvider abstraction)
+**Status**: Planned
+
+### Phase 7: Prediction Signals
+
+**Goal**: Multi-signal architecture — refined Elo, market odds, rolling form, squad value, rest days. SignalRegistry for plugin-style signal management. Each signal independently testable.
+**Depends on**: Phase 5 (fixture source for signal data; no hard dependency, but logical order)
+**Status**: Planned
+
+### Phase 8: Signal Blending & Market Integration
+
+**Goal**: Weighted ensemble with inverse-log-loss weights. Market odds as calibration baseline and blended signal. EnsembleEngine architecture.
+**Depends on**: Phase 7 (signals to blend)
+**Status**: Planned
+
+### Phase 9: Tournament Validation
+
+**Goal**: Three-tier validation framework — cross-tournament backtest, walk-forward match-level, replay validation. TRPS, Log Loss, ECE as primary metrics. Establishes uncalibrated baseline before calibration (Phase 10).
+**Depends on**: Phase 6 (replay mode for Tier 3), Phase 8 (blended signals to validate)
+**Status**: Planned
+
+### Phase 10: Probability Calibration & Uncertainty
+
+**Goal**: Temperature scaling for match-level calibration. Bayesian/Glicko-style Elo with (μ, σ²) per team. Confidence intervals on champion probabilities. Improves on baseline established by Phase 9.
+**Depends on**: Phase 7 (signals), Phase 8 (blended probabilities to calibrate)
+**Status**: Planned
+
+### Phase 11: Explainability & Production
+
+**Goal**: Prediction breakdown (signal contribution), counterfactual analysis, reporting improvements, production architecture refinements (config management, CLI cleanup).
+**Depends on**: Phases 5-10 (all prerequisite)
+**Status**: Planned
+
+</details>
 
 ## Progress
 
@@ -66,3 +116,10 @@
 | 2. UCL Knockout Phase | v1.0 | 4/4 | ✓ Complete | 2026-06-28 |
 | 3. UCL Simulation Orchestration + Display | v1.0 | 3/3 | ✓ Complete | 2026-06-28 |
 | 4. Validation & Production Readiness | v1.0 | 4/4 | ✓ Complete | 2026-06-29 |
+| 5. Official Fixture Ingestion | v2.0 | 3/3 | ✓ Complete | 2026-06-30 |
+| 6. Simulation Modes | v2.0 | 0/0 | ▷ Planned | — |
+| 7. Prediction Signals | v2.0 | 0/0 | ▷ Planned | — |
+| 8. Signal Blending & Market Integration | v2.0 | 0/0 | ▷ Planned | — |
+| 9. Tournament Validation | v2.0 | 0/0 | ▷ Planned | — |
+| 10. Probability Calibration & Uncertainty | v2.0 | 0/0 | ▷ Planned | — |
+| 11. Explainability & Production | v2.0 | 0/0 | ▷ Planned | — |

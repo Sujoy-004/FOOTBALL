@@ -1,18 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
+milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 5 context updated — FixtureProvider abstraction decisions locked (location, validation, BSD viability, testing) — ready for planning
-last_updated: "2026-06-29T23:45:00.000Z"
-last_activity: 2026-06-29 -- v2 planning refined: validation moved before calibration, football_core restriction removed
+status: executing
+stopped_at: Phase 5 complete — all 3 plans executed. Ready for Phase 6.
+last_updated: "2026-06-30T12:00:00.000Z"
 progress:
   total_phases: 11
-  completed_phases: 4
-  planned_phases: 7
-  total_plans: 22
-  completed_plans: 22
-  percent: 36
+  completed_phases: 5
+  total_plans: 17
+  completed_plans: 17
+  percent: 100
 ---
 
 # Project State
@@ -22,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29 after v2.0 planning)
 
 **Core value:** Adding a new competition requires only a new competition module — not changes to `football_core`
-**Current focus:** Milestone v2.0 — UCL Prediction Quality (planning complete, ready for execution)
+**Current focus:** Phase 05 — 06
 
 ## Current Position
 
 Milestone: v2.0 — UCL Prediction Quality
-Phase: 5 of 11 — Official Fixture Ingestion
-Plan: Not yet planned (CONTEXT written, execution phase pending)
-Status: v1.0 shipped, v2.0 planned
+Phase: 05 (06) — COMPLETE
+Plan: 3 of 3
+Status: Phase 5 complete — all 3 plans executed
 
-Progress: [########------------] 36% (4 completed phases, 7 planned)
+Progress: [####################----] 45% (5 completed phases, 6 planned)
 
 ## Performance Metrics
 
@@ -93,7 +91,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Plan and execute Phase 5 (Official Fixture Ingestion)
+- Plan and execute Phase 6 (Simulation Modes)
 
 ### Blockers/Concerns
 
@@ -115,6 +113,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-29
-Stopped at: v2.0 planning complete — 7 phases defined with CONTEXT docs. Ready for Phase 5 execution.
-Next: Execute Phase 5 (Official Fixture Ingestion) or `/gsd-progress` to review
+Last session: 2026-06-30
+Stopped at: Phase 5 complete — all 3 plans executed and verified. 172 UCL tests pass, 600 WC tests pass (1 skipped).
+Next: Execute Phase 6 (Simulation Modes) or `/gsd-progress` to review

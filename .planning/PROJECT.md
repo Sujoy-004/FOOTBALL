@@ -34,6 +34,32 @@ Adding a new competition requires only a new competition module — not changes 
 - [ ] **ENG-04**: `football_core` proven by 3+ competitions — World Cup, Euro, UCL (3 proven ✓), need at least one domestic league
 - [ ] **ENG-05**: La Liga / Premier League competition module — proving the core handles league-style (double round-robin) competitions
 
+### v2 (UCL Prediction Quality)
+
+- [ ] **UCLF-01**: BSD fixtures as primary simulation source, repo as fallback (Phase 5)
+- [ ] **UCLF-02**: FixtureProvider abstraction with two implementations (Phase 5)
+- [ ] **UCLF-03**: Remove synthetic-only execution path (Phase 5)
+- [ ] **UCLM-01**: Three simulation modes — simulate, replay, live (Phase 6)
+- [ ] **UCLM-02**: PlayedMatches override in simulation engine (Phase 6)
+- [ ] **UCLS-01**: Multi-signal architecture with SignalRegistry (Phase 7)
+- [ ] **UCLS-02**: Refined Elo with configurable K-factor (Phase 7)
+- [ ] **UCLS-03**: Market odds as simulation signal (Phase 7)
+- [ ] **UCLS-04**: Rolling form features (Phase 7)
+- [ ] **UCLS-05**: Squad value signal (Phase 7)
+- [ ] **UCLS-06**: Rest days signal (Phase 7)
+- [ ] **UCLB-01**: Weighted ensemble with inverse-log-loss weights (Phase 8)
+- [ ] **UCLB-02**: Market integration — calibration baseline, blended signal, value detection (Phase 8)
+- [ ] **UCLB-03**: EnsembleEngine with JSON config (Phase 8)
+- [ ] **UCLV-07**: Three-tier validation — cross-tournament, walk-forward, replay (Phase 9)
+- [ ] **UCLV-08**: TRPS tournament-level metric (Phase 9)
+- [ ] **UCLV-09**: Automated validation suite (Phase 9)
+- [ ] **UCLC-01**: Temperature scaling for calibration (Phase 10)
+- [ ] **UCLC-02**: Bayesian/Glicko-style Elo with uncertainty (Phase 10)
+- [ ] **UCLC-03**: Confidence intervals on champion probabilities (Phase 10)
+- [ ] **UCLE-01**: Prediction breakdown / signal contribution display (Phase 11)
+- [ ] **UCLE-02**: Counterfactual analysis (`--what-if`) (Phase 11)
+- [ ] **UCLE-03**: Production config management and CLI cleanup (Phase 11)
+
 ### Out of Scope
 
 - **pip-installable package** — deferred until 3 competitions (WC, UCL, 1 league) are proven stable and interfaces stop changing
@@ -50,6 +76,8 @@ This extraction produced `football_core/` at the repo root with 12 shared module
 
 **Shipped v1.0** (2026-06-29): UCL competition module with full Swiss-system league phase, knockout bracket, Monte Carlo simulation, BSD API validation, and documentation. 22,244 LOC Python across 94 files. `football_core` proven by 3 competitions (WC, Euro, UCL).
 
+**Planning v2.0** (2026-06-29): UCL prediction quality milestone — 7 phases addressing root causes identified in RESPONSE.md: real fixture ingestion, simulation modes, multi-signal architecture, signal blending, tournament validation (baseline), calibration/uncertainty (improvement), and explainability/production refinements. Driven by RESEARCH.md architectural study.
+
 Remaining legacy:
 - Euro's `__init__.py` still mutates `sys.path` to reach WC-specific `src.groups` functions — these need to be refactored into `football_core`
 - `competitions/worldcup/src/` still holds single-proven modules (blender, governance, form, lineup, enrichment) — some now shared (evaluation extracted to football_core)
@@ -59,7 +87,7 @@ Remaining legacy:
 
 - **Python 3.11+** — all code and CI targets 3.10–3.12
 - **No new runtime dependencies** — stick to stdlib + requests + catboost (already in requirements.txt)
-- **No modifying `football_core` for a single competition** — every change must be justified by evidence from multiple competitions
+- **Generic functionality belongs in `football_core`** — competition-agnostic primitives (fixture providers, signal interfaces, calibration pipelines, evaluation utilities) should live in `football_core` once proven by 2+ competitions. Competition-specific logic (UCL Swiss-system, WC group stage, league rules) stays in `competitions/<name>/`
 - **Sys.path bootstrap** — keep until 3 competitions are proven; no pyproject.toml yet
 - **WC regression suite** — must remain green (613 passed, 1 skipped) after every change
 - **Euro simulation** — must produce identical results after every change
@@ -77,16 +105,24 @@ Remaining legacy:
 | Synthetic schedules for dev, official for validation | Unblocks competition dev without official fixtures; gates validation/benchmarking/public reporting | ✓ ADR-002 — honored |
 | Elo-based expected_score for validation | Same foundation as simulation engine, no MC loop modification | ✓ Good — used in `run_validation()` |
 | Evaluation extraction: verbatim copy to football_core | Preserves WC 613-test regression compatibility | ✓ Good — 38 WC evaluation tests pass |
+| **v2 phases consolidated from 11 research topics to 7 phases** | Dependent topics grouped into coherent implementation phases; each phase independently executable | ✓ Planned — see ROADMAP.md |
+| **Temperature scaling over isotonic regression** | Limited calibration data (1 UCL season ≈ 144 matches); single-parameter T is robust | ✓ Planned — Phase 10 |
+| **Validation before calibration** | Establish uncalibrated baseline first, then measure calibration improvement — enables objective before/after comparison | ✓ Planned — Phase 9 (validation), Phase 10 (calibration) |
+| **No artificial football_core restriction** | Generic, proven-reusable functionality (fixture providers, signal interfaces, calibration utilities) belongs in football_core | ✓ Planned — phases may contribute to football_core |
+| **Weighted averaging over stacking** | Small-data regime; stacking deferred until 5+ tournament seasons of data exist | ✓ Planned — Phase 8 |
 
 ## Next Milestone Goals
 
-Potential directions for v1.1+ (subject to `/gsd:new-milestone` questioning):
+**v2.0 — UCL Prediction Quality** (current planning):
 
-1. **Domestic league module** (La Liga / Premier League) — prove football_core handles double round-robin format
-2. **Euro refactoring** — remove sys.path hack, extract shared group/advancement logic into football_core
-3. **Package & publish** — pyproject.toml for pip-installable football_core
-4. **UCL differentiators** — what-if scenarios, path visualization, strength-of-schedule reporting
+1. **Fixture quality** — real BSD fixtures replace synthetic schedules (Phase 5)
+2. **Simulation modes** — replay + live conditioning unlock validation (Phase 6)
+3. **Signal diversity** — market odds, form, squad value, rest days (Phase 7)
+4. **Signal blending** — weighted ensemble resolves contradictory probabilities (Phase 8)
+5. **Tournament validation** — three-tier framework establishing uncalibrated baseline (Phase 9)
+6. **Calibration & uncertainty** — temperature scaling + Bayesian Elo improving on baseline (Phase 10)
+7. **Explainability & production** — understanding and maintainability (Phase 11)
 
 ---
 
-*Last updated: 2026-06-29 after v1.0 milestone*
+*Last updated: 2026-06-29 after v2.0 planning*

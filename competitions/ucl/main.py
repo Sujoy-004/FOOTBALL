@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import random
 import sys
@@ -38,6 +39,9 @@ from competitions.ucl.src.knockout import (
     track_knockout_stages,
 )
 from competitions.ucl.src.elo_fetcher import fetch_team_elos
+from football_core.provider import FixtureSchedule, FixtureProviderError
+
+logger = logging.getLogger(__name__)
 
 # Enable ANSI color support on Windows
 os.system("")
@@ -69,11 +73,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--api-key", type=str, default=None,
         metavar="KEY", help="BSD API key (default: BSD_API_KEY env var)",
     )
+    parser.add_argument(
+        "--fixture-source", type=str, default="auto",
+        choices=["auto", "repo", "bsd"],
+        help="Fixture source: auto (try BSD, fallback repo), "
+             "repo (force repo), bsd (force BSD, fail if unavailable)",
+    )
     return parser.parse_args(argv)
 
 
 def build_simulation_result(
-    fixtures: dict,
+    fixtures: FixtureSchedule,
     elo_ratings: dict[str, float],
     seed: int,
     n_iterations: int,
@@ -83,7 +93,7 @@ def build_simulation_result(
     Parameters
     ----------
     fixtures:
-        UCL fixture schedule dict from fixtures.json.
+        UCL FixtureSchedule from provider chain.
     elo_ratings:
         {team_name: Elo} for all 36 teams.
     seed:
@@ -96,9 +106,12 @@ def build_simulation_result(
     SimulationResult
         Fully populated result contract with MC probabilities + bracket snapshot.
     """
+    # Convert FixtureSchedule to legacy dict format for engine compatibility
+    fixtures_dict = {"schedule": asdict(fixtures)}
+
     # ── 1. Run Monte Carlo for aggregated probabilities ──
     mc_result = run_monte_carlo(
-        fixtures,
+        fixtures_dict,
         elo_ratings=elo_ratings,
         n_iterations=n_iterations,
         seed=seed,
@@ -107,7 +120,7 @@ def build_simulation_result(
     # ── 2. Run one representative iteration for bracket display ──
     # Use the same seed so the first iteration is deterministic
     rng = random.Random(seed)
-    standings = simulate_league_phase(fixtures, elo_ratings, rng)
+    standings = simulate_league_phase(fixtures_dict, elo_ratings, rng)
 
     # Pre-load data files to avoid per-call disk I/O
     data_dir = os.path.join(
@@ -249,11 +262,47 @@ def main() -> None:
         "data",
     )
     fixtures_path = os.path.join(data_dir, "fixtures.json")
+
+    # Resolve fixture provider based on --fixture-source flag
+    api_key = args.api_key or os.environ.get("BSD_API_KEY")
+    fixture_source = args.fixture_source
+
+    # Build teams_data from repo fixtures (needed for BSD provider construction)
     with open(fixtures_path) as f:
-        fixtures = json.load(f)
+        repo_fixtures = json.load(f)
+    teams_data = repo_fixtures["schedule"]["teams"]
+
+    if fixture_source == "repo" or (fixture_source == "auto" and not api_key):
+        from competitions.ucl.src.provider import RepoFixtureProvider
+        provider = RepoFixtureProvider(fixtures_path=fixtures_path)
+        fixtures_schedule = provider.load()
+    else:
+        from competitions.ucl.src.provider import BSDFixtureProvider, RepoFixtureProvider
+        team_aliases_path = os.path.join(data_dir, "team_aliases.json")
+        with open(team_aliases_path) as f:
+            team_aliases = json.load(f)
+
+        bsd_provider = BSDFixtureProvider(
+            api_key=api_key,
+            aliases=team_aliases,
+            cache_dir=data_dir,
+            teams_data=teams_data,
+        )
+
+        if fixture_source == "auto":
+            try:
+                fixtures_schedule = bsd_provider.load()
+            except FixtureProviderError as e:
+                logger.warning(
+                    "BSD unavailable (%s) — falling back to RepoFixtureProvider", e,
+                )
+                provider = RepoFixtureProvider(fixtures_path=fixtures_path)
+                fixtures_schedule = provider.load()
+        else:
+            fixtures_schedule = bsd_provider.load()
 
     # Extract team names from fixtures and fetch Elo ratings
-    team_names = [t["name"] for t in fixtures["schedule"]["teams"]]
+    team_names = [t.name for t in fixtures_schedule.teams]
     elo_ratings = fetch_team_elos(team_names)
 
     # Determine seed
@@ -261,7 +310,7 @@ def main() -> None:
 
     # Run simulation
     result = build_simulation_result(
-        fixtures, elo_ratings, seed, args.iterations,
+        fixtures_schedule, elo_ratings, seed, args.iterations,
     )
 
     # Display results in D-06 tournament chronology order
@@ -283,7 +332,9 @@ def main() -> None:
         team_aliases_path = os.path.join(data_dir, "team_aliases.json")
         with open(team_aliases_path) as f:
             team_aliases = json.load(f)
-        real_matches = fetch_ucl_matches(api_key, team_aliases, fixtures["schedule"])
+        real_matches = fetch_ucl_matches(
+            api_key, team_aliases, asdict(fixtures_schedule),
+        )
 
         # Cross-check predictions vs real outcomes using expected_score from Elo
         validation_result = run_validation(result, real_matches, elo_ratings)
