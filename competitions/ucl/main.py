@@ -87,6 +87,7 @@ def build_simulation_result(
     elo_ratings: dict[str, float],
     seed: int,
     n_iterations: int,
+    played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
 ) -> SimulationResult:
     """Run MC simulation + one representative bracket iteration, return SimulationResult.
 
@@ -115,12 +116,13 @@ def build_simulation_result(
         elo_ratings=elo_ratings,
         n_iterations=n_iterations,
         seed=seed,
+        played_matches=played_matches,
     )
 
     # ── 2. Run one representative iteration for bracket display ──
     # Use the same seed so the first iteration is deterministic
     rng = random.Random(seed)
-    standings = simulate_league_phase(fixtures_dict, elo_ratings, rng)
+    standings = simulate_league_phase(fixtures_dict, elo_ratings, rng, played_matches=played_matches)
 
     # Pre-load data files to avoid per-call disk I/O
     data_dir = os.path.join(
