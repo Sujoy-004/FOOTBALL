@@ -19,21 +19,21 @@ class TestPlayedMatchesInjection:
     def test_single_played_match_injected(
         self, sample_fixture_schedule, sample_elo_dict, sample_rng,
     ):
-        played = {("Man City", "Bayern"): (5, 0)}
+        played = {("Barcelona", "Man City"): (5, 0)}
         standings = simulate_league_phase(
             sample_fixture_schedule, sample_elo_dict, sample_rng,
             played_matches=played,
         )
         city_entry = next(s for s in standings if s["team"] == "Man City")
-        bayern_entry = next(s for s in standings if s["team"] == "Bayern")
-        assert city_entry["gs"] >= 5
-        assert bayern_entry["gs"] >= 0
-        assert city_entry["gd"] >= 5
+        barca_entry = next(s for s in standings if s["team"] == "Barcelona")
+        assert barca_entry["gs"] >= 5
+        assert city_entry["gs"] >= 0
+        assert barca_entry["gd"] >= 5
 
     def test_replay_mode_mc_output(
         self, sample_fixture_schedule, sample_elo_dict,
     ):
-        played = {("Man City", "Bayern"): (3, 1)}
+        played = {("Barcelona", "Man City"): (3, 1)}
         result = run_monte_carlo(
             sample_fixture_schedule, sample_elo_dict,
             n_iterations=5, seed=42,
@@ -65,15 +65,15 @@ class TestPlayedMatchesInjection:
     def test_bidirectional_lookup(
         self, sample_fixture_schedule, sample_elo_dict, sample_rng,
     ):
-        played = {("Bayern", "Man City"): (2, 1)}
+        played = {("Atletico Madrid", "Man City"): (2, 1)}
         standings = simulate_league_phase(
             sample_fixture_schedule, sample_elo_dict, sample_rng,
             played_matches=played,
         )
         city_entry = next(s for s in standings if s["team"] == "Man City")
-        bayern_entry = next(s for s in standings if s["team"] == "Bayern")
-        assert city_entry["gd"] <= -1
-        assert bayern_entry["gd"] >= 1
+        atleti_entry = next(s for s in standings if s["team"] == "Atletico Madrid")
+        assert city_entry["gd"] >= 1
+        assert atleti_entry["gd"] <= -1
 
 
 class TestPlayedMatchesDeterminism:
@@ -82,7 +82,7 @@ class TestPlayedMatchesDeterminism:
     def test_same_seed_same_replay_output(
         self, sample_fixture_schedule, sample_elo_dict,
     ):
-        played = {("Man City", "Bayern"): (1, 1)}
+        played = {("Barcelona", "Man City"): (1, 1)}
         result1 = run_monte_carlo(
             sample_fixture_schedule, sample_elo_dict,
             n_iterations=5, seed=42,
@@ -98,7 +98,7 @@ class TestPlayedMatchesDeterminism:
     def test_played_matches_immutable_during_mc(
         self, sample_fixture_schedule, sample_elo_dict,
     ):
-        played = {("Man City", "Bayern"): (3, 0)}
+        played = {("Barcelona", "Man City"): (3, 0)}
         before_keys = set(played.keys())
         _ = run_monte_carlo(
             sample_fixture_schedule, sample_elo_dict,
@@ -115,7 +115,7 @@ class TestReplayDataLoading:
         from competitions.ucl.src.result_provider import ReplayMatchResultProvider
         import json
         data = {"matches": [
-            {"team_a": "Man City", "team_b": "Bayern",
+            {"team_a": "Barcelona", "team_b": "Man City",
              "home_score": 3, "away_score": 1},
             {"team_a": "Real Madrid", "team_b": "PSG",
              "home_score": 2, "away_score": 0},
@@ -125,10 +125,10 @@ class TestReplayDataLoading:
             json.dump(data, f)
         provider = ReplayMatchResultProvider(str(path))
         result = provider.load()
-        assert ("Man City", "Bayern") in result
-        assert result[("Man City", "Bayern")] == (3, 1)
-        assert ("Bayern", "Man City") in result
-        assert result[("Bayern", "Man City")] == (3, 1)
+        assert ("Barcelona", "Man City") in result
+        assert result[("Barcelona", "Man City")] == (3, 1)
+        assert ("Man City", "Barcelona") in result
+        assert result[("Man City", "Barcelona")] == (3, 1)
 
     def test_missing_file_raises(self):
         from competitions.ucl.src.result_provider import ReplayMatchResultProvider

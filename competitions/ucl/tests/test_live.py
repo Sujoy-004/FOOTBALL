@@ -15,9 +15,9 @@ class TestLiveMode:
         from competitions.ucl.src.result_provider import BSDMatchResultProvider
 
         mock_results = [
-            {"team_a": "Man City", "team_b": "Bayern",
+            {"team_a": "Barcelona", "team_b": "Man City",
              "home_score": 4, "away_score": 0,
-             "winner": "Man City", "is_draw": False,
+             "winner": "Barcelona", "is_draw": False,
              "match_id": "MD01_01", "completed_at": "2025-09-17"},
             {"team_a": "Real Madrid", "team_b": "PSG",
              "home_score": 1, "away_score": 1,
@@ -35,8 +35,8 @@ class TestLiveMode:
 
         provider = BSDMatchResultProvider("dummy_key", {}, {})
         result = provider.load()
-        assert ("Man City", "Bayern") in result
-        assert result[("Man City", "Bayern")] == (4, 0)
+        assert ("Barcelona", "Man City") in result
+        assert result[("Barcelona", "Man City")] == (4, 0)
         assert ("Real Madrid", "PSG") in result
         assert result[("Real Madrid", "PSG")] == (1, 1)
 
@@ -47,9 +47,9 @@ class TestLiveMode:
         from competitions.ucl.src.result_provider import convert_bsd_matches
 
         mock_bsd_results = [
-            {"team_a": "Man City", "team_b": "Bayern",
+            {"team_a": "Barcelona", "team_b": "Man City",
              "home_score": 3, "away_score": 0,
-             "winner": "Man City", "is_draw": False,
+             "winner": "Barcelona", "is_draw": False,
              "match_id": "MD01_01", "completed_at": "2025-09-17"},
         ]
 
