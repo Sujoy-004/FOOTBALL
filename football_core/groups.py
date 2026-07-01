@@ -384,6 +384,7 @@ def simulate_league_matches(
     base_rate: float = constants.EXPECTED_GOALS_BASE_RATE,
     matchup_lambdas: dict[str, tuple[float, float]] | None = None,
     fair_play: bool = True,
+    played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
 ) -> dict[str, dict]:
     """Simulate all matches in a league-format fixture schedule.
 
@@ -412,12 +413,33 @@ def simulate_league_matches(
     table_bits = _TABLE_BITS
     build_table = _build_poisson_table
 
+    played_lookup: dict[tuple[str, str], tuple[int, int]] = {}
+    if played_matches:
+        for (ta, tb), score in played_matches.items():
+            played_lookup[(ta, tb)] = score
+            played_lookup[(tb, ta)] = score
+
     results: dict[str, dict] = {}
     for matchday in schedule["matchdays"]:
         for match in matchday:
             mid = match["match_id"]
             ta: str = match["team_a"]
             tb: str = match["team_b"]
+
+            pair_key = (ta, tb)
+            if pair_key in played_lookup:
+                home_score, away_score = played_lookup[pair_key]
+                results[mid] = {
+                    "team_a": ta, "team_b": tb,
+                    "score_a": home_score, "score_b": away_score,
+                    "winner": ta if home_score > away_score
+                              else tb if away_score > home_score
+                              else None,
+                    "yellow_cards_a": 0, "red_cards_a": 0,
+                    "yellow_cards_b": 0, "red_cards_b": 0,
+                }
+                continue
+
             la, lb = matchup_lambdas[mid]
 
             score_a = (
