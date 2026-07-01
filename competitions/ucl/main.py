@@ -79,6 +79,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Fixture source: auto (try BSD, fallback repo), "
              "repo (force repo), bsd (force BSD, fail if unavailable)",
     )
+    parser.add_argument(
+        "--mode", type=str, default="simulate",
+        choices=["simulate", "replay", "live"],
+        help="Simulation mode: simulate (default), replay, or live",
+    )
+    parser.add_argument(
+        "--replay-data", type=str, default=None,
+        metavar="FILE",
+        help="JSON file with played match results (required for replay mode)",
+    )
     return parser.parse_args(argv)
 
 
@@ -310,9 +320,12 @@ def main() -> None:
     # Determine seed
     seed = args.seed if args.seed is not None else random.randrange(10000)
 
-    # Run simulation
-    result = build_simulation_result(
+    # Run simulation via orchestrator (D-05: mode routing in orchestrator.py)
+    from competitions.ucl.src.orchestrator import run_simulation
+
+    result = run_simulation(
         fixtures_schedule, elo_ratings, seed, args.iterations,
+        args, data_dir,
     )
 
     # Display results in D-06 tournament chronology order

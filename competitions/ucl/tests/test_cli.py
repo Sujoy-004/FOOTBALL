@@ -127,3 +127,41 @@ class TestProviderResolution:
         assert isinstance(schedule, FixtureSchedule)
         assert len(schedule.teams) == 36
         assert len(schedule.matchdays) == 8
+
+
+class TestModeFlags:
+    """Tests for the --mode and --replay-data CLI flags."""
+
+    def test_default_is_simulate(self):
+        args = _parse_args([])
+        assert args.mode == "simulate"
+
+    def test_replay_flag(self):
+        args = _parse_args(["--mode", "replay"])
+        assert args.mode == "replay"
+
+    def test_live_flag(self):
+        args = _parse_args(["--mode", "live"])
+        assert args.mode == "live"
+
+    def test_invalid_mode_rejected(self):
+        try:
+            _parse_args(["--mode", "invalid"])
+            assert False, "Should have raised SystemExit"
+        except SystemExit:
+            pass
+
+    def test_replay_data_flag(self):
+        args = _parse_args(["--mode", "replay", "--replay-data", "data.json"])
+        assert args.mode == "replay"
+        assert args.replay_data == "data.json"
+
+    def test_replay_data_defaults_none(self):
+        args = _parse_args(["--mode", "replay"])
+        assert args.replay_data is None
+
+    def test_mode_compatible_with_other_flags(self):
+        args = _parse_args(["-n", "5000", "--mode", "live", "--seed", "42"])
+        assert args.iterations == 5000
+        assert args.mode == "live"
+        assert args.seed == 42
