@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 complete — all 3 plans executed. Ready for Phase 6.
-last_updated: "2026-06-30T12:00:00.000Z"
+stopped_at: Session resumed, proceeding to plan Phase 6 (Simulation Modes)
+last_updated: "2026-07-01T04:47:45.894Z"
 progress:
   total_phases: 11
   completed_phases: 5
-  total_plans: 17
+  total_plans: 23
   completed_plans: 17
-  percent: 100
+  percent: 74
 ---
 
 # Project State
@@ -20,16 +20,38 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29 after v2.0 planning)
 
 **Core value:** Adding a new competition requires only a new competition module — not changes to `football_core`
-**Current focus:** Phase 05 — 06
+**Current focus:** Phase null — 6
 
 ## Current Position
 
 Milestone: v2.0 — UCL Prediction Quality
-Phase: 05 (06) — COMPLETE
-Plan: 3 of 3
-Status: Phase 5 complete — all 3 plans executed
+Phase: null (6) — EXECUTING
+Plan: 1 of ?
+Plans: 3 of 0 (replanned)
+Status: Executing Phase null
 
-Progress: [####################----] 45% (5 completed phases, 6 planned)
+### Changes Made (2026-07-01 replan)
+
+**D-07 (signal code location):** Added `decisions: [D-07]` to all 3 plan frontmatter. Plans already conform with signals in `football_core/signals/`.
+
+**D-08 (SignalRegistry.evaluate()):** Updated 07-01-PLAN.md:
+
+- Added `evaluate()` method to SignalRegistry — iterates registered signals, catches exceptions per signal, returns uniform (1/3, 1/3, 1/3) for failures
+- Added 4 new test cases (evaluate_returns_dict, evaluate_values_are_signal_output, evaluate_failing_signal_returns_uniform, evaluate_failing_signal_does_not_affect_others)
+- Added T-07-07 threat: DoS via broken signal mitigated by per-signal exception catching
+- Added `decisions: [D-07, D-08]` to frontmatter
+
+**D-09 (RollingFormSignal uses MatchResultProvider):** Updated 07-03-PLAN.md:
+
+- Defined `MatchResultProvider` Protocol in `football_core/result_provider.py` with `@runtime_checkable` and `get_team_results()` method
+- Updated `RollingFormSignal.__init__()` to require a `MatchResultProvider` parameter instead of reading `context.played_results`
+- Replaced `sample_played_results` conftest fixture with `sample_match_result_provider` and `empty_result_provider` fixtures using `_MockMatchResultProvider` stub
+- Updated test methods to use provider-based data access
+- Added `decisions: [D-07, D-09]` to frontmatter
+
+**Cross-cutting:** Updated 07-VALIDATION.md with D-08 and D-09 verification entries. Updated 07-01 must_haves with result_provider.py artifact.
+
+Progress: [######################--] 55% (5 completed phases, 2 planned, 4 remaining)
 
 ## Performance Metrics
 
@@ -113,6 +135,5 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-30
-Stopped at: Phase 5 complete — all 3 plans executed and verified. 172 UCL tests pass, 600 WC tests pass (1 skipped).
-Next: Execute Phase 6 (Simulation Modes) or `/gsd-progress` to review
+Last session: 2026-07-01
+Stopped at: Session resumed, proceeding to plan Phase 6 (Simulation Modes)
