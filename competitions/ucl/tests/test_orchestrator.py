@@ -35,8 +35,9 @@ class TestResolvePlayedMatches:
         with pytest.raises(SystemExit):
             resolve_played_matches(FakeArgs(), "/data", None)
 
-    def test_live_mode_without_key_exits(self):
+    def test_live_mode_without_key_exits(self, monkeypatch):
         """Live mode without API key exits with error."""
+        monkeypatch.delenv("BSD_API_KEY", raising=False)
         from competitions.ucl.src.orchestrator import resolve_played_matches
 
         class FakeArgs:
