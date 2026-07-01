@@ -66,6 +66,30 @@ class FixtureSchedule:
         validate_ucl_fixtures(fixture_dict)
 
 
+@runtime_checkable
+class MatchResultProvider(Protocol):
+    """Protocol that all match result providers implement.
+
+    Follows the same pattern as FixtureProvider.
+    Implementations load match results from their source (JSON, BSD API, etc.)
+    and return a played_matches dict for injection into the simulation engine.
+    """
+
+    def load(
+        self,
+    ) -> dict[tuple[str, str], tuple[int, int]]:
+        """Load and return played match results.
+
+        Returns a dict keyed by (team_a, team_b) tuple with
+        (home_score, away_score) values. Both orientations are stored
+        for bidirectional lookup.
+
+        Raises FileNotFoundError, json.JSONDecodeError, or custom errors
+        specific to the provider implementation.
+        """
+        ...
+
+
 class FixtureProviderError(Exception):
     """Raised when a provider cannot produce a valid fixture schedule."""
 
