@@ -969,3 +969,122 @@ def sample_cached_fixtures(tmp_path, sample_fixture_schedule):
     with open(cache_path, "w") as f:
         json.dump(cache_data, f, indent=2)
     return tmp_path
+
+
+# ── Signal fixtures (Phase 7) ──────────────────────────────────────────────
+
+
+@pytest.fixture
+def sample_match_data():
+    """Returns a single match dict matching the Match schema."""
+    return {
+        "match_id": "MD01_01",
+        "team_a": "Manchester City",
+        "team_b": "Bayern Munich",
+        "home_pot": 1,
+        "away_pot": 1,
+        "event_date": "2026-09-15T19:00:00+00:00",
+    }
+
+
+@pytest.fixture
+def sample_prediction_context():
+    """Returns a PredictionContext with sample Elo ratings."""
+    from football_core.signal import PredictionContext
+
+    return PredictionContext(
+        fixtures=[],
+        elo_ratings={
+            "Manchester City": 2100.0,
+            "Bayern Munich": 2050.0,
+            "Real Madrid": 2080.0,
+            "Liverpool": 2030.0,
+        },
+        played_results=[],
+        team_aliases={},
+        squad_values={},
+    )
+
+
+@pytest.fixture
+def sample_match_with_odds_data(sample_match_data):
+    """Like sample_match_data but with BSD odds fields."""
+    return {**sample_match_data,
+        "odds_home": 2.10,
+        "odds_draw": 3.40,
+        "odds_away": 3.80,
+    }
+
+
+class _MockMatchResultProvider:
+    """Minimal stub implementing MatchResultProvider for tests."""
+
+    def __init__(self, results: list[dict], default_return: list | None = None):
+        self._results = results
+        self._default = default_return or []
+
+    def get_team_results(
+        self, team: str, before_date: str, limit: int = 10
+    ) -> list[dict]:
+        filtered = [
+            r
+            for r in self._results
+            if (r.get("team_a") == team or r.get("team_b") == team)
+            and r.get("event_date", "") < before_date
+        ]
+        return sorted(filtered, key=lambda r: r.get("event_date", ""), reverse=True)[
+            :limit
+        ]
+
+
+@pytest.fixture
+def sample_match_result_provider():
+    """Returns a _MockMatchResultProvider with 5 pre-built results."""
+    return _MockMatchResultProvider([
+        {
+            "match_id": "PREV_01",
+            "team_a": "Manchester City",
+            "team_b": "Arsenal",
+            "event_date": "2026-09-01T19:00:00+00:00",
+            "home_score": 3, "away_score": 0,
+            "winner": "Manchester City", "is_draw": False,
+        },
+        {
+            "match_id": "PREV_02",
+            "team_a": "Chelsea",
+            "team_b": "Manchester City",
+            "event_date": "2026-08-25T19:00:00+00:00",
+            "home_score": 1, "away_score": 2,
+            "winner": "Manchester City", "is_draw": False,
+        },
+        {
+            "match_id": "PREV_03",
+            "team_a": "Manchester City",
+            "team_b": "Liverpool",
+            "event_date": "2026-08-18T19:00:00+00:00",
+            "home_score": 1, "away_score": 1,
+            "winner": None, "is_draw": True,
+        },
+        {
+            "match_id": "PREV_04",
+            "team_a": "Bayern Munich",
+            "team_b": "Dortmund",
+            "event_date": "2026-09-02T19:00:00+00:00",
+            "home_score": 3, "away_score": 1,
+            "winner": "Bayern Munich", "is_draw": False,
+        },
+        {
+            "match_id": "PREV_05",
+            "team_a": "Leverkusen",
+            "team_b": "Bayern Munich",
+            "event_date": "2026-08-26T19:00:00+00:00",
+            "home_score": 2, "away_score": 2,
+            "winner": None, "is_draw": True,
+        },
+    ])
+
+
+@pytest.fixture
+def empty_result_provider():
+    """Returns a _MockMatchResultProvider with no results."""
+    return _MockMatchResultProvider([])
