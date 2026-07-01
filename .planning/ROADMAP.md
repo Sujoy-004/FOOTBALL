@@ -76,10 +76,10 @@
 **Depends on**: Phase 5 (FixtureProvider abstraction)
 **Plans**: 3 plans
 
-- [ ] 06-01-PLAN.md — Engine: PlayedMatches injection in simulate_league_matches() + UCL pipeline threading (Wave 1)
-- [ ] 06-02-PLAN.md — MatchResultProvider + run_monte_carlo/build_simulation_result threading (Wave 1)
-- [ ] 06-03-PLAN.md — CLI --mode/--replay-data flags + mode routing + tests (Wave 2)
-**Status**: Planned
+- [x] 06-01-PLAN.md — Engine: PlayedMatches injection in simulate_league_matches() + UCL pipeline threading (Wave 1)
+- [x] 06-02-PLAN.md — MatchResultProvider + run_monte_carlo/build_simulation_result threading (Wave 1)
+- [x] 06-03-PLAN.md — CLI --mode/--replay-data flags + mode routing + tests (Wave 2)
+**Status**: Complete ✓ (2026-07-01)
 
 ### Phase 7: Prediction Signals
 
@@ -130,7 +130,7 @@
 | 3. UCL Simulation Orchestration + Display | v1.0 | 3/3 | ✓ Complete | 2026-06-28 |
 | 4. Validation & Production Readiness | v1.0 | 4/4 | ✓ Complete | 2026-06-29 |
 | 5. Official Fixture Ingestion | v2.0 | 3/3 | ✓ Complete | 2026-06-30 |
-| 6. Simulation Modes | v2.0 | 3/0 | ▷ Planned | — |
+| 6. Simulation Modes | v2.0 | 3/3 | ✓ Complete | 2026-07-01 |
 | 7. Prediction Signals | v2.0 | 3/3 | ✓ Complete | 2026-07-01 |
 | 8. Signal Blending & Market Integration | v2.0 | 0/0 | ▷ Planned | — |
 | 9. Tournament Validation | v2.0 | 0/0 | ▷ Planned | — |
