@@ -88,12 +88,12 @@
 **Plans**: 3 plans
 
 **Wave 1** *(parallel)*
-- [ ] 07-01-PLAN.md — Signal Protocol + SignalOutput + PredictionContext + SignalRegistry (foundation)
-- [ ] 07-02-PLAN.md — RefinedEloSignal + MarketOddsSignal (core signals)
+- [x] 07-01-PLAN.md — Signal Protocol + SignalOutput + PredictionContext + SignalRegistry (foundation)
+- [x] 07-02-PLAN.md — RefinedEloSignal + MarketOddsSignal (core signals)
 
 **Wave 2** *(blocked on Wave 1)*
-- [ ] 07-03-PLAN.md — RollingFormSignal + SquadValueSignal + RestDaysSignal (advanced signals)
-**Status**: Planned
+- [x] 07-03-PLAN.md — RollingFormSignal + SquadValueSignal + RestDaysSignal (advanced signals)
+**Status**: Complete
 
 ### Phase 8: Signal Blending & Market Integration
 
@@ -131,7 +131,7 @@
 | 4. Validation & Production Readiness | v1.0 | 4/4 | ✓ Complete | 2026-06-29 |
 | 5. Official Fixture Ingestion | v2.0 | 3/3 | ✓ Complete | 2026-06-30 |
 | 6. Simulation Modes | v2.0 | 3/0 | ▷ Planned | — |
-| 7. Prediction Signals | v2.0 | 3/0 | ▷ Planned | — |
+| 7. Prediction Signals | v2.0 | 3/3 | ✓ Complete | 2026-07-01 |
 | 8. Signal Blending & Market Integration | v2.0 | 0/0 | ▷ Planned | — |
 | 9. Tournament Validation | v2.0 | 0/0 | ▷ Planned | — |
 | 10. Probability Calibration & Uncertainty | v2.0 | 0/0 | ▷ Planned | — |
