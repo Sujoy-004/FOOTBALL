@@ -58,6 +58,7 @@ def simulate_league_phase(
     rng: random.Random,
     uefa_coefficients: dict[str, float] | None = None,
     matchup_lambdas: dict[str, tuple[float, float]] | None = None,
+    played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
 ) -> list[dict]:
     """Simulate one complete UCL league phase iteration.
 
@@ -91,6 +92,7 @@ def simulate_league_phase(
         rng,
         base_rate=EXPECTED_GOALS_BASE_RATE,
         matchup_lambdas=matchup_lambdas,
+        played_matches=played_matches,
     )
 
     standings = compute_swiss_standings(
@@ -188,6 +190,7 @@ def run_monte_carlo(
     seed: int = 42,
     uefa_coefficients: dict[str, float] | None = None,
     team_aliases: dict[str, str] | None = None,
+    played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
 ) -> dict:
     """Run Monte Carlo simulation of UCL league phase.
 
@@ -273,6 +276,7 @@ def run_monte_carlo(
             rng,
             uefa_coefficients=uefa_coefficients,
             matchup_lambdas=matchup_lambdas,
+            played_matches=played_matches,
         )
 
         # ── Knockout pipeline (Phase 2) ─────────────────────────────────
