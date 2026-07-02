@@ -10,6 +10,7 @@ import json
 import math
 
 from football_core.elo import expected_score
+from football_core.signal import BlendedPrediction, PredictionContext, Signal, SignalRegistry, SignalOutput
 
 EPS = 1e-15
 RIDGE = 1e-6
@@ -214,3 +215,110 @@ def compute_poisson_base_rate(match_data_path: str | None = None, fallback: floa
         return round(rate, 4)
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return fallback
+
+
+class EnsembleEngine:
+    """Orchestrates signal evaluation and blends results into a single prediction.
+
+    Wraps SignalRegistry for signal evaluation, applies weighted averaging
+    per outcome (home/draw/away independently), re-normalizes to 1.0.
+    """
+
+    def __init__(
+        self,
+        signals: list[Signal],
+        weights: dict[str, float] | None = None,
+        weights_path: str | None = None,
+    ):
+        """Construct engine with signals and weights.
+
+        Args:
+            signals: List of Signal instances to register and evaluate.
+            weights: Optional direct weights dict (takes precedence over file).
+            weights_path: Optional path to JSON weight config file.
+                If both weights and weights_path are None, uniform weights are used.
+        """
+        self._registry = SignalRegistry()
+        for sig in signals:
+            self._registry.register(sig)
+
+        # Resolve weights: direct dict > JSON file > uniform fallback
+        if weights is not None:
+            self._weights = dict(weights)
+        elif weights_path is not None:
+            with open(weights_path) as f:
+                data = json.load(f)
+            raw = data.get("weights", {})
+            self._weights = {k: v for k, v in raw.items() if v > 0}
+        else:
+            # Uniform fallback to all registered signals
+            names = self._registry.list()
+            uniform = 1.0 / len(names) if names else 0.0
+            self._weights = {n: uniform for n in names}
+
+    def evaluate(self, match: dict, context: PredictionContext) -> BlendedPrediction:
+        """Evaluate all registered signals and blend into a single prediction.
+
+        Args:
+            match: Match dict with team_a, team_b, match_id, etc.
+            context: PredictionContext with elo_ratings, fixtures, etc.
+
+        Returns:
+            BlendedPrediction with blended probabilities, signal breakdown, and weights.
+        """
+        signal_results = self._registry.evaluate(match, context)
+        return self._blend(signal_results)
+
+    def _blend(self, results: dict[str, SignalOutput]) -> BlendedPrediction:
+        """Blend per-signal SignalOutputs into a single BlendedPrediction.
+
+        Blends home_prob, draw_prob, away_prob independently, then
+        re-normalizes to handle floating-point drift.
+        """
+        # Filter to signals that have weights and produced output
+        active = {name: out for name, out in results.items() if name in self._weights}
+
+        if not active:
+            return BlendedPrediction(1 / 3, 1 / 3, 1 / 3, {}, {})
+
+        # Re-normalize weights for available signals
+        avail_weights = {n: self._weights[n] for n in active}
+        total_w = sum(avail_weights.values())
+        if total_w <= 0:
+            return BlendedPrediction(1 / 3, 1 / 3, 1 / 3, {}, {})
+        norm_weights = {n: w / total_w for n, w in avail_weights.items()}
+
+        # Blend each outcome independently per Pitfall 1
+        blended_h = sum(norm_weights[n] * r.home_prob for n, r in active.items())
+        blended_d = sum(norm_weights[n] * r.draw_prob for n, r in active.items())
+        blended_a = sum(norm_weights[n] * r.away_prob for n, r in active.items())
+
+        # Re-normalize to handle floating-point drift per D-01
+        total = blended_h + blended_d + blended_a
+        if total > 0:
+            blended_h /= total
+            blended_d /= total
+            blended_a /= total
+
+        # Build breakdown dict: {signal_name: {home, draw, away, weight}}
+        breakdown = {}
+        for name, result in active.items():
+            breakdown[name] = {
+                "home": round(result.home_prob, 4),
+                "draw": round(result.draw_prob, 4),
+                "away": round(result.away_prob, 4),
+                "weight": round(norm_weights[name], 4),
+            }
+
+        return BlendedPrediction(
+            home_prob=round(blended_h, 6),
+            draw_prob=round(blended_d, 6),
+            away_prob=round(blended_a, 6),
+            signal_breakdown=breakdown,
+            weights_applied=dict(norm_weights),
+        )
+
+    @property
+    def weights(self) -> dict[str, float]:
+        """Return current weights dict (read-only)."""
+        return dict(self._weights)
