@@ -25,11 +25,16 @@ Tests are organized by layer, mirroring the project's three-tier architecture:
 
 ```
 FOOTBALL/
-├── football_core/tests/                  ← Shared engine library (1 file)
+├── football_core/tests/                  ← Shared engine library (6 test files, 85 tests)
 │   ├── __init__.py
-│   └── test_evaluation.py                Brier score, log loss, calibration, ECE
+│   ├── test_availability_signal.py       Availability: team unavailability, match probability
+│   ├── test_defensive_quality_signal.py  Defensive quality rating and probability
+│   ├── test_evaluation.py                Brier score, log loss, calibration, ECE
+│   ├── test_manager_effect_signal.py     Manager effect rating and probability
+│   ├── test_manager_provider.py          Manager data parsing (providers.manager)
+│   └── test_player_provider.py           Player data parsing (providers.player)
 │
-├── competitions/worldcup/tests/          ← World Cup 2026 (26 files, 613 tests)
+├── competitions/worldcup/tests/          ← World Cup 2026 (24 test files, 615 tests)
 │   ├── __init__.py
 │   ├── conftest.py                        Shared fixtures (sample_teams, sample_groups, etc.)
 │   ├── fixtures/                          TSV data files
@@ -60,7 +65,7 @@ FOOTBALL/
 │   ├── test_state.py
 │   └── test_state_load.py
 │
-├── competitions/ucl/tests/               ← UCL 2025/26 (11 files, 149 tests)
+├── competitions/ucl/tests/               ← UCL 2025/26 (15 test files, 246 tests)
 │   ├── __init__.py
 │   ├── conftest.py                        Shared fixtures (36-team data, schedule, etc.)
 │   ├── test_cli.py
@@ -68,7 +73,13 @@ FOOTBALL/
 │   ├── test_fetcher.py
 │   ├── test_fixture_validation.py
 │   ├── test_knockout.py
+│   ├── test_live.py                       Live mode: BSD fetch + played_matches injection
 │   ├── test_monte_carlo.py
+│   ├── test_orchestrator.py               Simulation mode orchestrator
+│   ├── test_provider.py                   Fixture providers: Protocol conformance, schedule validation
+│   ├── test_replay.py                     Replay mode: played_matches injection
+│   ├── test_signal_registry.py            Signal Protocol, SignalOutput, SignalRegistry
+│   ├── test_signals.py                    All signal implementations (RefinedElo, MarketOdds, etc.)
 │   ├── test_simulation.py
 │   ├── test_swiss_tiebreakers.py
 │   └── test_validation.py
@@ -227,11 +238,13 @@ Only the **World Cup** competition has a CI pipeline. It is defined in:
 
 ```yaml
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -241,16 +254,24 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
+
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: |
+
+      - name: Install dependencies
+        run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install requests numpy
-      - run: python -m pytest -v --cov=src --cov-report=term-missing
+
+      - name: Test with pytest
+        run: |
+          python -m pytest -v --cov=src --cov-report=term-missing
         env:
           BSD_API_KEY: ${{ secrets.BSD_API_KEY }}
 ```
@@ -286,7 +307,7 @@ def test_live_smoke_once():
     ...
 ```
 
-When running locally without the key, the test suite reports **613 passed, 1 skipped**. When running in CI (where `BSD_API_KEY` is available via secrets), the live smoke test executes as part of the full suite.
+When running locally without the key, the test suite reports **614 passed, 1 skipped**. When running in CI (where `BSD_API_KEY` is available via secrets), the live smoke test executes as part of the full suite.
 
 To run the live smoke test locally:
 

@@ -55,7 +55,6 @@ The core dependencies are:
 | `pytest-cov>=7.1` | Test coverage reporting |
 | `python-dotenv>=1.0` | Load `.env` for API keys |
 | `requests` | HTTP client for the BSD sports data API |
-| `numpy` | Numerical operations in the simulation engine |
 
 ---
 
@@ -82,7 +81,22 @@ cp .env.example .env
 # BSD_API_KEY=your_api_key_here
 ```
 
-Without the API key, the engine falls back to Elo-only mode — predictions are still generated, but live data and advanced signals (market odds, CatBoost) are unavailable.
+Without the API key, the engine falls back to Elo-only mode — predictions are still generated, but live data and the full 8-signal blend pipeline are unavailable.
+
+The eight prediction signals are:
+
+| Signal | Source | Description |
+|---|---|---|
+| **Elo** | Built-in (always available) | Head-to-head Elo rating differential |
+| **Market odds** | BSD API | Bookmaker-implied probabilities |
+| **CatBoost** | BSD API | ML model prediction from team-level features |
+| **Rolling form** | Computed locally | Recent performance trend (last N matches) |
+| **Lineup strength** | Computed locally | Squad quality based on market value / lineup data |
+| **Defensive quality** | BSD API | Expected goals conceded — defensive solidity metric |
+| **Manager effect** | BSD API | Historical manager performance vs. opponent levels |
+| **Availability / injury** | BSD API | Key player absences and squad depth impact |
+
+Each signal is independently calibrated and blended via inverse-Brier weighting — signals with lower historical Brier scores (more accurate) carry more weight in the final prediction.
 
 ---
 
@@ -100,7 +114,7 @@ python -m competitions.worldcup.main
 # Reproducible simulation with a fixed seed
 python -m competitions.worldcup.main --once --seed 42
 
-# Full list of flags: --once, --no-color, --seed N, --ai-preview, --match-detail
+# Full list of flags: --once, --no-color, --seed N, --ai-preview, --match-detail, --league ID, --list-leagues
 ```
 
 The World Cup predictor simulates 48 teams across 12 groups (A–L), 104 total matches (72 group + 32 knockout), with annex C routing for the 8 best third-placed teams. It runs 50,000 Monte Carlo iterations per cycle.
@@ -120,10 +134,18 @@ python -m competitions.ucl.main -n 10000 -s 42 -o results.json
 # Validate predictions against real BSD match results (requires API key)
 python -m competitions.ucl.main -n 10000 --validate --api-key YOUR_KEY
 
-# Full list of flags: -n N, -s N, -o FILE, --validate, --api-key KEY
+# Full list of flags: -n N, -s N, -o FILE, --validate, --api-key KEY, --fixture-source {auto,repo,bsd}, --mode {simulate,replay,live}, --replay-data FILE
 ```
 
 The UCL predictor simulates a 36-team Swiss-system league phase (8 matchdays), followed by the playoff round, seeded R16 bracket, quarter-finals, semi-finals, and final.
+
+Three simulation modes are available:
+
+- **`--mode simulate`** (default) — Full synthetic simulation with no real-world match data.
+- **`--mode replay`** — Replay a known schedule from a JSON file (requires `--replay-data FILE`).
+- **`--mode live`** — Fetch real match results from the BSD API to seed the simulation (requires API key).
+
+The `--fixture-source` flag controls where fixtures are loaded from: `auto` (try BSD, fall back to local repo), `repo` (local fixtures only), or `bsd` (BSD API only, fails if unavailable).
 
 ### UEFA Euro 2024 (`euro-predict` — dormant)
 
@@ -141,7 +163,7 @@ The Euro predictor is currently dormant. It shares its architecture with the Wor
 
 ## Running Tests
 
-### World Cup test suite (613 tests)
+### World Cup test suite (614 tests)
 
 ```bash
 # Run all tests from the project root
@@ -151,11 +173,20 @@ pytest competitions/worldcup/tests/
 pytest competitions/worldcup/tests/ --cov=competitions.worldcup.src --cov-report=term-missing
 ```
 
-### UCL test suite (149 tests)
+### UCL test suite (246 tests)
 
 ```bash
-pytest competitions/ucl/tests/ -x --timeout=60
+pytest competitions/ucl/tests/ -x
 ```
+
+### football_core test suite (85 tests)
+
+```bash
+pytest football_core/tests/ -v
+pytest football_core/tests/ --cov=football_core --cov-report=term-missing
+```
+
+The football_core library contains the shared signal computation, Elo engine, and enrichment pipeline used by both competition predictors.
 
 ---
 

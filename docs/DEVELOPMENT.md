@@ -91,27 +91,55 @@ if _repo_root not in sys.path:
 
 ```
 FOOTBALL/
-├── football_core/                   ← Shared engine library (imported by all competitions)
+├── football_core/                     ← Shared engine library (imported by all competitions)
 │   ├── __init__.py
-│   ├── constants.py                 K-factor, Elo defaults, Poisson config, timeouts
-│   ├── elo.py                       Expected score, K-factor, rating updates
-│   ├── elo_sync.py                  Fetch/parse Elo ratings from eloratings.net
-│   ├── fetcher.py                   BSD API match fetching, dedup, normalization
-│   ├── groups.py                    Poisson match simulation, tiebreaker chain, round-robin
-│   ├── knockout.py                  Generic round-map building, match simulation, blended probs
-│   ├── evaluation.py                Brier score, log loss, calibration, ECE
-│   ├── state.py                     JSON persistence with atomic writes, caching helpers
-│   ├── math_utils.py                Sigmoid and other small math helpers
+│   ├── constants.py                   K-factor, Elo defaults, Poisson config, timeouts
+│   ├── elo.py                         Expected score, K-factor, rating updates
+│   ├── elo_sync.py                    Fetch/parse Elo ratings from eloratings.net
+│   ├── elo_fetcher.py                 Fetch ClubElo ratings from api.clubelo.com
+│   ├── fetcher.py                     BSD API match fetching, dedup, normalization
+│   ├── groups.py                      Poisson match simulation, tiebreaker chain, round-robin
+│   ├── knockout.py                    Generic round-map building, match simulation, blended probs
+│   ├── evaluation.py                  Brier score, log loss, calibration, ECE
+│   ├── state.py                       JSON persistence with atomic writes, caching helpers
+│   ├── math_utils.py                  Sigmoid and other small math helpers
+│   ├── signal.py                      Signal interface, SignalOutput, PredictionContext protocol
+│   ├── provider.py                    Fixture provider interface, Team/Match dataclasses
+│   ├── result_provider.py             MatchResultProvider protocol for form computation
+│   ├── enrichment.py                  Match stats/context extraction from BSD events
+│   ├── blender.py                     Platt scaling, Brier-weighted blending, calibration
 │   ├── predictors/
-│   │   ├── odds.py                  Market odds ingestion and vig removal
-│   │   └── catboost.py              CatBoost ML prediction ingestion from BSD API
-│   └── tests/
-│       └── test_evaluation.py       Core evaluation metric tests
+│   │   ├── __init__.py
+│   │   ├── odds.py                    Market odds ingestion and vig removal
+│   │   └── catboost.py                CatBoost ML prediction ingestion from BSD API
+│   ├── providers/                     ← Data provider implementations for BSD API
+│   │   ├── __init__.py
+│   │   ├── manager.py                 ManagerProfile fetcher from BSD /api/managers/
+│   │   ├── player.py                  PlayerProfile fetcher from BSD /api/v2/players/
+│   │   └── team.py                    Team ID→name mapping from BSD /api/teams/
+│   ├── signals/                       ← Independent prediction signal implementations
+│   │   ├── __init__.py
+│   │   ├── availability.py            Availability/injury impact signal
+│   │   ├── defensive_quality.py       Defensive quality signal
+│   │   ├── manager_effect.py          Manager experience effect signal
+│   │   ├── market_odds.py             Market odds prediction signal
+│   │   ├── refined_elo.py             Refined Elo-based prediction signal
+│   │   ├── rest_days.py               Rest days advantage signal
+│   │   ├── rolling_form.py            Rolling form signal (D-09)
+│   │   └── squad_value.py             Squad market value signal
+│   └── tests/                         7 test files, 85 tests
+│       ├── __init__.py
+│       ├── test_availability_signal.py
+│       ├── test_defensive_quality_signal.py
+│       ├── test_evaluation.py
+│       ├── test_manager_effect_signal.py
+│       ├── test_manager_provider.py
+│       └── test_player_provider.py
 │
 ├── competitions/
 │   ├── worldcup/                    ← World Cup 2026 predictor (active — continuous polling)
 │   │   ├── __init__.py              sys.path setup
-│   │   ├── main.py                  CLI entry point, 60s polling loop, orchestration (1568 lines)
+│   │   ├── main.py                  CLI entry point, 60s polling loop, orchestration (1472 lines)
 │   │   ├── config.json              League ID: 27
 │   │   ├── .env.example             BSD_API_KEY template
 │   │   ├── requirements.txt         pytest, pytest-cov, python-dotenv
@@ -124,17 +152,19 @@ FOOTBALL/
 │   │   │   ├── fetcher.py           WC-specific BSD API fetching
 │   │   │   ├── state.py             WC-specific state persistence + versioning
 │   │   │   ├── evaluation.py        WC-specific evaluation/calibration
-│   │   │   ├── output.py            ANSI terminal display (952 lines)
+│   │   │   ├── output.py            ANSI terminal display (719 lines)
 │   │   │   ├── blender.py           Platt scaling, Brier-weighted blending
-│   │   │   ├── governance.py        Version tracking, drift detection (573 lines)
-│   │   │   ├── enrichment.py        Match enrichment pipeline
+│   │   │   ├── governance.py        Version tracking, drift detection (465 lines)
 │   │   │   ├── math_utils.py        Sigmoid helper
 │   │   │   └── predictors/          Competition-specific predictor wrappers
-│   │   │       ├── odds.py
-│   │   │       ├── catboost.py
+│   │   │       ├── __init__.py
+│   │   │       ├── odds.py          Market odds fetcher
+│   │   │       ├── catboost.py      CatBoost ML prediction fetcher
 │   │   │       ├── form.py          Form signal computation
-│   │   │       └── lineup.py        Lineup signal computation
-│   │   ├── tests/                   26 test files, 613 tests
+│   │   │       ├── lineup.py        Lineup strength signal computation
+│   │   │       ├── availability.py  Availability/injury impact signal
+│   │   │       └── manager_signals.py Manager effect signal computation
+│   │   ├── tests/                   24 test files, 614 tests
 │   │   │   ├── conftest.py          Shared fixtures (sample_teams, sample_bracket, etc.)
 │   │   │   └── test_*.py            Unit + integration tests
 │   │   ├── scripts/                 Benchmark scripts
@@ -144,26 +174,30 @@ FOOTBALL/
 │   │
 │   ├── ucl/                         ← UEFA Champions League 2025/26 predictor (active — single-run)
 │   │   ├── __init__.py              sys.path setup, exports SimulationResult + main
-│   │   ├── main.py                  CLI entry point, Monte Carlo orchestration (313 lines)
+│   │   ├── main.py                  CLI entry point, Monte Carlo orchestration (321 lines)
 │   │   ├── result.py                SimulationResult dataclass (display contract)
-│   │   ├── display.py               Formatted terminal output (309 lines)
+│   │   ├── display.py               Formatted terminal output (236 lines)
 │   │   ├── src/                     UCL-specific simulation modules
 │   │   │   ├── __init__.py          Public API: simulation, knockout, groups, elo_fetcher
+│   │   │   ├── constants.py         UCL-specific constants
 │   │   │   ├── simulation.py        Monte Carlo engine, league phase simulation
 │   │   │   ├── knockout.py          Swiss playoff + knockout bracket simulation
 │   │   │   ├── groups.py            Swiss-system standings, matchup lambdas
 │   │   │   ├── fetcher.py           Match fetching for UCL
 │   │   │   ├── elo_fetcher.py       ClubElo data fetching
+│   │   │   ├── orchestrator.py      Replay/live simulation orchestrator
+│   │   │   ├── provider.py          BSD data provider for UCL
+│   │   │   ├── result_provider.py   Match result fetching for UCL
 │   │   │   └── validation.py        Cross-check predictions vs real results
-│   │   ├── tests/                   10 test files, 149 tests
-│   │   │   ├── conftest.py          Team pots, Elo ratings, fixture data (908 lines)
+│   │   ├── tests/                   15 test files, 246 tests
+│   │   │   ├── conftest.py          Team pots, Elo ratings, fixture data (951 lines)
 │   │   │   └── test_*.py            Unit + integration tests
 │   │   ├── benchmarks/              Performance benchmarks + results
 │   │   └── data/                    Fixture data, bracket rules, team aliases, coefficients
 │   │
 │   └── euro/                        ← Euro 2024 predictor (dormant — continuous polling)
 │       ├── __init__.py              sys.path setup (also adds worldcup/src to path)
-│       ├── main.py                  CLI entry point, polling loop (262 lines)
+│       ├── main.py                  CLI entry point, polling loop (213 lines)
 │       ├── config.py                Euro-specific configuration
 │       ├── display.py               Terminal display
 │       ├── simulation.py            Match + knockout simulation
@@ -194,18 +228,35 @@ around pure math and data pipeline functions — avoid adding competition-specif
 logic here.
 
 | Module | File | Purpose | Key Functions |
-|---|---|---|---|
+|---|---|---|---|---|
 | **constants** | `constants.py` | Shared configuration constants | `K_FACTOR`, `DEFAULT_ELO`, `MAX_EXPECTED_GOALS`, `HOME_ADVANTAGE_MULTIPLIER`, `POISSON_TABLE_BITS`, `API_TIMEOUT`, `ELORATINGS_TSV_URL` |
 | **elo** | `elo.py` | Elo rating engine | `expected_score()`, `update_ratings()`, `compute_k_factor()` |
-| **elo_sync** | `elo_sync.py` | Sync ratings from eloratings.net | `fetch_eloratings_tsv()`, `parse_eloratings_tsv()`, `validate_ratings()`, `correct_ratings()` |
+| **elo_sync** | `elo_sync.py` | Sync ratings from eloratings.net | `fetch_eloratings_tsv()`, `parse_eloratings_tsv()`, `validate_eloratings_data()`, `apply_graduated_correction()`, `get_staleness_level()` |
+| **elo_fetcher** | `elo_fetcher.py` | Fetch ClubElo ratings from api.clubelo.com | `fetch_team_elos()`, `resolve_clubelo_name()`, cached single-request CSV lookup |
 | **fetcher** | `fetcher.py` | BSD API match fetch + processing | `fetch_raw_matches()`, `process_group_matches()`, `process_matches()`, `find_bracket_match()`, `find_group_match()`, `normalize_team()` |
-| **groups** | `groups.py` | Poisson group simulation | `expected_goals()`, `simulate_group()`, `simulate_group_stage()`, `resolve_group_standings()` |
-| **knockout** | `knockout.py` | Generic knockout primitives | `_build_round_map()`, `_get_blended_prob()`, `simulate_knockout_match()` |
+| **groups** | `groups.py` | Poisson group simulation | `expected_goals()`, `simulate_group_matches()`, `precompute_matchup_lambdas()`, `_tiebreak_group()` |
+| **knockout** | `knockout.py` | Generic knockout primitives | `_build_round_map()`, `_get_blended_prob()`, `simulate_single_match()`, `simulate_two_legged_tie()` |
 | **evaluation** | `evaluation.py` | Prediction accuracy metrics | `brier_score()`, `log_loss()`, `compute_metrics()`, `calibration_curve()`, `expected_calibration_error()` |
-| **state** | `state.py` | JSON persistence layer | `_atomic_write_json()`, `load_json()`, `save_json()`, bracket validation, cache helpers |
+| **state** | `state.py` | JSON persistence layer | `_atomic_write_json()`, `load_teams()`, `save_teams()`, `load_played()`, `save_played()`, bracket validation, cache helpers |
 | **math_utils** | `math_utils.py` | Small math helpers | `sigmoid()` |
+| **signal** | `signal.py` | Signal interface protocol | `SignalOutput` dataclass, `PredictionContext`, `Signal` protocol |
+| **provider** | `provider.py` | Fixture provider interface | `Team` dataclass, `Match` dataclass, `FixtureProvider` protocol |
+| **result_provider** | `result_provider.py` | Match result provider protocol | `MatchResultProvider` protocol, `get_team_results()` |
+| **enrichment** | `enrichment.py` | Match stats/context extraction | `extract_stats()`, `extract_context()` from BSD event dicts |
+| **blender** | `blender.py` | Calibration + blending primitives | `calibrate_signal()`, `apply_calibration()`, `compute_rolling_brier()`, `compute_blend_weights()`, `blend_predictions()`, `compute_poisson_base_rate()` |
 | **predictors.odds** | `predictors/odds.py` | Market odds ingestion | `remove_vig()`, TTL-based cache read/write |
 | **predictors.catboost** | `predictors/catboost.py` | ML prediction ingestion | BSD API CatBoost probability fetching, TTL caching |
+| **providers.manager** | `providers/manager.py` | Manager profile fetcher | `ManagerProfile` dataclass, `fetch_managers()`, `parse_managers()`, `fetch_and_cache_managers()` |
+| **providers.player** | `providers/player.py` | Player profile fetcher | `PlayerProfile` dataclass, `fetch_players()`, `parse_players()`, `fetch_and_cache_players()` |
+| **providers.team** | `providers/team.py` | Team ID→name mapping | `fetch_teams()` |
+| **signals.availability** | `signals/availability.py` | Availability/injury impact signal | `AvailabilitySignal.predict()` |
+| **signals.defensive_quality** | `signals/defensive_quality.py` | Defensive quality signal | `DefensiveQualitySignal.predict()` |
+| **signals.manager_effect** | `signals/manager_effect.py` | Manager effect signal | `ManagerEffectSignal.predict()` |
+| **signals.market_odds** | `signals/market_odds.py` | Market odds signal | `MarketOddsSignal.predict()` |
+| **signals.refined_elo** | `signals/refined_elo.py` | Refined Elo signal | `RefinedEloSignal.predict()` |
+| **signals.rest_days** | `signals/rest_days.py` | Rest days advantage signal | `RestDaysSignal.predict()` |
+| **signals.rolling_form** | `signals/rolling_form.py` | Rolling form signal | `RollingFormSignal.predict()` |
+| **signals.squad_value** | `signals/squad_value.py` | Squad market value signal | `SquadValueSignal.predict()` |
 
 ### When to Add to `football_core` vs a Competition
 
@@ -226,14 +277,20 @@ Add to `competitions/<name>/src/` when:
 Each competition has its own test suite under `competitions/<name>/tests/`.
 The core library has a small test suite under `football_core/tests/`.
 
-### Core Library Tests
+### Core Library Tests (85 tests)
 
 ```bash
 # From the repository root
 python -m pytest football_core/tests/ -v
+
+# Run with coverage
+python -m pytest football_core/tests/ --cov=football_core --cov-report=term-missing
+
+# Run a specific test file
+python -m pytest football_core/tests/test_evaluation.py -v
 ```
 
-### World Cup Tests (613 tests)
+### World Cup Tests (614 tests)
 
 ```bash
 # From the repository root
@@ -251,7 +308,7 @@ python -m pytest competitions/worldcup/tests/ -k "test_expected_score"
 # World Cup CI is the only fully configured CI pipeline (see CI Pipeline section)
 ```
 
-### UCL Tests (149 tests)
+### UCL Tests (246 tests)
 
 ```bash
 # From the repository root

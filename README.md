@@ -5,11 +5,10 @@ A Python Monte Carlo simulation engine that predicts football tournament outcome
 
 | Competition | Status | CLI Tool | Run Command | Tests |
 |---|---|---|---|---|
-| **World Cup 2026** | Active — continuous polling (60s) | `wc-predict` | `python -m competitions.worldcup.main` | 613 |
-| **UCL 2025/26** | Active — single-run Monte Carlo | `ucl-predict` | `python -m competitions.ucl.main` | 149 |
+| **World Cup 2026** | Active — continuous polling (60s) | `wc-predict` | `python -m competitions.worldcup.main` | 614 |
+| **UCL 2025/26** | Active — single-run Monte Carlo | `ucl-predict` | `python -m competitions.ucl.main` | 246 |
 | **Euro 2024** | Dormant — continuous polling | `euro-predict` | `python -m competitions.euro.main` | — |
-
----
+| **football_core** | Shared library | — | — | 85 |
 
 ## Quick Start
 
@@ -31,13 +30,11 @@ cp competitions/worldcup/.env.example competitions/worldcup/.env
 python -m competitions.worldcup.main --once
 ```
 
----
-
 ## Usage
 
 ### World Cup 2026 (continuous polling)
 
-Fetches live match data from the BSD API every 60 seconds, updates Elo ratings, refreshes signal caches (market odds, CatBoost ML predictions), runs 50,000 Monte Carlo iterations, and prints championship probability tables with deltas.
+Fetches live match data from the BSD API every 60 seconds, updates Elo ratings, refreshes signal caches (market odds, CatBoost ML predictions, and 6 additional signals), runs 50,000 Monte Carlo iterations, and prints championship probability tables with deltas.
 
 ```bash
 # Single fetch → simulate → print cycle, then exit
@@ -49,7 +46,13 @@ python -m competitions.worldcup.main
 # Reproducible simulation with a fixed seed
 python -m competitions.worldcup.main --once --seed 42
 
-# Available flags: --once, --no-color, --seed N, --ai-preview, --match-detail [TABLE|MATCH_ID]
+# List all available BSD league IDs and names
+python -m competitions.worldcup.main --list-leagues
+
+# Simulate a different league by ID
+python -m competitions.worldcup.main --once --league 27
+
+# Available flags: --once, --no-color, --seed N, --ai-preview, --match-detail [TABLE|MATCH_ID], --league ID, --list-leagues
 ```
 
 The World Cup competition supports 48 teams across 12 groups (A–L), 104 total matches (72 group + 32 knockout), and annex C routing for third-placed teams.
@@ -68,7 +71,11 @@ python -m competitions.ucl.main -n 10000 -s 42 -o results.json
 # Cross-check predictions against real BSD match results
 python -m competitions.ucl.main --validate --api-key KEY
 
-# Available flags: -n N (iterations), -s N (seed), -o FILE (output), --validate, --api-key KEY
+# Run in replay mode with historical match data
+python -m competitions.ucl.main --mode replay --replay-data matches.json
+
+# Available flags: -n N (iterations), -s N (seed), -o FILE (output), --validate, --api-key KEY,
+#   --fixture-source {auto,repo,bsd}, --mode {simulate,replay,live}, --replay-data FILE
 ```
 
 The UCL competition uses a Swiss-system league phase (36 teams, 8 matchdays) followed by a playoff round and a 16-team knockout bracket.
@@ -78,33 +85,56 @@ The UCL competition uses a Swiss-system league phase (36 teams, 8 matchdays) fol
 Continuous polling predictor for UEFA Euro 2024. Shares architecture with the World Cup predictor but is currently in a dormant state.
 
 ```bash
-# Single cycle
-python -m competitions.euro.main --once
+# Single cycle with reproducible seed
+python -m competitions.euro.main --once --seed 42
 
 # Continuous polling
 python -m competitions.euro.main
 ```
-
----
 
 ## Project Structure
 
 ```
 FOOTBALL/
 ├── football_core/              ← Shared engine library
-│   ├── elo.py                  Elo rating math (expected_score, update_ratings, K-factor)
+│   ├── elo.py                  Elo rating math
+│   ├── elo_fetcher.py          Elo rating fetch from external sources
 │   ├── elo_sync.py             Elo sync from eloratings.net
 │   ├── fetcher.py              BSD API fetch + match dedup
 │   ├── groups.py               Poisson simulation + FIFA tiebreaker chain
 │   ├── knockout.py             Generic round simulation primitive
+│   ├── blender.py              Signal blending and weighting
+│   ├── enrichment.py           Match data enrichment pipeline
 │   ├── evaluation.py           Brier score, log loss, calibration, ECE
 │   ├── state.py                JSON persistence layer
 │   ├── math_utils.py           Sigmoid and other math helpers
-│   ├── display.py              Terminal output helpers
 │   ├── constants.py            Shared configuration constants
-│   └── predictors/             Signal ingestion pipeline
-│       ├── odds.py             Market odds fetcher
-│       └── catboost.py         CatBoost prediction fetcher
+│   ├── signal.py               Signal computation framework
+│   ├── provider.py             Data provider framework
+│   ├── result_provider.py      Result data provider
+│   ├── providers/              BSD data providers
+│   │   ├── manager.py          Manager profile fetcher & parser
+│   │   ├── player.py           Player profile fetcher & parser
+│   │   └── team.py             Team ID-to-name mapping
+│   ├── signals/                8 prediction signal implementations
+│   │   ├── availability.py     Availability/injury impact signal
+│   │   ├── defensive_quality.py Defensive quality signal
+│   │   ├── manager_effect.py   Manager effect signal
+│   │   ├── market_odds.py      Market odds signal
+│   │   ├── refined_elo.py      Refined Elo signal
+│   │   ├── rest_days.py        Rest days signal
+│   │   ├── rolling_form.py     Rolling form signal
+│   │   └── squad_value.py      Squad value signal
+│   ├── predictors/             Signal ingestion pipeline
+│   │   ├── odds.py             Market odds fetcher
+│   │   └── catboost.py         CatBoost prediction fetcher
+│   └── tests/                  7 modules, 85 tests
+│       ├── test_availability_signal.py
+│       ├── test_defensive_quality_signal.py
+│       ├── test_evaluation.py
+│       ├── test_manager_effect_signal.py
+│       ├── test_manager_provider.py
+│       └── test_player_provider.py
 │
 ├── competitions/
 │   ├── worldcup/               ← World Cup 2026 (active)
@@ -113,44 +143,45 @@ FOOTBALL/
 │   │   ├── .env.example        BSD_API_KEY template
 │   │   ├── config.json         League ID (27)
 │   │   ├── src/                WC-specific modules (blender, governance, output, etc.)
-│   │   ├── tests/              26 modules, 613 tests
+│   │   ├── tests/              26 modules, 614 tests
 │   │   ├── data/               JSON state files (generated at runtime)
+│   │   ├── scripts/            Benchmark scripts
+│   │   ├── docs/               Archive docs
 │   │   └── .github/workflows/  CI pipeline (Python 3.10–3.12, pytest --cov)
 │   │
 │   ├── ucl/                    ← UCL 2025/26 (active)
 │   │   ├── main.py             CLI entry point, single-run Monte Carlo
+│   │   ├── display.py          Formatted terminal output
+│   │   ├── result.py           SimulationResult contract
 │   │   ├── src/                UCL-specific simulation + knockout modules
-│   │   ├── tests/              10 modules, 149 tests
-│   │   └── data/               Fixture, bracket rules, Elo data
+│   │   ├── tests/              17 modules, 246 tests
+│   │   ├── data/               Fixture files, bracket rules, team aliases
+│   │   └── benchmarks/         Performance benchmarking
 │   │
 │   └── euro/                   ← Euro 2024 (dormant)
 │       ├── main.py             CLI entry point, continuous polling
-│       ├── config.py           Euro-specific configuration
+│       ├── config.py           Competition configuration
+│       ├── display.py          Formatted terminal output
+│       ├── simulation.py       Euro-specific simulation logic
+│       ├── __init__.py         Package init + sys.path bootstrap
 │       └── data/               Teams, groups, bracket data
 │
 └── docs/
-    ├── FOOTBALL_ENGINE_ARCHITECTURE.md   Detailed architecture and design decisions
-    └── COMMONALITY_REPORT.md             Cross-competition commonality analysis
+    ├── ARCHITECTURE.md            System architecture, data flow, design decisions
+    ├── ARCHITECTURE_RESEARCH.md Architecture research notes
+    ├── CONFIGURATION.md        Environment variables and CLI reference
+    ├── DEVELOPMENT.md          Development setup and contribution guide
+    ├── GETTING-STARTED.md      Installation and quick start
+    ├── TESTING.md              Test framework, layout, and patterns
+    ├── FOOTBALL_ENGINE_ARCHITECTURE.md   Detailed architecture document
+    └── COMMONALITY_REPORT.md   Cross-competition commonality analysis
 ```
-
----
-
-## Detailed Documentation
-
-See the `docs/` directory for in-depth technical documentation:
-
-- **[FOOTBALL_ENGINE_ARCHITECTURE.md](docs/FOOTBALL_ENGINE_ARCHITECTURE.md)** — System architecture, component relationships, data flow, and design rationale for all three competitions.
-- **[COMMONALITY_REPORT.md](docs/COMMONALITY_REPORT.md)** — Analysis of shared vs. competition-specific code across the World Cup, UCL, and Euro implementations.
-
----
 
 ## Requirements
 
 - **Python:** 3.10, 3.11, or 3.12
 - **Dependencies:** pytest, pytest-cov, python-dotenv, requests, numpy
 - **API key:** A free [BSD API key](https://sports.bzzoiro.com/register/) for live match data, market odds, and CatBoost predictions. The engine can run in Elo-only mode without an API key, but will not fetch live data or signals.
-
----
 
 ## License
 

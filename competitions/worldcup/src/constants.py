@@ -230,6 +230,42 @@ FORM_CACHE_FILE: str = "form_cache.json"
 LINEUP_CACHE_FILE: str = "lineup_cache.json"
 """Filename for lineup strength signal cache in data/ directory."""
 
+MANAGER_CACHE_TTL_HOURS: int = 24
+"""How long manager data cache is valid in hours.
+Manager profiles change rarely (only on managerial changes)."""
+
+MANAGER_CACHE_FILE: str = "manager_cache.json"
+"""Filename for manager data cache in data/ directory.
+Contains raw manager profiles used by both defensive_quality and manager_effect."""
+
+DEFENSIVE_CACHE_FILE: str = "defensive_cache.json"
+"""Filename for defensive quality signal cache in data/ directory."""
+
+MANAGER_EFFECT_CACHE_FILE: str = "manager_effect_cache.json"
+"""Filename for manager effect signal cache in data/ directory."""
+
+AVAILABILITY_CACHE_TTL_HOURS: int = 6
+"""How long player/availability data cache is valid in hours.
+Shorter TTL because player availability changes rapidly with squad announcements."""
+
+AVAILABILITY_CACHE_FILE: str = "availability_cache.json"
+"""Filename for availability signal cache in data/ directory.
+Player data (availability, injury_risk) from BSD /api/v2/players/."""
+
+DEFAULT_DEFENSIVE_K: float = 2.0
+"""Default sigmoid steepness for defensive quality signal.
+clean_sheet_pct ∈ [0, 1] and xga_norm ∈ [0, 1], so composite ∈ [0, 1].
+k=2.0 maps diff=0.5 to sigmoid(1.0)=0.73."""
+
+DEFAULT_MANAGER_K: float = 2.0
+"""Default sigmoid steepness for manager effect signal.
+win_pct ∈ [0, 1], rating ∈ [0, ~1.1] with bonuses.
+k=2.0 provides reasonable spread."""
+
+DEFAULT_AVAILABILITY_K: float = 3.0
+"""Default sigmoid steepness for availability signal.
+Unavailability ∈ [0, 1]. k=3.0 maps diff=0.5 to sigmoid(1.5)=0.82."""
+
 # ─── Governance Constants (Phase 16) ───────────────────────────────────
 
 GOV_DATA_FILE: str = "versions.json"

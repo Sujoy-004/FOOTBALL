@@ -22,32 +22,58 @@ The system has no API server, no database, and no web framework. All state is pe
                     │  │ src/     │  │simul.. │  │py   │ │
                     │  │  knockout│  │display │  │src/  │ │
                     │  │  output  │  │config  │  │ sim. │ │
-                    │  │  blender │  └────────┘  │ kno. │ │
-                    │  │  eval.   │              │ grps │ │
-                    │  │  gov.    │              │ val. │ │
-                    │  │  enrich. │              └─────┘ │
-                    │  │  const.  │                      │
-                    │  └────┬─────┘                      │
+                    │  │  eval.   │  └────────┘  │ kno. │ │
+                    │  │  gov.    │              │ grps │ │
+                    │  │  const.  │              │ val. │ │
+                    │  │  form    │              │ live │ │
+                    │  │  lineup  │              │provid.│ │
+                    │  │  avail.  │              │replay│ │
+                    │  │  mgr_sig │              │sig_reg│ │
+                    │  └────┬─────┘              └─────┘ │
                     └───────┼───────────────────────────┘
                             │ imports all via football_core.*
                             ▼
-              ┌─────────────────────────────┐
-              │       football_core/        │  ← SHARED ENGINE
-              │                             │
-              │  ┌──────┐ ┌──────┐ ┌─────┐  │
-              │  │ elo  │ │groups│ │kno. │  │
-              │  └──┬───┘ └──┬───┘ └──┬──┘  │
-              │     │        │        │      │
-              │  ┌──▼───┐ ┌──▼───┐ ┌──▼───┐ │
-              │  │ state│ │fetcher│ │math  │ │
-              │  └──────┘ └──────┘ └──────┘ │
-              │                             │
-              │  ┌──────────┐ ┌────────────┐│
-              │  │predictors│ │evaluation  ││
-              │  │ /odds    │ │ /constants ││
-              │  │ /catboost│ │ /elo_sync  ││
-              │  └──────────┘ └────────────┘│
-              └─────────────────────────────┘
+              ┌──────────────────────────────────────────┐
+              │              football_core/              │  ← SHARED ENGINE
+              │                                          │
+              │  ┌──────┐ ┌──────┐ ┌─────┐ ┌──────────┐ │
+              │  │ elo  │ │groups│ │kno. │ │ blender  │ │
+              │  └──┬───┘ └──┬───┘ └──┬──┘ └──────────┘ │
+              │     │        │        │      ┌──────────┐│
+              │  ┌──▼───┐ ┌──▼───┐ ┌──▼───┐ │enrichment││
+              │  │ state│ │fetcher│ │math  │ └──────────┘│
+              │  └──────┘ └──────┘ └──────┘ ┌──────────┐│
+              │  ┌──────────┐ ┌──────────┐  │provider  ││
+              │  │elo_sync  │ │elo_fetch │  │(protocol)││
+              │  └──────────┘ └──────────┘  └──────────┘│
+              │  ┌──────────┐ ┌────────────┐ ┌────────┐ │
+              │  │evaluation│ │ result_    │ │ signal │ │
+              │  │          │ │ provider   │ │(proto.)│ │
+              │  └──────────┘ └────────────┘ └────────┘ │
+              │  ┌──────────┐ ┌────────────┐            │
+              │  │predictors│ │ constants  │            │
+              │  │ /odds    │ │            │            │
+              │  │ /catboost│ │            │            │
+              │  └──────────┘ └────────────┘            │
+              │                                          │
+              │  ┌────────────────────────┐             │
+              │  │  providers/            │             │
+              │  │   manager.py           │             │
+              │  │   player.py            │             │
+              │  │   team.py              │             │
+              │  └────────────────────────┘             │
+              │  ┌────────────────────────┐             │
+              │  │  signals/              │             │
+              │  │   availability.py      │             │
+              │  │   defensive_quality.py │             │
+              │  │   manager_effect.py    │             │
+              │  │   market_odds.py       │             │
+              │  │   refined_elo.py       │             │
+              │  │   rest_days.py         │             │
+              │  │   rolling_form.py      │             │
+              │  │   squad_value.py       │             │
+              │  └────────────────────────┘             │
+              └──────────────────────────────────────────┘
                             │
                             ▼
               ┌─────────────────────────────┐
@@ -55,6 +81,7 @@ The system has no API server, no database, and no web framework. All state is pe
               │                             │
               │  BSD API ── live match data │
               │  eloratings.net ── Elo sync │
+              │  api.clubelo.com ── Club Elo│
               └─────────────────────────────┘
 ```
 
@@ -102,9 +129,9 @@ The data flow differs between **live-polling** competitions (worldcup, euro) and
                     │  2. POLL LOOP        │ │  (default 60s)   │
                     │                      │◄┘                  │
                     │  ┌─────────────────┐ │                    │
-                    │  │ a) Fetch matches │ │──→ BSD API        │
-                    │  │    from BSD API  │ │    (football_core │
-                    │  │                  │ │     .fetcher)     │
+                    │  │ a) Fetch matches│ │──→ BSD API         │
+                    │  │    from BSD API │ │    (football_core  │
+                    │  │                 │ │     .fetcher)      │
                     │  └────────┬────────┘ │                    │
                     │           ▼          │                    │
                     │  ┌─────────────────┐ │                    │
@@ -122,15 +149,22 @@ The data flow differs between **live-polling** competitions (worldcup, euro) and
                     │  │    - Market odds │ │                    │
                     │  │    - CatBoost    │ │                    │
                     │  │    - Form/lineup │ │                    │
+                    │  │    - Availability│ │                    │
+                    │  │    - Defensive   │ │                    │
+                    │  │      quality     │ │                    │
+                    │  │    - Manager     │ │                    │
+                    │  │      effect      │ │                    │
                     │  └────────┬────────┘ │                    │
                     │           ▼          │                    │
                     │  ┌─────────────────┐ │                    │
-                    │  │ d) Calibrate &  │ │                    │
-                    │  │    blend signals│ │  (worldcup only)   │
+                    │  │ d) Calibrate &  │ │  (worldcup only)   │
+                    │  │    blend 8      │ │  8-signal Brier-   │
+                    │  │    prediction   │ │  weighted fusion   │
+                    │  │    signals      │ │                    │
                     │  └────────┬────────┘ │                    │
                     │           ▼          │                    │
-                    │  ┌─────────────────┐ │                    │
-                    │  │ e) Run Monte    │ │  50000 iterations  │
+                    │  ┌─────────────────┐ │  50000 iterations  │
+                    │  │ e) Run Monte    │ │                    │
                     │  │    Carlo sim    │ │                    │
                     │  │    (groups →    │ │                    │
                     │  │     knockout)   │ │                    │
@@ -219,7 +253,7 @@ The data flow differs between **live-polling** competitions (worldcup, euro) and
 | **Mode** | Continuous poll loop (default 60s) | Single run, exits after display |
 | **Data source** | BSD API (live matches) | Pre-loaded fixtures JSON |
 | **Elo source** | eloratings.net (sync on startup + periodic) | ClubElo API (fetched once) |
-| **Signal fusion** | Multi-signal (ElO + odds + CatBoost + form + lineup) | Elo-only |
+| **Signal fusion** | Multi-signal (8 signals: Elo, odds, CatBoost, form, lineup, availability, defensive quality, manager effect) | Elo-only |
 | **State persistence** | JSON files updated after each poll cycle | No runtime persistence |
 | **Group format** | Round-robin groups (4 teams × groups) | Swiss-system (36-team single table) |
 | **Knockout structure** | Two-legged or single matches, bracket resolution | Two-legged ties (playoff + R16), single final |
@@ -242,15 +276,32 @@ The shared library follows the **Rule of Two**: a module graduates to `football_
 | `fetcher.py` | BSD API fetch pipeline: `fetch_raw_matches`, `process_matches`, `process_group_matches` | WC, Euro |
 | `state.py` | JSON persistence with atomic writes: load/save for all state files | WC, Euro, UCL |
 | `elo_sync.py` | Elo sync from eloratings.net with drift detection | WC, Euro |
+| `elo_fetcher.py` | ClubElo API fetcher for UCL with team-alias resolution | UCL |
 | `evaluation.py` | Shared metric computation: Brier score, log loss, calibration curve | UCL |
 | `math_utils.py` | Sigmoid utility | WC |
 | `constants.py` | Generic constants only (K_FACTOR, Poisson params, timeouts) | WC, Euro, UCL |
 | `predictors/odds.py` | Market odds fetch and vig removal | WC, Euro |
 | `predictors/catboost.py` | CatBoost prediction fetch | WC, Euro |
+| `provider.py` | Base provider protocol & dataclasses: `FixtureProvider`, `MatchResultProvider`, `FixtureSchedule` | UCL |
+| `signal.py` | Base signal protocol & registry: `Signal`, `SignalRegistry`, `SignalOutput`, `PredictionContext` | UCL, WC |
+| `blender.py` | Signal calibration & blending primitives (Platt scaling, Brier weighting) | WC |
+| `enrichment.py` | Match enrichment: `extract_stats`, `extract_context` from BSD event dicts | WC |
+| `result_provider.py` | `MatchResultProvider` protocol for rolling-form signal data sources | UCL |
+| `providers/manager.py` | Manager data fetch and caching from BSD API | WC |
+| `providers/player.py` | Player data fetch and caching from BSD API | WC |
+| `providers/team.py` | Team data structures and providers | UCL |
+| `signals/availability.py` | Availability/injury impact signal from player data | WC |
+| `signals/defensive_quality.py` | Defensive quality signal from manager stats | WC |
+| `signals/manager_effect.py` | Manager effect signal (win rate, formation, style) | WC |
+| `signals/market_odds.py` | Market odds prediction signal (Signal protocol wrapper) | UCL |
+| `signals/refined_elo.py` | Refined Elo signal with configurable K-factor & home advantage | UCL |
+| `signals/rest_days.py` | Rest days advantage signal | UCL |
+| `signals/rolling_form.py` | Rolling form signal from recent match results | UCL |
+| `signals/squad_value.py` | Squad market value signal | UCL |
 
 ### 4.3 Design Constraints
 
-- **Flat package**: All modules live at the top level of `football_core/`. Subpackage reorganization into `compute/`, `signals/`, `bsd/`, `state/` is deferred until a third competition justifies it (see [FOOTBALL_ENGINE_ARCHITECTURE.md](./FOOTBALL_ENGINE_ARCHITECTURE.md) §2.4).
+- **Evolving structure**: The original design mandated a fully flat `football_core/` package. With the addition of 8 signal modules and 3 provider modules, the package now has two subpackages — `providers/` and `signals/` — while core primitives (`elo`, `groups`, `state`, etc.) remain at top level. This hybrid layout keeps import paths short for frequently-used modules while organizing the growing signal/provider surface area.
 - **Data-directory parameterization**: Every `state.py` function accepts a `data_dir` parameter — no hardcoded paths.
 - **League-ID parameterization**: `fetcher.py` and `constants.py` accept `league_id` parameters. The BSD API URL template and most competition-specific constants live in competition modules, not the core.
 - **No pip-installable package**: The project runs from source. There is no `setup.py` or `pyproject.toml`. Import discovery relies on `sys.path` manipulation in each competition's `__init__.py`.
@@ -273,7 +324,7 @@ The simulation kernel is always Poisson-distributed match outcomes computed from
 
 | Aspect | World Cup | Euro | UCL |
 |---|---|---|---|
-| **Maturity** | Most mature (613 tests) | Mature (dormant) | Mature (149 tests) |
+| **Maturity** | Most mature (614 tests, 24 test files) | Mature (dormant) | Mature (246 tests, 17 test files) |
 | **CLI name** | `wc-predict` | `euro-predict` | `ucl-predict` |
 | **Poll mode** | Continuous (60s interval) | Continuous (60s interval) | Single-run |
 | **Group format** | 12 groups (A-L), 4 teams each | 6 groups (A-F), 4 teams each | Swiss-system, 36 teams, 8 matchdays |
@@ -281,8 +332,8 @@ The simulation kernel is always Poisson-distributed match outcomes computed from
 | **Knockout entry** | R32 → R16 → QF → SF → FINAL + TPP | R16 → QF → SF → FINAL | Playoff → R16 → QF → SF → FINAL |
 | **R32 resolution** | Annex C (495-entry table, WC-specific) | Precomputed bracket JSON | Playoff round (positions 9-24, two-legged) |
 | **Match format** | Single match per round | Single match per round | Two-legged aggregate + ET + penalties |
-| **Signals used** | Elo, odds, CatBoost, form, lineup | Elo, odds, CatBoost | Elo only |
-| **Blending** | Brier-weighted signal fusion | None | None |
+| **Signals used** | Elo, odds, CatBoost, form, lineup, availability, defensive quality, manager effect | Elo, odds, CatBoost | Elo only |
+| **Blending** | Brier-weighted 8-signal fusion | None | None |
 | **Governance** | Drift detection, version tracking, backtest | None | None |
 | **Display** | Rich: standings table, trend arrows, delta, signal detail, AI previews | Simple: probability table only | Structured: standings, playoff, bracket, odds table |
 | **Validation** | History-based evaluation | None | `--validate` flag cross-checks vs BSD results |
@@ -292,12 +343,13 @@ The simulation kernel is always Poisson-distributed match outcomes computed from
 
 These remain in `competitions/worldcup/src/` because no other competition needs them yet:
 
-- `blender.py` — signal calibration and blending
+- `blender.py` — thin WC-specific orchestration layer; calibration/blending primitives imported from `football_core.blender`
 - `evaluation.py` — WC-specific `evaluate_all_matches` (historical match evaluation)
 - `governance.py` — model governance with drift detection
 - `predictors/form.py` — form signal computation
 - `predictors/lineup.py` — lineup strength signal
-- `enrichment.py` — BSD stats/context field extraction
+- `predictors/manager_signals.py` — manager-based signal orchestration (uses `football_core.providers.manager`, `football_core.signals.defensive_quality`, `football_core.signals.manager_effect`)
+- `predictors/availability.py` — availability signal orchestration (uses `football_core.providers.player`, `football_core.signals.availability`)
 - `output.py` — WC-specific display with 12-group standings, trend arrows, signal detail
 - `knockout.py` — full simulation orchestrator with R32 Annex C routing
 
@@ -315,9 +367,9 @@ This is a deliberate trade-off: it avoids rewriting all module-level import path
 
 ## 6. Key Design Decisions
 
-### 6.1 Flat Package over Subpackages
+### 6.1 Flat Package over Subpackages (Relaxed)
 
-`football_core/` is deliberately flat (all modules at top level) rather than organized into `compute/`, `signals/`, `bsd/`, `state/` subpackages. The flat layout minimizes friction during the extraction phase and keeps import paths short. Reorganization is deferred until a third competition provides sufficient justification.
+`football_core/` was originally designed as a fully flat package — all modules at top level rather than organized into `compute/`, `signals/`, `bsd/`, `state/` subpackages. As the signal and provider surface area grew, two subpackages were introduced: `providers/` (3 modules) and `signals/` (8 modules). Core primitives (`elo`, `groups`, `state`, `knockout`, `fetcher`) remain at top level. This hybrid preserves short import paths for the most frequently-used modules while keeping the growing signal/provider surface organized.
 
 ### 6.2 Sys.Path over pip Install
 
@@ -337,28 +389,37 @@ All state is stored as human-readable JSON files. This was chosen for simplicity
 
 ### 6.6 Signal Fusion Architecture (World Cup Only)
 
-The World Cup blends up to five independent prediction signals (Elo, market odds, CatBoost, form, lineup) using Brier-weighted calibration. This is the most architecturally complex part of the system:
+The World Cup blends up to **eight** independent prediction signals using Brier-weighted calibration. This is the most architecturally complex part of the system. The blender's pure-computation primitives (Platt scaling, rolling Brier, blend weighting) live in `football_core/blender.py`, while WC-specific orchestration (`calibrate_and_blend`) remains in `competitions/worldcup/src/blender.py`:
 
 ```
         ┌──────┐ ┌──────┐ ┌──────┐ ┌────┐ ┌─────┐
         │ Elo  │ │ Odds │ │CBoo. │ │Form│ │Line │
         └──┬───┘ └──┬───┘ └──┬───┘ └──┬─┘ └──┬──┘
-           └────┬───┴────────┴────────┴──────┘
-                │
-                ▼
-        ┌──────────────────┐
-        │  calibrate_and_  │  ← blender.py
-        │  blend()         │     (calibrate each signal against
-        │                  │      history, then Brier-weighted blend)
-        └────────┬─────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │  match_probs     │  → used by knockout simulation
-        │  blend_weights   │  → logged in governance
-        │  calibration_    │
-        │  params          │  → persisted for next run
-        └──────────────────┘
+           │        │        │        │      │
+           │   ┌────▼──┐ ┌──▼───┐ ┌───▼────┐ │
+           │   │Avail. │ │Def.  │ │Manager │ │
+           │   │       │ │Qual. │ │Effect  │ │
+           │   └──┬────┘ └──┬───┘ └───┬────┘ │
+           └──────┴─────────┴─────────┴───────┘
+                            │
+                            ▼
+                    ┌──────────────────┐
+                    │  calibrate_and_  │  ← competitions/worldcup/src/blender.py
+                    │  blend()         │     (orchestration)
+                    │                  │     primitives: football_core/blender.py
+                    │  - Platt scaling │
+                    │  - Rolling Brier │
+                    │  - Brier-weighted│
+                    │    blend         │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │  match_probs     │  → used by knockout simulation
+                    │  blend_weights   │  → logged in governance
+                    │  calibration_    │
+                    │  params          │  → persisted for next run
+                    └──────────────────┘
 ```
 
 This architecture keeps the simulation engine clean — it consumes `blend_params` as a dict and does not need to know how signals are combined. Signal fusion remains entirely in the World Cup domain because no other competition performs blending.

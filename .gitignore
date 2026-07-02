@@ -45,6 +45,9 @@ catboost_cache.json
 form_cache.json
 lineup_cache.json
 probability_log.json
+availability_cache.json
+defensive_cache.json
+manager_effect_cache.json
 
 # AI-generated responses, agent context files, and one-time reports
 /RESPONSE.md

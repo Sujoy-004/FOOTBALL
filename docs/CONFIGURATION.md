@@ -28,7 +28,7 @@ in the shell environment or passed via `--api-key`.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `BSD_API_KEY` | **Required** for `wc-predict`; optional for `ucl-predict` / `euro-predict` | — | API key for the BSD (Bzzoiro Sports Data) API. Used to fetch live match data, odds, and CatBoost predictions. |
+| `BSD_API_KEY` | **Required** for `wc-predict`; required for `ucl-predict` with `--validate` or `--mode live`; optional for `euro-predict` | — | API key for the BSD (Bzzoiro Sports Data) API. Used to fetch live match data, odds, and CatBoost predictions. |
 | `POLL_INTERVAL` | Optional | `60` | Polling interval in seconds between API fetch cycles (World Cup predictor only). |
 
 ### BSD_API_KEY
@@ -39,8 +39,10 @@ predictions. Each tool handles a missing key differently:
 - **`wc-predict`** — Exits immediately with an error if `BSD_API_KEY` is not
   set. Also validates the key by making a test request; exits with an error
   if the API returns HTTP 401.
-- **`ucl-predict`** — Requires `BSD_API_KEY` only when `--validate` is used.
-  Without it, the validation step prints an error and exits with code 1.
+- **`ucl-predict`** — Requires `BSD_API_KEY` when `--validate` or
+  `--mode live` is used. Without it, the validation or live step prints
+  an error and exits with code 1. For default `--mode simulate`, the key
+  is optional (used only for BSD fixture fallback when `--fixture-source auto`).
 - **`euro-predict`** — Logs a warning and runs with **Elo-only simulation**
   when the key is missing. No hard failure.
 
@@ -104,8 +106,13 @@ python -m competitions.worldcup.main [options]
 | `--seed N` | `int` | `None` | Random seed for reproducible simulation |
 | `--ai-preview` | flag | `False` | Display BSD AI prediction previews after simulation output |
 | `--match-detail` | `str` / flag | `None` | Display per-match signal breakdown. Use `--match-detail` to show table, or `--match-detail MATCH_ID` to show a focus card for a specific match |
-| `--league ID` | `int` | `27` | BSD league ID (default: 27 for World Cup; see `--list-leagues`) |
+| `--league ID` | `int` | `27` (from `DEFAULT_LEAGUE_ID` constant; `config.json` may override) | BSD league ID (default: 27 for World Cup; see `--list-leagues` for available leagues) |
 | `--list-leagues` | flag | `False` | Print all available league IDs and names, then exit |
+
+**League ID resolution order:**
+1. `DEFAULT_LEAGUE_ID` constant (`27`) as the starting default
+2. `config.json` file (auto-created with `{"league_id": 27}` on first run) — persisted preference
+3. CLI `--league` flag — one-off override (not persisted to `config.json`)
 
 **Default behavior:** Runs continuously, polling the BSD API every
 `POLL_INTERVAL` seconds and re-simulating after each new match. Press
@@ -130,12 +137,24 @@ python -m competitions.ucl.main [options]
 | `-o FILE`, `--output FILE` | `str` | `None` | Write JSON output to FILE (stdout still prints text) |
 | `--validate` | flag | `False` | Cross-check predictions against real BSD match results |
 | `--api-key KEY` | `str` | `None` | BSD API key (overrides `BSD_API_KEY` env var) |
+| `--fixture-source` | `str` | `auto` | Fixture source: `auto` (try BSD, fallback repo), `repo` (force repo fixtures), `bsd` (force BSD, fail if unavailable) |
+| `--mode` | `str` | `simulate` | Simulation mode: `simulate` (full synthetic), `replay` (from JSON file), `live` (from BSD API) |
+| `--replay-data FILE` | `str` | `None` | JSON file path with played match results (required for `--mode replay`) |
 
 **Default behavior:** Runs a single Monte Carlo simulation with 10,000
 iterations, prints formatted output, and optionally exports JSON.
 
-**Environment variable:** `BSD_API_KEY` is optional unless `--validate` is
-used.
+**Mode behavior:**
+- **`simulate`** (default) — Full synthetic simulation with no real match results.
+  `BSD_API_KEY` is optional; only used for BSD fixture fallback when
+  `--fixture-source auto` is set and the BSD API is reachable.
+- **`replay`** — Loads played match results from `--replay-data FILE` and uses
+  them to constrain the simulation. `--replay-data` is **required**.
+- **`live`** — Fetches real match results from the BSD API. `BSD_API_KEY` is
+  **required** (or `--api-key`).
+
+**Environment variable:** `BSD_API_KEY` is optional for `simulate` mode,
+required for `--validate` or `--mode live`.
 
 ### euro-predict (UEFA Euro 2024)
 
@@ -170,7 +189,9 @@ behave differently or fail when absent:
 |---------|---------|-----------------------|
 | `BSD_API_KEY` | `wc-predict` | **Hard failure** — exits with code 1 after printing an error message |
 | `BSD_API_KEY` | `ucl-predict` (with `--validate`) | **Hard failure** — exits with code 1 |
+| `BSD_API_KEY` | `ucl-predict` (with `--mode live`) | **Hard failure** — exits with code 1 |
 | `BSD_API_KEY` | `euro-predict` | **Graceful degradation** — runs Elo-only simulation with a warning |
+| `--replay-data FILE` | `ucl-predict` (with `--mode replay`) | **Hard failure** — exits with code 1 if missing |
 | `POLL_INTERVAL` | `wc-predict` | **Uses default** — 60 seconds |
 
 ---
@@ -182,16 +203,19 @@ defaults file is used.
 
 | Variable | Default Value | Set In |
 |----------|---------------|--------|
+| `API_TIMEOUT` | `10` (seconds) | `football_core/constants.py` line 11 |
 | `POLL_INTERVAL` | `60` | `competitions/worldcup/src/constants.py` line 53 |
-| `--seed` (wc-predict) | `None` | `competitions/worldcup/main.py` line 247 |
-| `--seed` (euro-predict) | `None` | `competitions/euro/main.py` line 43 |
-| `--iterations` (ucl-predict) | `10000` | `competitions/ucl/main.py` line 53 |
-| `--league` (wc-predict) | `27` (World Cup) | `competitions/worldcup/main.py` line 268 |
-| `--no-color` (wc-predict) | `False` | `competitions/worldcup/main.py` line 240 |
-| `--once` (wc-predict) | `False` | `competitions/worldcup/main.py` line 235 |
-| `--once` (euro-predict) | `False` | `competitions/euro/main.py` line 41 |
-| `--ai-preview` (wc-predict) | `False` | `competitions/worldcup/main.py` line 254 |
-| `--validate` (ucl-predict) | `False` | `competitions/ucl/main.py` line 65 |
+| `--seed` (wc-predict) | `None` | `competitions/worldcup/main.py` line 275 |
+| `--seed` (euro-predict) | `None` | `competitions/euro/main.py` line 36 |
+| `--iterations` (ucl-predict) | `10000` | `competitions/ucl/main.py` line 57 |
+| `--league` (wc-predict) | `27` (from `DEFAULT_LEAGUE_ID`) | `competitions/worldcup/src/constants.py` line 28 |
+| `--no-color` (wc-predict) | `False` | `competitions/worldcup/main.py` line 267 |
+| `--once` (wc-predict) | `False` | `competitions/worldcup/main.py` line 260 |
+| `--once` (euro-predict) | `False` | `competitions/euro/main.py` line 34 |
+| `--ai-preview` (wc-predict) | `False` | `competitions/worldcup/main.py` line 279 |
+| `--validate` (ucl-predict) | `False` | `competitions/ucl/main.py` line 68 |
+| `--fixture-source` (ucl-predict) | `auto` | `competitions/ucl/main.py` line 77 |
+| `--mode` (ucl-predict) | `simulate` | `competitions/ucl/main.py` line 83 |
 
 ---
 

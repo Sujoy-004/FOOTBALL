@@ -33,7 +33,12 @@ from src.predictors.odds import fetch_and_cache_odds
 from src.predictors.catboost import fetch_and_cache_catboost
 from src.predictors.form import compute_form_signal
 from src.predictors.lineup import compute_lineup_signal
-from src.constants import FORM_CACHE_FILE, LINEUP_CACHE_FILE
+from src.constants import (
+    FORM_CACHE_FILE, LINEUP_CACHE_FILE,
+    DEFENSIVE_CACHE_FILE, MANAGER_EFFECT_CACHE_FILE, AVAILABILITY_CACHE_FILE,
+    MANAGER_CACHE_FILE, MANAGER_CACHE_TTL_HOURS,
+    AVAILABILITY_CACHE_TTL_HOURS,
+)
 
 
 @dataclass
@@ -112,6 +117,15 @@ def _merge_signals_into_history(
         if "lineup_strength" in match_signals and "lineup_strength" not in signals:
             signals["lineup_strength"] = dict(match_signals["lineup_strength"])
             changed = True
+        if "defensive_quality" in match_signals and "defensive_quality" not in signals:
+            signals["defensive_quality"] = dict(match_signals["defensive_quality"])
+            changed = True
+        if "manager_effect" in match_signals and "manager_effect" not in signals:
+            signals["manager_effect"] = dict(match_signals["manager_effect"])
+            changed = True
+        if "availability" in match_signals and "availability" not in signals:
+            signals["availability"] = dict(match_signals["availability"])
+            changed = True
     if changed:
         state.save_prediction_history(history, data_dir)
 
@@ -124,6 +138,9 @@ def _run_calibrate_and_blend(
     cb_cache: dict,
     form_cache: dict | None = None,
     lineup_cache: dict | None = None,
+    defensive_cache: dict | None = None,
+    manager_cache: dict | None = None,
+    availability_cache: dict | None = None,
     data_dir: Path | str | None = None,
 ) -> dict | None:
     """Orchestrate calibration + blending via blender.calibrate_and_blend().
@@ -145,9 +162,17 @@ def _run_calibrate_and_blend(
             return None
 
         elo_ratings = {name: data["elo"] for name, data in teams.items()}
+        signal_keys = ["elo", "market_odds", "catboost", "form", "lineup_strength"]
+        if defensive_cache:
+            signal_keys.append("defensive_quality")
+        if manager_cache:
+            signal_keys.append("manager_effect")
+        if availability_cache:
+            signal_keys.append("availability")
+
         blend_params = calibrate_and_blend(
             history=history,
-            signal_keys=["elo", "market_odds", "catboost", "form", "lineup_strength"],
+            signal_keys=signal_keys,
             elo_ratings=elo_ratings,
             groups_data=groups,
             bracket_data=bracket,
@@ -155,6 +180,9 @@ def _run_calibrate_and_blend(
             cb_cache=cb_cache or {},
             form_cache=form_cache or {},
             lineup_cache=lineup_cache or {},
+            defensive_cache=defensive_cache or {},
+            manager_cache=manager_cache or {},
+            availability_cache=availability_cache or {},
         )
         if blend_params and blend_params.get("calibration_params"):
             save_calibration_params(blend_params["calibration_params"], data_dir)
@@ -659,6 +687,9 @@ def _gather_signal_data(
     played: dict,
     played_groups: dict | None = None,
     blend_params: dict | None = None,
+    defensive_cache: dict | None = None,
+    manager_cache: dict | None = None,
+    availability_cache: dict | None = None,
 ) -> list[dict]:
     """Build per-match signal data for the match detail table.
 
@@ -676,6 +707,9 @@ def _gather_signal_data(
         blend_params: Optional result from calibrate_and_blend() for
                       correct Brier-weighted blend. Falls back to Elo
                       when unavailable.
+        defensive_cache: Defensive quality signal cache.
+        manager_cache: Manager effect signal cache.
+        availability_cache: Availability signal cache.
 
     Returns:
         List of match data dicts with signals.
@@ -684,6 +718,9 @@ def _gather_signal_data(
     cb_m = (cb_cache or {}).get("matches", {})
     form_m = (form_cache or {}).get("matches", {})
     lineup_m = (lineup_cache or {}).get("matches", {})
+    defensive_m = (defensive_cache or {}).get("matches", {})
+    manager_m = (manager_cache or {}).get("matches", {})
+    availability_m = (availability_cache or {}).get("matches", {})
 
     played_mids: set = set()
     for g in (played_groups or {}).values():
@@ -716,6 +753,15 @@ def _gather_signal_data(
         lineup_prob = None
         if mid in lineup_m and isinstance(lineup_m[mid], dict):
             lineup_prob = lineup_m[mid].get("probability")
+        defensive_prob = None
+        if mid in defensive_m and isinstance(defensive_m[mid], dict):
+            defensive_prob = defensive_m[mid].get("probability")
+        manager_prob = None
+        if mid in manager_m and isinstance(manager_m[mid], dict):
+            manager_prob = manager_m[mid].get("probability")
+        availability_prob = None
+        if mid in availability_m and isinstance(availability_m[mid], dict):
+            availability_prob = availability_m[mid].get("probability")
 
         xg_val = None
         if xg_overrides and mid in xg_overrides:
@@ -736,6 +782,9 @@ def _gather_signal_data(
                 "catboost": cb_prob,
                 "form": form_prob,
                 "lineup": lineup_prob,
+                "defensive_quality": defensive_prob,
+                "manager_effect": manager_prob,
+                "availability": availability_prob,
                 "xg": xg_val,
             },
             "blended": round(blended, 4),
@@ -949,6 +998,47 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
         if not lineup_cache or not lineup_cache.get("matches"):
             signal_warnings.append("Lineup strength unavailable — no cached data")
 
+    # ── Manager-based signals: defensive quality + manager effect (Phase 21) ──
+    defensive_cache = {}
+    manager_cache = {}
+    if api_key:
+        manager_cache_data = state.load_signal_cache(MANAGER_CACHE_FILE, data_dir)
+        if not state.is_cache_valid(manager_cache_data, MANAGER_CACHE_TTL_HOURS):
+            try:
+                from src.predictors.manager_signals import fetch_and_cache_manager_signals
+                defensive_cache, manager_cache = fetch_and_cache_manager_signals(
+                    api_key, groups, bracket=bracket, league_id=league_id,
+                    cache_ttl_hours=MANAGER_CACHE_TTL_HOURS,
+                )
+                state.save_signal_cache(defensive_cache, DEFENSIVE_CACHE_FILE, data_dir)
+                state.save_signal_cache(manager_cache, MANAGER_EFFECT_CACHE_FILE, data_dir)
+            except Exception as e:
+                print(f"Warning: Manager signals fetch failed: {e}", file=sys.stderr)
+                if not defensive_cache or not defensive_cache.get("matches"):
+                    signal_warnings.append("Defensive quality unavailable — no cached data")
+                if not manager_cache or not manager_cache.get("matches"):
+                    signal_warnings.append("Manager effect unavailable — no cached data")
+        else:
+            defensive_cache = state.load_signal_cache(DEFENSIVE_CACHE_FILE, data_dir)
+            manager_cache = state.load_signal_cache(MANAGER_EFFECT_CACHE_FILE, data_dir)
+
+    # ── Availability / Injury Impact signal (Phase 21) ──
+    availability_cache = {}
+    if api_key:
+        availability_cache = state.load_signal_cache(AVAILABILITY_CACHE_FILE, data_dir)
+        if not state.is_cache_valid(availability_cache, AVAILABILITY_CACHE_TTL_HOURS):
+            try:
+                from src.predictors.availability import fetch_and_cache_availability_signal
+                availability_cache = fetch_and_cache_availability_signal(
+                    api_key, groups, bracket=bracket, league_id=league_id,
+                    cache_ttl_hours=AVAILABILITY_CACHE_TTL_HOURS,
+                )
+                state.save_signal_cache(availability_cache, AVAILABILITY_CACHE_FILE, data_dir)
+            except Exception as e:
+                print(f"Warning: Availability signal fetch failed: {e}", file=sys.stderr)
+                if not availability_cache or not availability_cache.get("matches"):
+                    signal_warnings.append("Availability signal unavailable — no cached data")
+
     # ══ Architecture Q4+Q5: Capture pre-mutation state ══
     # Capture prev_history for data_version change detection.
     # Must happen BEFORE _merge_signals_into_history().
@@ -958,10 +1048,12 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     # Merge signal cache data into prediction_history entries
     _merge_signals_into_history(data_dir=data_dir)
 
-    # ── Calibrate, blend, inject into simulation (Phase 14) ──
+    # ── Calibrate, blend, inject into simulation (Phase 14 + Phase 21) ──
     blend_params = _run_calibrate_and_blend(
         teams, groups, bracket, odds_cache, cb_cache,
         form_cache=form_cache, lineup_cache=lineup_cache,
+        defensive_cache=defensive_cache, manager_cache=manager_cache,
+        availability_cache=availability_cache,
         data_dir=data_dir,
     )
 
@@ -1048,6 +1140,31 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
             f"⚠ Lineup strength unavailable for {lineup_unavailable} match(es)"
         )
 
+    defensive_matches = defensive_cache.get("matches", {}) if defensive_cache else {}
+    defensive_unavailable = sum(
+        1 for m in defensive_matches.values() if not m.get("available", False)
+    )
+    if defensive_unavailable:
+        signal_warnings.append(
+            f"⚠ Defensive quality unavailable for {defensive_unavailable} match(es)"
+        )
+    manager_matches = manager_cache.get("matches", {}) if manager_cache else {}
+    manager_unavailable = sum(
+        1 for m in manager_matches.values() if not m.get("available", False)
+    )
+    if manager_unavailable:
+        signal_warnings.append(
+            f"⚠ Manager effect unavailable for {manager_unavailable} match(es)"
+        )
+    availability_matches = availability_cache.get("matches", {}) if availability_cache else {}
+    availability_unavailable = sum(
+        1 for m in availability_matches.values() if not m.get("available", False)
+    )
+    if availability_unavailable:
+        signal_warnings.append(
+            f"⚠ Availability signal unavailable for {availability_unavailable} match(es)"
+        )
+
     # Print aggregated warnings once per poll cycle (D-09)
     for warning in signal_warnings:
         print(warning)
@@ -1130,6 +1247,9 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                 odds_cache, cb_cache, form_cache, lineup_cache,
                 xg_overrides, played, played_groups,
                 blend_params=blend_params,
+                defensive_cache=defensive_cache,
+                manager_cache=manager_cache,
+                availability_cache=availability_cache,
             )
             if _state.match_detail_enabled == "table":
                 output.print_match_detail_table(matches_data, _state.prev_signal_data)
@@ -1219,7 +1339,9 @@ def _migrate_legacy_data(data_dir: Path | str, league_id: int) -> None:
         "played.json", "played_groups.json", "teams.json",
         "predictions_ledger.json", "prediction_history.json",
         "catboost_cache.json", "odds_cache.json", "form_cache.json",
-        "lineup_cache.json", "elo_applied.json", "elo_update_log.json",
+        "lineup_cache.json", "defensive_cache.json", "manager_effect_cache.json",
+        "manager_cache.json", "availability_cache.json",
+        "elo_applied.json", "elo_update_log.json",
         "calibration_params.json", "versions.json",
         "probability_log.json",
     ]

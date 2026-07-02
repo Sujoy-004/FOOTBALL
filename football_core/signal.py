@@ -28,6 +28,8 @@ class PredictionContext:
     played_results: list | None = None
     team_aliases: dict | None = None
     squad_values: dict[str, float] | None = None
+    manager_data: dict[str, dict] | None = None
+    player_data: dict[str, list[dict]] | None = None
 
 
 @runtime_checkable

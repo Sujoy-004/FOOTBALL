@@ -31,6 +31,9 @@ def calibrate_and_blend(
     cold_start_threshold: int = constants.COLD_START_THRESHOLD,
     form_cache: dict | None = None,
     lineup_cache: dict | None = None,
+    defensive_cache: dict | None = None,
+    manager_cache: dict | None = None,
+    availability_cache: dict | None = None,
 ) -> dict | None:
     if not history or not signal_keys:
         return None
@@ -86,6 +89,9 @@ def calibrate_and_blend(
     try:
         form_cache = form_cache or {}
         lineup_cache = lineup_cache or {}
+        defensive_cache = defensive_cache or {}
+        manager_cache = manager_cache or {}
+        availability_cache = availability_cache or {}
 
         all_matches: list[dict] = []
         groups_data_inner = groups_data.get("groups", groups_data) if isinstance(groups_data, dict) else groups_data
@@ -106,6 +112,9 @@ def calibrate_and_blend(
         cb_matches = cb_cache.get("matches", {}) if isinstance(cb_cache, dict) else {}
         form_matches = form_cache.get("matches", {}) if isinstance(form_cache, dict) else {}
         lineup_matches = lineup_cache.get("matches", {}) if isinstance(lineup_cache, dict) else {}
+        defensive_matches = defensive_cache.get("matches", {}) if isinstance(defensive_cache, dict) else {}
+        manager_matches = manager_cache.get("matches", {}) if isinstance(manager_cache, dict) else {}
+        availability_matches = availability_cache.get("matches", {}) if isinstance(availability_cache, dict) else {}
 
         for match in all_matches:
             mid = match.get("match_id", "")
@@ -121,6 +130,9 @@ def calibrate_and_blend(
             cb_prob = cb_matches.get(mid, {}).get("probability") if isinstance(cb_matches.get(mid), dict) else None
             form_prob = form_matches.get(mid, {}).get("probability") if isinstance(form_matches.get(mid), dict) else None
             lineup_prob = lineup_matches.get(mid, {}).get("probability") if isinstance(lineup_matches.get(mid), dict) else None
+            defensive_prob = defensive_matches.get(mid, {}).get("probability") if isinstance(defensive_matches.get(mid), dict) else None
+            manager_prob = manager_matches.get(mid, {}).get("probability") if isinstance(manager_matches.get(mid), dict) else None
+            availability_prob = availability_matches.get(mid, {}).get("probability") if isinstance(availability_matches.get(mid), dict) else None
 
             raw_probs: dict[str, float] = {}
             for sig_key, raw_p in [
@@ -129,6 +141,9 @@ def calibrate_and_blend(
                 ("catboost", cb_prob),
                 ("form", form_prob),
                 ("lineup_strength", lineup_prob),
+                ("defensive_quality", defensive_prob),
+                ("manager_effect", manager_prob),
+                ("availability", availability_prob),
             ]:
                 if raw_p is not None and isinstance(raw_p, (int, float)):
                     raw_probs[sig_key] = raw_p
