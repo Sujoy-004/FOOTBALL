@@ -97,3 +97,21 @@ class SignalRegistry:
                 )
                 results[name] = SignalOutput(1 / 3, 1 / 3, 1 / 3)
         return results
+
+
+@dataclass
+class BlendedPrediction:
+    """Final blended probability for one match from the ensemble.
+
+    Produced by EnsembleEngine.evaluate(). Consumed by Phase 9 calibration
+    and downstream consumers (simulation, display).
+
+    signal_breakdown: {signal_name: {home, draw, away, weight}}
+    weights_applied:  {signal_name: normalized_weight}
+    """
+
+    home_prob: float
+    draw_prob: float
+    away_prob: float
+    signal_breakdown: dict[str, dict[str, float]]
+    weights_applied: dict[str, float]
