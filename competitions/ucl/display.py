@@ -327,25 +327,19 @@ def print_value_plays(
 
         # Only show significant deltas (|delta| > 5%)
         sig_deltas = []
-        for outcome, delta, market_prob in [
-            ("HOME", delta_home, market_home),
-            ("DRAW", delta_draw, market_draw),
-            ("AWAY", delta_away, market_away),
+        for outcome, delta, market_prob, model_p in [
+            ("HOME", delta_home, market_home, bp.home_prob),
+            ("DRAW", delta_draw, market_draw, bp.draw_prob),
+            ("AWAY", delta_away, market_away, bp.away_prob),
         ]:
             if abs(delta) > 0.05:
-                sig_deltas.append((outcome, delta, market_prob))
+                sig_deltas.append((outcome, delta, market_prob, model_p))
 
         if sig_deltas:
             found_value = True
             print(f"  Match {i + 1}:")
-            for outcome, delta, mkt in sig_deltas:
+            for outcome, delta, mkt, model_p in sig_deltas:
                 direction = "OVER" if delta > 0 else "UNDER"
-                if outcome == "HOME":
-                    model_p = bp.home_prob
-                elif outcome == "DRAW":
-                    model_p = bp.draw_prob
-                else:
-                    model_p = bp.away_prob
                 print(f"    {outcome}: model={model_p:.3f} "
                       f"market={mkt:.3f} "
                       f"delta={delta:+.3f} ({direction}VALUE)")
