@@ -119,6 +119,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Cross-check predictions against real BSD match results",
     )
     parser.add_argument(
+        "--tier",
+        choices=["cross-tournament", "walk-forward", "replay", "all"],
+        default="all",
+        help="Validation tier to run (default: all tiers)",
+    )
+    parser.add_argument(
         "--api-key", type=str, default=None,
         metavar="KEY", help="BSD API key (default: BSD_API_KEY env var)",
     )
@@ -154,6 +160,21 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=["summary", "match"],
         help="Show signal breakdown: 'summary' (default) for avg weights, "
              "'match' for per-match signal probabilities",
+    )
+    parser.add_argument(
+        "--what-if", type=str, default=None,
+        action="append", dest="what_if_list",
+        metavar="TEAM.PARAM=VALUE",
+        help="Run counterfactual analysis: modify a parameter and re-run simulation. "
+             "Repeatable for multiple changes. "
+             "Supported: Elo only (--what-if Arsenal.elo=1960). "
+             "Example: --what-if 'Arsenal.elo=1960' --what-if 'RealMadrid.elo=2100'",
+    )
+    parser.add_argument(
+        "--report", type=str, default=None,
+        metavar="FILE",
+        help="Write structured report to FILE (JSON with simulation, signal breakdown, "
+             "validation, and counterfactual results)",
     )
     return parser.parse_args(argv)
 
@@ -217,6 +238,143 @@ def parse_weights(weights_str: str | None) -> dict[str, float] | None:
         weights = {k: v / total for k, v in weights.items()}
 
     return weights
+
+
+def _parse_what_if(what_if_list: list[str] | None) -> list[dict]:
+    """Parse --what-if arguments into structured modifications.
+
+    Each argument has format: TEAM.PARAM=VALUE
+    Supported params: elo (float)
+
+    Returns list of dicts: [{team, param, value}, ...]
+    Returns empty list if what_if_list is None or empty.
+
+    Raises SystemExit on malformed input with clear error messages.
+    """
+    if not what_if_list:
+        return []
+
+    supported_params = {"elo"}
+    modifications: list[dict] = []
+
+    for arg in what_if_list:
+        # Check format: must contain a dot and an equals sign
+        if "." not in arg or "=" not in arg:
+            print(
+                f"Error: invalid --what-if format '{arg}'. "
+                f"Use TEAM.PARAM=VALUE format (e.g., 'Arsenal.elo=1960').",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        # Split on the FIRST dot and the FIRST equals
+        dot_idx = arg.index(".")
+        eq_idx = arg.index("=", dot_idx)
+
+        if dot_idx == 0 or eq_idx <= dot_idx + 1:
+            print(
+                f"Error: invalid --what-if format '{arg}'. "
+                f"Team name must not be empty.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        team = arg[:dot_idx]
+        param = arg[dot_idx + 1:eq_idx]
+        value_str = arg[eq_idx + 1:]
+
+        if not param:
+            print(
+                f"Error: empty parameter in --what-if '{arg}'.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if param not in supported_params:
+            supported_str = ", ".join(sorted(supported_params))
+            print(
+                f"Error: unsupported parameter '{param}' in --what-if '{arg}'. "
+                f"Supported parameters: {supported_str}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        try:
+            value = float(value_str)
+        except ValueError:
+            print(
+                f"Error: non-numeric value '{value_str}' for parameter "
+                f"'{param}' in --what-if '{arg}'.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if value < 0:
+            print(
+                f"Error: negative value {value} for parameter "
+                f"'{param}' in --what-if '{arg}'. Elo must be positive.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        modifications.append({"team": team, "param": param, "value": value})
+
+    return modifications
+
+
+def _run_counterfactual(
+    what_if_changes: list[dict],
+    elo_ratings: dict[str, float],
+    fixtures_schedule: FixtureSchedule,
+    seed: int,
+    n_iterations: int,
+    args: argparse.Namespace,
+    data_dir: str,
+) -> tuple[SimulationResult, list[str]]:
+    """Run counterfactual simulation with modified parameters.
+
+    Deep-copies elo_ratings, applies modifications, and re-runs the
+    full MC simulation with adjusted seed (base_seed + 1).
+
+    Args:
+        what_if_changes: List of {team, param, value} dicts from _parse_what_if().
+        elo_ratings: Base {team: elo} dict (not mutated).
+        fixtures_schedule: FixtureSchedule for the tournament.
+        seed: Base random seed for reproducibility.
+        n_iterations: Number of MC iterations.
+        args: Parsed CLI args (passed through to build_simulation_result).
+        data_dir: Path to competition data directory.
+
+    Returns:
+        Tuple of (counterfactual SimulationResult, list of change description strings).
+    """
+    # Deep-copy to avoid mutating original
+    modified_elos = dict(elo_ratings)
+
+    change_descriptions: list[str] = []
+    for change in what_if_changes:
+        team = change["team"]
+        param = change["param"]
+        value = change["value"]
+
+        if param == "elo":
+            old_val = modified_elos.get(team, 1500.0)
+            modified_elos[team] = value
+            delta = int(value - old_val)
+            if delta >= 0:
+                change_descriptions.append(f"{team}.elo={value} (was {old_val:.0f}, +{delta})")
+            else:
+                change_descriptions.append(f"{team}.elo={value} (was {old_val:.0f}, {delta})")
+
+    # Re-run simulation with modified Elo and adjusted seed
+    from competitions.ucl.src.orchestrator import run_simulation
+
+    result = run_simulation(
+        fixtures_schedule, modified_elos, seed + 1, n_iterations,
+        args, data_dir,
+    )
+
+    return result, change_descriptions
 
 
 def build_simulation_result(
@@ -391,6 +549,146 @@ def run_validation(
     return result
 
 
+def _run_validation_suite(
+    args: argparse.Namespace,
+    elo_ratings: dict[str, float],
+    fixtures_schedule: FixtureSchedule,
+    data_dir: str,
+) -> dict:
+    """Execute validation pipeline using ValidationSuite.
+
+    Parameters
+    ----------
+    args :
+        Parsed CLI arguments.
+    elo_ratings :
+        {team: Elo} ratings for all teams.
+    fixtures_schedule :
+        Loaded fixture schedule from provider.
+    data_dir :
+        Path to competition data directory.
+
+    Returns
+    -------
+    dict
+        Combined validation report from all requested tiers.
+    """
+    from competitions.ucl.src.validation_suite import ValidationSuite
+
+    engine = _build_signal_engine(elo_ratings, parse_weights(args.weights))
+
+    # Build seasons_data from available sources
+    fixture_dict = {"schedule": asdict(fixtures_schedule)}
+    team_names = [t["name"] for t in fixture_dict["schedule"]["teams"]]
+
+    # Use the fixture schedule to construct a minimal season data
+    current_season_id = "current"
+    matches: list[dict] = []
+    for md in fixture_dict["schedule"]["matchdays"]:
+        for m in md:
+            matches.append({
+                "match_id": m.get("match_id", ""),
+                "team_a": m.get("team_a", ""),
+                "team_b": m.get("team_b", ""),
+                "winner": None,
+                "is_draw": False,
+                "home_score": 0,
+                "away_score": 0,
+            })
+
+    standings = [
+        {"team": t, "position": i + 1, "elo": elo_ratings.get(t, 1500.0)}
+        for i, t in enumerate(team_names)
+    ]
+
+    seasons_data: dict[str, dict] = {
+        current_season_id: {
+            "matches": matches,
+            "teams": team_names,
+            "standings": standings,
+        },
+    }
+
+    suite = ValidationSuite(engine, seasons_data)
+
+    # Load replay data if available
+    replay_data: list[list[dict]] | None = None
+    if args.replay_data:
+        try:
+            with open(args.replay_data) as f:
+                raw = json.load(f)
+            # Handle both flat list and nested matchday structure
+            if isinstance(raw, list):
+                if raw and isinstance(raw[0], list):
+                    replay_data = raw
+                else:
+                    # Flat list — wrap in single matchday
+                    replay_data = [raw]
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Error loading replay data: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    # Run requested tier(s)
+    if args.tier == "all":
+        report = suite.run_all(replay_matchdays=replay_data)
+    elif args.tier == "cross-tournament":
+        result = suite.run_tier_1_cross_tournament()
+        report = {
+            "phase": 9,
+            "date": result.date,
+            "uncalibrated": True,
+            "tournament_level": {
+                "trps": result.metrics.get("trps", 0.0),
+                "champion_accuracy": result.metrics.get("champion_accuracy", 0.0),
+                "stage_accuracy": result.metrics.get("stage_accuracy", 0.0),
+            },
+            "n_matches_total": result.n_matches,
+            "n_seasons": result.n_seasons,
+        }
+        if result.details:
+            report["cross_tournament_details"] = result.details
+    elif args.tier == "walk-forward":
+        result = suite.run_tier_2_walk_forward()
+        report = {
+            "phase": 9,
+            "date": result.date,
+            "uncalibrated": True,
+            "match_level": {
+                "log_loss": result.metrics.get("log_loss", 0.0),
+                "brier": result.metrics.get("brier", 0.0),
+                "ece": result.metrics.get("ece", 0.0),
+            },
+            "n_matches_total": result.n_matches,
+            "n_seasons": result.n_seasons,
+        }
+        if result.details:
+            report["walk_forward_details"] = result.details
+    elif args.tier == "replay":
+        if not replay_data:
+            print("Error: --replay-data PATH required for --tier replay",
+                  file=sys.stderr)
+            sys.exit(1)
+        result = suite.run_tier_3_replay(replay_data)
+        report = {
+            "phase": 9,
+            "date": result.date,
+            "uncalibrated": True,
+            "calibration": {
+                "ece": result.metrics.get("ece", 0.0),
+                "n_decision_points": result.metrics.get("n_decision_points", 0),
+            },
+            "n_matches_total": result.n_matches,
+            "n_seasons": result.n_seasons,
+        }
+        if result.details:
+            report["replay_details"] = result.details
+    else:
+        print(f"Error: unknown tier '{args.tier}'", file=sys.stderr)
+        sys.exit(1)
+
+    return report
+
+
 def main() -> None:
     """Entry point: parse args, run simulation, display results, optionally export JSON."""
     args = _parse_args()
@@ -519,46 +817,103 @@ def main() -> None:
             )
         print_signal_breakdown(contributions, champion_team, champion_prob)
 
+    # ── Phase 11: Counterfactual analysis (--what-if) ──
+    counterfactual_results: list[tuple[SimulationResult, list[str]]] = []
+    if args.what_if_list:
+        what_if_changes = _parse_what_if(args.what_if_list)
+        if what_if_changes:
+            cf_result, cf_descriptions = _run_counterfactual(
+                what_if_changes, elo_ratings, fixtures_schedule,
+                seed, args.iterations, args, data_dir,
+            )
+            counterfactual_results.append((cf_result, cf_descriptions))
+            from competitions.ucl.display import print_counterfactual_comparison
+            print_counterfactual_comparison(result, cf_result, cf_descriptions)
+
+    # ── Phase 11: Report generation (--report) ──
+    if args.report:
+        from competitions.ucl.report import build_report, write_report
+
+        report = build_report(
+            result,
+            blended_predictions=blended_predictions,
+            engine=engine,
+            counterfactual_results=counterfactual_results if counterfactual_results else None,
+            match_fixtures=signal_matches,
+        )
+        write_report(report, args.report)
+        print(f"Report written to {args.report}")
+
     # ── Signal breakdown display (Phase 8, D-07) ──
     if args.show_breakdown:
         from competitions.ucl.display import show_breakdown, print_value_plays
         show_breakdown(blended_predictions, mode=args.show_breakdown)
         print_value_plays(blended_predictions)
 
-    # Validation (Phase 4, D-01 through D-03)
+    # Validation (Phase 9 — three-tier validation suite)
     if args.validate:
+        # Run the validation suite (no API key required — uses local data)
+        try:
+            validation_report = _run_validation_suite(
+                args, elo_ratings, fixtures_schedule, data_dir,
+            )
+        except Exception as e:
+            print(f"Warning: Validation suite failed: {e}", file=sys.stderr)
+            validation_report = None
+
+        if validation_report:
+            # Print summary
+            print("\n── Validation Suite Results ──────────────────────────────")
+
+            if "tournament_level" in validation_report:
+                tl = validation_report["tournament_level"]
+                print(f"  TRPS:               {tl.get('trps', 'N/A'):>10}")
+                print(f"  Champion accuracy:  {tl.get('champion_accuracy', 'N/A'):>10}")
+                print(f"  Stage accuracy:     {tl.get('stage_accuracy', 'N/A'):>10}")
+
+            if "match_level" in validation_report:
+                ml = validation_report["match_level"]
+                print(f"  Log Loss:           {ml.get('log_loss', 'N/A'):>10}")
+                print(f"  Brier:              {ml.get('brier', 'N/A'):>10}")
+                print(f"  ECE:                {ml.get('ece', 'N/A'):>10}")
+
+            if "calibration" in validation_report:
+                cal = validation_report["calibration"]
+                print(f"  Replay ECE:         {cal.get('ece', 'N/A'):>10}")
+                print(f"  Decision points:    {cal.get('n_decision_points', 'N/A'):>10}")
+
+            # Save report if --output given
+            if args.output:
+                with open(args.output, "w") as f:
+                    json.dump(validation_report, f, indent=2)
+                print(f"Validation report saved to: {args.output}")
+
+        # Also run old-style BSD validation if API key available (Phase 4 compat)
         api_key = args.api_key or os.environ.get("BSD_API_KEY")
-        if not api_key:
-            print("Error: BSD_API_KEY not set. Provide --api-key or set BSD_API_KEY env var.")
-            sys.exit(1)
+        if api_key:
+            try:
+                from competitions.ucl.src.fetcher import fetch_ucl_matches
 
-        from competitions.ucl.src.fetcher import fetch_ucl_matches
+                team_aliases_path = os.path.join(data_dir, "team_aliases.json")
+                with open(team_aliases_path) as f:
+                    team_aliases = json.load(f)
+                real_matches = fetch_ucl_matches(
+                    api_key, team_aliases, asdict(fixtures_schedule),
+                )
 
-        team_aliases_path = os.path.join(data_dir, "team_aliases.json")
-        with open(team_aliases_path) as f:
-            team_aliases = json.load(f)
-        real_matches = fetch_ucl_matches(
-            api_key, team_aliases, asdict(fixtures_schedule),
-        )
+                # Cross-check predictions vs real outcomes using expected_score from Elo
+                validation_result = run_validation(result, real_matches, elo_ratings)
 
-        # Cross-check predictions vs real outcomes using expected_score from Elo
-        validation_result = run_validation(result, real_matches, elo_ratings)
+                # Store in result for JSON enrichment
+                object.__setattr__(result, "validation", validation_result)
 
-        # Store in result for JSON enrichment (frozen dataclass workaround)
-        object.__setattr__(result, "validation", validation_result)
+                # Print summary table to stdout
+                from competitions.ucl.display import print_validation_summary
+                print_validation_summary(validation_result)
+            except Exception:
+                pass  # BSD validation is optional; don't crash
 
-        # Print summary table to stdout
-        from competitions.ucl.display import print_validation_summary
-        print_validation_summary(validation_result)
-
-        # Enrich JSON if --output given
-        if args.output:
-            output = asdict(result)
-            with open(args.output, "w") as f:
-                json.dump(output, f, indent=2)
-            print(f"JSON enriched with validation: {args.output}")
-
-    # JSON export (existing) — only if NOT already written with validation
+    # JSON export — only if NOT already written with validation
     elif args.output:
         with open(args.output, "w") as f:
             json.dump(asdict(result), f, indent=2)

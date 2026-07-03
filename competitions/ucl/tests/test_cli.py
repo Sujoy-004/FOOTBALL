@@ -9,7 +9,10 @@ from dataclasses import asdict
 
 import pytest
 
-from competitions.ucl.main import _parse_args, build_simulation_result, parse_weights
+from competitions.ucl.main import (
+    _parse_args, _run_validation_suite,
+    build_simulation_result, parse_weights,
+)
 from football_core.provider import (
     FixtureSchedule, FixtureProvider, Team, Match, FixtureProviderError,
 )
@@ -282,3 +285,93 @@ class TestBreakdownFlags:
             assert False, "Should raise SystemExit"
         except SystemExit:
             pass
+
+
+class TestCounterfactualFlags:
+    """Tests for --what-if CLI flag parsing."""
+
+    def test_what_if_default_none(self):
+        args = _parse_args([])
+        assert args.what_if_list is None
+
+    def test_what_if_single(self):
+        args = _parse_args(["--what-if", "Arsenal.elo=1960"])
+        assert args.what_if_list == ["Arsenal.elo=1960"]
+
+    def test_what_if_multiple(self):
+        args = _parse_args([
+            "--what-if", "Arsenal.elo=1960",
+            "--what-if", "RealMadrid.elo=2100",
+        ])
+        assert len(args.what_if_list) == 2
+        assert args.what_if_list[0] == "Arsenal.elo=1960"
+        assert args.what_if_list[1] == "RealMadrid.elo=2100"
+
+
+class TestReportFlags:
+    """Tests for --report CLI flag parsing."""
+
+    def test_report_default_none(self):
+        args = _parse_args([])
+        assert args.report is None
+
+    def test_report_flag(self):
+        args = _parse_args(["--report", "report.json"])
+        assert args.report == "report.json"
+
+    def test_report_compatible_with_other_flags(self):
+        args = _parse_args([
+            "-n", "5000", "--report", "report.json", "--seed", "42",
+        ])
+        assert args.report == "report.json"
+        assert args.iterations == 5000
+        assert args.seed == 42
+
+
+class TestValidationSuiteIntegration:
+    """Tests for _run_validation_suite returning correct structure."""
+
+    def test_help_includes_tier(self):
+        """--help output includes --tier flag."""
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, "-m", "competitions.ucl.main", "--help"],
+            capture_output=True, text=True,
+        )
+        assert "--tier" in result.stdout
+        assert "cross-tournament" in result.stdout
+        assert "walk-forward" in result.stdout
+        assert "replay" in result.stdout
+
+
+class TestTierFlags:
+    """Tests for --tier CLI flag (Phase 9 validation suite)."""
+
+    def test_tier_default_all(self):
+        args = _parse_args(["--validate"])
+        assert args.tier == "all"
+
+    def test_tier_cross_tournament(self):
+        args = _parse_args(["--validate", "--tier", "cross-tournament"])
+        assert args.tier == "cross-tournament"
+
+    def test_tier_walk_forward(self):
+        args = _parse_args(["--validate", "--tier", "walk-forward"])
+        assert args.tier == "walk-forward"
+
+    def test_tier_replay(self):
+        args = _parse_args(["--validate", "--tier", "replay"])
+        assert args.tier == "replay"
+
+    def test_tier_invalid_choice_rejected(self):
+        try:
+            _parse_args(["--validate", "--tier", "invalid"])
+            assert False, "Should raise SystemExit"
+        except SystemExit:
+            pass
+
+    def test_tier_compatible_with_seed(self):
+        args = _parse_args(["--validate", "--tier", "walk-forward", "-s", "42"])
+        assert args.tier == "walk-forward"
+        assert args.seed == 42

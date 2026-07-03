@@ -454,6 +454,88 @@ def print_signal_breakdown(
     print()
 
 
+def print_counterfactual_comparison(
+    baseline_result: SimulationResult,
+    counterfactual_result: SimulationResult,
+    change_descriptions: list[str],
+    n_top: int = 5,
+) -> None:
+    """Display side-by-side comparison of baseline vs counterfactual results.
+
+    Shows changes applied, top-N champion probabilities with deltas,
+    and champion stage probability comparison.
+
+    Args:
+        baseline_result: Original SimulationResult (unchanged).
+        counterfactual_result: SimulationResult after parameter changes.
+        change_descriptions: Human-readable list of what changed.
+        n_top: Number of top teams to show in comparison (default 5).
+    """
+    print()
+    print("==== Counterfactual Comparison ====")
+    print()
+
+    # Show changes made
+    for desc in change_descriptions:
+        print(f"  Change: {desc}")
+    print()
+
+    # Sort teams by baseline champion probability descending
+    sorted_teams = sorted(
+        baseline_result.teams.items(),
+        key=lambda x: -x[1].get("champion_prob", 0.0),
+    )
+
+    # Top-N champion probabilities side-by-side
+    print(f"  Top-{n_top} Champion Probabilities:")
+    print(f"  {'Team':<24} {'Baseline':>9} {'Counterfactual':>14} {'Delta':>7}")
+    print(f"  {'-' * 56}")
+
+    for rank, (team_name, team_data) in enumerate(sorted_teams[:n_top], start=1):
+        base_champ = team_data.get("champion_prob", 0.0) * 100
+        cf_data = counterfactual_result.teams.get(team_name, {})
+        cf_champ = cf_data.get("champion_prob", 0.0) * 100
+        delta = cf_champ - base_champ
+
+        print(
+            f"  {team_name:<24} "
+            f"{base_champ:>8.1f}% "
+            f"{cf_champ:>13.1f}% "
+            f"{delta:>+7.1f}%"
+        )
+    print()
+
+    # Stage probabilities for champion team (baseline champion)
+    champion_team = baseline_result.bracket_champion
+    if champion_team and champion_team in baseline_result.teams:
+        print(f"  {champion_team} Stage Probabilities:")
+        print(f"  {'Stage':<15} {'Baseline':>9} {'Counterfactual':>14} {'Delta':>7}")
+        print(f"  {'-' * 47}")
+
+        stage_keys = [
+            ("Champion", "champion_prob"),
+            ("Final", "stage_final_prob"),
+            ("Semifinal", "stage_sf_prob"),
+            ("Quarterfinal", "stage_qf_prob"),
+        ]
+
+        base_team_data = baseline_result.teams[champion_team]
+        cf_team_data = counterfactual_result.teams.get(champion_team, {})
+
+        for stage_label, prob_key in stage_keys:
+            base_val = base_team_data.get(prob_key, 0.0) * 100
+            cf_val = cf_team_data.get(prob_key, 0.0) * 100
+            delta = cf_val - base_val
+
+            print(
+                f"  {stage_label:<15} "
+                f"{base_val:>8.1f}% "
+                f"{cf_val:>13.1f}% "
+                f"{delta:>+7.1f}%"
+            )
+        print()
+
+
 def print_odds(result: SimulationResult) -> None:
     """Print champion/qualification odds for all 36 teams (D-06 position 5).
 
