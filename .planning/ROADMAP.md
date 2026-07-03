@@ -116,14 +116,14 @@
 **Plans**: 3 plans
 
 **Wave 1** *(foundation)*
-- [ ] 09-01-PLAN.md — Core metrics: TRPS + multi-outcome evaluation (UCLV-10, UCLV-11)
+- [x] 09-01-PLAN.md — Core metrics: TRPS + multi-outcome evaluation (UCLV-10, UCLV-11)
 
 **Wave 2** *(blocked on Wave 1)*
-- [ ] 09-02-PLAN.md — Walk-forward + replay validation framework (UCLV-08, UCLV-09)
+- [x] 09-02-PLAN.md — Walk-forward + replay validation framework (UCLV-08, UCLV-09)
 
 **Wave 3** *(blocked on Wave 2)*
-- [ ] 09-03-PLAN.md — Cross-tournament backtest + baseline recording + CLI (UCLV-07, UCLV-12, UCLV-13, UCLV-14)
-**Status**: Planned
+- [x] 09-03-PLAN.md — Cross-tournament backtest + baseline recording + CLI (UCLV-07, UCLV-12, UCLV-13, UCLV-14)
+**Status**: Complete ✓ (2026-07-03)
 
 ### Phase 10: Probability Calibration & Uncertainty
 
@@ -132,12 +132,12 @@
 **Plans**: 3 plans
 
 **Wave 1** *(foundation)*
-- [ ] 10-01-PLAN.md — Calibration Pipeline: temperature scaling + CalibrationPipeline class (UCLC-01, UCLC-02)
+- [x] 10-01-PLAN.md — Calibration Pipeline: temperature scaling + CalibrationPipeline class (UCLC-01, UCLC-02)
 - [ ] 10-02-PLAN.md — Bayesian/Glicko-style Elo: (μ, σ²) per team + g(RD) deflation + variance floor (UCLC-03, UCLC-04, UCLC-05)
 
 **Wave 2** *(blocked on Wave 1)*
 - [ ] 10-03-PLAN.md — CI propagation + CLI display + before/after validation comparison (UCLC-06, UCLC-07, UCLC-08)
-**Status**: Planned
+**Status**: Partial — Plan 01 complete, Plans 02-03 pending
 
 ### Phase 11: Explainability & Production
 
@@ -146,12 +146,12 @@
 **Plans**: 3 plans
 
 **Wave 1** *(foundation)*
-- [ ] 11-01-PLAN.md — Signal Contribution Breakdown: always-on per-signal decomposition in CLI output (UCLE-01, UCLE-02)
+- [x] 11-01-PLAN.md — Signal Contribution Breakdown: always-on per-signal decomposition in CLI output (UCLE-01, UCLE-02)
 
 **Wave 2** *(parallel, blocked on Wave 1)*
-- [ ] 11-02-PLAN.md — Counterfactual Analysis & Reporting: --what-if flag, --report flag, side-by-side comparison (UCLE-03, UCLE-04)
-- [ ] 11-03-PLAN.md — Production Architecture Refinements: CLI cleanup, --verbose, centralized argument validation, config standardization (UCLE-05, UCLE-06)
-**Status**: Planned
+- [x] 11-02-PLAN.md — Counterfactual Analysis & Reporting: --what-if flag, --report flag, side-by-side comparison (UCLE-03, UCLE-04)
+- [x] 11-03-PLAN.md — Production Architecture Refinements: CLI cleanup, --verbose, centralized argument validation, config standardization (UCLE-05, UCLE-06)
+**Status**: Complete ✓ (2026-07-03)
 
 </details>
 
@@ -167,6 +167,6 @@
 | 6. Simulation Modes | v2.0 | 3/3 | ✓ Complete | 2026-07-01 |
 | 7. Prediction Signals | v2.0 | 3/3 | ✓ Complete | 2026-07-01 |
 | 8. Signal Blending & Market Integration | v2.0 | 3/3 | ✓ Complete | 2026-07-03 |
-| 9. Tournament Validation | v2.0 | 0/3 | ▷ Planned | — |
-| 10. Probability Calibration & Uncertainty | v2.0 | 0/3 | ▷ Planned | — |
-| 11. Explainability & Production | v2.0 | 0/3 | ▷ Planned | — |
+| 9. Tournament Validation | v2.0 | 3/3 | ✓ Complete | 2026-07-03 |
+| 10. Probability Calibration & Uncertainty | v2.0 | 1/3 | ◐ Partial | 2026-07-03 |
+| 11. Explainability & Production | v2.0 | 3/3 | ✓ Complete | 2026-07-03 |

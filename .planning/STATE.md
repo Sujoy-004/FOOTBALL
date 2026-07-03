@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 10 Plan 01 (Temperature Scaling) — EXECUTED
-last_updated: "2026-07-03T11:42:00.000Z"
+stopped_at: Phase 11 Plan 03 (Windows Printing & Output Hardening) — EXECUTED
+last_updated: "2026-07-03T12:30:00.000Z"
 progress:
   total_phases: 11
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 32
-  completed_plans: 30
-  percent: 94
+  completed_plans: 32
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,11 @@ See: .planning/PROJECT.md (updated 2026-06-29 after v2.0 planning)
 ## Current Position
 
 Milestone: v2.0 — UCL Prediction Quality
-Phase: 10 (Probability Calibration & Uncertainty) — EXECUTING
-Plan: 2 of 3 (Plan 1 complete)
+Phase: 11 (Explainability & Production) — EXECUTED
+Plan: 3 of 3 (All plans complete)
 Plans: 3 of 3 (planned)
 Status: Executing
+Note: Phase 10 Plans 02-03 (Glicko Elo, Bootstrap CI) remain pending
 
 ### Changes Made (2026-07-03 execution)
 
@@ -66,9 +67,9 @@ Status: Executing
 
 **Phase 11 — Explainability & Production:**
 
-- 11-01: Signal Contribution Breakdown — always-on per-signal decomposition in CLI output
-- 11-02: Counterfactual Analysis & Reporting — --what-if flag + --report flag
-- 11-03: Production Architecture Refinements — CLI cleanup, --verbose, centralized validation
+- [EXECUTED] 11-01: Signal Contribution Breakdown — always-on per-signal decomposition in CLI output
+- [EXECUTED] 11-02: Counterfactual Analysis & Reporting — --what-if flag, --report flag, side-by-side comparison
+- [EXECUTED] 11-03: Windows Printing & Output Hardening — UTF-8 mode, display hardening, ASCII-compatibility tests
 
 **Key outcomes:**
 
@@ -76,8 +77,12 @@ Status: Executing
 - Counterfactual analysis via --what-if with side-by-side comparison display per D-02
 - Structured reporting via --report matching RESPONSE.md pattern per D-03
 - Config directory standardization, --verbose, centralized argument validation per D-04
-- CLI flags: --what-if, --report, --verbose
+- CLI flags: --what-if, --report, --verbose, --tier
+- Windows UTF-8 mode via `_ensure_utf8_mode()` — stdout/stderr reconfigured to UTF-8
+- 6 display functions hardened with `_require()` None guards and `.get()` fallbacks
+- ASCII-compatibility test suite (7 tests) verifying all output is pure ASCII
 - All plans in 2 waves: Wave 1 (11-01 foundation), Wave 2 (11-02 + 11-03 parallel)
+- All 32 plans (v1.0 + v2.0) executed — complete project milestone
 
 ## Performance Metrics
 
@@ -131,14 +136,16 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- [x] Plan Phase 9 (Tournament Validation) ✓ Planned
+- [x] Plan Phase 9 (Tournament Validation) ✓ Complete
 - [x] Plan Phase 10 (Calibration & Uncertainty) ✓ Planned
-- [x] Plan Phase 11 (Explainability & Production) ✓ Planned
+- [x] Plan Phase 11 (Explainability & Production) ✓ Complete
 - [x] Execute Phase 9 (Tournament Validation) ✓ Complete
 - [x] Execute Phase 10 Plan 01 (Temperature Scaling) ✓ Complete
+- [x] Execute Phase 11 Plan 01 (Signal Contribution Breakdown) ✓ Complete
+- [x] Execute Phase 11 Plan 02 (Counterfactual Analysis & Reporting) ✓ Complete
+- [x] Execute Phase 11 Plan 03 (Windows Printing & Output Hardening) ✓ Complete
 - [ ] Execute Phase 10 Plan 02 (Glicko Elo)
 - [ ] Execute Phase 10 Plan 03 (Bootstrap CI & Display)
-- Execute Phase 11 (Explainability & Production)
 
 ### Blockers/Concerns
 
@@ -161,5 +168,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-07-03
-Stopped at: Phase 10 Plan 01 (Temperature Scaling) — EXECUTED (complete)
-Next: Phase 10 Plan 02 (Glicko Elo) — ready for execution
+Stopped at: Phase 11 Plan 03 (Windows Printing & Output Hardening) — EXECUTED (complete)
+Next: (All plans executed across 11 phases)
+Note: Phase 10 Plans 02-03 (Glicko Elo, Bootstrap CI) remain pending for post-v2 follow-up
