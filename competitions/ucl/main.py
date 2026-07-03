@@ -210,6 +210,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="N", help="Random seed for reproducible simulation",
     )
     sim_group.add_argument(
+        "--use-glicko", action="store_true",
+        help="Enable Bayesian/Glicko-1 uncertainty propagation. "
+             "Samples team strengths from N(μ, σ²) per MC iteration "
+             "instead of using fixed point estimates.",
+    )
+    sim_group.add_argument(
         "-o", "--output", type=str, default=None,
         metavar="FILE", help="Write JSON output to FILE (stdout still prints text)",
     )
@@ -535,6 +541,7 @@ def build_simulation_result(
     seed: int,
     n_iterations: int,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
+    rating_system=None,
 ) -> SimulationResult:
     """Run MC simulation + one representative bracket iteration, return SimulationResult.
 
@@ -548,6 +555,12 @@ def build_simulation_result(
         Random seed for reproducible simulation.
     n_iterations:
         Number of Monte Carlo iterations.
+    played_matches:
+        Pre-played match results for replay/live mode.
+    rating_system:
+        Optional :class:`~football_core.glicko.RatingSystem` for
+        Glicko-1 uncertainty propagation.  When provided, runs
+        :func:`run_monte_carlo_glicko` instead of :func:`run_monte_carlo`.
 
     Returns
     -------
@@ -558,18 +571,31 @@ def build_simulation_result(
     fixtures_dict = {"schedule": asdict(fixtures)}
 
     # ── 1. Run Monte Carlo for aggregated probabilities ──
-    mc_result = run_monte_carlo(
-        fixtures_dict,
-        elo_ratings=elo_ratings,
-        n_iterations=n_iterations,
-        seed=seed,
-        played_matches=played_matches,
-    )
+    using_glicko = rating_system is not None
+    if using_glicko:
+        from competitions.ucl.src.simulation import run_monte_carlo_glicko
+
+        mc_result = run_monte_carlo_glicko(
+            fixtures_dict,
+            rating_system,
+            n_iterations=n_iterations,
+            seed=seed,
+            played_matches=played_matches,
+        )
+    else:
+        mc_result = run_monte_carlo(
+            fixtures_dict,
+            elo_ratings=elo_ratings,
+            n_iterations=n_iterations,
+            seed=seed,
+            played_matches=played_matches,
+        )
 
     # ── 2. Run one representative iteration for bracket display ──
     # Use the same seed so the first iteration is deterministic
     rng = random.Random(seed)
-    standings = simulate_league_phase(fixtures_dict, elo_ratings, rng, played_matches=played_matches)
+    bracket_elos = rating_system.to_elo_dict() if using_glicko else elo_ratings
+    standings = simulate_league_phase(fixtures_dict, bracket_elos, rng, played_matches=played_matches)
 
     # Pre-load data files to avoid per-call disk I/O
     data_dir = os.path.join(
@@ -586,14 +612,14 @@ def build_simulation_result(
         bracket_data = _json.load(f)
 
     playoff_result = simulate_playoff_round(
-        standings, elo_ratings, rng,
+        standings, bracket_elos, rng,
         pairings_data=pairings_data,
     )
     bracket = build_r16_bracket(
         standings, playoff_result,
         bracket_data=bracket_data,
     )
-    tree_result = simulate_knockout_tree(bracket, elo_ratings, rng)
+    tree_result = simulate_knockout_tree(bracket, bracket_elos, rng)
     stages = track_knockout_stages(standings, tree_result)
 
     # ── 3. Assemble SimulationResult ──
@@ -1017,7 +1043,16 @@ def main() -> None:
 
     # Extract team names from fixtures and fetch Elo ratings
     team_names = [t.name for t in fixtures_schedule.teams]
-    elo_ratings = fetch_team_elos(team_names)
+
+    rating_system = None
+    if getattr(args, 'use_glicko', False):
+        # Glicko path: fetch ratings as RatingSystem with uncertainty
+        from competitions.ucl.src.elo_fetcher import fetch_team_ratings
+        rating_system = fetch_team_ratings(team_names)
+        elo_ratings = rating_system.to_elo_dict()  # point estimates for signal blending
+        logger.info("Using Glicko-1 rating system with %d teams", len(team_names))
+    else:
+        elo_ratings = fetch_team_elos(team_names)
 
     # Determine seed
     seed = args.seed if args.seed is not None else random.randrange(10000)
@@ -1031,6 +1066,7 @@ def main() -> None:
     result = run_simulation(
         fixtures_schedule, elo_ratings, seed, args.iterations,
         args, data_dir,
+        rating_system=rating_system,
     )
     _sim_duration = _time.time() - _sim_start
     logger.info("Simulation complete: %.2f seconds", _sim_duration)

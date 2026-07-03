@@ -20,6 +20,7 @@ from competitions.ucl.src.knockout import (
 from competitions.ucl.src.simulation import (
     aggregate_mc_results,
     run_monte_carlo,
+    run_monte_carlo_glicko,
     simulate_league_phase,
 )
 
@@ -37,5 +38,6 @@ __all__ = [
     "track_knockout_stages",
     "simulate_league_phase",
     "run_monte_carlo",
+    "run_monte_carlo_glicko",
     "aggregate_mc_results",
 ]
