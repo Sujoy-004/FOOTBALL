@@ -304,6 +304,16 @@ class RatingSystem:
 
     # ── Serialization ──────────────────────────────────────────────────
 
+    def teams(self) -> list[tuple[str, TeamRating]]:
+        """Return all stored ratings as (team, TeamRating) pairs.
+
+        Only teams that have been explicitly set via :meth:`set_rating`
+        or modified via :meth:`update_ratings` are included.  Teams that
+        have only been read via :meth:`get_rating` (returning defaults)
+        are excluded until explicitly set.
+        """
+        return list(self._ratings.items())
+
     def to_dict(self) -> dict[str, dict]:
         """Serialize all ratings to a plain dict.
 
