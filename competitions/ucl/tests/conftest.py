@@ -1088,3 +1088,150 @@ def sample_match_result_provider():
 def empty_result_provider():
     """Returns a _MockMatchResultProvider with no results."""
     return _MockMatchResultProvider([])
+
+
+# ── Validation suite fixtures (Phase 9, Plan 02) ────────────────────────────
+
+
+@pytest.fixture
+def seasons_data():
+    """Returns 4 synthetic UCL seasons for validation testing.
+
+    Each season has 8 matchdays with 3-4 matches each (reduced for test speed).
+    Uses a subset of 8 teams from the full 36-team pool.
+    """
+    teams = _SUB_ALL[:8]  # 8 teams for fast test execution
+    n_matchdays = 8
+    seasons: dict[str, dict] = {}
+
+    for season_num in range(1, 5):
+        season_id = f"Y{2022 + season_num}"
+        matches: list[dict] = []
+        standings: list[dict] = []
+
+        rng = random.Random(season_num * 42)
+        total_played = 0
+        team_wins: dict[str, int] = {t: 0 for t in teams}
+        team_draws: dict[str, int] = {t: 0 for t in teams}
+        team_pts: dict[str, int] = {t: 0 for t in teams}
+        team_gd: dict[str, int] = {t: 0 for t in teams}
+        team_gs: dict[str, int] = {t: 0 for t in teams}
+        team_games: dict[str, int] = {t: 0 for t in teams}
+
+        for md_idx in range(n_matchdays):
+            # Each matchday: pair up teams for n_teams/2 matches
+            shuffled = list(teams)
+            rng.shuffle(shuffled)
+            for pair_idx in range(0, len(shuffled), 2):
+                if pair_idx + 1 >= len(shuffled):
+                    break
+                ta, tb = shuffled[pair_idx], shuffled[pair_idx + 1]
+                score_a = rng.randint(0, 4)
+                score_b = rng.randint(0, 4)
+                mid = f"season{season_num}_MD{md_idx + 1:02d}_{pair_idx // 2 + 1:02d}"
+
+                if score_a > score_b:
+                    winner, is_draw = ta, False
+                elif score_b > score_a:
+                    winner, is_draw = tb, False
+                else:
+                    winner, is_draw = None, True
+
+                matches.append({
+                    "match_id": mid,
+                    "team_a": ta,
+                    "team_b": tb,
+                    "winner": winner,
+                    "is_draw": is_draw,
+                    "home_score": score_a,
+                    "away_score": score_b,
+                })
+
+                total_played += 1
+                team_games[ta] += 1
+                team_games[tb] += 1
+                team_gs[ta] += score_a
+                team_gs[tb] += score_b
+                team_gd[ta] += score_a - score_b
+                team_gd[tb] += score_b - score_a
+
+                if is_draw:
+                    team_draws[ta] += 1
+                    team_draws[tb] += 1
+                    team_pts[ta] += 1
+                    team_pts[tb] += 1
+                elif winner == ta:
+                    team_wins[ta] += 1
+                    team_pts[ta] += 3
+                else:
+                    team_wins[tb] += 1
+                    team_pts[tb] += 3
+
+        # Build standings sorted by points, then GD
+        sorted_teams = sorted(
+            teams,
+            key=lambda t: (-team_pts[t], -team_gd[t], -team_gs[t]),
+        )
+        for pos, team in enumerate(sorted_teams, 1):
+            standings.append({
+                "team": team,
+                "position": pos,
+                "zone": "top_8" if pos <= 8 else "playoff",
+                "pts": team_pts[team],
+                "gd": team_gd[team],
+                "gs": team_gs[team],
+                "wins": team_wins[team],
+                "draws": team_draws[team],
+                "elo": 1500.0 + (8 - pos) * 50.0,
+            })
+
+        seasons[season_id] = {
+            "matches": matches,
+            "teams": list(teams),
+            "standings": standings,
+        }
+
+    return seasons
+
+
+@pytest.fixture
+def replay_matchdays():
+    """Returns 3 matchdays of synthetic match data for replay validation tests.
+
+    8 teams, 4 matches per matchday, with deterministic results.
+    """
+    teams = _SUB_ALL[:8]
+    matchdays: list[list[dict]] = []
+    rng = random.Random(99)
+
+    for md_idx in range(3):
+        shuffled = list(teams)
+        rng.shuffle(shuffled)
+        md_matches: list[dict] = []
+        for pair_idx in range(0, len(shuffled), 2):
+            if pair_idx + 1 >= len(shuffled):
+                break
+            ta, tb = shuffled[pair_idx], shuffled[pair_idx + 1]
+            score_a = rng.randint(0, 3)
+            score_b = rng.randint(0, 3)
+            mid = f"replay_MD{md_idx + 1:02d}_{pair_idx // 2 + 1:02d}"
+
+            if score_a > score_b:
+                winner, is_draw = ta, False
+            elif score_b > score_a:
+                winner, is_draw = tb, False
+            else:
+                winner, is_draw = None, True
+
+            md_matches.append({
+                "match_id": mid,
+                "team_a": ta,
+                "team_b": tb,
+                "winner": winner,
+                "is_draw": is_draw,
+                "home_score": score_a,
+                "away_score": score_b,
+            })
+        matchdays.append(md_matches)
+
+    return matchdays
