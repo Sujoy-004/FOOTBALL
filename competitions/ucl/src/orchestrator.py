@@ -73,6 +73,7 @@ def run_simulation(
     args: argparse.Namespace,
     data_dir: str,
     rating_system: object | None = None,
+    compute_ci: bool = False,
 ) -> object:
     """Orchestrate the full simulation: resolve mode, run MC, return result.
 
@@ -85,6 +86,9 @@ def run_simulation(
         uncertainty propagation.  When provided, the MC loop samples
         team strengths from N(μ, σ²) per iteration.  ``None`` uses the
         existing point-estimate path.
+    compute_ci:
+        If True, compute bootstrap CIs on champion probabilities
+        (default False).  Passed through to the MC loop.
     """
     played_matches = resolve_played_matches(args, data_dir, fixtures_schedule)
 
@@ -93,4 +97,5 @@ def run_simulation(
         fixtures_schedule, elo_ratings, seed, n_iterations,
         played_matches=played_matches,
         rating_system=rating_system,
+        compute_ci=compute_ci,
     )

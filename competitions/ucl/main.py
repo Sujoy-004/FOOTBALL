@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 
 from competitions.ucl.display import (
     print_summary,
+    print_calibration_summary,
     print_league_table,
     print_playoff_rounds,
     print_knockout_bracket,
@@ -214,6 +215,24 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Enable Bayesian/Glicko-1 uncertainty propagation. "
              "Samples team strengths from N(μ, σ²) per MC iteration "
              "instead of using fixed point estimates.",
+    )
+    sim_group.add_argument(
+        "--calibrated", type=str, default=None,
+        nargs="?", const="auto",
+        choices=["auto", "on", "off"],
+        metavar="MODE",
+        help="Force calibration on/off. 'auto' (default): apply calibration "
+             "when config/calibration.json exists and T != 1.0. "
+             "'on': force calibration on. 'off': skip calibration for this run.",
+    )
+    sim_group.add_argument(
+        "--show-ci", type=str, default=None,
+        nargs="?", const="auto",
+        choices=["auto", "on", "off"],
+        metavar="MODE",
+        help="Show confidence intervals on champion probabilities. "
+             "'auto' (default): on when calibration is active, off otherwise. "
+             "'on': always show. 'off': always hide.",
     )
     sim_group.add_argument(
         "-o", "--output", type=str, default=None,
@@ -507,12 +526,13 @@ def _run_counterfactual(
     return result, change_descriptions
 
 
-def _load_calibration() -> float | None:
+def _load_calibration() -> dict | None:
     """Load temperature calibration from config file.
 
     Returns:
-        Temperature T if calibration file exists and is valid, None otherwise.
-        T=1.0 means identity (no calibration effect).
+        Dict with calibration data if calibration file exists and is valid,
+        None otherwise.  Dict keys: T, alpha, log_loss, log_loss_before,
+        n_samples.
     """
     cal_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
@@ -525,10 +545,28 @@ def _load_calibration() -> float | None:
     try:
         with open(cal_path) as f:
             data = json.load(f)
+        # Normalise to canonical keys
+        result: dict = {
+            "T": 1.0,
+            "alpha": 1.0,
+            "log_loss": None,
+            "log_loss_before": None,
+            "n_samples": 0,
+            "ece": None,
+        }
         if "T" in data:
-            return float(data["T"])
-        if "alpha" in data:
-            return 1.0 / float(data["alpha"])
+            result["T"] = float(data["T"])
+            result["alpha"] = 1.0 / result["T"]
+        elif "alpha" in data:
+            result["alpha"] = float(data["alpha"])
+            result["T"] = 1.0 / result["alpha"]
+
+        result["log_loss"] = data.get("log_loss")
+        result["log_loss_before"] = data.get("log_loss_before")
+        result["n_samples"] = data.get("n_samples", 0)
+        result["ece"] = data.get("ece")
+
+        return result
     except (json.JSONDecodeError, KeyError, ValueError, ZeroDivisionError):
         pass
 
@@ -542,6 +580,7 @@ def build_simulation_result(
     n_iterations: int,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
     rating_system=None,
+    compute_ci: bool = False,
 ) -> SimulationResult:
     """Run MC simulation + one representative bracket iteration, return SimulationResult.
 
@@ -561,6 +600,9 @@ def build_simulation_result(
         Optional :class:`~football_core.glicko.RatingSystem` for
         Glicko-1 uncertainty propagation.  When provided, runs
         :func:`run_monte_carlo_glicko` instead of :func:`run_monte_carlo`.
+    compute_ci:
+        If True, compute bootstrap CIs on champion probabilities
+        (default False).  Passed through to the MC loop.
 
     Returns
     -------
@@ -581,6 +623,7 @@ def build_simulation_result(
             n_iterations=n_iterations,
             seed=seed,
             played_matches=played_matches,
+            compute_ci=compute_ci,
         )
     else:
         mc_result = run_monte_carlo(
@@ -589,6 +632,7 @@ def build_simulation_result(
             n_iterations=n_iterations,
             seed=seed,
             played_matches=played_matches,
+            compute_ci=compute_ci,
         )
 
     # ── 2. Run one representative iteration for bracket display ──
@@ -1057,6 +1101,22 @@ def main() -> None:
     # Determine seed
     seed = args.seed if args.seed is not None else random.randrange(10000)
 
+    # ── Phase 10, Plan 03: Resolve compute_ci before simulation ──
+    cal_data_for_ci = _load_calibration()
+    cal_active_for_ci = (
+        cal_data_for_ci is not None
+        and abs(cal_data_for_ci["T"] - 1.0) > 1e-9
+    )
+
+    compute_ci = False
+    if args.show_ci == "on":
+        compute_ci = True
+    elif args.show_ci == "auto" or args.show_ci is None:
+        if cal_active_for_ci:
+            compute_ci = True
+    if args.calibrated == "on":
+        compute_ci = True
+
     # Run simulation via orchestrator (D-05: mode routing in orchestrator.py)
     from competitions.ucl.src.orchestrator import run_simulation
 
@@ -1067,6 +1127,7 @@ def main() -> None:
         fixtures_schedule, elo_ratings, seed, args.iterations,
         args, data_dir,
         rating_system=rating_system,
+        compute_ci=compute_ci,
     )
     _sim_duration = _time.time() - _sim_start
     logger.info("Simulation complete: %.2f seconds", _sim_duration)
@@ -1095,19 +1156,34 @@ def main() -> None:
                  _eval_duration / max(len(signal_matches), 1) * 1000)
 
     # ── Phase 10: Apply temperature calibration at prediction time ──
-    cal_T = _load_calibration()
-    if cal_T is not None and abs(cal_T - 1.0) > 1e-9:
+    cal_active = cal_active_for_ci
+    if cal_active:
         from football_core.blender import temperature_scale
-        blended_predictions = [temperature_scale(p, cal_T) for p in blended_predictions]
+        blended_predictions = [temperature_scale(p, cal_data_for_ci["T"]) for p in blended_predictions]
         logger.info("Applied temperature scaling T=%.4f to %d predictions",
-                     cal_T, len(blended_predictions))
+                     cal_data_for_ci["T"], len(blended_predictions))
+
+    if args.calibrated == "off":
+        cal_active = False
+        # Re-evaluate without calibration to get uncalibrated predictions
+        blended_predictions = [engine.evaluate(m, signal_context) for m in signal_matches]
+
+    # ── Resolve --show-ci display flag ──
+    show_ci = False
+    if args.show_ci == "on":
+        show_ci = True
+    elif args.show_ci == "auto" or args.show_ci is None:
+        if cal_active:
+            show_ci = True
 
     # Display results in D-06 tournament chronology order
     print_summary(result)
+    if cal_active and cal_data_for_ci is not None:
+        print_calibration_summary(cal_data_for_ci)
     print_league_table(result)
     print_playoff_rounds(result)
     print_knockout_bracket(result)
-    print_odds(result)
+    print_odds(result, show_ci=show_ci)
 
     # ── Phase 11: Signal contribution breakdown (always-on) ──
     champion_team = result.bracket_champion
