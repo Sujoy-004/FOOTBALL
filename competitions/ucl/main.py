@@ -120,7 +120,29 @@ class _EmptyResultProvider:
     def get_team_results(self, team: str, before_date: str | None = None, limit: int = 10) -> list[dict]:
         return []
 
-# Enable ANSI color support on Windows
+def _ensure_utf8_mode() -> None:
+    """Configure stdout/stderr for UTF-8 on Windows.
+
+    Python on Windows defaults to the system's active code page (e.g., 437 or 1252),
+    which cannot encode characters outside the legacy charset. This function:
+      1. Reconfigures stdout/stderr to use UTF-8 encoding.
+      2. Is a no-op on non-Windows platforms or if already UTF-8.
+
+    Called once at the top of main() before any output is produced.
+    """
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            # Python < 3.7 does not have reconfigure(); fall back silently.
+            pass
+
+
+# Enable ANSI color support on Windows 10+ via ENABLE_VIRTUAL_TERMINAL_PROCESSING.
+# The `os.system("")` call loads the VT-processing feature into the console's
+# output mode, allowing \033[ escape sequences to work in cmd.exe / PowerShell.
+# Without this, ANSI codes appear as raw text. Safe no-op on non-Windows.
 os.system("")
 
 
@@ -821,6 +843,7 @@ def _run_validation_suite(
 
 def main() -> None:
     """Entry point: parse args, run simulation, display results, optionally export JSON."""
+    _ensure_utf8_mode()
     args = _parse_args()
 
     # ── Phase 11: Logging setup and argument validation ──

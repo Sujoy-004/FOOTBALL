@@ -311,6 +311,43 @@ class TestDisplayOrder:
 # ── ANSI consistency tests ─────────────────────────────────────────
 
 
+class TestAsciiCompatibility:
+    """Verify all display output uses only ASCII characters (Windows compatibility)."""
+
+    def _assert_ascii(self, output: str, name: str):
+        """Assert output contains only ASCII characters (< 128 code points)."""
+        non_ascii = [c for c in output if ord(c) > 127]
+        assert not non_ascii, (
+            f"Non-ASCII characters found in {name}: "
+            f"{[f'U+{ord(c):04X}:{c}' for c in non_ascii[:10]]}"
+        )
+
+    def test_summary_is_ascii(self, sample_result: SimulationResult):
+        output = _capture(display.print_summary, sample_result)
+        self._assert_ascii(output, "print_summary")
+
+    def test_league_table_is_ascii(self, sample_result: SimulationResult):
+        output = _capture(display.print_league_table, sample_result)
+        self._assert_ascii(output, "print_league_table")
+
+    def test_odds_is_ascii(self, sample_result: SimulationResult):
+        output = _capture(display.print_odds, sample_result)
+        self._assert_ascii(output, "print_odds")
+
+    def test_playoff_is_ascii(self, sample_result: SimulationResult):
+        output = _capture(display.print_playoff_rounds, sample_result)
+        self._assert_ascii(output, "print_playoff_rounds")
+
+    def test_bracket_is_ascii(self, sample_result: SimulationResult):
+        output = _capture(display.print_knockout_bracket, sample_result)
+        self._assert_ascii(output, "print_knockout_bracket")
+
+    def test_full_output_is_ascii(self, sample_result: SimulationResult):
+        """Combined output of all display functions is ASCII-only."""
+        output = _capture_full(sample_result)
+        self._assert_ascii(output, "full output")
+
+
 class TestAnsiConsistency:
     """Tests that ANSI codes appear only where expected."""
 

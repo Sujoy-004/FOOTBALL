@@ -84,27 +84,45 @@ def _zone_color(zone: str):
 # ── Display functions (D-06: summary first, league table second) ────────
 
 
-def print_summary(result: SimulationResult) -> None:
+def _require(val, name: str, msg: str = ""):
+    """Guard helper: raise TypeError if val is None."""
+    if val is None:
+        raise TypeError(f"{name} is None. {msg}".strip())
+    return val
+
+
+def print_summary(result: SimulationResult | None) -> None:
     """Print simulation summary metadata (D-06 position 1).
 
     Includes iteration count, random seed, and snapshot date.
     """
+    _require(result, "result", "Cannot print summary without a SimulationResult.")
     print()
     print(f"==== Simulation Summary ====")
     print()
-    print(f"  Iterations: {result.n_iterations}")
-    print(f"  Seed: {result.seed}")
-    print(f"  Snapshot: {result.snapshot_date}")
+    print(f"  Iterations: {getattr(result, 'n_iterations', 'N/A')}")
+    print(f"  Seed: {getattr(result, 'seed', 'N/A')}")
+    print(f"  Snapshot: {getattr(result, 'snapshot_date', 'N/A')}")
     print()
 
 
-def print_league_table(result: SimulationResult) -> None:
+def print_league_table(result: SimulationResult | None) -> None:
     """Print formatted 36-row league table with ANSI zone coloring (D-06 position 2).
 
     Columns: Pos, Team, Pts, GD, GS, Zone (D-07).
     Zone color: green for top_8, yellow for playoff, red for eliminated (D-10).
     Auto-detects terminal color support (D-11).
     """
+    _require(result, "result", "Cannot print league table without a SimulationResult.")
+    standings = getattr(result, "standings", None) or []
+    if not standings:
+        print()
+        print("==== League Table ====")
+        print()
+        print("  (no standings data)")
+        print()
+        return
+
     print()
     print(f"==== League Table ====")
     print()
@@ -123,15 +141,16 @@ def print_league_table(result: SimulationResult) -> None:
     print("-" * 48)
 
     # ── Data rows (sorted by position ascending) ──
-    for entry in result.standings:
-        zone_label = entry["zone"].upper()
-        color_fn = _zone_color(entry["zone"])
+    for entry in standings:
+        zone = entry.get("zone", "eliminated")
+        zone_label = zone.upper()
+        color_fn = _zone_color(zone)
 
-        pos_str = f"{entry['position']:>2}."
-        team_str = f"{entry['team']:<24}"
-        pts_str = f"{entry['pts']:>3}"
-        gd_str = f"{entry['gd']:>+4}"
-        gs_str = f"{entry['gs']:>3}"
+        pos_str = f"{entry.get('position', '?'):>2}."
+        team_str = f"{entry.get('team', '?'):<24}"
+        pts_str = f"{entry.get('pts', 0):>3}"
+        gd_str = f"{entry.get('gd', 0):>+4}"
+        gs_str = f"{entry.get('gs', 0):>3}"
         zone_str = color_fn(f"{zone_label:<10}")
 
         print(f"{pos_str}  {team_str} {pts_str} {gd_str} {gs_str} {zone_str}")
@@ -142,32 +161,45 @@ def print_league_table(result: SimulationResult) -> None:
 # ── Playoff display (D-06 position 3) ──────────────────────────────────
 
 
-def print_playoff_rounds(result: SimulationResult) -> None:
+def print_playoff_rounds(result: SimulationResult | None) -> None:
     """Print 8 playoff ties with aggregate scores and advancing winners (D-06 position 3).
 
     ET/Pens shown only when triggered (D-08).
     """
+    _require(result, "result", "Cannot print playoff results without a SimulationResult.")
+    playoff_ties = getattr(result, "playoff_ties", None) or {}
+    playoff_winners = getattr(result, "playoff_winners", None) or {}
+    if not playoff_ties:
+        print()
+        print("==== Playoff Results ====")
+        print()
+        print("  (no playoff data)")
+        print()
+        return
+
     print()
     print("==== Playoff Results ====")
     print()
 
-    for tie_num in sorted(result.playoff_ties):
-        tie = result.playoff_ties[tie_num]
-        winner = result.playoff_winners[tie_num]
-        team_a = tie["winner"]
-        team_b = tie["loser"]
-        agg_a = tie["aggregate_a"]
-        agg_b = tie["aggregate_b"]
+    for tie_num in sorted(playoff_ties):
+        tie = playoff_ties[tie_num]
+        if not isinstance(tie, dict):
+            continue
+        winner = playoff_winners.get(tie_num, "?")
+        team_a = tie.get("winner", "?")
+        team_b = tie.get("loser", "?")
+        agg_a = tie.get("aggregate_a", 0)
+        agg_b = tie.get("aggregate_b", 0)
 
         # Build aggregate display with optional ET/Pens suffix
         agg_display = f"{agg_a}-{agg_b} agg"
         if tie.get("et_played"):
-            agg_display = f"{agg_a}-{agg_b} agg ({tie['et_a']}-{tie['et_b']} ET)"
+            agg_display = f"{agg_a}-{agg_b} agg ({tie.get('et_a', 0)}-{tie.get('et_b', 0)} ET)"
         if tie.get("penalties_played"):
             if tie.get("et_played"):
-                agg_display = f"{agg_a}-{agg_b} agg ({tie['et_a']}-{tie['et_b']} ET, {tie['penalty_a']}-{tie['penalty_b']} pens)"
+                agg_display = f"{agg_a}-{agg_b} agg ({tie.get('et_a', 0)}-{tie.get('et_b', 0)} ET, {tie.get('penalty_a', 0)}-{tie.get('penalty_b', 0)} pens)"
             else:
-                agg_display = f"{agg_a}-{agg_b} agg ({tie['penalty_a']}-{tie['penalty_b']} pens)"
+                agg_display = f"{agg_a}-{agg_b} agg ({tie.get('penalty_a', 0)}-{tie.get('penalty_b', 0)} pens)"
 
         print(f"  Tie {tie_num}: {team_a} {agg_display}  {team_b} -> {winner} advances")
 
@@ -177,12 +209,22 @@ def print_playoff_rounds(result: SimulationResult) -> None:
 # ── Bracket display (D-06 position 4, D-08 format) ─────────────────────
 
 
-def print_knockout_bracket(result: SimulationResult) -> None:
+def print_knockout_bracket(result: SimulationResult | None) -> None:
     """Print round-by-round match list (NOT ASCII tree — D-08).
 
-    Rounds in order: R16 → QF → SF → FINAL.
+    Rounds in order: R16 -> QF -> SF -> FINAL.
     Two-legged ties show aggregate scores; FINAL shows single score.
     """
+    _require(result, "result", "Cannot print bracket without a SimulationResult.")
+    bracket_rounds = getattr(result, "bracket_rounds", None) or {}
+    if not bracket_rounds:
+        print()
+        print("==== Knockout Bracket ====")
+        print()
+        print("  (no bracket data)")
+        print()
+        return
+
     print()
     print("==== Knockout Bracket ====")
     print()
@@ -191,39 +233,48 @@ def print_knockout_bracket(result: SimulationResult) -> None:
     for round_name in round_order:
         print(f"  {_bold(f'--- {round_name} ---')}")
 
-        matches = result.bracket_rounds.get(round_name, [])
+        matches = bracket_rounds.get(round_name, [])
+        if not matches:
+            print("    (no matches)")
+            continue
+
         for m in matches:
-            team_a = m["team_a"]
-            team_b = m["team_b"]
-            r = m["result"]
+            if not isinstance(m, dict):
+                continue
+            team_a = m.get("team_a", "?")
+            team_b = m.get("team_b", "?")
+            r = m.get("result", {})
+            if not isinstance(r, dict):
+                print(f"    {team_a} vs {team_b}")
+                continue
 
             if r.get("is_final"):
                 # Single-match final
-                score_line = f"{r['score_a']}-{r['score_b']}"
+                score_line = f"{r.get('score_a', 0)}-{r.get('score_b', 0)}"
                 suffix = ""
                 if r.get("et_played"):
-                    suffix = f" ({r['et_a']}-{r['et_b']} ET"
+                    suffix = f" ({r.get('et_a', 0)}-{r.get('et_b', 0)} ET"
                     if r.get("penalties_played"):
-                        suffix += f", {r['penalty_a']}-{r['penalty_b']} pens)"
+                        suffix += f", {r.get('penalty_a', 0)}-{r.get('penalty_b', 0)} pens)"
                     else:
                         suffix += ")"
                 elif r.get("penalties_played"):
-                    suffix = f" ({r['penalty_a']}-{r['penalty_b']} pens)"
+                    suffix = f" ({r.get('penalty_a', 0)}-{r.get('penalty_b', 0)} pens)"
                 print(f"    {team_a} {score_line}{suffix} {team_b}")
             else:
                 # Two-legged tie with aggregate scores
-                agg_a = r["aggregate_a"]
-                agg_b = r["aggregate_b"]
+                agg_a = r.get("aggregate_a", 0)
+                agg_b = r.get("aggregate_b", 0)
                 score_line = f"{agg_a}-{agg_b} agg"
                 suffix = ""
                 if r.get("et_played"):
-                    suffix = f" ({r['et_a']}-{r['et_b']} ET"
+                    suffix = f" ({r.get('et_a', 0)}-{r.get('et_b', 0)} ET"
                     if r.get("penalties_played"):
-                        suffix += f", {r['penalty_a']}-{r['penalty_b']} pens)"
+                        suffix += f", {r.get('penalty_a', 0)}-{r.get('penalty_b', 0)} pens)"
                     else:
                         suffix += ")"
                 elif r.get("penalties_played"):
-                    suffix = f" ({r['penalty_a']}-{r['penalty_b']} pens)"
+                    suffix = f" ({r.get('penalty_a', 0)}-{r.get('penalty_b', 0)} pens)"
                 print(f"    {team_a} {score_line}{suffix}  {team_b}")
 
     print()
@@ -355,30 +406,41 @@ def print_value_plays(
 # ── Validation display (Phase 4, D-02) ────────────────────────────────
 
 
-def print_validation_summary(validation_result: dict) -> None:
+def print_validation_summary(validation_result: dict | None) -> None:
     """Print validation accuracy summary table to stdout (Phase 4, D-02).
 
     Shows games played, Brier score, Log Loss, accuracy, and calibration ECE.
     Also shows market odds metrics if available.
     """
+    _require(validation_result, "validation_result",
+             "Cannot print validation summary without data.")
+    pm = validation_result.get("prediction_metrics")
+    if not isinstance(pm, dict):
+        print()
+        print("==== Validation Results ====")
+        print()
+        print("  (no prediction metrics)")
+        print()
+        return
+
     print()
     print(f"==== Validation Results ====")
     print()
 
-    pm = validation_result["prediction_metrics"]
-    print(f"  Games matched: {pm['n']}")
-    print(f"  Brier Score:   {pm['brier']:.4f}")
-    print(f"  Log Loss:      {pm['log_loss']:.4f}")
-    print(f"  Accuracy:      {pm['accuracy']:.2%}")
-    print(f"  Calibration ECE: {validation_result['calibration']['ece']:.4f}")
+    print(f"  Games matched: {pm.get('n', 'N/A')}")
+    print(f"  Brier Score:   {pm.get('brier', 0.0):.4f}")
+    print(f"  Log Loss:      {pm.get('log_loss', 0.0):.4f}")
+    print(f"  Accuracy:      {pm.get('accuracy', 0.0):.2%}")
+    cal = validation_result.get("calibration") or {}
+    print(f"  Calibration ECE: {cal.get('ece', 0.0):.4f}")
 
-    if "market_odds_metrics" in validation_result:
-        om = validation_result["market_odds_metrics"]
+    om = validation_result.get("market_odds_metrics")
+    if isinstance(om, dict):
         print()
         print(f"  Market Odds Comparison:")
-        print(f"    Brier Score:   {om['brier']:.4f}")
-        print(f"    Log Loss:      {om['log_loss']:.4f}")
-        print(f"    Games with odds: {om['n']}")
+        print(f"    Brier Score:   {om.get('brier', 0.0):.4f}")
+        print(f"    Log Loss:      {om.get('log_loss', 0.0):.4f}")
+        print(f"    Games with odds: {om.get('n', 0)}")
 
     print()
 
@@ -389,8 +451,8 @@ def print_validation_summary(validation_result: dict) -> None:
 
 
 def print_signal_breakdown(
-    contributions: dict[str, float],
-    champion_team: str,
+    contributions: dict[str, float] | None,
+    champion_team: str | None,
     champion_prob: float,
 ) -> None:
     """Display per-signal contribution breakdown for champion prediction.
@@ -407,10 +469,13 @@ def print_signal_breakdown(
         champion_team: Name of the champion team.
         champion_prob: Champion probability as percentage (0-100).
     """
+    _require(contributions, "contributions",
+             "Cannot print breakdown without contribution data.")
+    team_label = champion_team if champion_team else "N/A"
     print()
     print("==== Prediction Breakdown ====")
     print()
-    print(f"  Champion: {_bold(champion_team)} ({champion_prob:.1f}%)")
+    print(f"  Champion: {_bold(team_label)} ({champion_prob:.1f}%)")
     print()
 
     if not contributions:
@@ -455,9 +520,9 @@ def print_signal_breakdown(
 
 
 def print_counterfactual_comparison(
-    baseline_result: SimulationResult,
-    counterfactual_result: SimulationResult,
-    change_descriptions: list[str],
+    baseline_result: SimulationResult | None,
+    counterfactual_result: SimulationResult | None,
+    change_descriptions: list[str] | None,
     n_top: int = 5,
 ) -> None:
     """Display side-by-side comparison of baseline vs counterfactual results.
@@ -471,6 +536,10 @@ def print_counterfactual_comparison(
         change_descriptions: Human-readable list of what changed.
         n_top: Number of top teams to show in comparison (default 5).
     """
+    _require(baseline_result, "baseline_result")
+    _require(counterfactual_result, "counterfactual_result")
+    change_descriptions = change_descriptions or []
+
     print()
     print("==== Counterfactual Comparison ====")
     print()
@@ -536,21 +605,31 @@ def print_counterfactual_comparison(
         print()
 
 
-def print_odds(result: SimulationResult) -> None:
+def print_odds(result: SimulationResult | None) -> None:
     """Print champion/qualification odds for all 36 teams (D-06 position 5).
 
     Columns per D-09: Rank, Team, Champion %, Final %, SF %, QF %.
     Sorted by champion probability descending, with alphabetical tie-break.
     """
-    print()
-    print("==== Champion / Qualification Odds ====")
-    print()
+    _require(result, "result", "Cannot print odds without a SimulationResult.")
+    teams_data = getattr(result, "teams", None) or {}
+    if not teams_data:
+        print()
+        print("==== Champion / Qualification Odds ====")
+        print()
+        print("  (no odds data)")
+        print()
+        return
 
     # Sort teams by champion_prob descending, then alphabetically
     sorted_teams = sorted(
-        result.teams.items(),
+        teams_data.items(),
         key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]),
     )
+
+    print()
+    print("==== Champion / Qualification Odds ====")
+    print()
 
     # Header row (bold)
     print(
@@ -567,6 +646,8 @@ def print_odds(result: SimulationResult) -> None:
 
     # Data rows
     for rank, (team_name, team_data) in enumerate(sorted_teams, start=1):
+        if not isinstance(team_data, dict):
+            continue
         champ = team_data.get("champion_prob", 0.0)
         final = team_data.get("stage_final_prob", 0.0)
         sf = team_data.get("stage_sf_prob", 0.0)

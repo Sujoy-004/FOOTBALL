@@ -328,6 +328,119 @@ class TestReportFlags:
         assert args.seed == 42
 
 
+class TestVerboseFlag:
+    """Tests for --verbose CLI flag parsing."""
+
+    def test_verbose_default_false(self):
+        args = _parse_args([])
+        assert args.verbose is False
+
+    def test_verbose_flag_true(self):
+        args = _parse_args(["--verbose"])
+        assert args.verbose is True
+
+    def test_verbose_compatible_with_other_flags(self):
+        args = _parse_args(["-n", "5000", "--verbose", "--seed", "42"])
+        assert args.verbose is True
+        assert args.iterations == 5000
+        assert args.seed == 42
+
+    def test_verbose_sets_debug_level(self):
+        """_setup_logging(True) sets DEBUG level (test via import)."""
+        from competitions.ucl.main import _setup_logging
+        import logging
+        # Reset root logger before test
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+        _setup_logging(True)
+        assert logging.root.level == logging.DEBUG
+
+    def test_verbose_sets_warning_level_when_false(self):
+        """_setup_logging(False) sets WARNING level."""
+        from competitions.ucl.main import _setup_logging
+        import logging
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+        _setup_logging(False)
+        assert logging.root.level == logging.WARNING
+
+
+class TestArgValidation:
+    """Tests for _validate_args()."""
+
+    def test_calibrate_and_what_if_incompatible(self):
+        """--calibrate --what-if raises SystemExit."""
+        from competitions.ucl.main import _validate_args
+        import argparse
+        args = argparse.Namespace(
+            calibrate=True, what_if_list=["Arsenal.elo=1960"],
+            report=None, mode="simulate",
+            replay_data=None, api_key=None,
+        )
+        with pytest.raises(SystemExit):
+            _validate_args(args)
+
+    def test_report_and_calibrate_incompatible(self):
+        """--report --calibrate raises SystemExit."""
+        from competitions.ucl.main import _validate_args
+        import argparse
+        args = argparse.Namespace(
+            calibrate=True, what_if_list=None,
+            report="report.json", mode="simulate",
+            replay_data=None, api_key=None,
+        )
+        with pytest.raises(SystemExit):
+            _validate_args(args)
+
+    def test_replay_mode_needs_replay_data(self):
+        """--mode replay without --replay-data raises SystemExit."""
+        from competitions.ucl.main import _validate_args
+        import argparse
+        args = argparse.Namespace(
+            calibrate=False, calibrate_temp=False,
+            what_if_list=None, report=None,
+            mode="replay", replay_data=None, api_key=None,
+        )
+        with pytest.raises(SystemExit):
+            _validate_args(args)
+
+    def test_live_mode_needs_api_key(self, monkeypatch):
+        """--mode live without api key raises SystemExit."""
+        monkeypatch.delenv("BSD_API_KEY", raising=False)
+        from competitions.ucl.main import _validate_args
+        import argparse
+        args = argparse.Namespace(
+            calibrate=False, calibrate_temp=False,
+            what_if_list=None, report=None,
+            mode="live", replay_data=None, api_key=None,
+        )
+        with pytest.raises(SystemExit):
+            _validate_args(args)
+
+    def test_calibrate_needs_replay_data(self):
+        """--calibrate without --replay-data raises SystemExit."""
+        from competitions.ucl.main import _validate_args
+        import argparse
+        args = argparse.Namespace(
+            calibrate=True, calibrate_temp=False,
+            what_if_list=None, report=None,
+            mode="simulate", replay_data=None, api_key=None,
+        )
+        with pytest.raises(SystemExit):
+            _validate_args(args)
+
+    def test_valid_combination_no_error(self):
+        """Valid flag combinations do not raise."""
+        from competitions.ucl.main import _validate_args
+        import argparse
+        args = argparse.Namespace(
+            calibrate=False, calibrate_temp=False,
+            what_if_list=None, report=None,
+            mode="simulate", replay_data=None, api_key=None,
+        )
+        _validate_args(args)  # should not raise
+
+
 class TestValidationSuiteIntegration:
     """Tests for _run_validation_suite returning correct structure."""
 
