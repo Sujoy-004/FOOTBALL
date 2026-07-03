@@ -89,7 +89,85 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="FILE",
         help="JSON file with played match results (required for replay mode)",
     )
+    parser.add_argument(
+        "--calibrate", action="store_true",
+        help="Run weight calibration offline using replay data (requires --replay-data)",
+    )
+    parser.add_argument(
+        "--weights", type=str, default=None,
+        metavar="K=V,K=V",
+        help="Override blend weights: --weights elo=0.4,market=0.3,form=0.2,squad=0.1 "
+             "(auto-normalized, warns if sum != 1.0)",
+    )
+    parser.add_argument(
+        "--show-breakdown", type=str, default=None,
+        nargs="?", const="summary",
+        choices=["summary", "match"],
+        help="Show signal breakdown: 'summary' (default) for avg weights, "
+             "'match' for per-match signal probabilities",
+    )
     return parser.parse_args(argv)
+
+
+def parse_weights(weights_str: str | None) -> dict[str, float] | None:
+    """Parse --weights CLI override string into {name: weight} dict.
+
+    Format: "elo=0.4,market=0.3,form=0.2,squad=0.1"
+    Auto-normalizes to sum 1.0. Emits warning to stderr if sum != 1.0.
+
+    Returns None if weights_str is None (no override).
+    Raises SystemExit on malformed input.
+    """
+    if weights_str is None:
+        return None
+
+    weights: dict[str, float] = {}
+    pairs = weights_str.split(",")
+    for pair in pairs:
+        pair = pair.strip()
+        if "=" not in pair:
+            print(
+                f"Error: invalid --weights format '{pair}'. Use K=V format "
+                f"(e.g., elo=0.4,market=0.3)",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        key, val_str = pair.split("=", 1)
+        key = key.strip()
+        val_str = val_str.strip()
+        if not key:
+            print(f"Error: empty key in --weights '{pair}'", file=sys.stderr)
+            sys.exit(1)
+        try:
+            val = float(val_str)
+        except ValueError:
+            print(
+                f"Error: non-numeric weight value '{val_str}' for signal '{key}'",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if val < 0:
+            print(
+                f"Error: negative weight {val} for signal '{key}'",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        weights[key] = val
+
+    if not weights:
+        print("Error: --weights must specify at least one key=value pair", file=sys.stderr)
+        sys.exit(1)
+
+    # Auto-normalize per D-05
+    total = sum(weights.values())
+    if abs(total - 1.0) > 1e-9:
+        print(
+            f"Warning: --weights sum={total:.4f} != 1.0 — auto-normalizing",
+            file=sys.stderr,
+        )
+        weights = {k: v / total for k, v in weights.items()}
+
+    return weights
 
 
 def build_simulation_result(
@@ -267,6 +345,31 @@ def run_validation(
 def main() -> None:
     """Entry point: parse args, run simulation, display results, optionally export JSON."""
     args = _parse_args()
+
+    # ── Calibration mode (offline, standalone — D-03, D-07) ──
+    if args.calibrate:
+        if not args.replay_data:
+            print(
+                "Error: --calibrate requires --replay-data PATH",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if getattr(args, 'season', None):
+            print(
+                "Error: --season convenience flag not yet implemented. Use --replay-data.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        from competitions.ucl.src.calibrate import run_calibration
+
+        result = run_calibration(replay_data_path=args.replay_data)
+        print(f"Calibration complete. {result['n_matches']} matches processed.")
+        print(f"Computed weights for {len(result['weights'])} signals:")
+        for sig, w in sorted(result["weights"].items()):
+            print(f"  {sig}: {w:.4f}")
+        return
 
     # Resolve data directory
     data_dir = os.path.join(
