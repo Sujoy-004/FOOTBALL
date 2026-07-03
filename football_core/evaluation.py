@@ -1,8 +1,37 @@
 """Shared accuracy metric primitives — extracted from WC evaluation.py."""
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
+
+
+@dataclass
+class MatchOutcome:
+    """Actual result of a single football match.
+
+    Used as the target/ground-truth for calibration fitting and evaluation.
+    """
+    home_goals: int
+    away_goals: int
+
+    @property
+    def result(self) -> float:
+        """1.0 for home win, 0.0 for away win, 0.5 for draw."""
+        if self.home_goals > self.away_goals:
+            return 1.0
+        elif self.away_goals > self.home_goals:
+            return 0.0
+        return 0.5
+
+    @property
+    def outcome_index(self) -> int:
+        """0 for home win, 1 for draw, 2 for away win."""
+        if self.home_goals > self.away_goals:
+            return 0
+        elif self.away_goals > self.home_goals:
+            return 2
+        return 1
 
 
 def brier_score(prediction: float, actual: float) -> float:
