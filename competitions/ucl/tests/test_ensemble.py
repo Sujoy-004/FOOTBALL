@@ -19,6 +19,23 @@ from football_core.blender import EnsembleEngine, compute_log_loss_weights, comp
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 
+class StubSignal:
+    """Reusable minimal Signal-conforming stub with deterministic outputs."""
+
+    def __init__(self, name: str, home: float = 0.4, draw: float = 0.3, away: float = 0.3):
+        self._name = name
+        self._home = home
+        self._draw = draw
+        self._away = away
+
+    @property
+    def name(self):
+        return self._name
+
+    def predict(self, match: dict, context: PredictionContext) -> SignalOutput:
+        return SignalOutput(self._home, self._draw, self._away)
+
+
 def _make_stub_signal(
     name: str,
     home: float = 0.4,
@@ -26,22 +43,7 @@ def _make_stub_signal(
     away: float = 0.3,
 ) -> Signal:
     """Return a minimal Signal-conforming object with deterministic outputs."""
-    _name = name
-    _home = home
-    _draw = draw
-    _away = away
-
-    class StubSignal:
-        n = _name
-
-        @property
-        def name(self):
-            return self.n
-
-        def predict(self, match: dict, context: PredictionContext) -> SignalOutput:
-            return SignalOutput(_home, _draw, _away)
-
-    return StubSignal()
+    return StubSignal(name, home, draw, away)
 
 
 # ── TestBlendedPrediction ────────────────────────────────────────────────────
