@@ -371,6 +371,15 @@ def main() -> None:
             print(f"  {sig}: {w:.4f}")
         return
 
+    # ── Parse --weights override (validated but deferred — D-05) ──
+    if args.weights is not None:
+        parsed_weights = parse_weights(args.weights)
+        print(
+            "Warning: --weights override is parsed but blend integration is not yet "
+            "active in this version. Weights will take effect in a future update.",
+            file=sys.stderr,
+        )
+
     # Resolve data directory
     data_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
