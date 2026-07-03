@@ -9,7 +9,7 @@ from dataclasses import asdict
 
 import pytest
 
-from competitions.ucl.main import _parse_args, build_simulation_result
+from competitions.ucl.main import _parse_args, build_simulation_result, parse_weights
 from football_core.provider import (
     FixtureSchedule, FixtureProvider, Team, Match, FixtureProviderError,
 )
@@ -165,3 +165,120 @@ class TestModeFlags:
         assert args.iterations == 5000
         assert args.mode == "live"
         assert args.seed == 42
+
+
+class TestCalibrateFlags:
+    """Tests for the --calibrate and --replay-data CLI flags (D-07)."""
+
+    def test_calibrate_default_false(self):
+        args = _parse_args([])
+        assert args.calibrate is False
+
+    def test_calibrate_flag_true(self):
+        args = _parse_args(["--calibrate"])
+        assert args.calibrate is True
+
+    def test_calibrate_needs_replay_data(self):
+        """--calibrate without --replay-data errors in main(). Parser accepts both independently."""
+        args = _parse_args(["--calibrate"])
+        assert args.calibrate is True
+        assert args.replay_data is None  # Validation happens in main(), not parser
+
+    def test_calibrate_with_replay_data(self):
+        args = _parse_args(["--calibrate", "--replay-data", "data.json"])
+        assert args.calibrate is True
+        assert args.replay_data == "data.json"
+
+    def test_compatible_with_other_flags(self):
+        args = _parse_args([
+            "--calibrate", "--replay-data", "data.json",
+            "-n", "5000", "-s", "42",
+        ])
+        assert args.calibrate is True
+        assert args.replay_data == "data.json"
+        assert args.iterations == 5000
+        assert args.seed == 42
+
+
+class TestWeightFlags:
+    """Tests for --weights CLI flag and parse_weights() (D-05)."""
+
+    def test_weights_default_none(self):
+        args = _parse_args([])
+        assert args.weights is None
+
+    def test_weights_override_single(self):
+        args = _parse_args(["--weights", "elo=1.0"])
+        assert args.weights == "elo=1.0"
+
+    def test_weights_override_multiple(self):
+        args = _parse_args(["--weights", "elo=0.4,market=0.3,form=0.2,squad=0.1"])
+        assert args.weights == "elo=0.4,market=0.3,form=0.2,squad=0.1"
+
+    def test_parse_weights_basic(self):
+        w = parse_weights("elo=0.5,market=0.5")
+        assert abs(w["elo"] - 0.5) < 1e-9
+        assert abs(w["market"] - 0.5) < 1e-9
+
+    def test_parse_weights_auto_normalizes(self):
+        """Sum != 1.0 auto-normalizes with warning."""
+        w = parse_weights("elo=0.6,market=0.6")
+        assert abs(sum(w.values()) - 1.0) < 1e-9
+        assert abs(w["elo"] - 0.5) < 1e-9
+        assert abs(w["market"] - 0.5) < 1e-9
+
+    def test_parse_weights_returns_none(self):
+        assert parse_weights(None) is None
+
+    def test_parse_weights_rejects_non_numeric(self):
+        try:
+            parse_weights("elo=abc")
+            assert False, "Should raise SystemExit"
+        except SystemExit:
+            pass
+
+    def test_parse_weights_rejects_negative(self):
+        try:
+            parse_weights("elo=-0.5")
+            assert False, "Should raise SystemExit"
+        except SystemExit:
+            pass
+
+    def test_parse_weights_rejects_missing_equals(self):
+        try:
+            parse_weights("el0.5")
+            assert False, "Should raise SystemExit"
+        except SystemExit:
+            pass
+
+    def test_parse_weights_single_signal(self):
+        w = parse_weights("elo=1.0")
+        assert abs(w["elo"] - 1.0) < 1e-9
+
+
+class TestBreakdownFlags:
+    """Tests for --show-breakdown CLI flag (D-07)."""
+
+    def test_breakdown_default_none(self):
+        args = _parse_args([])
+        assert args.show_breakdown is None
+
+    def test_breakdown_flag_without_value_defaults_summary(self):
+        """--show-breakdown without value defaults to 'summary'."""
+        args = _parse_args(["--show-breakdown"])
+        assert args.show_breakdown == "summary"
+
+    def test_breakdown_summary(self):
+        args = _parse_args(["--show-breakdown", "summary"])
+        assert args.show_breakdown == "summary"
+
+    def test_breakdown_match(self):
+        args = _parse_args(["--show-breakdown", "match"])
+        assert args.show_breakdown == "match"
+
+    def test_breakdown_invalid_choice_rejected(self):
+        try:
+            _parse_args(["--show-breakdown", "invalid"])
+            assert False, "Should raise SystemExit"
+        except SystemExit:
+            pass
