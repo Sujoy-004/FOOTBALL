@@ -284,9 +284,7 @@ class EnsembleEngine:
 
         # Re-normalize weights for available signals
         avail_weights = {n: self._weights[n] for n in active}
-        if not avail_weights:
-            return BlendedPrediction(1 / 3, 1 / 3, 1 / 3, {}, {})
-        total_w = sum(avail_weights.values())
+        total_w = sum(avail_weights.values())  # guaranteed > 0 since active is non-empty
         norm_weights = {n: w / total_w for n, w in avail_weights.items()}
 
         # Blend each outcome independently per Pitfall 1
