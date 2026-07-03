@@ -244,7 +244,7 @@ class EnsembleEngine:
 
         # Resolve weights: direct dict > JSON file > uniform fallback
         if weights is not None:
-            self._weights = dict(weights)
+            self._weights = {k: v for k, v in weights.items() if v > 0}
         elif weights_path is not None:
             with open(weights_path) as f:
                 data = json.load(f)
