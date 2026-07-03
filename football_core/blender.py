@@ -143,6 +143,102 @@ def _brent_minimize(
     return x
 
 
+def temperature_scale(prediction: 'BlendedPrediction', T: float) -> 'BlendedPrediction':
+    """Apply simplex temperature scaling to a BlendedPrediction.
+
+    Uses the corrected multiclass formulation for probability-only ensembles:
+        q_i = p_i^α / Σⱼ p_j^α    where α = 1/T
+
+    This is NOT logit-per-class temperature scaling (which requires pre-softmax
+    logits). Simplex scaling works directly on probability vectors via elementwise
+    exponentiation and L¹ renormalization.
+
+    Args:
+        prediction: BlendedPrediction with home/draw/away probs.
+        T: Temperature parameter. T=1.0 is identity (no change).
+           T > 1.0 flattens (reduces overconfidence).
+           T < 1.0 sharpens (increases confidence).
+           T=0.0 → uniform distribution (limit as T→∞ for α→0).
+
+    Returns:
+        New BlendedPrediction with calibrated probabilities.
+        signal_breakdown and weights_applied preserved unchanged.
+
+    Raises:
+        ValueError: If T <= 0.
+    """
+    if T <= 0:
+        raise ValueError(f"Temperature must be positive, got T={T}")
+
+    α = 1.0 / T
+
+    # Handle T→∞ case (α→0): all probabilities equal
+    if T == float('inf'):
+        return BlendedPrediction(
+            home_prob=1.0 / 3,
+            draw_prob=1.0 / 3,
+            away_prob=1.0 / 3,
+            signal_breakdown=prediction.signal_breakdown,
+            weights_applied=prediction.weights_applied,
+        )
+
+    # Clamp probabilities to [EPS, 1-EPS] before exponentiation
+    # to avoid numerical issues with zero/one inputs
+    p_h = max(EPS, min(1 - EPS, prediction.home_prob))
+    p_d = max(EPS, min(1 - EPS, prediction.draw_prob))
+    p_a = max(EPS, min(1 - EPS, prediction.away_prob))
+
+    # Elementwise exponentiation: p_i^α
+    # Use math.pow (or fallback to math.exp(α * log(p)))
+    def _pow_safe(base: float, exp: float) -> float:
+        """Safe exponentiation with underflow protection."""
+        if base <= 0:
+            return 0.0
+        try:
+            result = math.exp(exp * math.log(base))
+            # Clamp near-zero results to EPS
+            if result < EPS:
+                return 0.0
+            return result
+        except (OverflowError, ValueError):
+            if exp > 0:
+                return 0.0  # Underflow: very small base^positive → 0
+            return float('inf')  # Overflow: small base^negative → inf
+
+    q_h = _pow_safe(p_h, α)
+    q_d = _pow_safe(p_d, α)
+    q_a = _pow_safe(p_a, α)
+
+    # Renormalize by dividing by sum
+    total = q_h + q_d + q_a
+    if total <= 0:
+        # All underflowed — return uniform
+        return BlendedPrediction(
+            home_prob=1.0 / 3,
+            draw_prob=1.0 / 3,
+            away_prob=1.0 / 3,
+            signal_breakdown=prediction.signal_breakdown,
+            weights_applied=prediction.weights_applied,
+        )
+
+    q_h /= total
+    q_d /= total
+    q_a /= total
+
+    # Round for numerical consistency
+    q_h = round(q_h, 10)
+    q_d = round(q_d, 10)
+    q_a = round(q_a, 10)
+
+    return BlendedPrediction(
+        home_prob=q_h,
+        draw_prob=q_d,
+        away_prob=q_a,
+        signal_breakdown=prediction.signal_breakdown,
+        weights_applied=prediction.weights_applied,
+    )
+
+
 def _sigmoid(x: float) -> float:
     """Numerically stable sigmoid."""
     if x < -100:
