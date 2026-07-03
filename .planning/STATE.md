@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Planned Phase 10 (Probability Calibration & Uncertainty) — ready for execution
-last_updated: "2026-07-03T11:38:00.000Z"
+stopped_at: Phase 10 Plan 01 (Temperature Scaling) — EXECUTED
+last_updated: "2026-07-03T11:42:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 32
-  completed_plans: 29
-  percent: 93
+  completed_plans: 30
+  percent: 94
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-29 after v2.0 planning)
 
 Milestone: v2.0 — UCL Prediction Quality
 Phase: 10 (Probability Calibration & Uncertainty) — EXECUTING
-Plan: 1 of 3
+Plan: 2 of 3 (Plan 1 complete)
 Plans: 3 of 3 (planned)
-Status: Planned (ready for execution)
+Status: Executing
 
 ### Changes Made (2026-07-03 execution)
 
@@ -49,18 +49,20 @@ Status: Planned (ready for execution)
 
 **Phase 10 — Probability Calibration & Uncertainty:**
 
-- 10-01: Temperature scaling pipeline — Brent's method log-loss minimization + CalibrationPipeline class with fit/transform/save/load lifecycle
+- [EXECUTED] 10-01: Temperature scaling pipeline — Brent's method log-loss minimization + CalibrationPipeline class with fit/transform/save/load lifecycle + --calibrate-temp CLI + prediction-time calibration loading
 - 10-02: Bayesian/Glicko-style Elo — (μ, σ²) per team via Glicko-1 closed-form updates + g(RD) deflation + min variance floor + MC rating sampling
 - 10-03: Bootstrap CI computation on champion probabilities + --calibrated/--show-ci/--use-glicko CLI flags + before/after validation comparison
 
-**Key outcomes:**
+**Key outcomes (10-01):**
 
-- Temperature scaling with single T optimized via Brent's method (0.1 ≤ T ≤ 10.0) per D-01
-- CalibrationPipeline class in football_core/blender.py with full lifecycle per D-03
-- Glicko-1 closed-form updates with q=ln(10)/400, minimum σ² = 50² per D-04
-- Bootstrap CIs on champion probabilities (percentile method, 1000 resamples) per D-05
-- 3 plans in 2 waves: Wave 1 (10-01 + 10-02 parallel foundation), Wave 2 (10-03 blocked)
-- CLI flags: --calibrate-temp, --calibrated, --show-ci, --use-glicko, --validate-calibrated
+- `temperature_scale()` — Simplex temperature scaling with identity at T=1.0, flood protection, all edge cases
+- `_brent_minimize()` — Pure-Python Brent's method with parabolic interpolation + golden-section fallback
+- `CalibrationPipeline` — Full lifecycle class with fit/transform/predict/save/load in football_core/blender.py
+- `MatchOutcome` — Dataclass with result (1.0/0.5/0.0) and outcome_index (0/1/2) in evaluation.py
+- `--calibrate-temp FILE` — CLI flag for offline temperature fitting on replay data
+- `calibration.json` — Config file with α=1.0 default, updated after fitting
+- Prediction-time application — Calibration loaded and applied to blended predictions when config exists
+- 52 tests — All passing, covering identity, flatten/sharpen, save/load, error handling
 
 **Phase 11 — Explainability & Production:**
 
@@ -82,10 +84,10 @@ Status: Planned (ready for execution)
 **Velocity:**
 
 - Total plans completed (v1.0): 22
-- Total plans completed (v2.0 plans): 7 (Phase 9: 3)
+- Total plans completed (v2.0 plans): 8 (Phase 9: 3, Phase 10: 1)
 - Total plans planned (v2.0): 32
 - Average duration: 15 min
-- Total execution time: 360 min
+- Total execution time: 372 min
 
 ## Accumulated Context
 
@@ -133,7 +135,9 @@ Recent decisions affecting current work:
 - [x] Plan Phase 10 (Calibration & Uncertainty) ✓ Planned
 - [x] Plan Phase 11 (Explainability & Production) ✓ Planned
 - [x] Execute Phase 9 (Tournament Validation) ✓ Complete
-- Execute Phase 10 (Calibration & Uncertainty)
+- [x] Execute Phase 10 Plan 01 (Temperature Scaling) ✓ Complete
+- [ ] Execute Phase 10 Plan 02 (Glicko Elo)
+- [ ] Execute Phase 10 Plan 03 (Bootstrap CI & Display)
 - Execute Phase 11 (Explainability & Production)
 
 ### Blockers/Concerns
@@ -157,5 +161,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-07-03
-Stopped at: Phase 9 (Tournament Validation) — EXECUTED (complete)
-Next: Phase 10 (Probability Calibration & Uncertainty) — ready for execution
+Stopped at: Phase 10 Plan 01 (Temperature Scaling) — EXECUTED (complete)
+Next: Phase 10 Plan 02 (Glicko Elo) — ready for execution
