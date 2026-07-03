@@ -9,15 +9,15 @@ Usage:
     config = run_calibration(replay_data_path="path/to/replay.json")
 """
 
+import datetime
 import json
 import logging
 import os
-import sys
 import tempfile
 
 from football_core.evaluation import log_loss
 from football_core.blender import compute_log_loss_weights
-from football_core.signal import PredictionContext, SignalRegistry, SignalOutput
+from football_core.signal import PredictionContext, SignalRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -186,8 +186,8 @@ def run_calibration(
     # 6. Assemble config dict
     config = {
         "version": 1,
-        "calibrated_at": __import__("datetime").datetime.now(
-            __import__("datetime").timezone.utc
+        "calibrated_at": datetime.datetime.now(
+            datetime.timezone.utc
         ).isoformat(),
         "n_matches": max(n_matches.values()) if n_matches else 0,
         "threshold": threshold,
