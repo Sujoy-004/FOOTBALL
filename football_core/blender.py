@@ -18,6 +18,131 @@ MAX_ITER = 50
 CONV_TOL = 1e-6
 
 
+def _brent_minimize(
+    f,
+    a: float,
+    b: float,
+    tol: float = 1e-6,
+    max_iter: int = 50,
+) -> float:
+    """Brent's method for 1D minimization (parabolic interpolation + golden section).
+
+    Finds minimum of f(x) in [a, b] (unimodal) using Brent's method with
+    golden-section fallback. Pure Python stdlib — no numpy/scipy dependency.
+
+    Args:
+        f: Objective function to minimize (must be unimodal in [a, b]).
+        a: Left bracket.
+        b: Right bracket.
+        tol: Convergence tolerance on x.
+        max_iter: Maximum iterations.
+
+    Returns:
+        Approximate minimizer x*.
+
+    Reference:
+        Brent, R. P. (1973). Algorithms for Minimization without Derivatives.
+        Implementation based on the algorithm in Numerical Recipes §10.2.
+    """
+    # Golden ratio conjugate
+    φ = (3 - math.sqrt(5)) / 2  # ≈ 0.381966
+
+    # Ensure correct ordering
+    if a > b:
+        a, b = b, a
+
+    # Initial interior point
+    x = w = v = a + φ * (b - a)
+    fx = fw = fv = f(x)
+
+    # Previous step distance (e) and current step (d)
+    d = 0.0
+    e = 0.0
+
+    for _ in range(max_iter):
+        # Midpoint and convergence tolerance
+        xm = (a + b) * 0.5
+        tol1 = tol * abs(x) + 1e-10
+        tol2 = 2.0 * tol1
+
+        # --- Convergence check ---
+        if abs(x - xm) <= tol2 - 0.5 * (b - a):
+            break
+
+        # --- Attempt parabolic interpolation ---
+        # Only try if we have distinct points for a meaningful parabola
+        p, q = 0.0, 0.0
+        parabolic_ok = False
+
+        if abs(e) > tol1:
+            # Three distinct points for interpolation
+            # Parabolic minimizer: step = -0.5 * ( (x-w)^2*(fx-fv) - (x-v)^2*(fx-fw) )
+            #                           / ( (x-w)*(fx-fv) - (x-v)*(fx-fw) )
+            r = (x - w) * (fx - fv)
+            s = (x - v) * (fx - fw)
+            denom = 2.0 * (r - s)
+
+            if abs(denom) > 1e-15:
+                # Numerator = (x-w)^2 * (fx-fv) - (x-v)^2 * (fx-fw)
+                num = (x - w) * (x - w) * (fx - fv) - (x - v) * (x - v) * (fx - fw)
+                p = num / denom  # This gives the step directly
+                q = 1.0
+
+                # Accept parabolic step only if it falls within [a,b]
+                # and is not too large (less than half the previous step)
+                step = p  # step from x to parabolic minimum
+                if (abs(step) < abs(0.5 * e)
+                        and a + tol1 <= x + step <= b - tol1):
+                    parabolic_ok = True
+
+        # --- If parabolic step is invalid, do golden-section ---
+        if not parabolic_ok:
+            # Golden section: step toward the larger gap
+            if x >= xm:
+                e = a - x
+            else:
+                e = b - x
+            d = φ * e
+        else:
+            d = p  # Parabolic step
+            e = d
+
+        # Step magnitude must be at least tol1 (to avoid stagnation)
+        if abs(d) < tol1:
+            # Use sign of (xm - x) to step toward midpoint
+            d = tol1 if xm >= x else -tol1
+
+        # Take the step
+        u = x + d
+        fu = f(u)
+
+        # --- Update bracket and best point ---
+        if fu <= fx:
+            # New point is better — move bracket to contain it
+            if u >= x:
+                a = x
+            else:
+                b = x
+            # Shift points
+            v, w, x = w, x, u
+            fv, fw, fx = fw, fx, fu
+        else:
+            # x remains best — narrow bracket
+            if u >= x:
+                b = u
+            else:
+                a = u
+            # Update v, w (keep x as best)
+            if fu <= fw or abs(w - x) < tol1:
+                v, w = w, u
+                fv, fw = fw, fu
+            elif fu <= fv or abs(v - x) < tol1 or abs(v - w) < tol1:
+                v = u
+                fv = fu
+
+    return x
+
+
 def _sigmoid(x: float) -> float:
     """Numerically stable sigmoid."""
     if x < -100:
@@ -335,3 +460,77 @@ def compute_log_loss_weights(log_losses: dict[str, float]) -> dict[str, float]:
         {signal_name: normalized_weight} summing to 1.0
     """
     return compute_blend_weights(log_losses)
+
+
+def compute_signal_contributions(
+    blended_predictions: list[BlendedPrediction],
+    target_team: str,
+    weights: dict[str, float],
+    match_fixtures: list[dict] | None = None,
+) -> dict[str, float]:
+    """Compute per-signal contribution to champion probability for a target team.
+
+    Uses post-hoc attribution approximation: each signal is attributed a share of
+    the champion probability based on its ensemble weight and how much its
+    prediction deviates from uniform (1/3) for the target team's match outcomes.
+
+    This is NOT exact decomposition — champion probability emerges from a non-linear
+    MC pipeline (simulation -> standings -> tiebreakers -> bracket) and cannot be
+    exactly decomposed into additive signal contributions. The attribution provides
+    directional intuition (which signals push the prediction up/down), not causal
+    decomposition.
+
+    Args:
+        blended_predictions: List of BlendedPrediction for all tournament matches.
+        target_team: The team name to compute contributions for.
+        weights: {signal_name: normalized_weight} from EnsembleEngine.
+        match_fixtures: Optional list of match dicts with team_a/team_b keys.
+            Must be same length as blended_predictions. When provided, contributions
+            are computed only for matches involving target_team, using the correct
+            home/away direction. When omitted, contributions are computed across
+            all matches using average of home/away probabilities.
+
+    Returns:
+        {signal_name: raw_contribution} dict. Values are un-normalized contribution
+        scores that the display layer scales to match champion probability.
+        Returns empty dict if no relevant data.
+    """
+    if not blended_predictions or not weights or target_team is None:
+        return {}
+
+    # Initialize contribution accumulators for all signals in weights
+    contributions: dict[str, float] = {sig: 0.0 for sig in weights}
+    match_count: dict[str, int] = {sig: 0 for sig in weights}
+    uniform_baseline = 1 / 3
+
+    if match_fixtures is not None and len(match_fixtures) == len(blended_predictions):
+        # ── Team-filtered mode: compute contributions only for target_team's matches ──
+        for bp, match in zip(blended_predictions, match_fixtures):
+            team_a = match.get("team_a", "")
+            team_b = match.get("team_b", "")
+            if target_team not in (team_a, team_b):
+                continue
+
+            outcome_key = "home" if target_team == team_a else "away"
+            for signal, weight in weights.items():
+                if signal in bp.signal_breakdown:
+                    sig_prob = bp.signal_breakdown[signal].get(outcome_key, uniform_baseline)
+                    contributions[signal] += weight * (sig_prob - uniform_baseline)
+                    match_count[signal] += 1
+    else:
+        # ── Global mode: compute across all matches (fallback without match info) ──
+        for bp in blended_predictions:
+            for signal, weight in weights.items():
+                if signal in bp.signal_breakdown:
+                    sig_home = bp.signal_breakdown[signal].get("home", uniform_baseline)
+                    sig_away = bp.signal_breakdown[signal].get("away", uniform_baseline)
+                    # Use the larger of home/away deviation as a directional proxy
+                    best_outcome = max(sig_home, sig_away)
+                    contributions[signal] += weight * (best_outcome - uniform_baseline)
+                    match_count[signal] += 1
+
+    # Remove signals with zero contribution/no matches
+    result = {sig: round(val, 4) for sig, val in contributions.items()
+              if match_count.get(sig, 0) > 0}
+
+    return result
