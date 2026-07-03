@@ -47,6 +47,74 @@ from football_core.blender import EnsembleEngine, compute_signal_contributions
 logger = logging.getLogger(__name__)
 
 
+def _get_config_dir() -> str:
+    """Return absolute path to competitions/ucl/config/ directory.
+
+    Used for standardized config file resolution (signal_weights.json, etc.).
+    """
+    return os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "config",
+    )
+
+
+def _setup_logging(verbose: bool) -> None:
+    """Configure logging based on --verbose flag.
+
+    In verbose mode: DEBUG level to stderr with timestamp format.
+    In normal mode: WARNING level (suppress info/debug).
+    """
+    level = logging.DEBUG if verbose else logging.WARNING
+    logging.basicConfig(
+        level=level,
+        format="[%(asctime)s] %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stderr,
+    )
+
+
+def _validate_args(args: argparse.Namespace) -> None:
+    """Validate CLI argument combinations. Exits with error on invalid combos."""
+    if args.calibrate and args.what_if_list:
+        print(
+            "Error: --calibrate and --what-if are incompatible. "
+            "Calibration is a standalone operation that does not run simulation.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if args.report and args.calibrate:
+        print(
+            "Error: --report requires a simulation run. "
+            "Cannot combine with --calibrate (standalone mode).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if args.mode == "replay" and not args.replay_data:
+        print(
+            "Error: --mode replay requires --replay-data PATH",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if args.mode == "live" and not args.api_key and not os.environ.get("BSD_API_KEY"):
+        print(
+            "Error: --mode live requires BSD_API_KEY (set via --api-key or env var)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if args.calibrate and not args.replay_data:
+        print(
+            "Error: --calibrate requires --replay-data PATH",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if args.calibrate_temp and not args.replay_data:
+        print(
+            "Error: --calibrate-temp requires --replay-data PATH",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 class _EmptyResultProvider:
     """Minimal stub for RollingFormSignal — no historical results available."""
     def get_team_results(self, team: str, before_date: str | None = None, limit: int = 10) -> list[dict]:
@@ -83,16 +151,21 @@ def _build_signal_engine(
         RestDaysSignal(),
     ]
 
+    logger.debug("Building ensemble engine with %d signals: %s",
+                 len(signals), [s.name for s in signals])
+
     weights_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "config",
+        _get_config_dir(),
         "signal_weights.json",
     )
 
     if weights_override is not None:
+        logger.debug("Using direct weight override: %s", weights_override)
         return EnsembleEngine(signals, weights=weights_override)
     if os.path.exists(weights_path):
+        logger.debug("Loading weights from: %s", weights_path)
         return EnsembleEngine(signals, weights_path=weights_path)
+    logger.debug("No weights found — using uniform fallback")
     return EnsembleEngine(signals)
 
 
@@ -101,67 +174,60 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="ucl-predict",
         description="UEFA Champions League 2025/26 Monte Carlo predictor.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
+
+    # ── Simulation control ──
+    sim_group = parser.add_argument_group("Simulation options")
+    sim_group.add_argument(
         "-n", "--iterations", type=int, default=10000,
         metavar="N", help="Number of Monte Carlo iterations (default: 10000)",
     )
-    parser.add_argument(
+    sim_group.add_argument(
         "-s", "--seed", type=int, default=None,
         metavar="N", help="Random seed for reproducible simulation",
     )
-    parser.add_argument(
+    sim_group.add_argument(
         "-o", "--output", type=str, default=None,
         metavar="FILE", help="Write JSON output to FILE (stdout still prints text)",
     )
-    parser.add_argument(
-        "--validate", action="store_true",
-        help="Cross-check predictions against real BSD match results",
-    )
-    parser.add_argument(
-        "--tier",
-        choices=["cross-tournament", "walk-forward", "replay", "all"],
-        default="all",
-        help="Validation tier to run (default: all tiers)",
-    )
-    parser.add_argument(
-        "--api-key", type=str, default=None,
-        metavar="KEY", help="BSD API key (default: BSD_API_KEY env var)",
-    )
-    parser.add_argument(
+
+    # ── Data source ──
+    data_group = parser.add_argument_group("Data source options")
+    data_group.add_argument(
         "--fixture-source", type=str, default="auto",
         choices=["auto", "repo", "bsd"],
         help="Fixture source: auto (try BSD, fallback repo), "
              "repo (force repo), bsd (force BSD, fail if unavailable)",
     )
-    parser.add_argument(
+    data_group.add_argument(
+        "--api-key", type=str, default=None,
+        metavar="KEY", help="BSD API key (default: BSD_API_KEY env var)",
+    )
+    data_group.add_argument(
         "--mode", type=str, default="simulate",
         choices=["simulate", "replay", "live"],
         help="Simulation mode: simulate (default), replay, or live",
     )
-    parser.add_argument(
+    data_group.add_argument(
         "--replay-data", type=str, default=None,
         metavar="FILE",
         help="JSON file with played match results (required for replay mode)",
     )
-    parser.add_argument(
-        "--calibrate", action="store_true",
-        help="Run weight calibration offline using replay data (requires --replay-data)",
+
+    # ── Analysis ──
+    analysis_group = parser.add_argument_group("Analysis options")
+    analysis_group.add_argument(
+        "--validate", action="store_true",
+        help="Cross-check predictions against real BSD match results",
     )
-    parser.add_argument(
-        "--weights", type=str, default=None,
-        metavar="K=V,K=V",
-        help="Override blend weights: --weights elo=0.4,market=0.3,form=0.2,squad=0.1 "
-             "(auto-normalized, warns if sum != 1.0)",
+    analysis_group.add_argument(
+        "--tier",
+        choices=["cross-tournament", "walk-forward", "replay", "all"],
+        default="all",
+        help="Validation tier to run (default: all tiers)",
     )
-    parser.add_argument(
-        "--show-breakdown", type=str, default=None,
-        nargs="?", const="summary",
-        choices=["summary", "match"],
-        help="Show signal breakdown: 'summary' (default) for avg weights, "
-             "'match' for per-match signal probabilities",
-    )
-    parser.add_argument(
+    analysis_group.add_argument(
         "--what-if", type=str, default=None,
         action="append", dest="what_if_list",
         metavar="TEAM.PARAM=VALUE",
@@ -170,12 +236,48 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "Supported: Elo only (--what-if Arsenal.elo=1960). "
              "Example: --what-if 'Arsenal.elo=1960' --what-if 'RealMadrid.elo=2100'",
     )
-    parser.add_argument(
+    analysis_group.add_argument(
         "--report", type=str, default=None,
         metavar="FILE",
         help="Write structured report to FILE (JSON with simulation, signal breakdown, "
              "validation, and counterfactual results)",
     )
+    analysis_group.add_argument(
+        "--calibrate", action="store_true",
+        help="Run weight calibration offline using replay data (requires --replay-data)",
+    )
+    analysis_group.add_argument(
+        "--calibrate-temp", type=str, default=None,
+        metavar="FILE",
+        help="Run temperature calibration on replay data and save to config/calibration.json. "
+             "Requires --replay-data FILE. Fits simplex temperature scaling (T parameter) "
+             "by minimizing multiclass log-loss via Brent's method.",
+    )
+
+    # ── Signals ──
+    signal_group = parser.add_argument_group("Signal options")
+    signal_group.add_argument(
+        "--weights", type=str, default=None,
+        metavar="K=V,K=V",
+        help="Override blend weights: --weights elo=0.4,market=0.3,form=0.2,squad=0.1 "
+             "(auto-normalized, warns if sum != 1.0)",
+    )
+    signal_group.add_argument(
+        "--show-breakdown", type=str, default=None,
+        nargs="?", const="summary",
+        choices=["summary", "match"],
+        help="Show signal breakdown: 'summary' (default) for avg weights, "
+             "'match' for per-match signal probabilities",
+    )
+
+    # ── Diagnostics ──
+    diagnostic_group = parser.add_argument_group("Diagnostic options")
+    diagnostic_group.add_argument(
+        "--verbose", action="store_true",
+        help="Enable debug-level logging to stderr. Shows signal evaluation times, "
+             "provider selection, MC iteration progress.",
+    )
+
     return parser.parse_args(argv)
 
 
@@ -375,6 +477,34 @@ def _run_counterfactual(
     )
 
     return result, change_descriptions
+
+
+def _load_calibration() -> float | None:
+    """Load temperature calibration from config file.
+
+    Returns:
+        Temperature T if calibration file exists and is valid, None otherwise.
+        T=1.0 means identity (no calibration effect).
+    """
+    cal_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "config",
+        "calibration.json",
+    )
+    if not os.path.exists(cal_path):
+        return None
+
+    try:
+        with open(cal_path) as f:
+            data = json.load(f)
+        if "T" in data:
+            return float(data["T"])
+        if "alpha" in data:
+            return 1.0 / float(data["alpha"])
+    except (json.JSONDecodeError, KeyError, ValueError, ZeroDivisionError):
+        pass
+
+    return None
 
 
 def build_simulation_result(
@@ -693,7 +823,103 @@ def main() -> None:
     """Entry point: parse args, run simulation, display results, optionally export JSON."""
     args = _parse_args()
 
-    # ── Calibration mode (offline, standalone — D-03, D-07) ──
+    # ── Phase 11: Logging setup and argument validation ──
+    _setup_logging(args.verbose)
+    _validate_args(args)
+
+    # ── Temperature calibration mode (offline, standalone — Phase 10) ──
+    if args.calibrate_temp:
+        if not args.replay_data:
+            print(
+                "Error: --calibrate-temp requires --replay-data PATH",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        from football_core.blender import CalibrationPipeline, temperature_scale
+        from football_core.evaluation import MatchOutcome
+
+        # Load replay data
+        with open(args.replay_data) as f:
+            replay_raw = json.load(f)
+
+        # Flatten matchday structure if needed
+        if isinstance(replay_raw, list) and replay_raw and isinstance(replay_raw[0], list):
+            all_matches = [m for md in replay_raw for m in md]
+        else:
+            all_matches = replay_raw if isinstance(replay_raw, list) else []
+
+        if not all_matches:
+            print("Error: No matches found in replay data.", file=sys.stderr)
+            sys.exit(1)
+
+        # Build EnsembleEngine and evaluate all matches
+        elo_ratings = fetch_team_elos(
+            list(set(m.get("team_a", "") for m in all_matches)
+                 | set(m.get("team_b", "") for m in all_matches))
+        )
+        engine = _build_signal_engine(elo_ratings)
+        signal_context = PredictionContext(
+            fixtures=all_matches,
+            elo_ratings=elo_ratings,
+            played_results=[],
+        )
+
+        predictions: list = []
+        outcomes: list = []
+        skipped = 0
+
+        for match in all_matches:
+            team_a = match.get("team_a", "")
+            team_b = match.get("team_b", "")
+            if not team_a or not team_b:
+                skipped += 1
+                continue
+
+            # Get blended prediction
+            pred = engine.evaluate(match, signal_context)
+            predictions.append(pred)
+
+            # Get actual outcome
+            home_score = match.get("home_score", 0) or match.get("goals_home", 0)
+            away_score = match.get("away_score", 0) or match.get("goals_away", 0)
+            if isinstance(home_score, str):
+                home_score = int(home_score.split("-")[0]) if "-" in home_score else int(home_score)
+            if isinstance(away_score, str):
+                away_score = int(away_score.split("-")[1]) if "-" in away_score else int(away_score)
+            outcomes.append(MatchOutcome(int(home_score), int(away_score)))
+
+        if skipped:
+            print(f"Warning: skipped {skipped} matches with missing team data", file=sys.stderr)
+
+        if len(predictions) < 5:
+            print(
+                f"Error: Only {len(predictions)} valid matches — need at least 5 for calibration.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        # Fit CalibrationPipeline
+        pipe = CalibrationPipeline()
+        alpha = pipe.fit(predictions, outcomes)
+
+        # Save to config/calibration.json
+        config_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "config",
+        )
+        os.makedirs(config_dir, exist_ok=True)
+        cal_path = os.path.join(config_dir, "calibration.json")
+        pipe.save(cal_path)
+
+        print(
+            f"Calibrated: α={alpha:.4f} (T={pipe.T_:.4f}) "
+            f"log-loss improved from {pipe.log_loss_before_:.4f} to {pipe.log_loss_:.4f}"
+        )
+        print(f"Calibration config saved to: {cal_path}")
+        return
+
+    # ── Weight calibration mode (offline, standalone — D-03, D-07) ──
     if args.calibrate:
         if not args.replay_data:
             print(
@@ -776,10 +1002,15 @@ def main() -> None:
     # Run simulation via orchestrator (D-05: mode routing in orchestrator.py)
     from competitions.ucl.src.orchestrator import run_simulation
 
+    logger.info("Running simulation: %d iterations, seed=%d", args.iterations, seed)
+    import time as _time
+    _sim_start = _time.time()
     result = run_simulation(
         fixtures_schedule, elo_ratings, seed, args.iterations,
         args, data_dir,
     )
+    _sim_duration = _time.time() - _sim_start
+    logger.info("Simulation complete: %.2f seconds", _sim_duration)
 
     # ── Phase 8: Signal blending ──
     engine = _build_signal_engine(elo_ratings, parsed_weights)
@@ -796,7 +1027,21 @@ def main() -> None:
         elo_ratings=elo_ratings,
         played_results=[],
     )
+    logger.info("Evaluating %d match signals...", len(signal_matches))
+    _eval_start = _time.time()
     blended_predictions = [engine.evaluate(m, signal_context) for m in signal_matches]
+    _eval_duration = _time.time() - _eval_start
+    logger.debug("Signal evaluation: %d matches in %.2f seconds (%.0f ms/match)",
+                 len(signal_matches), _eval_duration,
+                 _eval_duration / max(len(signal_matches), 1) * 1000)
+
+    # ── Phase 10: Apply temperature calibration at prediction time ──
+    cal_T = _load_calibration()
+    if cal_T is not None and abs(cal_T - 1.0) > 1e-9:
+        from football_core.blender import temperature_scale
+        blended_predictions = [temperature_scale(p, cal_T) for p in blended_predictions]
+        logger.info("Applied temperature scaling T=%.4f to %d predictions",
+                     cal_T, len(blended_predictions))
 
     # Display results in D-06 tournament chronology order
     print_summary(result)
