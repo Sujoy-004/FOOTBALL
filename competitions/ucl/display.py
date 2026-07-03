@@ -19,6 +19,7 @@ from __future__ import annotations
 import sys
 
 from competitions.ucl.result import SimulationResult
+from football_core.signal import BlendedPrediction
 
 # ── Module-level constants ──────────────────────────────────────────────
 
@@ -221,6 +222,135 @@ def print_knockout_bracket(result: SimulationResult) -> None:
                 elif r.get("penalties_played"):
                     suffix = f" ({r['penalty_a']}-{r['penalty_b']} pens)"
                 print(f"    {team_a} {score_line}{suffix}  {team_b}")
+
+    print()
+
+
+# ── Signal breakdown display (Phase 8, D-07) ──────────────────────────
+
+
+def show_breakdown(
+    blended_predictions: list[BlendedPrediction] | None = None,
+    mode: str = "summary",
+) -> None:
+    """Display signal breakdown information per D-07.
+
+    Two modes:
+    - "summary": Display average weights across all predictions, signal utilization stats
+    - "match": Display per-match signal probabilities and weight contributions
+
+    Args:
+        blended_predictions: List of BlendedPrediction from EnsembleEngine.
+            If None or empty, shows a placeholder message.
+        mode: "summary" or "match". Default "summary".
+    """
+    print()
+    print(f"==== Signal Breakdown ({mode}) ====")
+    print()
+
+    if not blended_predictions:
+        print("  No blended predictions available. Run with signal blending enabled.")
+        print()
+        return
+
+    if mode == "summary":
+        # Compute average weights and utilization across all predictions
+        all_weights: dict[str, list[float]] = {}
+        for bp in blended_predictions:
+            for sig, weight in bp.weights_applied.items():
+                if sig not in all_weights:
+                    all_weights[sig] = []
+                all_weights[sig].append(weight)
+
+        print(f"  {'Signal':<20} {'Avg Weight':>10} {'In Blend':>9}")
+        print("  " + "-" * 41)
+        for sig in sorted(all_weights.keys()):
+            avg_w = sum(all_weights[sig]) / len(all_weights[sig])
+            in_blend = len(all_weights[sig])
+            print(f"  {sig:<20} {avg_w:>10.4f} {in_blend:>9}")
+        print()
+
+    elif mode == "match":
+        # Per-match display
+        for i, bp in enumerate(blended_predictions):
+            print(f"  --- Match {i + 1} ---")
+            print(f"  Blended: home={bp.home_prob:.4f}  draw={bp.draw_prob:.4f}  "
+                  f"away={bp.away_prob:.4f}")
+            print(f"  {'Signal':<20} {'Home':>6} {'Draw':>6} {'Away':>6} {'Weight':>7}")
+            print("  " + "-" * 47)
+            for sig in sorted(bp.signal_breakdown.keys()):
+                sd = bp.signal_breakdown[sig]
+                print(f"  {sig:<20} {sd['home']:>6.3f} {sd['draw']:>6.3f} "
+                      f"{sd['away']:>6.3f} {sd['weight']:>7.4f}")
+            print()
+
+
+def print_value_plays(
+    blended_predictions: list[BlendedPrediction] | None = None,
+) -> None:
+    """Display value detection — model_prob minus market_implied_prob.
+
+    Per D-04 Tier 3: Value detection display shows where the ensemble's
+    prediction differs significantly from market odds (indicating potential
+    value).
+
+    Requires that 'market_odds' exists in the signal_breakdown and that
+    the blended prediction probabilities differ meaningfully from market.
+
+    Args:
+        blended_predictions: List of BlendedPrediction from EnsembleEngine.
+            If None or empty, shows a placeholder.
+    """
+    print()
+    print("==== Value Plays (model - market) ====")
+    print()
+
+    if not blended_predictions:
+        print("  No predictions available for value analysis.")
+        print()
+        return
+
+    found_value = False
+    for i, bp in enumerate(blended_predictions):
+        if "market_odds" not in bp.signal_breakdown:
+            continue
+
+        md = bp.signal_breakdown["market_odds"]
+        market_home = md["home"]
+        market_draw = md["draw"]
+        market_away = md["away"]
+
+        # Value delta for each outcome
+        delta_home = bp.home_prob - market_home
+        delta_draw = bp.draw_prob - market_draw
+        delta_away = bp.away_prob - market_away
+
+        # Only show significant deltas (|delta| > 5%)
+        sig_deltas = []
+        for outcome, delta, market_prob in [
+            ("HOME", delta_home, market_home),
+            ("DRAW", delta_draw, market_draw),
+            ("AWAY", delta_away, market_away),
+        ]:
+            if abs(delta) > 0.05:
+                sig_deltas.append((outcome, delta, market_prob))
+
+        if sig_deltas:
+            found_value = True
+            print(f"  Match {i + 1}:")
+            for outcome, delta, mkt in sig_deltas:
+                direction = "OVER" if delta > 0 else "UNDER"
+                if outcome == "HOME":
+                    model_p = bp.home_prob
+                elif outcome == "DRAW":
+                    model_p = bp.draw_prob
+                else:
+                    model_p = bp.away_prob
+                print(f"    {outcome}: model={model_p:.3f} "
+                      f"market={mkt:.3f} "
+                      f"delta={delta:+.3f} ({direction}VALUE)")
+    if not found_value:
+        print("  No significant value plays detected (|delta| <= 5%).")
 
     print()
 
