@@ -166,10 +166,6 @@ def compute_blend_weights(signal_briers: dict[str, float]) -> dict[str, float]:
         raw_weights[signal] = 1.0 / max(brier, 0.05)
 
     total = sum(raw_weights.values())
-    if total == 0:
-        weight = 1.0 / len(signal_briers)
-        return {signal: round(weight, 6) for signal in signal_briers}
-
     normalized_weights = {}
     for signal, raw_weight in raw_weights.items():
         normalized_weights[signal] = round(raw_weight / total, 6)
