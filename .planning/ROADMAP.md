@@ -102,12 +102,12 @@
 **Plans**: 3 plans
 
 **Wave 1** *(foundation)*
-- [ ] 08-01-PLAN.md — BlendedPrediction dataclass + EnsembleEngine class + tests (UCLB-01)
+- [x] 08-01-PLAN.md — BlendedPrediction dataclass + EnsembleEngine class + tests (UCLB-01)
 
 **Wave 2** *(parallel, blocked on Wave 1)*
-- [ ] 08-02-PLAN.md — Calibration orchestration + signal_weights.json + tests (UCLB-01, UCLB-03)
-- [ ] 08-03-PLAN.md — CLI flags + display breakdown + value detection + tests (UCLB-01, UCLB-02, UCLB-03)
-**Status**: Planned
+- [x] 08-02-PLAN.md — Calibration orchestration + signal_weights.json + tests (UCLB-01, UCLB-03)
+- [x] 08-03-PLAN.md — CLI flags + display breakdown + value detection + tests (UCLB-01, UCLB-02, UCLB-03)
+**Status**: Complete ✓ (2026-07-03)
 
 ### Phase 9: Tournament Validation
 
@@ -140,7 +140,7 @@
 | 5. Official Fixture Ingestion | v2.0 | 3/3 | ✓ Complete | 2026-06-30 |
 | 6. Simulation Modes | v2.0 | 3/3 | ✓ Complete | 2026-07-01 |
 | 7. Prediction Signals | v2.0 | 3/3 | ✓ Complete | 2026-07-01 |
-| 8. Signal Blending & Market Integration | v2.0 | 0/3 | ▷ Planned | — |
+| 8. Signal Blending & Market Integration | v2.0 | 3/3 | ✓ Complete | 2026-07-03 |
 | 9. Tournament Validation | v2.0 | 0/0 | ▷ Planned | — |
 | 10. Probability Calibration & Uncertainty | v2.0 | 0/0 | ▷ Planned | — |
 | 11. Explainability & Production | v2.0 | 0/0 | ▷ Planned | — |
