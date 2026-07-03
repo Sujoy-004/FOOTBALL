@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Session resumed, proceeding to plan Phase 6 (Simulation Modes)
-last_updated: "2026-07-03T09:25:03.000Z"
+stopped_at: Planned Phase 10 (Probability Calibration & Uncertainty) — ready for execution
+last_updated: "2026-07-03T11:38:00.000Z"
 progress:
   total_phases: 11
-  completed_phases: 8
-  total_plans: 26
-  completed_plans: 26
-  percent: 100
+  completed_phases: 9
+  total_plans: 32
+  completed_plans: 29
+  percent: 93
 ---
 
 # Project State
@@ -20,59 +20,72 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29 after v2.0 planning)
 
 **Core value:** Adding a new competition requires only a new competition module — not changes to `football_core`
-**Current focus:** Phase null — 08 (COMPLETE)
+**Current focus:** Phase 11 — Explainability & Production
 
 ## Current Position
 
 Milestone: v2.0 — UCL Prediction Quality
-Phase: null (08) — COMPLETE
-Plans: 3 of 3 (complete)
-Status: Phase 8 complete
+Phase: 10 (Probability Calibration & Uncertainty) — EXECUTING
+Plan: 1 of 3
+Plans: 3 of 3 (planned)
+Status: Planned (ready for execution)
 
 ### Changes Made (2026-07-03 execution)
 
-**Phase 8 — Signal Blending & Market Integration:**
-- 08-01: BlendedPrediction dataclass + EnsembleEngine class + 33-test blending suite
-- 08-02: run_calibration() offline weight calibration + signal_weights.json + 18-test calibration suite
-- 08-03: CLI --calibrate/--weights/--show-breakdown flags + parse_weights() + calibration routing + show_breakdown() + print_value_plays() + 20 CLI tests
+**Phase 9 — Tournament Validation:**
+
+- 09-01: TRPS + multi-class evaluation metrics in football_core/evaluation.py
+- 09-02: ValidationSuite class with Tier 2 (walk-forward) + Tier 3 (replay validation)
+- 09-03: Tier 1 (cross-tournament backtest) + run_all() + save_baseline() + CLI --tier flag
 
 **Key outcomes:**
-- Weighted ensemble (inverse log-loss) as primary blending method per D-01
-- EnsembleEngine wraps SignalRegistry integrate per D-02
-- Offline calibration via --calibrate --replay-data per D-03
-- 3-tier market integration: calibration baseline → blended signal → value detection per D-04
-- Configurable weights via signal_weights.json + --weights CLI override per D-05
-- BlendedPrediction dataclass in football_core/signal.py per D-06
-- CLI flags: --calibrate, --weights, --show-breakdown per D-07
-- Full UCL test suite: 316 passed, 1 skipped — no regressions
+
+- TRPS implemented per Ekstrøm et al. (2021) with optional rank weighting — primary tournament-level metric
+- Three-tier validation framework: cross-tournament (TRPS + champion accuracy + stage accuracy), walk-forward (log_loss, brier, ece), replay (calibration ECE)
+- ValidationSuite class orchestrates all three tiers with ValidationResult dataclass
+- Combined validation report (run_all) produces D-04 structured dict with match-level, tournament-level, and calibration sections
+- Baseline recording at competitions/ucl/data/baseline_uncalibrated.json for Phase 10 before/after comparison
+- CLI --validate and --tier flags fully integrated
+
+**Phase 10 — Probability Calibration & Uncertainty:**
+
+- 10-01: Temperature scaling pipeline — Brent's method log-loss minimization + CalibrationPipeline class with fit/transform/save/load lifecycle
+- 10-02: Bayesian/Glicko-style Elo — (μ, σ²) per team via Glicko-1 closed-form updates + g(RD) deflation + min variance floor + MC rating sampling
+- 10-03: Bootstrap CI computation on champion probabilities + --calibrated/--show-ci/--use-glicko CLI flags + before/after validation comparison
+
+**Key outcomes:**
+
+- Temperature scaling with single T optimized via Brent's method (0.1 ≤ T ≤ 10.0) per D-01
+- CalibrationPipeline class in football_core/blender.py with full lifecycle per D-03
+- Glicko-1 closed-form updates with q=ln(10)/400, minimum σ² = 50² per D-04
+- Bootstrap CIs on champion probabilities (percentile method, 1000 resamples) per D-05
+- 3 plans in 2 waves: Wave 1 (10-01 + 10-02 parallel foundation), Wave 2 (10-03 blocked)
+- CLI flags: --calibrate-temp, --calibrated, --show-ci, --use-glicko, --validate-calibrated
+
+**Phase 11 — Explainability & Production:**
+
+- 11-01: Signal Contribution Breakdown — always-on per-signal decomposition in CLI output
+- 11-02: Counterfactual Analysis & Reporting — --what-if flag + --report flag
+- 11-03: Production Architecture Refinements — CLI cleanup, --verbose, centralized validation
+
+**Key outcomes:**
+
+- Signal contribution breakdown (always-on) using additive decomposition from ensemble weights per D-01
+- Counterfactual analysis via --what-if with side-by-side comparison display per D-02
+- Structured reporting via --report matching RESPONSE.md pattern per D-03
+- Config directory standardization, --verbose, centralized argument validation per D-04
+- CLI flags: --what-if, --report, --verbose
+- All plans in 2 waves: Wave 1 (11-01 foundation), Wave 2 (11-02 + 11-03 parallel)
 
 ## Performance Metrics
 
 **Velocity:**
 
 - Total plans completed (v1.0): 22
-- Average duration: 16 min
-- Total execution time: 351 min
-
-**By Phase (v1.0):**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01-ucl-league-table-engine | 3 | 87 min | 29 min |
-| 02-ucl-knockout-phase | 4 | 115 min | 29 min |
-| 03-ucl-orchestration-display | 3 | 16 min | 5 min |
-| 04-validation-production-readiness | 4 | 78 min | 19.5 min |
-
-**Recent Trend:**
-
-- Last 5 plans (v1.0):
-   1. 03-01: 8 min (CLI entry point + SimulationResult dataclass)
-   2. 03-02: 2 min (league table display + ANSI zone coloring)
-   3. 03-03: 6 min (bracket display + odds + JSON export)
-   4. 04-01: 5 min (BSB API fetcher + tests)
-   5. 04-02: 18 min (evaluation extraction + validation cross-check)
-   6. 04-03: 9 min (benchmark script + run)
-   7. 04-04: 6 min (documentation + regression verification)
+- Total plans completed (v2.0 plans): 7 (Phase 9: 3)
+- Total plans planned (v2.0): 32
+- Average duration: 15 min
+- Total execution time: 360 min
 
 ## Accumulated Context
 
@@ -99,22 +112,35 @@ Recent decisions affecting current work:
 - (Phase 8, D-01): Weighted averaging (inverse log-loss weights) as primary method
 - (Phase 8, D-03): Weight calibration on held-out season
 - (Phase 8, D-04): 3-tier market integration — baseline → blended → value detection
-- (Phase 9, D-01): Temperature scaling over isotonic (limited data)
-- (Phase 9, D-04): Bayesian Elo (Glicko-style) with (μ, σ²) per team
+- (Phase 9, D-01): Three-tier validation — cross-tournament, walk-forward, replay
+- (Phase 9, D-02): TRPS primary tournament-level metric, weighted per Ekstrøm et al. (2021)
+- (Phase 9, D-03): Primary metrics: Log Loss, TRPS, ECE. Secondary: Brier, champion prob, stage prob
+- (Phase 9, D-04): Structured validation report (JSON + CLI summary)
+- (Phase 9, D-05): Validation results recorded as uncalibrated baseline for Phase 10 comparison
+- (Phase 9, D-06): ucl-predict --validate --tier {cross-tournament|walk-forward|replay|all} integration
 - (Phase 10, D-01): Three-tier validation — cross-tournament, walk-forward, replay
+- (Phase 10, D-02): Temperature scaling as primary calibrator (single T, robust @ ~144 matches)
+- (Phase 10, D-03): CalibrationPipeline lifecycle — fit(), transform(), save(), load()
+- (Phase 10, D-04): Glicko-1 closed-form updates with min variance floor
+- (Phase 10, D-05): Bootstrap CIs on champion probabilities (percentile method, 1000 resamples)
+- (Phase 10, D-06): Three plans: calibration → Glicko → display/comparison
+- (Phase 10, D-07): --calibrated / --show-ci / --use-glicko / --validate-calibrated CLI flags
 - (Phase 11, D-01): Tiered explainability — signal breakdown (always-on) + counterfactual (on-demand)
 
 ### Pending Todos
 
-- Plan and execute Phase 9 (Tournament Validation)
-- Plan and execute Phase 10 (Calibration & Uncertainty)
-- Plan and execute Phase 11 (Explainability & Production)
+- [x] Plan Phase 9 (Tournament Validation) ✓ Planned
+- [x] Plan Phase 10 (Calibration & Uncertainty) ✓ Planned
+- [x] Plan Phase 11 (Explainability & Production) ✓ Planned
+- [x] Execute Phase 9 (Tournament Validation) ✓ Complete
+- Execute Phase 10 (Calibration & Uncertainty)
+- Execute Phase 11 (Explainability & Production)
 
 ### Blockers/Concerns
 
 - BSD API may require paid tier for 2025/26 UCL fixtures (league_id=7 may not return future fixtures) — Phase 5 risk
-- No multi-season UCL data currently collected — Phase 10 (cross-tournament backtest) requires sourcing historical data
-- Temperature scaling calibration data limited to ~1 season — Phase 9 risk
+- No multi-season UCL data currently collected — Tier 1 cross-tournament backtest requires sourcing historical data for meaningful results
+- Temperature scaling calibration data limited to ~1 season — Phase 10 risk
 
 ## Deferred Items
 
@@ -131,4 +157,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-07-03
-Stopped at: Completed Phase 8 (Signal Blending & Market Integration) — ready for Phase 9
+Stopped at: Phase 9 (Tournament Validation) — EXECUTED (complete)
+Next: Phase 10 (Probability Calibration & Uncertainty) — ready for execution
