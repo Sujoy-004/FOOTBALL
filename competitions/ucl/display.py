@@ -1,7 +1,8 @@
 """UCL display functions — formatted output for simulation results.
 
-D-17: This module imports ONLY from competitions.ucl.result and stdlib.
-No imports from competitions.ucl.src.
+D-17 (relaxed for Phase 8): Primarily imports from competitions.ucl.result
+and stdlib. Signal types imported from football_core.signal for breakdown
+and value-play display. No imports from competitions.ucl.src.
 
 Exports:
     - print_summary(result: SimulationResult) -> None
@@ -10,6 +11,8 @@ Exports:
     - print_knockout_bracket(result: SimulationResult) -> None
     - print_odds(result: SimulationResult) -> None
     - print_validation_summary(validation_result: dict) -> None
+    - show_breakdown(blended_predictions, mode) -> None
+    - print_value_plays(blended_predictions) -> None
     - _supports_color() -> bool
     - _ansi(code: str) -> callable
 """
