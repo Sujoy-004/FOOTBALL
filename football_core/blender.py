@@ -275,17 +275,18 @@ class EnsembleEngine:
         Blends home_prob, draw_prob, away_prob independently, then
         re-normalizes to handle floating-point drift.
         """
-        # Filter to signals that have weights and produced output
-        active = {name: out for name, out in results.items() if name in self._weights}
+        # Filter to signals that have positive weights and produced output
+        active = {name: out for name, out in results.items()
+                  if self._weights.get(name, 0) > 0}
 
         if not active:
             return BlendedPrediction(1 / 3, 1 / 3, 1 / 3, {}, {})
 
         # Re-normalize weights for available signals
         avail_weights = {n: self._weights[n] for n in active}
-        total_w = sum(avail_weights.values())
-        if total_w <= 0:
+        if not avail_weights:
             return BlendedPrediction(1 / 3, 1 / 3, 1 / 3, {}, {})
+        total_w = sum(avail_weights.values())
         norm_weights = {n: w / total_w for n, w in avail_weights.items()}
 
         # Blend each outcome independently per Pitfall 1
@@ -322,3 +323,21 @@ class EnsembleEngine:
     def weights(self) -> dict[str, float]:
         """Return current weights dict (read-only)."""
         return dict(self._weights)
+
+
+def compute_log_loss_weights(log_losses: dict[str, float]) -> dict[str, float]:
+    """Compute inverse-log-loss normalized weights for ensemble blending.
+
+    w_i = (1/ll_i) / sum(1/ll_j for j in signals)
+
+    Delegates to compute_blend_weights() which implements the same
+    1/x normalization. This wrapper exists for API clarity — callers
+    pass log-loss values, not Brier scores.
+
+    Args:
+        log_losses: {signal_name: log_loss_value}
+
+    Returns:
+        {signal_name: normalized_weight} summing to 1.0
+    """
+    return compute_blend_weights(log_losses)
