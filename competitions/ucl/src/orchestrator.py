@@ -4,6 +4,9 @@ Routes between simulate, replay, and live modes per D-05.
 Each mode resolves played_matches from its source, then delegates
 to the simulation engine which is mode-agnostic.
 
+Extended in Phase 10 (Plan 02) to support Glicko-1 rating system
+uncertainty propagation via the *rating_system* parameter.
+
 Usage:
     from competitions.ucl.src.orchestrator import run_simulation
 """
@@ -69,10 +72,19 @@ def run_simulation(
     n_iterations: int,
     args: argparse.Namespace,
     data_dir: str,
+    rating_system: object | None = None,
 ) -> object:
     """Orchestrate the full simulation: resolve mode, run MC, return result.
 
     This is the main entry point called by main.py after CLI parsing.
+
+    Parameters
+    ----------
+    rating_system:
+        Optional :class:`~football_core.glicko.RatingSystem` for Glicko-1
+        uncertainty propagation.  When provided, the MC loop samples
+        team strengths from N(μ, σ²) per iteration.  ``None`` uses the
+        existing point-estimate path.
     """
     played_matches = resolve_played_matches(args, data_dir, fixtures_schedule)
 
@@ -80,4 +92,5 @@ def run_simulation(
     return build_simulation_result(
         fixtures_schedule, elo_ratings, seed, n_iterations,
         played_matches=played_matches,
+        rating_system=rating_system,
     )
