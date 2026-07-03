@@ -6,6 +6,9 @@ Provides the top-level orchestration layer:
 - :func:`run_monte_carlo` — N-iteration Monte Carlo loop with aggregation
 - :func:`run_monte_carlo_glicko` — N-iteration MC loop with Glicko-1 uncertainty
 - :func:`aggregate_mc_results` — isolated aggregation function for testability
+- :func:`compute_uncertainty_contributions` — CI width delta from Glicko vs point-estimate
+- :func:`compute_bootstrap_ci` — percentile bootstrap on champion probabilities
+- :func:`compute_bootstrap_ci_small_sample` — Clopper-Pearson for small-count teams
 - :func:`_sample_glicko_elos` — sample team strengths from N(μ, σ²)
 
 Consumes the match simulation and standings functions from
@@ -793,3 +796,87 @@ def run_monte_carlo_glicko(
         ),
         "stage_order": STAGE_ORDER,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── Uncertainty contribution  (Phase 10, Plan 03)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def compute_uncertainty_contributions(
+    fixtures: dict,
+    rating_system,
+    elo_ratings: dict[str, float],
+    n_iterations: int = 10000,
+    seed: int = 42,
+    uefa_coefficients: dict[str, float] | None = None,
+    played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
+) -> dict[str, float]:
+    """Compare champion CI widths with and without Glicko uncertainty.
+
+    Runs two MC simulations — one with point-estimate Elos
+    (:func:`run_monte_carlo`), one with Glicko-sampled Elos
+    (:func:`run_monte_carlo_glicko`) — then computes the difference
+    in bootstrap CI widths for each team.  The difference represents
+    the additional uncertainty contributed by rating imprecision.
+
+    Parameters
+    ----------
+    fixtures:
+        UCL fixture schedule dict (36 teams, 144 matches).
+    rating_system:
+        :class:`~football_core.glicko.RatingSystem` with per-team
+        (μ, σ²) distributions.
+    elo_ratings:
+        ``{team_name: Elo}`` point estimates (same as rating_system μ).
+    n_iterations:
+        Number of MC iterations per run (default 10000).
+    seed:
+        Random seed for reproducibility (Glicko run uses seed+1).
+    uefa_coefficients:
+        ``{team_name: coefficient}`` for tiebreaker step 10.
+    played_matches:
+        ``{(team_a, team_b): (home_goals, away_goals)}`` dict.
+
+    Returns
+    -------
+    dict[str, float]
+        ``{team_name: uncertainty_contribution_pct}`` where the value
+        is the additional CI width (in percentage points) attributed to
+        Glicko rating uncertainty.  Teams with no CI data get 0.0.
+    """
+    # Run 1: point-estimate Elo (no rating uncertainty)
+    mc_point = run_monte_carlo(
+        fixtures,
+        elo_ratings=elo_ratings,
+        n_iterations=n_iterations,
+        seed=seed,
+        uefa_coefficients=uefa_coefficients,
+        played_matches=played_matches,
+        compute_ci=True,
+    )
+
+    # Run 2: Glicko-sampled Elos (with rating uncertainty)
+    mc_glicko = run_monte_carlo_glicko(
+        fixtures,
+        rating_system,
+        n_iterations=n_iterations,
+        seed=seed + 1,  # offset seed for independent sample
+        uefa_coefficients=uefa_coefficients,
+        played_matches=played_matches,
+        compute_ci=True,
+    )
+
+    contributions: dict[str, float] = {}
+    for team in elo_ratings:
+        point_entry = mc_point["teams"].get(team, {})
+        glicko_entry = mc_glicko["teams"].get(team, {})
+
+        ci_width_point = point_entry.get("champion_ci_width_pct", 0.0)
+        ci_width_glicko = glicko_entry.get("champion_ci_width_pct", 0.0)
+
+        # Uncertainty contribution = additional width from Glicko sampling
+        delta = ci_width_glicko - ci_width_point
+        contributions[team] = round(max(0.0, delta), 4)
+
+    return contributions
