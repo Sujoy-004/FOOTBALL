@@ -29,6 +29,7 @@ from competitions.ucl.display import (
     print_playoff_rounds,
     print_knockout_bracket,
     print_odds,
+    print_signal_breakdown,
 )
 from competitions.ucl.result import SimulationResult
 from competitions.ucl.src.simulation import run_monte_carlo, simulate_league_phase
@@ -40,11 +41,59 @@ from competitions.ucl.src.knockout import (
 )
 from competitions.ucl.src.elo_fetcher import fetch_team_elos
 from football_core.provider import FixtureSchedule, FixtureProviderError
+from football_core.signal import PredictionContext
+from football_core.blender import EnsembleEngine, compute_signal_contributions
 
 logger = logging.getLogger(__name__)
 
+
+class _EmptyResultProvider:
+    """Minimal stub for RollingFormSignal — no historical results available."""
+    def get_team_results(self, team: str, before_date: str | None = None, limit: int = 10) -> list[dict]:
+        return []
+
 # Enable ANSI color support on Windows
 os.system("")
+
+
+def _build_signal_engine(
+    elo_ratings: dict[str, float],
+    weights_override: dict[str, float] | None = None,
+) -> EnsembleEngine:
+    """Build EnsembleEngine with 5 pre-configured signals and calibrated weights.
+
+    Args:
+        elo_ratings: {team: elo} dict for PredictionContext.
+        weights_override: Optional --weights CLI override dict.
+
+    Returns:
+        Configured EnsembleEngine ready for evaluate() calls.
+    """
+    from football_core.signals.refined_elo import RefinedEloSignal
+    from football_core.signals.market_odds import MarketOddsSignal
+    from football_core.signals.rolling_form import RollingFormSignal
+    from football_core.signals.squad_value import SquadValueSignal
+    from football_core.signals.rest_days import RestDaysSignal
+
+    signals = [
+        RefinedEloSignal(),
+        MarketOddsSignal(),
+        RollingFormSignal(result_provider=_EmptyResultProvider()),
+        SquadValueSignal(),
+        RestDaysSignal(),
+    ]
+
+    weights_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "config",
+        "signal_weights.json",
+    )
+
+    if weights_override is not None:
+        return EnsembleEngine(signals, weights=weights_override)
+    if os.path.exists(weights_path):
+        return EnsembleEngine(signals, weights_path=weights_path)
+    return EnsembleEngine(signals)
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -371,14 +420,8 @@ def main() -> None:
             print(f"  {sig}: {w:.4f}")
         return
 
-    # ── Parse --weights override (validated but deferred — D-05) ──
-    if args.weights is not None:
-        parsed_weights = parse_weights(args.weights)
-        print(
-            "Warning: --weights override is parsed but blend integration is not yet "
-            "active in this version. Weights will take effect in a future update.",
-            file=sys.stderr,
-        )
+    # ── Parse --weights override ──
+    parsed_weights = parse_weights(args.weights)
 
     # Resolve data directory
     data_dir = os.path.join(
@@ -440,6 +483,23 @@ def main() -> None:
         args, data_dir,
     )
 
+    # ── Phase 8: Signal blending ──
+    engine = _build_signal_engine(elo_ratings, parsed_weights)
+    signal_matches: list[dict] = []
+    for matchday in fixtures_schedule.matchdays:
+        for match in matchday:
+            signal_matches.append({
+                "team_a": match.team_a,
+                "team_b": match.team_b,
+                "match_id": match.match_id,
+            })
+    signal_context = PredictionContext(
+        fixtures=signal_matches,
+        elo_ratings=elo_ratings,
+        played_results=[],
+    )
+    blended_predictions = [engine.evaluate(m, signal_context) for m in signal_matches]
+
     # Display results in D-06 tournament chronology order
     print_summary(result)
     print_league_table(result)
@@ -447,11 +507,23 @@ def main() -> None:
     print_knockout_bracket(result)
     print_odds(result)
 
+    # ── Phase 11: Signal contribution breakdown (always-on) ──
+    champion_team = result.bracket_champion
+    if champion_team and champion_team in result.teams:
+        champion_prob = result.teams[champion_team].get("champion_prob", 0.0) * 100
+        contributions = {}
+        if blended_predictions:
+            contributions = compute_signal_contributions(
+                blended_predictions, champion_team, engine.weights,
+                match_fixtures=signal_matches,
+            )
+        print_signal_breakdown(contributions, champion_team, champion_prob)
+
     # ── Signal breakdown display (Phase 8, D-07) ──
     if args.show_breakdown:
         from competitions.ucl.display import show_breakdown, print_value_plays
-        show_breakdown(mode=args.show_breakdown)
-        print_value_plays()
+        show_breakdown(blended_predictions, mode=args.show_breakdown)
+        print_value_plays(blended_predictions)
 
     # Validation (Phase 4, D-01 through D-03)
     if args.validate:

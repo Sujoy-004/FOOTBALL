@@ -388,6 +388,72 @@ def print_validation_summary(validation_result: dict) -> None:
 # ── Odds display (D-06 position 5, D-09 format) ────────────────────────
 
 
+def print_signal_breakdown(
+    contributions: dict[str, float],
+    champion_team: str,
+    champion_prob: float,
+) -> None:
+    """Display per-signal contribution breakdown for champion prediction.
+
+    Shows which signals drive the champion probability and by how much.
+    Positive contributions (pushing probability up) shown in green,
+    negative contributions (pulling probability down) shown in red.
+
+    Contributions are normalized to sum to champion_prob. If contributions
+    dict is empty, prints a placeholder message.
+
+    Args:
+        contributions: {signal_name: raw_contribution} from compute_signal_contributions().
+        champion_team: Name of the champion team.
+        champion_prob: Champion probability as percentage (0-100).
+    """
+    print()
+    print("==== Prediction Breakdown ====")
+    print()
+    print(f"  Champion: {_bold(champion_team)} ({champion_prob:.1f}%)")
+    print()
+
+    if not contributions:
+        print("  No signal contribution data available.")
+        print()
+        return
+
+    # Normalize contributions so they sum to champion_prob
+    total_raw = sum(contributions.values())
+    if abs(total_raw) < 1e-9:
+        print("  All signal contributions are near zero.")
+        print()
+        return
+
+    normalized = {
+        sig: round(val / total_raw * champion_prob, 1)
+        for sig, val in contributions.items()
+    }
+
+    # Sort by absolute contribution descending
+    sorted_signals = sorted(
+        normalized.items(),
+        key=lambda x: -abs(x[1]),
+    )
+
+    print(f"  Signal contribution for champion prediction:")
+    print()
+    for sig_name, contrib in sorted_signals:
+        sign = "+" if contrib >= 0 else ""
+        formatted = f"{sign}{contrib:.1f}%"
+        if contrib >= 0:
+            formatted = _green(formatted)
+        else:
+            formatted = _red(formatted)
+        print(f"    {sig_name:<20} {formatted}")
+
+    # Separator line (ASCII only per Windows compatibility)
+    print(f"    {'-' * 33}")
+    total_formatted = f"{champion_prob:.1f}%"
+    print(f"    {'Total:':<20} {_bold(total_formatted)}")
+    print()
+
+
 def print_odds(result: SimulationResult) -> None:
     """Print champion/qualification odds for all 36 teams (D-06 position 5).
 

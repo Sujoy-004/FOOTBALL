@@ -239,6 +239,232 @@ def temperature_scale(prediction: 'BlendedPrediction', T: float) -> 'BlendedPred
     )
 
 
+def multiclass_log_loss(predictions: list['BlendedPrediction'], outcomes: list) -> float:
+    """Compute multiclass log-loss for blended predictions vs actual match outcomes.
+
+    Args:
+        predictions: List of BlendedPrediction with home/draw/away probabilities.
+        outcomes: List of MatchOutcome objects with home_goals/away_goals.
+
+    Returns:
+        Average log-loss across all predictions. Lower is better.
+    """
+    if len(predictions) != len(outcomes):
+        raise ValueError(
+            f"predictions ({len(predictions)}) and outcomes ({len(outcomes)}) "
+            f"must have the same length"
+        )
+    if len(predictions) == 0:
+        return 0.0
+
+    total_loss = 0.0
+    for pred, outcome in zip(predictions, outcomes):
+        # Get probability assigned to actual outcome index
+        outcome_idx = outcome.outcome_index
+        probs = [pred.home_prob, pred.draw_prob, pred.away_prob]
+        p = max(EPS, min(1 - EPS, probs[outcome_idx]))
+        total_loss += -math.log(p)
+
+    return total_loss / len(predictions)
+
+
+class CalibrationPipeline:
+    """Temperature scaling calibration for match-level blended probabilities.
+
+    Learns a single parameter α (exponent for simplex scaling: q_i = p_i^α / Σ p_j^α)
+    by minimizing multiclass log-loss on held-out calibration data.
+
+    Lifecycle: fit() -> transform() / predict() -> save() / load()
+
+    Reference: CONTEXT.md D-01, D-03
+    """
+
+    def __init__(self, min_alpha: float = 0.1, max_alpha: float = 10.0):
+        """Initialize calibration pipeline with alpha bounds.
+
+        Args:
+            min_alpha: Minimum α = 1/T (default 0.1, corresponding to T=10).
+            max_alpha: Maximum α = 1/T (default 10.0, corresponding to T=0.1).
+        """
+        if min_alpha <= 0:
+            raise ValueError(f"min_alpha must be positive, got {min_alpha}")
+        if max_alpha < min_alpha:
+            raise ValueError(
+                f"max_alpha ({max_alpha}) must be >= min_alpha ({min_alpha})"
+            )
+
+        self.min_alpha = min_alpha
+        self.max_alpha = max_alpha
+        self.alpha_: float | None = None  # Fitted exponent
+        self.T_: float | None = None      # Fitted temperature = 1/α
+        self.log_loss_: float | None = None  # Log-loss after calibration
+        self.log_loss_before_: float | None = None  # Log-loss before calibration
+        self.n_samples_: int = 0
+
+    def fit(
+        self,
+        predictions: list['BlendedPrediction'],
+        outcomes: list,
+    ) -> float:
+        """Fit temperature scaling by minimizing log-loss via Brent's method.
+
+        Optimizes α (exponent parameter) directly, since simplex scaling
+        is parameterized by α = 1/T.
+
+        Args:
+            predictions: List of BlendedPrediction with uncalibrated probs.
+            outcomes: List of MatchOutcome with actual results.
+
+        Returns:
+            Optimized α value.
+        """
+        if len(predictions) != len(outcomes):
+            raise ValueError(
+                f"predictions ({len(predictions)}) and outcomes ({len(outcomes)}) "
+                f"must have same length"
+            )
+        if len(predictions) == 0:
+            raise ValueError("Cannot fit calibration on empty data")
+
+        self.n_samples_ = len(predictions)
+
+        # Compute log-loss before calibration (T=1, α=1)
+        self.log_loss_before_ = multiclass_log_loss(predictions, outcomes)
+
+        # Define objective: log-loss as a function of α
+        def objective(alpha: float) -> float:
+            # Apply temperature scaling with given α = 1/T
+            if alpha <= 0:
+                return 1e10  # Penalize non-positive α
+            T = 1.0 / alpha
+            scaled = [temperature_scale(p, T) for p in predictions]
+            return multiclass_log_loss(scaled, outcomes)
+
+        # Optimize α via Brent's method
+        self.alpha_ = _brent_minimize(
+            objective,
+            self.min_alpha,
+            self.max_alpha,
+            tol=1e-6,
+            max_iter=50,
+        )
+
+        # Compute T and final log-loss
+        self.T_ = 1.0 / self.alpha_
+        scaled_final = [temperature_scale(p, self.T_) for p in predictions]
+        self.log_loss_ = multiclass_log_loss(scaled_final, outcomes)
+
+        return self.alpha_
+
+    def transform(
+        self,
+        predictions: list['BlendedPrediction'],
+    ) -> list['BlendedPrediction']:
+        """Apply fitted temperature scaling to a list of predictions.
+
+        Args:
+            predictions: List of BlendedPrediction to calibrate.
+
+        Returns:
+            List of calibrated BlendedPrediction.
+
+        Raises:
+            RuntimeError: If fit() has not been called.
+        """
+        if self.T_ is None:
+            raise RuntimeError(
+                "CalibrationPipeline must be fit() before transform()"
+            )
+        return [temperature_scale(p, self.T_) for p in predictions]
+
+    def predict(
+        self,
+        prediction: 'BlendedPrediction',
+    ) -> 'BlendedPrediction':
+        """Apply fitted temperature scaling to a single prediction.
+
+        Convenience method wrapping transform() for single predictions.
+
+        Args:
+            prediction: Single BlendedPrediction to calibrate.
+
+        Returns:
+            Calibrated BlendedPrediction.
+
+        Raises:
+            RuntimeError: If fit() has not been called.
+        """
+        if self.T_ is None:
+            raise RuntimeError(
+                "CalibrationPipeline must be fit() before predict()"
+            )
+        return temperature_scale(prediction, self.T_)
+
+    def save(self, path: str) -> None:
+        """Serialize fitted calibration parameters to JSON.
+
+        Args:
+            path: File path to write calibration JSON.
+
+        Raises:
+            RuntimeError: If fit() has not been called.
+        """
+        if self.alpha_ is None:
+            raise RuntimeError(
+                "CalibrationPipeline must be fit() before save()"
+            )
+
+        data = {
+            "alpha": round(self.alpha_, 6),
+            "T": round(self.T_, 6),
+            "log_loss": round(self.log_loss_, 6) if self.log_loss_ is not None else None,
+            "log_loss_before": round(self.log_loss_before_, 6) if self.log_loss_before_ is not None else None,
+            "n_samples": self.n_samples_,
+        }
+
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    def load(self, path: str) -> None:
+        """Load calibration parameters from JSON file.
+
+        Supports both 'alpha' key (new format) and 'T' key (legacy format).
+
+        Args:
+            path: File path to calibration JSON.
+
+        Raises:
+            FileNotFoundError: If path does not exist.
+            ValueError: If JSON is invalid or missing required keys.
+        """
+        with open(path) as f:
+            data = json.load(f)
+
+        if "alpha" in data:
+            self.alpha_ = float(data["alpha"])
+            self.T_ = 1.0 / self.alpha_
+        elif "T" in data:
+            self.T_ = float(data["T"])
+            self.alpha_ = 1.0 / self.T_
+        else:
+            raise ValueError(
+                f"Calibration file must contain 'alpha' or 'T' key, "
+                f"got keys: {list(data.keys())}"
+            )
+
+        self.log_loss_ = data.get("log_loss")
+        self.log_loss_before_ = data.get("log_loss_before")
+        self.n_samples_ = data.get("n_samples", 0)
+
+    def __repr__(self) -> str:
+        if self.alpha_ is not None:
+            return (
+                f"CalibrationPipeline(α={self.alpha_:.4f}, T={self.T_:.4f}, "
+                f"log_loss={self.log_loss_:.4f}, n={self.n_samples_})"
+            )
+        return "CalibrationPipeline(unfitted)"
+
+
 def _sigmoid(x: float) -> float:
     """Numerically stable sigmoid."""
     if x < -100:
