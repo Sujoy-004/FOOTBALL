@@ -447,6 +447,12 @@ def main() -> None:
     print_knockout_bracket(result)
     print_odds(result)
 
+    # ── Signal breakdown display (Phase 8, D-07) ──
+    if args.show_breakdown:
+        from competitions.ucl.display import show_breakdown, print_value_plays
+        show_breakdown(mode=args.show_breakdown)
+        print_value_plays()
+
     # Validation (Phase 4, D-01 through D-03)
     if args.validate:
         api_key = args.api_key or os.environ.get("BSD_API_KEY")
