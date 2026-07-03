@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "calibrated_at": null,
+  "n_matches": 0,
+  "threshold": 20,
+  "weights": {
+    "refined_elo": 0.25,
+    "market_odds": 0.30,
+    "rolling_form": 0.15,
+    "squad_value": 0.10,
+    "rest_days": 0.05,
+    "defensive_quality": 0.10,
+    "manager_effect": 0.05
+  },
+  "per_signal": {
+    "refined_elo": {"log_loss": null, "n_matches": 0, "excluded": false},
+    "market_odds": {"log_loss": null, "n_matches": 0, "excluded": false},
+    "rolling_form": {"log_loss": null, "n_matches": 0, "excluded": false},
+    "squad_value": {"log_loss": null, "n_matches": 0, "excluded": false},
+    "rest_days": {"log_loss": null, "n_matches": 0, "excluded": false},
+    "defensive_quality": {"log_loss": null, "n_matches": 0, "excluded": false},
+    "manager_effect": {"log_loss": null, "n_matches": 0, "excluded": false}
+  }
+}
