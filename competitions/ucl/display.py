@@ -672,6 +672,64 @@ def print_counterfactual_comparison(
         print()
 
 
+def print_calibration_comparison(
+    baseline: dict | None,
+    calibrated_report: dict | None,
+) -> None:
+    """Display before/after calibration comparison table.
+
+    Shows three metrics (Log Loss, ECE, TRPS) with Before, After, and Δ
+    columns in a formatted table.
+
+    Args:
+        baseline: Baseline validation report dict with match_level and
+            tournament_level keys.  May be None (placeholder values used).
+        calibrated_report: Calibrated validation report dict with same
+            structure as baseline.  May be None.
+    """
+    # ── Extract metric values ──────────────────────────────────────────
+    def _extract_metrics(report: dict | None) -> dict:
+        if report is None:
+            return {"log_loss": None, "ece": None, "trps": None}
+        ml = report.get("match_level") or {}
+        tl = report.get("tournament_level") or {}
+        return {
+            "log_loss": ml.get("log_loss"),
+            "ece": ml.get("ece", report.get("calibration", {}).get("ece")),
+            "trps": tl.get("trps"),
+        }
+
+    before = _extract_metrics(baseline)
+    after = _extract_metrics(calibrated_report)
+
+    metrics_order = ["Log Loss", "ECE", "TRPS"]
+    metric_keys = {"Log Loss": "log_loss", "ECE": "ece", "TRPS": "trps"}
+
+    # ── Print comparison table ─────────────────────────────────────────
+    print()
+    print("── Calibration Impact ──────────────────")
+    print(f"  {'Metric':<15} {'Before':>8} {'After':>8} {'Δ':>8}")
+    print(f"  {'-' * 42}")
+
+    for metric_name in metrics_order:
+        key = metric_keys[metric_name]
+        b_val = before.get(key)
+        a_val = after.get(key)
+
+        if b_val is not None and a_val is not None:
+            delta = a_val - b_val
+            print(f"  {metric_name:<15} {b_val:>8.3f} {a_val:>8.3f} {delta:>+8.3f}")
+        elif b_val is not None and a_val is None:
+            print(f"  {metric_name:<15} {b_val:>8.3f} {'N/A':>8} {'N/A':>8}")
+        elif b_val is None and a_val is not None:
+            print(f"  {metric_name:<15} {'N/A':>8} {a_val:>8.3f} {'N/A':>8}")
+        else:
+            print(f"  {metric_name:<15} {'N/A':>8} {'N/A':>8} {'N/A':>8}")
+
+    print("────────────────────────────────────────")
+    print()
+
+
 def print_odds(
     result: SimulationResult | None,
     show_ci: bool = False,

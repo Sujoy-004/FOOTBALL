@@ -114,6 +114,16 @@ def _validate_args(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
+    # --validate-calibrated without --validate is a standalone operation
+    if args.validate_calibrated and args.validate:
+        print(
+            "Error: --validate-calibrated and --validate are incompatible. "
+            "Use --validate-calibrated alone for calibrated validation, "
+            "or --validate alone for uncalibrated.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
 
 class _EmptyResultProvider:
     """Minimal stub for RollingFormSignal — no historical results available."""
@@ -280,6 +290,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Run temperature calibration on replay data and save to config/calibration.json. "
              "Requires --replay-data FILE. Fits simplex temperature scaling (T parameter) "
              "by minimizing multiclass log-loss via Brent's method.",
+    )
+    analysis_group.add_argument(
+        "--validate-calibrated", action="store_true",
+        help="Run validation pipeline with temperature calibration applied. "
+             "Re-runs Phase 9 validation tiers with calibrated probabilities "
+             "and produces before/after comparison table. Requires calibration "
+             "config to exist (run --calibrate-temp first).",
     )
 
     # ── Signals ──
@@ -898,6 +915,284 @@ def _run_validation_suite(
     return report
 
 
+def _run_calibrated_validation(
+    args: argparse.Namespace,
+    elo_ratings: dict[str, float],
+    fixtures_schedule: FixtureSchedule,
+    data_dir: str,
+) -> dict:
+    """Run validation pipeline with temperature calibration applied.
+
+    Loads calibration config, builds the standard validation suite, then
+    applies temperature scaling to each match prediction before scoring.
+    Produces a validation report with calibrated metrics.
+
+    Parameters
+    ----------
+    args:
+        Parsed CLI arguments.
+    elo_ratings:
+        {team: Elo} ratings for all teams.
+    fixtures_schedule:
+        Loaded fixture schedule from provider.
+    data_dir:
+        Path to competition data directory.
+
+    Returns
+    -------
+    dict
+        Calibrated validation report in same format as _run_validation_suite.
+        Returns None if calibration config is not available.
+    """
+    # 1. Load calibration config
+    raw_cal = _load_calibration()
+    if raw_cal is None or "T" not in raw_cal:
+        print("Error: --validate-calibrated requires calibration config. "
+              "Run --calibrate-temp first.", file=sys.stderr)
+        return None
+
+    T = raw_cal["T"]
+    from football_core.blender import temperature_scale
+
+    # 2. Build the standard validation pipeline
+    from competitions.ucl.src.validation_suite import ValidationSuite
+
+    engine = _build_signal_engine(elo_ratings, parse_weights(args.weights))
+
+    # 3. Build seasons_data from available sources
+    fixture_dict = {"schedule": asdict(fixtures_schedule)}
+    team_names = [t["name"] for t in fixture_dict["schedule"]["teams"]]
+
+    current_season_id = "current"
+    matches: list[dict] = []
+    for md in fixture_dict["schedule"]["matchdays"]:
+        for m in md:
+            matches.append({
+                "match_id": m.get("match_id", ""),
+                "team_a": m.get("team_a", ""),
+                "team_b": m.get("team_b", ""),
+                "winner": None,
+                "is_draw": False,
+                "home_score": 0,
+                "away_score": 0,
+            })
+
+    standings_data = [
+        {"team": t, "position": i + 1, "elo": elo_ratings.get(t, 1500.0)}
+        for i, t in enumerate(team_names)
+    ]
+
+    seasons_data: dict[str, dict] = {
+        current_season_id: {
+            "matches": matches,
+            "teams": team_names,
+            "standings": standings_data,
+        },
+    }
+
+    suite = ValidationSuite(engine, seasons_data)
+
+    # Load replay data for Tier 3 calibration analysis
+    replay_data: list[list[dict]] | None = None
+    if args.replay_data:
+        try:
+            with open(args.replay_data) as f:
+                raw = json.load(f)
+            if isinstance(raw, list):
+                if raw and isinstance(raw[0], list):
+                    replay_data = raw
+                else:
+                    replay_data = [raw]
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Warning: Could not load replay data: {e}", file=sys.stderr)
+
+    # 4. Run validation tiers
+    if args.tier == "all":
+        report = suite.run_all(replay_matchdays=replay_data)
+    elif args.tier == "walk-forward":
+        result = suite.run_tier_2_walk_forward()
+        report = {
+            "phase": 10,
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "uncalibrated": False,
+            "calibrated": True,
+            "calibration_T": T,
+            "match_level": {
+                "log_loss": result.metrics.get("log_loss", 0.0),
+                "brier": result.metrics.get("brier", 0.0),
+                "ece": result.metrics.get("ece", 0.0),
+            },
+            "n_matches_total": result.n_matches,
+            "n_seasons": result.n_seasons,
+        }
+        if result.details:
+            report["walk_forward_details"] = result.details
+    elif args.tier == "replay":
+        if not replay_data:
+            print("Error: --replay-data PATH required for --tier replay",
+                  file=sys.stderr)
+            sys.exit(1)
+        result = suite.run_tier_3_replay(replay_data)
+        report = {
+            "phase": 10,
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "uncalibrated": False,
+            "calibrated": True,
+            "calibration_T": T,
+            "calibration": {
+                "ece": result.metrics.get("ece", 0.0),
+                "n_decision_points": result.metrics.get("n_decision_points", 0),
+            },
+            "n_matches_total": result.n_matches,
+            "n_seasons": result.n_seasons,
+        }
+        if result.details:
+            report["replay_details"] = result.details
+    elif args.tier == "cross-tournament":
+        result = suite.run_tier_1_cross_tournament()
+        report = {
+            "phase": 10,
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "uncalibrated": False,
+            "calibrated": True,
+            "calibration_T": T,
+            "tournament_level": {
+                "trps": result.metrics.get("trps", 0.0),
+                "champion_accuracy": result.metrics.get("champion_accuracy", 0.0),
+                "stage_accuracy": result.metrics.get("stage_accuracy", 0.0),
+            },
+            "n_matches_total": result.n_matches,
+            "n_seasons": result.n_seasons,
+        }
+        if result.details:
+            report["cross_tournament_details"] = result.details
+    else:
+        print(f"Error: unknown tier '{args.tier}'", file=sys.stderr)
+        sys.exit(1)
+
+    # 5. Apply calibration to the report metrics by adjusting predictions
+    # NOTE: The ValidationSuite evaluates matches using the base engine
+    # without calibration. For a proper calibrated validation, we modify
+    # the engine to apply temperature scaling at evaluation time.
+    # Since engine.evaluate() returns BlendedPrediction, we wrap it.
+    original_evaluate = engine.evaluate
+
+    def _calibrated_evaluate(match, context):
+        bp = original_evaluate(match, context)
+        return temperature_scale(bp, T)
+
+    engine.evaluate = _calibrated_evaluate  # type: ignore[assignment]
+
+    # Re-run with calibrated engine
+    try:
+        if args.tier == "all" or args.tier == "walk-forward":
+            cal_result = suite.run_tier_2_walk_forward()
+            if "match_level" in report:
+                report["match_level"]["log_loss"] = cal_result.metrics.get("log_loss", 0.0)
+                report["match_level"]["brier"] = cal_result.metrics.get("brier", 0.0)
+                report["match_level"]["ece"] = cal_result.metrics.get("ece", 0.0)
+            report["n_matches_total"] = cal_result.n_matches
+
+        if args.tier == "all" or args.tier == "replay":
+            if replay_data:
+                cal_result = suite.run_tier_3_replay(replay_data)
+                if "calibration" in report:
+                    report["calibration"]["ece"] = cal_result.metrics.get("ece", 0.0)
+                    report["calibration"]["n_decision_points"] = (
+                        cal_result.metrics.get("n_decision_points", 0)
+                    )
+
+        if args.tier == "all" or args.tier == "cross-tournament":
+            cal_result = suite.run_tier_1_cross_tournament()
+            if "tournament_level" in report:
+                report["tournament_level"]["trps"] = cal_result.metrics.get("trps", 0.0)
+                report["tournament_level"]["champion_accuracy"] = (
+                    cal_result.metrics.get("champion_accuracy", 0.0)
+                )
+                report["tournament_level"]["stage_accuracy"] = (
+                    cal_result.metrics.get("stage_accuracy", 0.0)
+                )
+    except Exception as e:
+        print(f"Warning: Calibrated validation failed: {e}", file=sys.stderr)
+
+    # Restore original evaluate
+    engine.evaluate = original_evaluate
+
+    return report
+
+
+def _save_validation_baseline(
+    baseline_path: str,
+    uncalibrated_report: dict | None,
+    calibrated_report: dict | None,
+) -> dict:
+    """Save or update validation baseline JSON with before/after data.
+
+    Creates ``baseline.json`` at the given path with structure:
+    {
+      "baseline": {log_loss, ece, trps, timestamp, source},
+      "calibrated": [{log_loss, ece, trps, timestamp, calibration_T, use_glicko}]
+    }
+
+    Parameters
+    ----------
+    baseline_path:
+        Path to the baseline JSON file.
+    uncalibrated_report:
+        Uncalibrated validation report (from Phase 9 or current run).
+    calibrated_report:
+        Calibrated validation report (from --validate-calibrated).
+
+    Returns
+    -------
+    dict
+        The updated/fresh baseline dict.
+    """
+    # Try loading existing baseline
+    existing: dict = {"baseline": None, "calibrated": []}
+    if os.path.exists(baseline_path):
+        try:
+            with open(baseline_path) as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            existing = {"baseline": None, "calibrated": []}
+
+    # Update baseline if we have fresh uncalibrated data
+    if uncalibrated_report is not None:
+        ml = uncalibrated_report.get("match_level") or {}
+        tl = uncalibrated_report.get("tournament_level") or {}
+        existing["baseline"] = {
+            "log_loss": ml.get("log_loss"),
+            "ece": ml.get("ece", uncalibrated_report.get("calibration", {}).get("ece")),
+            "trps": tl.get("trps"),
+            "brier": ml.get("brier"),
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "source": "phase_09_validation",
+        }
+
+    # Append calibrated entry
+    if calibrated_report is not None:
+        ml = calibrated_report.get("match_level") or {}
+        tl = calibrated_report.get("tournament_level") or {}
+        cal_entry = {
+            "log_loss": ml.get("log_loss"),
+            "ece": ml.get("ece", calibrated_report.get("calibration", {}).get("ece")),
+            "trps": tl.get("trps"),
+            "brier": ml.get("brier"),
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "calibration_T": calibrated_report.get("calibration_T"),
+            "use_glicko": False,
+        }
+        existing.setdefault("calibrated", []).append(cal_entry)
+
+    # Write to disk
+    os.makedirs(os.path.dirname(baseline_path), exist_ok=True)
+    with open(baseline_path, "w") as f:
+        json.dump(existing, f, indent=2)
+
+    return existing
+
+
 def main() -> None:
     """Entry point: parse args, run simulation, display results, optionally export JSON."""
     _ensure_utf8_mode()
@@ -1306,6 +1601,63 @@ def main() -> None:
                 print_validation_summary(validation_result)
             except Exception:
                 pass  # BSD validation is optional; don't crash
+
+    # ── Calibrated validation (Phase 10, Plan 03: before/after comparison) ──
+    if args.validate_calibrated:
+        baseline_path = os.path.join(data_dir, "validation", "baseline.json")
+        baseline_report = None
+
+        # Try to load existing baseline
+        if os.path.exists(baseline_path):
+            try:
+                with open(baseline_path) as f:
+                    baseline_data = json.load(f)
+                b = baseline_data.get("baseline") or {}
+                if b.get("log_loss") is not None:
+                    baseline_report = {
+                        "match_level": {
+                            "log_loss": b["log_loss"],
+                            "ece": b.get("ece", 0.0),
+                            "brier": b.get("brier", 0.0),
+                        },
+                        "tournament_level": {
+                            "trps": b.get("trps", 0.0),
+                        },
+                    }
+            except (json.JSONDecodeError, FileNotFoundError):
+                pass
+
+        # Run calibrated validation
+        calibrated_report = _run_calibrated_validation(
+            args, elo_ratings, fixtures_schedule, data_dir,
+        )
+        if calibrated_report is None:
+            # Error already printed by _run_calibrated_validation
+            pass
+        else:
+            # Print before/after comparison
+            from competitions.ucl.display import print_calibration_comparison
+            print_calibration_comparison(baseline_report, calibrated_report)
+
+            # Save/update baseline.json
+            _save_validation_baseline(baseline_path, baseline_report, calibrated_report)
+
+            # Print calibrated validation details
+            print("\n── Calibrated Validation Results ────────────────────────")
+            if "tournament_level" in calibrated_report:
+                tl = calibrated_report["tournament_level"]
+                print(f"  TRPS:               {tl.get('trps', 'N/A'):>10}")
+                print(f"  Champion acc:       {tl.get('champion_accuracy', 'N/A'):>10}")
+                print(f"  Stage acc:          {tl.get('stage_accuracy', 'N/A'):>10}")
+            if "match_level" in calibrated_report:
+                ml = calibrated_report["match_level"]
+                print(f"  Log Loss:           {ml.get('log_loss', 'N/A'):>10}")
+                print(f"  Brier:              {ml.get('brier', 'N/A'):>10}")
+                print(f"  ECE:                {ml.get('ece', 'N/A'):>10}")
+            if "calibration" in calibrated_report:
+                cal = calibrated_report["calibration"]
+                print(f"  Replay ECE:         {cal.get('ece', 'N/A'):>10}")
+                print(f"  Decision points:    {cal.get('n_decision_points', 'N/A'):>10}")
 
     # JSON export — only if NOT already written with validation
     elif args.output:
