@@ -7,6 +7,8 @@ Provides the top-level orchestration layer:
 - :func:`run_monte_carlo_glicko` — N-iteration MC loop with Glicko-1 uncertainty
 - :func:`aggregate_mc_results` — isolated aggregation function for testability
 - :func:`_sample_glicko_elos` — sample team strengths from N(μ, σ²)
+- :func:`compute_bootstrap_ci` — percentile bootstrap CI on champion probabilities
+- :func:`compute_bootstrap_ci_small_sample` — conservative CI for low-count teams
 
 Consumes the match simulation and standings functions from
 :mod:`competitions.ucl.src.groups` (Plan 02).
@@ -15,6 +17,7 @@ Consumes the match simulation and standings functions from
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 
@@ -30,6 +33,197 @@ from competitions.ucl.src.knockout import (
     track_knockout_stages,
 )
 from football_core.constants import EXPECTED_GOALS_BASE_RATE
+
+
+# ── Z-score lookup for confidence intervals (two-tailed) ─────────────────────
+
+_Z_TABLE: dict[float, float] = {
+    0.10: 1.6449,   # 90% CI
+    0.05: 1.9600,   # 95% CI
+    0.01: 2.5758,   # 99% CI
+}
+"""Two-tailed z-scores for common alpha levels.
+
+Used by :func:`compute_bootstrap_ci` and :func:`compute_bootstrap_ci_small_sample`
+for the normal-approximation bootstrap and Wilson score interval.
+"""
+
+
+def _z_score(alpha: float) -> float:
+    """Return approximate two-tailed z-score for a given alpha level.
+
+    Linear interpolation between pre-computed values. Falls back to 1.96
+    (95% CI) for unrecognised alpha values.
+
+    Parameters
+    ----------
+    alpha:
+        Significance level (e.g., 0.05 for 95% CI).
+
+    Returns
+    -------
+    float
+        Approximate z-score.
+    """
+    if alpha in _Z_TABLE:
+        return _Z_TABLE[alpha]
+    # Linear interpolation for intermediate values
+    keys = sorted(_Z_TABLE.keys())
+    if alpha <= keys[0]:
+        return _Z_TABLE[keys[0]]
+    if alpha >= keys[-1]:
+        return _Z_TABLE[keys[-1]]
+    for i in range(len(keys) - 1):
+        if keys[i] <= alpha <= keys[i + 1]:
+            t = (alpha - keys[i]) / (keys[i + 1] - keys[i])
+            return _Z_TABLE[keys[i]] + t * (_Z_TABLE[keys[i + 1]] - _Z_TABLE[keys[i]])
+    return 1.96
+
+
+def _wilson_score_interval(
+    count: int,
+    n_total: int,
+    z: float = 1.96,
+) -> tuple[float, float]:
+    """Wilson score confidence interval for a binomial proportion.
+
+    Closed-form interval that avoids degenerate behaviour near 0/1.
+    Returns (lower, upper) clamped to [0.0, 1.0].
+
+    Parameters
+    ----------
+    count:
+        Number of successes.
+    n_total:
+        Total number of trials.
+    z:
+        Z-score for desired confidence level (default 1.96 ≈ 95%).
+
+    Returns
+    -------
+    tuple[float, float]
+        (lower_bound, upper_bound) in [0.0, 1.0].
+    """
+    if n_total <= 0:
+        return (0.0, 0.0)
+    p_hat = count / n_total
+    denom = 1.0 + z * z / n_total
+    centre = (p_hat + z * z / (2.0 * n_total)) / denom
+    margin = z * math.sqrt(
+        (p_hat * (1.0 - p_hat) + z * z / (4.0 * n_total)) / n_total
+    ) / denom
+    return (max(0.0, centre - margin), min(1.0, centre + margin))
+
+
+# ── Bootstrap CI functions (Phase 10, Plan 03) ───────────────────────────────
+
+
+def compute_bootstrap_ci(
+    champion_counts: dict[str, int],
+    n_iterations: int,
+    n_resamples: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 42,
+) -> dict[str, tuple[float, float]]:
+    """Percentile bootstrap confidence intervals on champion probabilities.
+
+    For each team with ``champion_count > 0``, generates *n_resamples*
+    bootstrap resamples of the champion proportion using efficient normal-
+    approximation binomial sampling.  Returns ``(lower, upper)`` tuples
+    for every team in *champion_counts*.
+
+    Parameters
+    ----------
+    champion_counts:
+        ``{team_name: count_of_iterations_where_team_was_champion}``.
+    n_iterations:
+        Total number of Monte Carlo iterations.
+    n_resamples:
+        Number of bootstrap resamples (default 1000).
+    alpha:
+        Significance level (default 0.05 → 95% CI).
+    seed:
+        Random seed for deterministic bootstrap.
+
+    Returns
+    -------
+    dict[str, tuple[float, float]]
+        ``{team_name: (lower, upper)}`` where both endpoints are in [0, 1].
+        Teams with count <= 0 get ``(0.0, 0.0)``.
+    """
+    rng = random.Random(seed)
+    result: dict[str, tuple[float, float]] = {}
+
+    lo_idx = int(round((alpha / 2.0) * n_resamples))
+    hi_idx = int(round((1.0 - alpha / 2.0) * n_resamples))
+    lo_idx = max(0, min(lo_idx, n_resamples - 1))
+    hi_idx = max(0, min(hi_idx, n_resamples - 1))
+
+    for team, count in champion_counts.items():
+        if count <= 0:
+            result[team] = (0.0, 0.0)
+            continue
+
+        p_hat = count / n_iterations
+
+        # Edge case: always champion in every iteration
+        if count >= n_iterations:
+            result[team] = (1.0, 1.0)
+            continue
+
+        # Efficient bootstrap: sample from the binomial distribution using
+        # the normal approximation (fast for large n_iterations).
+        # For n_iterations=10000 this is 3 orders of magnitude faster than
+        # drawing n_iterations Bernoulli per resample.
+        mean = n_iterations * p_hat
+        std = math.sqrt(n_iterations * p_hat * (1.0 - p_hat))
+        probs: list[float] = []
+        for _ in range(n_resamples):
+            sample_count = max(0, min(n_iterations, int(round(rng.gauss(mean, std)))))
+            probs.append(sample_count / n_iterations)
+
+        probs.sort()
+        result[team] = (probs[lo_idx], probs[hi_idx])
+
+    return result
+
+
+def compute_bootstrap_ci_small_sample(
+    champion_counts: dict[str, int],
+    n_iterations: int,
+    n_resamples: int = 10000,
+    alpha: float = 0.05,
+) -> dict[str, tuple[float, float]]:
+    """Conservative confidence intervals for teams with very small champion counts.
+
+    Uses the Wilson score interval (closed-form, no bootstrap degeneracy)
+    for teams with ``champion_count < 5``.  Returns a dict containing ONLY
+    those low-count teams — callers merge with bootstrap results.
+
+    Parameters
+    ----------
+    champion_counts:
+        ``{team_name: count_of_iterations_where_team_was_champion}``.
+    n_iterations:
+        Total number of Monte Carlo iterations.
+    n_resamples:
+        Ignored (kept for API compatibility with ``compute_bootstrap_ci``).
+    alpha:
+        Significance level (default 0.05 → 95% CI).
+
+    Returns
+    -------
+    dict[str, tuple[float, float]]
+        ``{team_name: (lower, upper)}`` for teams with ``0 < count < 5``.
+        Teams with ``count == 0`` are excluded (already ``(0.0, 0.0)``
+        from the main bootstrap).
+    """
+    z = _z_score(alpha)
+    result: dict[str, tuple[float, float]] = {}
+    for team, count in champion_counts.items():
+        if 0 < count < 5:
+            result[team] = _wilson_score_interval(count, n_iterations, z)
+    return result
 
 
 # ── D-09 stage constants ──────────────────────────────────────────────────────
@@ -117,6 +311,8 @@ def aggregate_mc_results(
     stat_collectors: dict[str, dict[str, list[int | float]]],
     n_iterations: int,
     stage_collectors: dict[str, list[int]] | None = None,
+    compute_ci: bool = False,
+    ci_seed: int = 42,
 ) -> dict[str, dict]:
     """Aggregate per-iteration results into per-team D-06/D-07/D-09 output.
 
@@ -125,6 +321,10 @@ def aggregate_mc_results(
 
     If *stage_collectors* is provided, also computes D-09 stage
     probabilities (stage_eliminated_prob, stage_playoff_prob, …).
+
+    When *compute_ci* is True, also computes bootstrap confidence
+    intervals on ``champion_prob`` and adds ``champion_ci_lower``,
+    ``champion_ci_upper``, and ``champion_ci_width_pct`` fields.
 
     Parameters
     ----------
@@ -140,12 +340,17 @@ def aggregate_mc_results(
         ``{team_name: [per-iteration stage values]}``, where values
         are ints from 0 (eliminated) to 6 (champion) per STAGE_ORDER.
         If None, stage probabilities are skipped (backward compat).
+    compute_ci:
+        If True, compute bootstrap confidence intervals (default False).
+    ci_seed:
+        Random seed for bootstrap resampling (default 42).
 
     Returns
     -------
     dict[str, dict]
         Per-team dict with D-06/D-07 fields plus D-09 stage probability
-        fields if *stage_collectors* was provided.
+        fields if *stage_collectors* was provided, plus CI fields
+        if *compute_ci* was True.
     """
     teams: dict[str, dict] = {}
     for team in positions:
@@ -177,6 +382,19 @@ def aggregate_mc_results(
 
         teams[team] = entry
 
+    # ── Bootstrap confidence intervals on champion probability ──────────
+    if compute_ci:
+        cis = compute_bootstrap_ci(champions, n_iterations, seed=ci_seed)
+        small_cis = compute_bootstrap_ci_small_sample(champions, n_iterations)
+        for team, entry in teams.items():
+            ci_lo, ci_hi = cis.get(team, (0.0, 0.0))
+            # Override with more conservative Wilson interval for low-count teams
+            if team in small_cis:
+                ci_lo, ci_hi = small_cis[team]
+            entry["champion_ci_lower"] = ci_lo
+            entry["champion_ci_upper"] = ci_hi
+            entry["champion_ci_width_pct"] = (ci_hi - ci_lo) * 100.0
+
     return teams
 
 
@@ -193,6 +411,7 @@ def run_monte_carlo(
     uefa_coefficients: dict[str, float] | None = None,
     team_aliases: dict[str, str] | None = None,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
+    compute_ci: bool = False,
 ) -> dict:
     """Run Monte Carlo simulation of UCL league phase.
 
@@ -216,6 +435,9 @@ def run_monte_carlo(
     team_aliases:
         ``{team_name: clubelo_slug}`` mapping.  Loaded from
         ``data/team_aliases.json`` if not provided.
+    compute_ci:
+        If True, compute bootstrap confidence intervals on champion
+        probabilities (default False).
 
     Returns
     -------
@@ -225,6 +447,7 @@ def run_monte_carlo(
           teams: {team_name: {top_8_prob, playoff_prob, eliminated_prob,
                               champion_prob, avg_position, avg_pts, avg_gd,
                               avg_gs, avg_away_gs, avg_wins, avg_away_wins}}}``
+        Plus CI fields when *compute_ci* is True.
     """
     # ── 1. Fetch / resolve Elo ratings ──────────────────────────────────
     if elo_ratings is None:
@@ -322,6 +545,7 @@ def run_monte_carlo(
         "teams": aggregate_mc_results(
             positions, champions, stat_collectors, n_iterations,
             stage_collectors=stage_collectors,
+            compute_ci=compute_ci,
         ),
         "stage_order": STAGE_ORDER,  # D-09 metadata for consumers
     }
@@ -374,6 +598,7 @@ def run_monte_carlo_glicko(
     uefa_coefficients: dict[str, float] | None = None,
     team_aliases: dict[str, str] | None = None,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
+    compute_ci: bool = False,
 ) -> dict:
     """Monte Carlo simulation with Glicko-1 uncertainty sampling.
 
@@ -404,12 +629,16 @@ def run_monte_carlo_glicko(
     played_matches:
         ``{(team_a, team_b): (home_goals, away_goals)}`` dict for
         conditioning on real results.
+    compute_ci:
+        If True, compute bootstrap confidence intervals on champion
+        probabilities (default False).
 
     Returns
     -------
     dict
         Same structure as :func:`run_monte_carlo`: ``{snapshot_date,
         n_iterations, seed, teams, stage_order}``.
+        Plus CI fields when *compute_ci* is True.
     """
     # Use mean ratings for precomputation (per-iteration sampling is
     # done inside the loop)
@@ -502,6 +731,8 @@ def run_monte_carlo_glicko(
         "teams": aggregate_mc_results(
             positions, champions, stat_collectors, n_iterations,
             stage_collectors=stage_collectors,
+            compute_ci=compute_ci,
         ),
         "stage_order": STAGE_ORDER,
+        "using_glicko": True,
     }
