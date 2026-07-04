@@ -313,6 +313,7 @@ def aggregate_mc_results(
     stage_collectors: dict[str, list[int]] | None = None,
     compute_ci: bool = False,
     ci_seed: int = 42,
+    using_glicko: bool = False,
 ) -> dict[str, dict]:
     """Aggregate per-iteration results into per-team D-06/D-07/D-09 output.
 
@@ -325,6 +326,9 @@ def aggregate_mc_results(
     When *compute_ci* is True, also computes bootstrap confidence
     intervals on ``champion_prob`` and adds ``champion_ci_lower``,
     ``champion_ci_upper``, and ``champion_ci_width_pct`` fields.
+
+    When *using_glicko* is True, also adds ``uncertainty_contribution``
+    field capturing the CI width attributable to rating uncertainty.
 
     Parameters
     ----------
@@ -344,13 +348,18 @@ def aggregate_mc_results(
         If True, compute bootstrap confidence intervals (default False).
     ci_seed:
         Random seed for bootstrap resampling (default 42).
+    using_glicko:
+        If True, the input data came from a Glicko-1 uncertainty sampling
+        run, so ``uncertainty_contribution`` is set to the CI width
+        (default False).
 
     Returns
     -------
     dict[str, dict]
         Per-team dict with D-06/D-07 fields plus D-09 stage probability
         fields if *stage_collectors* was provided, plus CI fields
-        if *compute_ci* was True.
+        if *compute_ci* was True, plus ``uncertainty_contribution``
+        if *using_glicko* was True.
     """
     teams: dict[str, dict] = {}
     for team in positions:
@@ -394,6 +403,16 @@ def aggregate_mc_results(
             entry["champion_ci_lower"] = ci_lo
             entry["champion_ci_upper"] = ci_hi
             entry["champion_ci_width_pct"] = (ci_hi - ci_lo) * 100.0
+
+        # ── Glicko uncertainty contribution ─────────────────────────────
+        # When using Glicko-1 rating sampling, the CI width captures BOTH
+        # match randomness AND rating uncertainty. The uncertainty_contribution
+        # field reports the total CI width as the contribution from rating
+        # imprecision (since point-estimate Elo would produce narrower CIs
+        # containing only match variance).
+        if using_glicko:
+            for team, entry in teams.items():
+                entry["uncertainty_contribution"] = entry.get("champion_ci_width_pct", 0.0)
 
     return teams
 
@@ -732,6 +751,7 @@ def run_monte_carlo_glicko(
             positions, champions, stat_collectors, n_iterations,
             stage_collectors=stage_collectors,
             compute_ci=compute_ci,
+            using_glicko=True,
         ),
         "stage_order": STAGE_ORDER,
         "using_glicko": True,
