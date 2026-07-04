@@ -136,8 +136,8 @@
 - [ ] 10-02-PLAN.md — Bayesian/Glicko-style Elo: (μ, σ²) per team + g(RD) deflation + variance floor (UCLC-03, UCLC-04, UCLC-05)
 
 **Wave 2** *(blocked on Wave 1)*
-- [ ] 10-03-PLAN.md — CI propagation + CLI display + before/after validation comparison (UCLC-06, UCLC-07, UCLC-08)
-**Status**: Partial — Plan 01 complete, Plans 02-03 pending
+- [x] 10-03-PLAN.md — CI propagation + CLI display + before/after validation comparison (UCLC-06, UCLC-07, UCLC-08)
+**Status**: Partial — Plan 01 complete, Plan 02 pending, Plan 03 complete
 
 ### Phase 11: Explainability & Production
 

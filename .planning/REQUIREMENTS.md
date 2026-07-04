@@ -107,9 +107,9 @@ Requirements for UCL Prediction Quality milestone (Phases 5-11). Each maps to ro
 - [ ] **UCLC-03**: Bayesian/Glicko-style Elo — per-team (μ, σ²) with closed-form update
 - [ ] **UCLC-04**: g(RD) probability deflation when opponent uncertainty is high
 - [ ] **UCLC-05**: Minimum variance floor preventing uncertainty collapse
-- [ ] **UCLC-06**: Confidence intervals on champion probabilities (p ± CI)
-- [ ] **UCLC-07**: Display calibrated probabilities with CIs in CLI output
-- [ ] **UCLC-08**: Re-run Phase 9 validation post-calibration for before/after comparison
+- [x] **UCLC-06**: Confidence intervals on champion probabilities (p ± CI)
+- [x] **UCLC-07**: Display calibrated probabilities with CIs in CLI output
+- [x] **UCLC-08**: Re-run Phase 9 validation post-calibration for before/after comparison
 
 ### Phase 11: Explainability & Production
 
@@ -237,9 +237,9 @@ Requirements for UCL Prediction Quality milestone (Phases 5-11). Each maps to ro
 | UCLC-03 | Phase 10 | Planned |
 | UCLC-04 | Phase 10 | Planned |
 | UCLC-05 | Phase 10 | Planned |
-| UCLC-06 | Phase 10 | Planned |
-| UCLC-07 | Phase 10 | Planned |
-| UCLC-08 | Phase 10 | Planned |
+| UCLC-06 | Phase 10 | Completed (Plan 03) |
+| UCLC-07 | Phase 10 | Completed (Plan 03) |
+| UCLC-08 | Phase 10 | Completed (Plan 03) |
 | UCLE-01 | Phase 11 | Completed (Plan 01) |
 | UCLE-02 | Phase 11 | Completed (Plan 01) |
 | UCLE-03 | Phase 11 | Completed (Plan 02) |

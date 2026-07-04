@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 11 Plan 03 (Windows Printing & Output Hardening) — EXECUTED
-last_updated: "2026-07-03T12:30:00.000Z"
+stopped_at: None — phase idle
+last_updated: "2026-07-04T05:12:43.152Z"
 progress:
   total_phases: 11
-  completed_phases: 10
-  total_plans: 32
-  completed_plans: 32
-  percent: 100
+  completed_phases: 8
+  total_plans: 35
+  completed_plans: 31
+  percent: 89
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29 after v2.0 planning)
 
 **Core value:** Adding a new competition requires only a new competition module — not changes to `football_core`
-**Current focus:** Phase 11 — Explainability & Production
+**Current focus:** Phase null — 10
 
 ## Current Position
 
 Milestone: v2.0 — UCL Prediction Quality
-Phase: 11 (Explainability & Production) — EXECUTED
-Plan: 3 of 3 (All plans complete)
+Phase: null (10) — EXECUTING
+Plan: 3 of 3
 Plans: 3 of 3 (planned)
-Status: Executing
-Note: Phase 10 Plans 02-03 (Glicko Elo, Bootstrap CI) remain pending
+Status: Partial — Plan 01 complete, Plan 02 pending, Plan 03 complete
+Note: Phase 10 Plan 02 (Glicko Elo) remains pending
 
 ### Changes Made (2026-07-03 execution)
 
@@ -89,10 +89,10 @@ Note: Phase 10 Plans 02-03 (Glicko Elo, Bootstrap CI) remain pending
 **Velocity:**
 
 - Total plans completed (v1.0): 22
-- Total plans completed (v2.0 plans): 8 (Phase 9: 3, Phase 10: 1)
+- Total plans completed (v2.0 plans): 9 (Phase 9: 3, Phase 10: 2)
 - Total plans planned (v2.0): 32
 - Average duration: 15 min
-- Total execution time: 372 min
+- Total execution time: 386 min
 
 ## Accumulated Context
 
@@ -132,6 +132,9 @@ Recent decisions affecting current work:
 - (Phase 10, D-05): Bootstrap CIs on champion probabilities (percentile method, 1000 resamples)
 - (Phase 10, D-06): Three plans: calibration → Glicko → display/comparison
 - (Phase 10, D-07): --calibrated / --show-ci / --use-glicko / --validate-calibrated CLI flags
+- (Phase 10, D-08): Normal-approximation bootstrap (rng.gauss per resample) — 3 OOM faster than Bernoulli per-resample
+- (Phase 10, D-09): Wilson score interval for small-sample CIs (0 < champion_count < 5) — closed-form, no external deps
+- (Phase 10, D-10): uncertainty_contribution = full CI width when using_glicko=True — integrates match randomness + rating uncertainty
 - (Phase 11, D-01): Tiered explainability — signal breakdown (always-on) + counterfactual (on-demand)
 
 ### Pending Todos
@@ -145,7 +148,7 @@ Recent decisions affecting current work:
 - [x] Execute Phase 11 Plan 02 (Counterfactual Analysis & Reporting) ✓ Complete
 - [x] Execute Phase 11 Plan 03 (Windows Printing & Output Hardening) ✓ Complete
 - [ ] Execute Phase 10 Plan 02 (Glicko Elo)
-- [ ] Execute Phase 10 Plan 03 (Bootstrap CI & Display)
+- [x] Execute Phase 10 Plan 03 (Bootstrap CI & Display) ✓ Complete
 
 ### Blockers/Concerns
 
@@ -167,7 +170,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-03
-Stopped at: Phase 11 Plan 03 (Windows Printing & Output Hardening) — EXECUTED (complete)
-Next: (All plans executed across 11 phases)
-Note: Phase 10 Plans 02-03 (Glicko Elo, Bootstrap CI) remain pending for post-v2 follow-up
+Last session: 2026-07-04
+Stopped at: None — phase idle
+Resume file: N/A
