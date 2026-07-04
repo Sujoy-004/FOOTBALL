@@ -18,8 +18,6 @@ import json
 import os
 import random
 
-import math
-
 from competitions.ucl.src.groups import (
     compute_swiss_standings,
     precompute_swiss_matchup_lambdas,
@@ -49,248 +47,6 @@ STAGE_ORDER = [
 
 STAGE_TO_VALUE: dict[str, int] = {s: i for i, s in enumerate(STAGE_ORDER)}
 """Map stage name to its numeric value (0–6) for per-iteration stage tracking."""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ── Bootstrap CI helpers (Phase 10, Plan 03)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def _binom_pmf(k: int, n: int, p: float) -> float:
-    """Binomial probability mass function P(X = k) for X ~ Bin(n, p).
-
-    Computed in log-space for numerical stability with large n.
-    Returns 0.0 if the probability is too small to represent.
-    """
-    if k < 0 or k > n:
-        return 0.0
-    if p <= 0.0 or p >= 1.0:
-        # Handle degenerate cases
-        if p <= 0.0:
-            return 1.0 if k == 0 else 0.0
-        return 1.0 if k == n else 0.0
-
-    # ln(P(X=k)) = ln(C(n,k)) + k*ln(p) + (n-k)*ln(1-p)
-    ln_comb = math.lgamma(n + 1) - math.lgamma(k + 1) - math.lgamma(n - k + 1)
-    log_prob = ln_comb + k * math.log(p) + (n - k) * math.log1p(-p)
-    if log_prob < -700:  # exp(-700) ≈ 10^-304 — near float min
-        return 0.0
-    return math.exp(log_prob)
-
-
-def _binom_cdf(k: int, n: int, p: float) -> float:
-    """Binomial cumulative distribution function P(X <= k) for X ~ Bin(n, p).
-
-    For small k (the common case in Clopper-Pearson for small counts),
-    computes the CDF by directly summing PMF values.  This avoids the
-    numerical issues of the regularized incomplete beta function for
-    large n and small k.
-
-    Parameters
-    ----------
-    k:
-        Number of successes (0 <= k <= n).
-    n:
-        Number of trials (>= 0).
-    p:
-        Success probability (0 <= p <= 1).
-
-    Returns
-    -------
-    float
-        P(X <= k) in [0, 1].
-    """
-    if k < 0:
-        return 0.0
-    if k >= n:
-        return 1.0
-    if p <= 0.0:
-        return 1.0
-    if p >= 1.0:
-        return 0.0
-
-    total = 0.0
-    for i in range(k + 1):
-        total += _binom_pmf(i, n, p)
-    return min(total, 1.0)
-
-
-def _binom_lower_bound(x: int, n: int, alpha: float, lo: float = 0.0,
-                       hi: float = 1.0, tol: float = 1e-12) -> float:
-    """Clopper-Pearson lower bound: solve P(X >= x) = alpha/2.
-
-    Binary search on p for the lower confidence bound of a binomial
-    proportion.  P(X >= x) is **increasing** in p (higher p means more
-    successes likely).  When tail > p_target, current p is too high
-    (tail too large) → search lower.  When tail < p_target, current p
-    is too low → search higher.
-
-    Returns 0.0 for x == 0.
-    """
-    if x <= 0:
-        return 0.0
-    if x >= n:
-        return (alpha / 2.0) ** (1.0 / n)
-
-    p_target = alpha / 2.0
-    for _ in range(100):
-        mid = (lo + hi) / 2.0
-        # P(X >= x) = 1 - P(X <= x-1)
-        tail = 1.0 - _binom_cdf(x - 1, n, mid)
-        if tail > p_target:
-            hi = mid  # tail too large — p is too high, search lower
-        else:
-            lo = mid  # tail too small — p is too low, search higher
-        if hi - lo < tol:
-            break
-    return (lo + hi) / 2.0
-
-
-def _binom_upper_bound(x: int, n: int, alpha: float, lo: float = 0.0,
-                       hi: float = 1.0, tol: float = 1e-12) -> float:
-    """Clopper-Pearson upper bound: solve P(X <= x) = alpha/2.
-
-    Binary search on p for the upper confidence bound of a binomial
-    proportion.  P(X <= x) is **decreasing** in p (higher p means more
-    successes beyond x).  When tail < p_target, current p is too high
-    (tail too small) → search lower.  When tail > p_target, current p
-    is too low → search higher.
-
-    Returns 1.0 for x >= n.
-    """
-    if x >= n:
-        return 1.0
-    if x <= 0:
-        return 1.0 - (alpha / 2.0) ** (1.0 / n)
-
-    p_target = alpha / 2.0
-    for _ in range(100):
-        mid = (lo + hi) / 2.0
-        # P(X <= x)
-        tail = _binom_cdf(x, n, mid)
-        if tail < p_target:
-            hi = mid  # tail too small — p is too high, search lower
-        else:
-            lo = mid  # tail too large — p is too low, search higher
-        if hi - lo < tol:
-            break
-    return (lo + hi) / 2.0
-
-
-def compute_bootstrap_ci(
-    champion_counts: dict[str, int],
-    n_iterations: int,
-    n_resamples: int = 1000,
-    alpha: float = 0.05,
-) -> dict[str, tuple[float, float]]:
-    """Percentile bootstrap confidence intervals on champion probabilities.
-
-    For each team with champion_count > 0, generates *n_resamples* bootstrap
-    samples from Bernoulli(p_hat), computes champion probability per resample,
-    and extracts the (alpha/2, 1-alpha/2) percentiles.
-
-    Teams with champion_count = 0 receive CI = (0.0, 0.0).
-
-    Parameters
-    ----------
-    champion_counts:
-        ``{team_name: count_of_iterations_where_team_was_champion}``.
-    n_iterations:
-        Total number of Monte Carlo iterations.
-    n_resamples:
-        Number of bootstrap resamples (default 1000).
-    alpha:
-        Significance level (default 0.05 → 95% CI).
-
-    Returns
-    -------
-    dict[str, tuple[float, float]]
-        ``{team_name: (lower, upper)}`` with CI endpoints in [0, 1].
-    """
-    ci: dict[str, tuple[float, float]] = {}
-    for team, count in champion_counts.items():
-        if count <= 0:
-            ci[team] = (0.0, 0.0)
-            continue
-
-        p_hat = count / n_iterations
-        # Generate bootstrap resamples from Bernoulli(p_hat)
-        resampled_probs: list[float] = []
-        rng = random.Random(42)  # fixed seed for reproducibility
-        for _ in range(n_resamples):
-            # Draw n_iterations Bernoulli(p_hat) trials
-            successes = sum(1 for _ in range(n_iterations) if rng.random() < p_hat)
-            resampled_probs.append(successes / n_iterations)
-
-        resampled_probs.sort()
-        lower_idx = max(0, int(n_resamples * alpha / 2))
-        upper_idx = min(n_resamples - 1, int(n_resamples * (1 - alpha / 2)))
-        ci[team] = (resampled_probs[lower_idx], resampled_probs[upper_idx])
-
-    return ci
-
-
-def compute_bootstrap_ci_small_sample(
-    champion_counts: dict[str, int],
-    n_iterations: int,
-    n_resamples: int = 10000,
-    alpha: float = 0.05,
-) -> dict[str, tuple[float, float]]:
-    """Confidence intervals using Clopper-Pearson for teams with very small counts.
-
-    For teams with champion_count < 5 (small-sample regime), uses the exact
-    Clopper-Pearson binomial interval (conservative, avoids degenerate bootstrap
-    samples).  For teams with count >= 5, delegates to
-    :func:`compute_bootstrap_ci`.
-
-    The Clopper-Pearson bounds are computed via binary search on binomial tail
-    probabilities — no external dependencies required.
-
-    Parameters
-    ----------
-    champion_counts:
-        ``{team_name: count_of_iterations_where_team_was_champion}``.
-    n_iterations:
-        Total number of Monte Carlo iterations.
-    n_resamples:
-        Number of bootstrap resamples for the fallback path (default 10000).
-    alpha:
-        Significance level (default 0.05 → 95% CI).
-
-    Returns
-    -------
-    dict[str, tuple[float, float]]
-        ``{team_name: (lower, upper)}`` with CI endpoints in [0, 1].
-        Teams with count < 5 get Clopper-Pearson intervals; others get
-        bootstrap intervals.
-    """
-    ci: dict[str, tuple[float, float]] = {}
-    for team, count in champion_counts.items():
-        if count <= 0:
-            ci[team] = (0.0, 0.0)
-            continue
-
-        if count < 5:
-            # Clopper-Pearson exact binomial interval
-            # Lower: solve P(X >= count) = alpha/2
-            # Upper: solve P(X <= count) = alpha/2
-            lower = _binom_lower_bound(count, n_iterations, alpha)
-            upper = _binom_upper_bound(count, n_iterations, alpha)
-            ci[team] = (lower, upper)
-        else:
-            # Fall back to bootstrap for non-small counts
-            p_hat = count / n_iterations
-            resampled_probs: list[float] = []
-            rng = random.Random(42)
-            for _ in range(n_resamples):
-                successes = sum(1 for _ in range(n_iterations) if rng.random() < p_hat)
-                resampled_probs.append(successes / n_iterations)
-            resampled_probs.sort()
-            lower_idx = max(0, int(n_resamples * alpha / 2))
-            upper_idx = min(n_resamples - 1, int(n_resamples * (1 - alpha / 2)))
-            ci[team] = (resampled_probs[lower_idx], resampled_probs[upper_idx])
-
-    return ci
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -361,7 +117,6 @@ def aggregate_mc_results(
     stat_collectors: dict[str, dict[str, list[int | float]]],
     n_iterations: int,
     stage_collectors: dict[str, list[int]] | None = None,
-    compute_ci: bool = False,
 ) -> dict[str, dict]:
     """Aggregate per-iteration results into per-team D-06/D-07/D-09 output.
 
@@ -370,10 +125,6 @@ def aggregate_mc_results(
 
     If *stage_collectors* is provided, also computes D-09 stage
     probabilities (stage_eliminated_prob, stage_playoff_prob, …).
-
-    When *compute_ci* is True, confidence intervals on champion probabilities
-    are computed via bootstrap (percentile method) with Clopper-Pearson
-    exact intervals for small-sample teams (champion_count < 5).
 
     Parameters
     ----------
@@ -389,17 +140,12 @@ def aggregate_mc_results(
         ``{team_name: [per-iteration stage values]}``, where values
         are ints from 0 (eliminated) to 6 (champion) per STAGE_ORDER.
         If None, stage probabilities are skipped (backward compat).
-    compute_ci:
-        If True, compute bootstrap confidence intervals on champion
-        probabilities (default False — backward compatible).
 
     Returns
     -------
     dict[str, dict]
         Per-team dict with D-06/D-07 fields plus D-09 stage probability
-        fields if *stage_collectors* was provided.  When *compute_ci* is
-        True, each team entry also includes ``champion_ci_lower``,
-        ``champion_ci_upper``, and ``champion_ci_width_pct`` fields.
+        fields if *stage_collectors* was provided.
     """
     teams: dict[str, dict] = {}
     for team in positions:
@@ -431,20 +177,6 @@ def aggregate_mc_results(
 
         teams[team] = entry
 
-    # ── Bootstrap CIs on champion probabilities (Phase 10, Plan 03) ──
-    if compute_ci:
-        ci_main = compute_bootstrap_ci(champions, n_iterations)
-        ci_small = compute_bootstrap_ci_small_sample(champions, n_iterations)
-        for team in teams:
-            # Prefer Clopper-Pearson for small-count teams, bootstrap for others
-            if champions.get(team, 0) < 5:
-                lower, upper = ci_small.get(team, (0.0, 0.0))
-            else:
-                lower, upper = ci_main.get(team, (0.0, 0.0))
-            teams[team]["champion_ci_lower"] = round(lower, 6)
-            teams[team]["champion_ci_upper"] = round(upper, 6)
-            teams[team]["champion_ci_width_pct"] = round((upper - lower) * 100, 4)
-
     return teams
 
 
@@ -461,7 +193,6 @@ def run_monte_carlo(
     uefa_coefficients: dict[str, float] | None = None,
     team_aliases: dict[str, str] | None = None,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
-    compute_ci: bool = False,
 ) -> dict:
     """Run Monte Carlo simulation of UCL league phase.
 
@@ -469,9 +200,6 @@ def run_monte_carlo(
     ratings from ClubElo, precomputes matchup lambdas once, runs
     *n_iterations* of the league phase (match simulation → standings),
     and aggregates per-team zone/champion probabilities and stat averages.
-
-    When *compute_ci* is True, adds bootstrap confidence intervals on
-    champion probabilities to the output.
 
     Parameters
     ----------
@@ -488,9 +216,6 @@ def run_monte_carlo(
     team_aliases:
         ``{team_name: clubelo_slug}`` mapping.  Loaded from
         ``data/team_aliases.json`` if not provided.
-    compute_ci:
-        If True, compute bootstrap CIs on champion probabilities
-        (default False).
 
     Returns
     -------
@@ -500,8 +225,6 @@ def run_monte_carlo(
           teams: {team_name: {top_8_prob, playoff_prob, eliminated_prob,
                               champion_prob, avg_position, avg_pts, avg_gd,
                               avg_gs, avg_away_gs, avg_wins, avg_away_wins}}}``
-        When *compute_ci* is True, each team entry also includes
-        ``champion_ci_lower``, ``champion_ci_upper``, ``champion_ci_width_pct``.
     """
     # ── 1. Fetch / resolve Elo ratings ──────────────────────────────────
     if elo_ratings is None:
@@ -599,7 +322,6 @@ def run_monte_carlo(
         "teams": aggregate_mc_results(
             positions, champions, stat_collectors, n_iterations,
             stage_collectors=stage_collectors,
-            compute_ci=compute_ci,
         ),
         "stage_order": STAGE_ORDER,  # D-09 metadata for consumers
     }
@@ -652,7 +374,6 @@ def run_monte_carlo_glicko(
     uefa_coefficients: dict[str, float] | None = None,
     team_aliases: dict[str, str] | None = None,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
-    compute_ci: bool = False,
 ) -> dict:
     """Monte Carlo simulation with Glicko-1 uncertainty sampling.
 
@@ -664,9 +385,6 @@ def run_monte_carlo_glicko(
     The matchup lambdas (Poisson rates) are precomputed once using
     the mean ratings (μ), while per-iteration Elo samples are used
     for match simulation and the knockout pipeline.
-
-    When *compute_ci* is True, adds bootstrap confidence intervals on
-    champion probabilities to the output.
 
     Parameters
     ----------
@@ -686,17 +404,12 @@ def run_monte_carlo_glicko(
     played_matches:
         ``{(team_a, team_b): (home_goals, away_goals)}`` dict for
         conditioning on real results.
-    compute_ci:
-        If True, compute bootstrap CIs on champion probabilities
-        (default False).
 
     Returns
     -------
     dict
         Same structure as :func:`run_monte_carlo`: ``{snapshot_date,
-        n_iterations, seed, teams, stage_order}``.  When *compute_ci*
-        is True, each team entry also includes ``champion_ci_lower``,
-        ``champion_ci_upper``, ``champion_ci_width_pct``.
+        n_iterations, seed, teams, stage_order}``.
     """
     # Use mean ratings for precomputation (per-iteration sampling is
     # done inside the loop)
@@ -789,7 +502,6 @@ def run_monte_carlo_glicko(
         "teams": aggregate_mc_results(
             positions, champions, stat_collectors, n_iterations,
             stage_collectors=stage_collectors,
-            compute_ci=compute_ci,
         ),
         "stage_order": STAGE_ORDER,
     }
