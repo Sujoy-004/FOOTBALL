@@ -298,6 +298,25 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "'match' for per-match signal probabilities",
     )
 
+    # ── Calibration & Uncertainty (Phase 10) ──
+    cal_group = parser.add_argument_group("Calibration & Uncertainty options")
+    cal_group.add_argument(
+        "--calibrated", type=str, default=None,
+        nargs="?", const="auto",
+        choices=["auto", "on", "off"],
+        help="Control temperature calibration: 'on' (force calibration), "
+             "'off' (skip calibration), or 'auto' (use config if available, "
+             "default).  'auto' enables calibration when T != 1.0 in config.",
+    )
+    cal_group.add_argument(
+        "--show-ci", type=str, default=None,
+        nargs="?", const="auto",
+        choices=["auto", "on", "off"],
+        help="Control confidence interval display: 'on' (always show), "
+             "'off' (never show), or 'auto' (show when calibration is active, "
+             "default).",
+    )
+
     # ── Diagnostics ──
     diagnostic_group = parser.add_argument_group("Diagnostic options")
     diagnostic_group.add_argument(
@@ -507,12 +526,13 @@ def _run_counterfactual(
     return result, change_descriptions
 
 
-def _load_calibration() -> float | None:
+def _load_calibration() -> dict | None:
     """Load temperature calibration from config file.
 
     Returns:
-        Temperature T if calibration file exists and is valid, None otherwise.
-        T=1.0 means identity (no calibration effect).
+        Dict with calibration metadata if config exists and is valid, None otherwise.
+        Keys: T, alpha, log_loss, log_loss_before, n_samples, ece (optional).
+        Returns None if file doesn't exist or is unreadable.
     """
     cal_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
@@ -525,10 +545,21 @@ def _load_calibration() -> float | None:
     try:
         with open(cal_path) as f:
             data = json.load(f)
+        result: dict = {}
         if "T" in data:
-            return float(data["T"])
+            result["T"] = float(data["T"])
         if "alpha" in data:
-            return 1.0 / float(data["alpha"])
+            result["alpha"] = float(data["alpha"])
+            result.setdefault("T", 1.0 / result["alpha"])
+        if "log_loss" in data and data["log_loss"] is not None:
+            result["log_loss"] = float(data["log_loss"])
+        if "log_loss_before" in data and data["log_loss_before"] is not None:
+            result["log_loss_before"] = float(data["log_loss_before"])
+        if "n_samples" in data:
+            result["n_samples"] = int(data["n_samples"])
+        if "ece" in data and data["ece"] is not None:
+            result["ece"] = float(data["ece"])
+        return result if "T" in result else None
     except (json.JSONDecodeError, KeyError, ValueError, ZeroDivisionError):
         pass
 
@@ -1095,19 +1126,78 @@ def main() -> None:
                  _eval_duration / max(len(signal_matches), 1) * 1000)
 
     # ── Phase 10: Apply temperature calibration at prediction time ──
-    cal_T = _load_calibration()
-    if cal_T is not None and abs(cal_T - 1.0) > 1e-9:
+    raw_calibration = _load_calibration()
+    cal_info: dict | None = None
+    show_ci: bool = False
+    apply_calibration: bool = False
+    cal_T: float | None = None
+
+    if raw_calibration is not None:
+        cal_T = raw_calibration.get("T")
+        cal_info = raw_calibration
+
+        # Resolve --calibrated flag
+        cal_flag = args.calibrated if args.calibrated is not None else "auto"
+        if cal_flag == "on":
+            apply_calibration = True
+        elif cal_flag == "off":
+            apply_calibration = False
+        else:  # "auto"
+            apply_calibration = cal_T is not None and abs(cal_T - 1.0) > 1e-9
+
+        # Resolve --show-ci flag
+        ci_flag = args.show_ci if args.show_ci is not None else "auto"
+        if ci_flag == "on":
+            show_ci = True
+        elif ci_flag == "off":
+            show_ci = False
+        else:  # "auto"
+            show_ci = apply_calibration
+
+    if apply_calibration and cal_T is not None:
         from football_core.blender import temperature_scale
         blended_predictions = [temperature_scale(p, cal_T) for p in blended_predictions]
         logger.info("Applied temperature scaling T=%.4f to %d predictions",
                      cal_T, len(blended_predictions))
 
+    # Re-run MC simulation with CIs if --show-ci will need them
+    if show_ci:
+        using_glicko = rating_system is not None
+        fixtures_dict = {"schedule": asdict(fixtures_schedule)}
+        if using_glicko:
+            from competitions.ucl.src.simulation import run_monte_carlo_glicko
+            mc_result = run_monte_carlo_glicko(
+                fixtures_dict, rating_system,
+                n_iterations=args.iterations, seed=seed,
+                compute_ci=True,
+            )
+        else:
+            from competitions.ucl.src.simulation import run_monte_carlo
+            mc_result = run_monte_carlo(
+                fixtures_dict, elo_ratings=elo_ratings,
+                n_iterations=args.iterations, seed=seed,
+                compute_ci=True,
+            )
+        # Update result teams with CI data
+        result = SimulationResult(
+            snapshot_date=result.snapshot_date,
+            n_iterations=result.n_iterations,
+            seed=result.seed,
+            standings=result.standings,
+            teams=mc_result["teams"],
+            playoff_ties=result.playoff_ties,
+            playoff_winners=result.playoff_winners,
+            bracket_rounds=result.bracket_rounds,
+            bracket_champion=result.bracket_champion,
+            stages=result.stages,
+        )
+
     # Display results in D-06 tournament chronology order
-    print_summary(result)
+    print_summary(result, calibration_info=cal_info if apply_calibration else None)
     print_league_table(result)
     print_playoff_rounds(result)
     print_knockout_bracket(result)
-    print_odds(result)
+    print_odds(result, show_ci=show_ci)
 
     # ── Phase 11: Signal contribution breakdown (always-on) ──
     champion_team = result.bracket_champion

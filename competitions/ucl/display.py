@@ -91,10 +91,19 @@ def _require(val, name: str, msg: str = ""):
     return val
 
 
-def print_summary(result: SimulationResult | None) -> None:
+def print_summary(
+    result: SimulationResult | None,
+    calibration_info: dict | None = None,
+) -> None:
     """Print simulation summary metadata (D-06 position 1).
 
-    Includes iteration count, random seed, and snapshot date.
+    Includes iteration count, random seed, snapshot date,
+    and optional calibration status.
+
+    Args:
+        result: SimulationResult to summarise.
+        calibration_info: Optional dict with calibration metadata.
+            Expected keys: T, n_matches, log_loss_delta, ece.
     """
     _require(result, "result", "Cannot print summary without a SimulationResult.")
     print()
@@ -103,7 +112,65 @@ def print_summary(result: SimulationResult | None) -> None:
     print(f"  Iterations: {getattr(result, 'n_iterations', 'N/A')}")
     print(f"  Seed: {getattr(result, 'seed', 'N/A')}")
     print(f"  Snapshot: {getattr(result, 'snapshot_date', 'N/A')}")
+
+    # ── Calibration status (Phase 10, Plan 03) ───────────────────────
+    if calibration_info:
+        T = calibration_info.get("T")
+        log_loss_before = calibration_info.get("log_loss_before")
+        log_loss_after = calibration_info.get("log_loss")
+        ece = calibration_info.get("ece")
+        n_matches = calibration_info.get("n_samples", 0)
+
+        if T is not None:
+            print(f"  Calibration: T={T:.4f} active")
+        if n_matches:
+            print(f"  Fitted on:   {n_matches} matches")
+        if log_loss_before is not None and log_loss_after is not None:
+            delta = log_loss_after - log_loss_before
+            print(f"  Log-loss Δ:  {delta:+.4f} (calibrated: {log_loss_after:.4f}, "
+                  f"raw: {log_loss_before:.4f})")
+        if ece is not None:
+            print(f"  ECE:         {ece:.4f} (calibrated)")
+
     print()
+
+
+# ── Calibration summary display (Phase 10, Plan 03) ────────────────────────
+
+
+def print_calibration_summary(calibration_info: dict | None) -> None:
+    """Display calibration metrics summary in a formatted block.
+
+    Args:
+        calibration_info: Dict with calibration metadata, or None to skip.
+            Expected keys: T, alpha, n_samples, log_loss, log_loss_before, ece.
+    """
+    if not calibration_info:
+        return
+
+    T = calibration_info.get("T")
+    alpha = calibration_info.get("alpha")
+    n_samples = calibration_info.get("n_samples", 0)
+    log_loss_after = calibration_info.get("log_loss")
+    log_loss_before = calibration_info.get("log_loss_before")
+    ece = calibration_info.get("ece")
+
+    if T is None and alpha is None:
+        return
+
+    print()
+    print("── Calibration ──────────────────────────")
+    if T is not None:
+        print(f"  Temperature:   T = {T:.4f}")
+    if n_samples:
+        print(f"  Fitted on:     {n_samples} matches")
+    if log_loss_before is not None and log_loss_after is not None:
+        delta = log_loss_after - log_loss_before
+        print(f"  Log-loss Δ:    {delta:+.4f} (calibrated: {log_loss_after:.4f}, "
+              f"raw: {log_loss_before:.4f})")
+    if ece is not None:
+        print(f"  ECE:           {ece:.4f} (calibrated)")
+    print("────────────────────────────────────────")
 
 
 def print_league_table(result: SimulationResult | None) -> None:
@@ -605,11 +672,22 @@ def print_counterfactual_comparison(
         print()
 
 
-def print_odds(result: SimulationResult | None) -> None:
+def print_odds(
+    result: SimulationResult | None,
+    show_ci: bool = False,
+) -> None:
     """Print champion/qualification odds for all 36 teams (D-06 position 5).
 
     Columns per D-09: Rank, Team, Champion %, Final %, SF %, QF %.
     Sorted by champion probability descending, with alphabetical tie-break.
+
+    When *show_ci* is True and team data contains ``champion_ci_lower`` /
+    ``champion_ci_upper`` fields, the champion column displays
+    ``P% ± W%`` format (e.g., ``45.2% ± 3.1%``).
+
+    Args:
+        result: SimulationResult with teams data.
+        show_ci: If True, show confidence intervals on champion probability.
     """
     _require(result, "result", "Cannot print odds without a SimulationResult.")
     teams_data = getattr(result, "teams", None) or {}
@@ -631,18 +709,23 @@ def print_odds(result: SimulationResult | None) -> None:
     print("==== Champion / Qualification Odds ====")
     print()
 
+    # Detect whether CI data is available
+    has_ci = show_ci and "champion_ci_lower" in next(iter(teams_data.values()), {})
+
     # Header row (bold)
+    champion_header = f"{_bold('Champion')}" if not has_ci else f"{_bold('Champion ± CI'):>13}"
     print(
         f"  {_bold('Rank'):>4}  "
         f"{_bold('Team'):<24} "
-        f"{_bold('Champion'):>8} "
+        f"{champion_header} "
         f"{_bold('Final'):>8} "
         f"{_bold('SF'):>8} "
         f"{_bold('QF'):>8}"
     )
 
     # Separator
-    print("  " + "-" * 64)
+    sep_len = 68 if has_ci else 64
+    print("  " + "-" * sep_len)
 
     # Data rows
     for rank, (team_name, team_data) in enumerate(sorted_teams, start=1):
@@ -653,10 +736,18 @@ def print_odds(result: SimulationResult | None) -> None:
         sf = team_data.get("stage_sf_prob", 0.0)
         qf = team_data.get("stage_qf_prob", 0.0)
 
+        if has_ci:
+            ci_lo = team_data.get("champion_ci_lower", 0.0)
+            ci_hi = team_data.get("champion_ci_upper", 0.0)
+            ci_width = (ci_hi - ci_lo) * 100
+            champ_str = f"{champ:>6.1%} ± {ci_width:>4.1f}%"
+        else:
+            champ_str = f"{champ:>7.1%}"
+
         print(
             f"  {rank:>4}  "
             f"{team_name:<24} "
-            f"{champ:>7.1%} "
+            f"{champ_str} "
             f"{final:>7.1%} "
             f"{sf:>7.1%} "
             f"{qf:>7.1%}"
