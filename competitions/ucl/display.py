@@ -6,11 +6,10 @@ and value-play display. No imports from competitions.ucl.src.
 
 Exports:
     - print_summary(result: SimulationResult) -> None
-    - print_calibration_summary(cal_data: dict | None) -> None
     - print_league_table(result: SimulationResult) -> None
     - print_playoff_rounds(result: SimulationResult) -> None
     - print_knockout_bracket(result: SimulationResult) -> None
-    - print_odds(result: SimulationResult, show_ci: bool = False) -> None
+    - print_odds(result: SimulationResult) -> None
     - print_validation_summary(validation_result: dict) -> None
     - show_breakdown(blended_predictions, mode) -> None
     - print_value_plays(blended_predictions) -> None
@@ -104,33 +103,6 @@ def print_summary(result: SimulationResult | None) -> None:
     print(f"  Iterations: {getattr(result, 'n_iterations', 'N/A')}")
     print(f"  Seed: {getattr(result, 'seed', 'N/A')}")
     print(f"  Snapshot: {getattr(result, 'snapshot_date', 'N/A')}")
-    print()
-
-
-def print_calibration_summary(cal_data: dict | None = None) -> None:
-    """Print calibration metrics summary when calibration is active.
-
-    Shows temperature, data provenance, log-loss delta, and ECE.
-    """
-    if cal_data is None:
-        return
-    T = cal_data.get("T", 1.0)
-    n_samples = cal_data.get("n_samples", 0)
-    ll_before = cal_data.get("log_loss_before")
-    ll_after = cal_data.get("log_loss")
-    ece = cal_data.get("ece")
-
-    print()
-    print("---- Calibration ------------------------------")
-    print(f"  Temperature:   T = {T:.4f}")
-    print(f"  Fitted on:     {n_samples} matches")
-    if ll_before is not None and ll_after is not None:
-        ll_delta = ll_after - ll_before
-        print(f"  Log-loss D:    {ll_delta:+.4f} "
-              f"(calibrated: {ll_after:.4f}, raw: {ll_before:.4f})")
-    if ece is not None:
-        print(f"  ECE:           {ece:.4f} (calibrated)")
-    print("-----------------------------------------------")
     print()
 
 
@@ -633,13 +605,10 @@ def print_counterfactual_comparison(
         print()
 
 
-def print_odds(result: SimulationResult | None, show_ci: bool = False) -> None:
+def print_odds(result: SimulationResult | None) -> None:
     """Print champion/qualification odds for all 36 teams (D-06 position 5).
 
     Columns per D-09: Rank, Team, Champion %, Final %, SF %, QF %.
-    When *show_ci* is True and team data contains ``champion_ci_width_pct``,
-    appends CI width to the Champion column: ``X.Y% ± Z.W%``.
-
     Sorted by champion probability descending, with alphabetical tie-break.
     """
     _require(result, "result", "Cannot print odds without a SimulationResult.")
@@ -658,37 +627,22 @@ def print_odds(result: SimulationResult | None, show_ci: bool = False) -> None:
         key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]),
     )
 
-    # Detect if CI data is available
-    has_ci = show_ci and any(
-        isinstance(td, dict) and "champion_ci_width_pct" in td
-        for _, td in sorted_teams
-    )
-
     print()
     print("==== Champion / Qualification Odds ====")
     print()
 
     # Header row (bold)
-    if has_ci:
-        print(
-            f"  {_bold('Rank'):>4}  "
-            f"{_bold('Team'):<24} "
-            f"{_bold('Champion'):>14} "
-            f"{_bold('Final'):>8} "
-            f"{_bold('SF'):>8} "
-            f"{_bold('QF'):>8}"
-        )
-        print("  " + "-" * 70)
-    else:
-        print(
-            f"  {_bold('Rank'):>4}  "
-            f"{_bold('Team'):<24} "
-            f"{_bold('Champion'):>8} "
-            f"{_bold('Final'):>8} "
-            f"{_bold('SF'):>8} "
-            f"{_bold('QF'):>8}"
-        )
-        print("  " + "-" * 64)
+    print(
+        f"  {_bold('Rank'):>4}  "
+        f"{_bold('Team'):<24} "
+        f"{_bold('Champion'):>8} "
+        f"{_bold('Final'):>8} "
+        f"{_bold('SF'):>8} "
+        f"{_bold('QF'):>8}"
+    )
+
+    # Separator
+    print("  " + "-" * 64)
 
     # Data rows
     for rank, (team_name, team_data) in enumerate(sorted_teams, start=1):
@@ -699,25 +653,13 @@ def print_odds(result: SimulationResult | None, show_ci: bool = False) -> None:
         sf = team_data.get("stage_sf_prob", 0.0)
         qf = team_data.get("stage_qf_prob", 0.0)
 
-        if has_ci:
-            ci_width = team_data.get("champion_ci_width_pct", 0.0)
-            champ_display = f"{champ:>6.1%} +/- {ci_width:>.1f}%"
-            print(
-                f"  {rank:>4}  "
-                f"{team_name:<24} "
-                f"{champ_display:>14} "
-                f"{final:>7.1%} "
-                f"{sf:>7.1%} "
-                f"{qf:>7.1%}"
-            )
-        else:
-            print(
-                f"  {rank:>4}  "
-                f"{team_name:<24} "
-                f"{champ:>7.1%} "
-                f"{final:>7.1%} "
-                f"{sf:>7.1%} "
-                f"{qf:>7.1%}"
-            )
+        print(
+            f"  {rank:>4}  "
+            f"{team_name:<24} "
+            f"{champ:>7.1%} "
+            f"{final:>7.1%} "
+            f"{sf:>7.1%} "
+            f"{qf:>7.1%}"
+        )
 
     print()
