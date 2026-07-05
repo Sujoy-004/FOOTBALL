@@ -67,6 +67,9 @@ reports/
 *.sublime-*
 *.code-workspace
 
+# UI design artifacts (discussions, mockups, specs)
+/UI/
+
 # OS-generated files
 Thumbs.db
 .DS_Store
