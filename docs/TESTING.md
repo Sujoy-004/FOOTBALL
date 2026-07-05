@@ -25,7 +25,7 @@ Tests are organized by layer, mirroring the project's three-tier architecture:
 
 ```
 FOOTBALL/
-├── football_core/tests/                  ← Shared engine library (6 test files, 85 tests)
+├── football_core/tests/                  ← Shared engine library (6 test files, 109 tests)
 │   ├── __init__.py
 │   ├── test_availability_signal.py       Availability: team unavailability, match probability
 │   ├── test_defensive_quality_signal.py  Defensive quality rating and probability
@@ -34,7 +34,7 @@ FOOTBALL/
 │   ├── test_manager_provider.py          Manager data parsing (providers.manager)
 │   └── test_player_provider.py           Player data parsing (providers.player)
 │
-├── competitions/worldcup/tests/          ← World Cup 2026 (24 test files, 615 tests)
+├── competitions/worldcup/tests/          ← World Cup 2026 (24 test files, 614 tests)
 │   ├── __init__.py
 │   ├── conftest.py                        Shared fixtures (sample_teams, sample_groups, etc.)
 │   ├── fixtures/                          TSV data files
@@ -65,11 +65,15 @@ FOOTBALL/
 │   ├── test_state.py
 │   └── test_state_load.py
 │
-├── competitions/ucl/tests/               ← UCL 2025/26 (15 test files, 246 tests)
+├── competitions/ucl/tests/               ← UCL 2025/26 (20 test files, 438 tests)
 │   ├── __init__.py
 │   ├── conftest.py                        Shared fixtures (36-team data, schedule, etc.)
+│   ├── test_calibrate.py                  Calibration pipeline (fit, transform, save/load)
 │   ├── test_cli.py
+│   ├── test_counterfactual.py             Counterfactual analysis (what-if scenarios)
 │   ├── test_display.py
+│   ├── test_ensemble.py                   Ensemble signal blending
+│   ├── test_explainability.py             Explainability metrics (SHAP, feature importance)
 │   ├── test_fetcher.py
 │   ├── test_fixture_validation.py
 │   ├── test_knockout.py
@@ -82,9 +86,15 @@ FOOTBALL/
 │   ├── test_signals.py                    All signal implementations (RefinedElo, MarketOdds, etc.)
 │   ├── test_simulation.py
 │   ├── test_swiss_tiebreakers.py
-│   └── test_validation.py
+│   ├── test_validation.py
+│   └── test_validation_suite.py           Cross-season validation suite (Tier 1-4) with baseline comparison
 │
-└── competitions/euro/tests/              ← Euro 2024 (dormant — no tests)
+├── tests/                                 ← Root-level shared tests (4 files, 132 tests)
+│   ├── test_calibrated_pipeline.py        Calibrated validation pipeline integration
+│   ├── test_calibration_pipeline.py       Temperature scaling, Brent's method, CalibrationPipeline
+│   ├── test_confidence_intervals.py       Bootstrap CI, Wilson score, aggregate_mc_results
+│   └── test_glicko.py                     Glicko-1 rating system (g(), expected_score, update, RatingSystem)
+│
 ```
 
 ### Test file naming convention
@@ -107,7 +117,7 @@ Shared fixtures live in `conftest.py` files at each test directory level:
 
 **`competitions/worldcup/tests/conftest.py`** provides:
 - `sample_teams` — 5 test teams with Elo ratings
-- `sample_bracket` — 4-match R16→QF→SF DAG structure
+- `sample_bracket` — 7-match R16→QF→SF DAG structure (4 R16 + 2 QF + 1 SF)
 - `sample_group_matches_results` — pre-built simulated Group A results
 - `sample_groups` — minimal `groups.json`-like dict with Group A
 - `sample_elo` — Elo ratings for the sample group teams
@@ -115,17 +125,35 @@ Shared fixtures live in `conftest.py` files at each test directory level:
 **`competitions/ucl/tests/conftest.py`** provides:
 - `sample_36_teams` — all 36 UCL teams with realistic Elo ratings, pot assignments, and UEFA coefficients
 - `sample_fixture_schedule` — the real 36-team, 8-matchday fixture schedule
-- `sample_elo_dict` — flat `{team_name: elo}` dict
+- `sample_fixture_path` — real fixture schedule written to a temp JSON file path
+- `sample_invalid_fixtures` — 3 fixture schedules with known validation failures
+- `sample_elo_dict` — flat `{team_name: elo}` dict for all 36 teams
+- `sample_elo_ratings` — Elo ratings for 4 sample teams
 - `sample_match_results` — pre-built match results for 2 sample matches
+- `sample_rng` — seeded `random.Random(42)` for deterministic tests
+- `sample_uefa_coefficients` — UEFA club coefficients for 4 sample teams
 - `sample_standings_results` — 36-team standings list sorted by Elo
+- `sample_full_fixture_path` — real fixtures.json copied to a temp path for disk-based tests
 - `sample_mc_output` — pre-formatted Monte Carlo output dict
-- `sample_knockout_elos`, `sample_playoff_winners`, `sample_result` — knockout and bracket fixtures
+- `sample_playoff_pairings`, `sample_bracket_rules` — playoff and bracket data loaded from competition data files
+- `sample_knockout_elos`, `sample_tie_standings`, `sample_playoff_standings` — standings and Elo data for knockout and playoff tests
+- `sample_playoff_winners`, `sample_stage_collectors`, `sample_knockout_stage_result`, `sample_result` — knockout and bracket fixtures including full `SimulationResult`
+- `bsd_response_data` — BSD API snapshot response loaded from `tests/fixtures/bsd_response.json`
+- `sample_36_teams_data`, `sample_cached_fixtures` — team dataclass structures and cache file for BSD provider tests
+- `sample_match_data`, `sample_prediction_context`, `sample_match_with_odds_data` — match schema and prediction context for signal tests
+- `sample_match_result_provider`, `empty_result_provider` — mock match result providers with pre-built or empty results
+- `seasons_data`, `replay_matchdays` — multi-season synthetic data for validation suite and replay tests
 
-### Fixtures directory
+Supports a `--live` CLI flag (registered via `pytest_addoption`) to optionally run live ClubElo API integration tests.
 
-`competitions/worldcup/tests/fixtures/` contains TSV data files for Elo rating testing:
+### Fixtures directories
+
+**`competitions/worldcup/tests/fixtures/`** contains TSV data files for Elo rating testing:
 - `eloratings_en_teams.tsv`
 - `eloratings_world.tsv`
+
+**`competitions/ucl/tests/fixtures/`** contains BSD API response data for offline provider tests:
+- `bsd_response.json`
 
 ---
 
@@ -154,6 +182,14 @@ python -m pytest -v
 cd football_core
 pip install pytest pytest-cov
 python -m pytest -v
+```
+
+### Run all tests (root-level shared tests)
+
+```bash
+cd <project_root>
+pip install pytest pytest-cov
+python -m pytest tests/ -v
 ```
 
 ### Run a single test file
@@ -227,6 +263,7 @@ python -m pytest --cov=src --cov-report=html
 | `competitions/worldcup/` | `--cov=src` (the competition's `src/` package) |
 | `competitions/ucl/` | No CI coverage configured — run manually with `--cov=src` |
 | `football_core/` | No CI coverage configured — run manually with `--cov=football_core` |
+| `tests/` (root level) | No CI coverage configured — run manually with `--cov=football_core --cov=competitions.ucl.src` |
 
 ---
 
@@ -307,7 +344,7 @@ def test_live_smoke_once():
     ...
 ```
 
-When running locally without the key, the test suite reports **614 passed, 1 skipped**. When running in CI (where `BSD_API_KEY` is available via secrets), the live smoke test executes as part of the full suite.
+When running locally without the key, the test suite reports **613 passed, 1 skipped** (614 collected, of which 1 is skipped and the remaining 613 execute). When running in CI (where `BSD_API_KEY` is available via secrets), the live smoke test executes as part of the full suite.
 
 To run the live smoke test locally:
 
@@ -321,7 +358,7 @@ python -m pytest tests/test_live_smoke.py -x -v
 $env:BSD_API_KEY = "your_api_key" ; python -m pytest tests/test_live_smoke.py -x -v
 ```
 
-You can obtain a free API key at `https://sports.bzzoiro.com/register/`. <!-- VERIFY: BSD API registration URL -->
+You can obtain a free API key at `https://sports.bzzoiro.com/register/`.
 
 ---
 
@@ -331,6 +368,7 @@ You can obtain a free API key at `https://sports.bzzoiro.com/register/`. <!-- VE
 
 | Code being tested | Test location |
 |---|---|
+| Cross-competition integration code (Glicko, calibration, CIs) | `<project_root>/tests/test_<module>.py` |
 | Shared engine code in `football_core/` | `football_core/tests/test_<module>.py` |
 | World Cup competition code in `competitions/worldcup/src/` | `competitions/worldcup/tests/test_<module>.py` |
 | UCL competition code in `competitions/ucl/src/` | `competitions/ucl/tests/test_<module>.py` |
@@ -384,6 +422,9 @@ class TestFeatureName:
 - **Unit tests with injected RNG:** `test_groups.py` passes `random.Random(seed)` to functions instead of relying on global state.
 - **API mocking:** `test_catboost.py` uses `monkeypatch.setattr("requests.get", mock_get)` to test HTTP error handling without real calls.
 - **Integration tests:** `test_group_integration.py` runs the full groups pipeline (simulate → standings → third-place ranking → R32 resolution) with real data files.
+- **Calibration pipeline tests:** `tests/test_calibration_pipeline.py` demonstrates temperature scaling, Brent's method, and `CalibrationPipeline` lifecycle testing.
+- **Bootstrap CI tests:** `tests/test_confidence_intervals.py` shows how to test Monte Carlo aggregation with `compute_ci=True` and Wilson score intervals.
+- **Glicko-1 rating system tests:** `tests/test_glicko.py` tests the full `RatingSystem` lifecycle with seeded determinism and symmetry checks.
 - **Deterministic fixtures:** `conftest.py` provides pre-built data structures so tests don't recompute expensive simulation results.
 
 ---
@@ -392,7 +433,7 @@ class TestFeatureName:
 
 | Issue | File | Status |
 |---|---|---|
-| `test_live_smoke_once` requires `BSD_API_KEY` | `tests/test_live_smoke.py` | Skipped by default |
+| `test_live_smoke_once` requires `BSD_API_KEY` | `competitions/worldcup/tests/test_live_smoke.py` | Skipped by default |
 | One flaky test in World Cup suite (nondeterministic) | World Cup tests | Intermittent |
 | No tests for Euro 2024 | `competitions/euro/tests/` | Dormant — no test coverage when the competition is reactivated |
 

@@ -1,7 +1,7 @@
 {
-  "alpha": 1.0,
-  "T": 1.0,
-  "log_loss": null,
-  "log_loss_before": null,
-  "n_samples": 0
+  "alpha": 1.860877,
+  "T": 0.537381,
+  "log_loss": 0.995298,
+  "log_loss_before": 1.017035,
+  "n_samples": 144
 }

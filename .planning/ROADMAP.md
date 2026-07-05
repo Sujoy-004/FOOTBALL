@@ -133,11 +133,11 @@
 
 **Wave 1** *(foundation)*
 - [x] 10-01-PLAN.md — Calibration Pipeline: temperature scaling + CalibrationPipeline class (UCLC-01, UCLC-02)
-- [ ] 10-02-PLAN.md — Bayesian/Glicko-style Elo: (μ, σ²) per team + g(RD) deflation + variance floor (UCLC-03, UCLC-04, UCLC-05)
+- [x] 10-02-PLAN.md — Bayesian/Glicko-style Elo: (μ, σ²) per team + g(RD) deflation + variance floor (UCLC-03, UCLC-04, UCLC-05)
 
 **Wave 2** *(blocked on Wave 1)*
 - [x] 10-03-PLAN.md — CI propagation + CLI display + before/after validation comparison (UCLC-06, UCLC-07, UCLC-08)
-**Status**: Partial — Plan 01 complete, Plan 02 pending, Plan 03 complete
+**Status**: Complete ✓ (2026-07-04)
 
 ### Phase 11: Explainability & Production
 
@@ -168,5 +168,5 @@
 | 7. Prediction Signals | v2.0 | 3/3 | ✓ Complete | 2026-07-01 |
 | 8. Signal Blending & Market Integration | v2.0 | 3/3 | ✓ Complete | 2026-07-03 |
 | 9. Tournament Validation | v2.0 | 3/3 | ✓ Complete | 2026-07-03 |
-| 10. Probability Calibration & Uncertainty | v2.0 | 1/3 | ◐ Partial | 2026-07-03 |
+| 10. Probability Calibration & Uncertainty | v2.0 | 3/3 | ✓ Complete | 2026-07-04 |
 | 11. Explainability & Production | v2.0 | 3/3 | ✓ Complete | 2026-07-03 |

@@ -138,6 +138,10 @@ def update_glicko(
     rd_opp = math.sqrt(opponent_sigma_sq)
     g_opp = g(rd_opp)
 
+    # Non-positive k_multiplier means no information from this match
+    if k_multiplier <= 0.0:
+        return mu, sigma_sq
+
     # Expected score given current ratings and opponent uncertainty
     e = 1.0 / (1.0 + 10.0 ** (-g_opp * (mu - opponent_mu) / 400.0))
 
@@ -147,11 +151,13 @@ def update_glicko(
     # Apply k_multiplier: scale information from this match
     # Larger k → more weight on the observed outcome in both the
     # variance reduction and the rating mean update.
-    if k_multiplier > 0.0:
+    # Dividing d² by k makes the effective precision 1/d² larger,
+    # which increases the rating movement and uncertainty reduction.
+    if k_multiplier != 1.0:
         d2 /= k_multiplier
 
     # Update mean and variance (Equation 4 in Glicko-1 paper)
-    # σ²_new = 1 / (1/σ² + 1/d²) where 1/d² is smaller with larger k
+    # σ²_new = 1 / (1/σ² + 1/d²)
     new_sigma_sq = 1.0 / (1.0 / sigma_sq + 1.0 / d2)
     # Scale the innovation directly so k>1 produces larger Δμ
     new_mu = mu + Q * new_sigma_sq * g_opp * (score - e) * k_multiplier

@@ -6,9 +6,9 @@ A Python Monte Carlo simulation engine that predicts football tournament outcome
 | Competition | Status | CLI Tool | Run Command | Tests |
 |---|---|---|---|---|
 | **World Cup 2026** | Active — continuous polling (60s) | `wc-predict` | `python -m competitions.worldcup.main` | 614 |
-| **UCL 2025/26** | Active — single-run Monte Carlo | `ucl-predict` | `python -m competitions.ucl.main` | 246 |
+| **UCL 2025/26** | Active — single-run Monte Carlo | `ucl-predict` | `python -m competitions.ucl.main` | 438 |
 | **Euro 2024** | Dormant — continuous polling | `euro-predict` | `python -m competitions.euro.main` | — |
-| **football_core** | Shared library | — | — | 85 |
+| **football_core** | Shared library | — | — | 109 |
 
 ## Quick Start
 
@@ -74,8 +74,12 @@ python -m competitions.ucl.main --validate --api-key KEY
 # Run in replay mode with historical match data
 python -m competitions.ucl.main --mode replay --replay-data matches.json
 
-# Available flags: -n N (iterations), -s N (seed), -o FILE (output), --validate, --api-key KEY,
-#   --fixture-source {auto,repo,bsd}, --mode {simulate,replay,live}, --replay-data FILE
+# Available flags: -n N (iterations), -s N (seed), --use-glicko (Bayesian uncertainty),
+#   -o FILE (output), --validate, --api-key KEY, --tier {cross-tournament,walk-forward,replay,all},
+#   --fixture-source {auto,repo,bsd}, --mode {simulate,replay,live}, --replay-data FILE,
+#   --what-if TEAM.PARAM=VALUE, --report FILE, --calibrate, --calibrate-temp FILE,
+#   --validate-calibrated, --weights K=V,K=V, --show-breakdown, --calibrated, --show-ci,
+#   --verbose
 ```
 
 The UCL competition uses a Swiss-system league phase (36 teams, 8 matchdays) followed by a playoff round and a 16-team knockout bracket.
@@ -107,6 +111,7 @@ FOOTBALL/
 │   ├── enrichment.py           Match data enrichment pipeline
 │   ├── evaluation.py           Brier score, log loss, calibration, ECE
 │   ├── state.py                JSON persistence layer
+│   ├── glicko.py               Glicko-1 Bayesian rating with uncertainty
 │   ├── math_utils.py           Sigmoid and other math helpers
 │   ├── constants.py            Shared configuration constants
 │   ├── signal.py               Signal computation framework
@@ -128,7 +133,7 @@ FOOTBALL/
 │   ├── predictors/             Signal ingestion pipeline
 │   │   ├── odds.py             Market odds fetcher
 │   │   └── catboost.py         CatBoost prediction fetcher
-│   └── tests/                  7 modules, 85 tests
+│   └── tests/                  7 modules, 109 tests
 │       ├── test_availability_signal.py
 │       ├── test_defensive_quality_signal.py
 │       ├── test_evaluation.py
@@ -143,20 +148,21 @@ FOOTBALL/
 │   │   ├── .env.example        BSD_API_KEY template
 │   │   ├── config.json         League ID (27)
 │   │   ├── src/                WC-specific modules (blender, governance, output, etc.)
+│   │   │   └── predictors/     Signal ingestion (odds, catboost, form, lineup, availability, manager_signals)
 │   │   ├── tests/              26 modules, 614 tests
 │   │   ├── data/               JSON state files (generated at runtime)
-│   │   ├── scripts/            Benchmark scripts
 │   │   ├── docs/               Archive docs
 │   │   └── .github/workflows/  CI pipeline (Python 3.10–3.12, pytest --cov)
 │   │
 │   ├── ucl/                    ← UCL 2025/26 (active)
 │   │   ├── main.py             CLI entry point, single-run Monte Carlo
 │   │   ├── display.py          Formatted terminal output
-│   │   ├── result.py           SimulationResult contract
+│   │   ├── result.py           SimulationResult contract (display-layer boundary)
+│   │   ├── report.py           Structured JSON report builder
+│   │   ├── config/             Signal weights and calibration JSON
 │   │   ├── src/                UCL-specific simulation + knockout modules
-│   │   ├── tests/              17 modules, 246 tests
-│   │   ├── data/               Fixture files, bracket rules, team aliases
-│   │   └── benchmarks/         Performance benchmarking
+│   │   ├── tests/              22 modules, 438 tests
+│   │   └── data/               Fixture files, bracket rules, team aliases
 │   │
 │   └── euro/                   ← Euro 2024 (dormant)
 │       ├── main.py             CLI entry point, continuous polling

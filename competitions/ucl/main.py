@@ -1627,12 +1627,43 @@ def main() -> None:
             except (json.JSONDecodeError, FileNotFoundError):
                 pass
 
+        # If no baseline exists, seed it by running uncalibrated validation first
+        if baseline_report is None:
+            print("No existing baseline found — running uncalibrated validation to seed baseline...")
+            uncalibrated_report = None
+            try:
+                uncalibrated_report = _run_validation_suite(
+                    args, elo_ratings, fixtures_schedule, data_dir,
+                )
+            except Exception as e:
+                print(f"Warning: Could not seed baseline: {e}", file=sys.stderr)
+            if uncalibrated_report is not None:
+                _save_validation_baseline(baseline_path, uncalibrated_report, None)
+                # Reload as baseline_report for comparison
+                if os.path.exists(baseline_path):
+                    try:
+                        with open(baseline_path) as f:
+                            baseline_data = json.load(f)
+                        b = baseline_data.get("baseline") or {}
+                        if b.get("log_loss") is not None:
+                            baseline_report = {
+                                "match_level": {
+                                    "log_loss": b["log_loss"],
+                                    "ece": b.get("ece", 0.0),
+                                    "brier": b.get("brier", 0.0),
+                                },
+                                "tournament_level": {
+                                    "trps": b.get("trps", 0.0),
+                                },
+                            }
+                    except (json.JSONDecodeError, FileNotFoundError):
+                        pass
+
         # Run calibrated validation
         calibrated_report = _run_calibrated_validation(
             args, elo_ratings, fixtures_schedule, data_dir,
         )
         if calibrated_report is None:
-            # Error already printed by _run_calibrated_validation
             pass
         else:
             # Print before/after comparison

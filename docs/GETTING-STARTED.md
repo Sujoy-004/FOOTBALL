@@ -134,7 +134,7 @@ python -m competitions.ucl.main -n 10000 -s 42 -o results.json
 # Validate predictions against real BSD match results (requires API key)
 python -m competitions.ucl.main -n 10000 --validate --api-key YOUR_KEY
 
-# Full list of flags: -n N, -s N, -o FILE, --validate, --api-key KEY, --fixture-source {auto,repo,bsd}, --mode {simulate,replay,live}, --replay-data FILE
+# Key flags: -n N, -s N, -o FILE, --validate, --api-key KEY, --fixture-source {auto,repo,bsd}, --mode {simulate,replay,live}, --replay-data FILE, --use-glicko, --weights, --show-breakdown, --verbose, --what-if, --report, --calibrate, --calibrate-temp, --validate-calibrated, --tier, --calibrated, --show-ci
 ```
 
 The UCL predictor simulates a 36-team Swiss-system league phase (8 matchdays), followed by the playoff round, seeded R16 bracket, quarter-finals, semi-finals, and final.
@@ -173,13 +173,13 @@ pytest competitions/worldcup/tests/
 pytest competitions/worldcup/tests/ --cov=competitions.worldcup.src --cov-report=term-missing
 ```
 
-### UCL test suite (246 tests)
+### UCL test suite (438 tests)
 
 ```bash
 pytest competitions/ucl/tests/ -x
 ```
 
-### football_core test suite (85 tests)
+### football_core test suite (109 tests)
 
 ```bash
 pytest football_core/tests/ -v

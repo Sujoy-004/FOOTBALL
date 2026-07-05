@@ -98,6 +98,7 @@ FOOTBALL/
 │   ├── elo_sync.py                    Fetch/parse Elo ratings from eloratings.net
 │   ├── elo_fetcher.py                 Fetch ClubElo ratings from api.clubelo.com
 │   ├── fetcher.py                     BSD API match fetching, dedup, normalization
+│   ├── glicko.py                      Glicko-1 Bayesian rating system with uncertainty propagation
 │   ├── groups.py                      Poisson match simulation, tiebreaker chain, round-robin
 │   ├── knockout.py                    Generic round-map building, match simulation, blended probs
 │   ├── evaluation.py                  Brier score, log loss, calibration, ECE
@@ -127,7 +128,7 @@ FOOTBALL/
 │   │   ├── rest_days.py               Rest days advantage signal
 │   │   ├── rolling_form.py            Rolling form signal (D-09)
 │   │   └── squad_value.py             Squad market value signal
-│   └── tests/                         7 test files, 85 tests
+│   └── tests/                         7 test files, 109 tests
 │       ├── __init__.py
 │       ├── test_availability_signal.py
 │       ├── test_defensive_quality_signal.py
@@ -139,7 +140,7 @@ FOOTBALL/
 ├── competitions/
 │   ├── worldcup/                    ← World Cup 2026 predictor (active — continuous polling)
 │   │   ├── __init__.py              sys.path setup
-│   │   ├── main.py                  CLI entry point, 60s polling loop, orchestration (1472 lines)
+│   │   ├── main.py                  CLI entry point, 60s polling loop, orchestration (1694 lines)
 │   │   ├── config.json              League ID: 27
 │   │   ├── .env.example             BSD_API_KEY template
 │   │   ├── requirements.txt         pytest, pytest-cov, python-dotenv
@@ -152,9 +153,9 @@ FOOTBALL/
 │   │   │   ├── fetcher.py           WC-specific BSD API fetching
 │   │   │   ├── state.py             WC-specific state persistence + versioning
 │   │   │   ├── evaluation.py        WC-specific evaluation/calibration
-│   │   │   ├── output.py            ANSI terminal display (719 lines)
+│   │   │   ├── output.py            ANSI terminal display (891 lines)
 │   │   │   ├── blender.py           Platt scaling, Brier-weighted blending
-│   │   │   ├── governance.py        Version tracking, drift detection (465 lines)
+│   │   │   ├── governance.py        Version tracking, drift detection (573 lines)
 │   │   │   ├── math_utils.py        Sigmoid helper
 │   │   │   └── predictors/          Competition-specific predictor wrappers
 │   │   │       ├── __init__.py
@@ -167,18 +168,18 @@ FOOTBALL/
 │   │   ├── tests/                   24 test files, 614 tests
 │   │   │   ├── conftest.py          Shared fixtures (sample_teams, sample_bracket, etc.)
 │   │   │   └── test_*.py            Unit + integration tests
-│   │   ├── scripts/                 Benchmark scripts
-│   │   ├── benchmarks/              Performance benchmarks
 │   │   ├── data/                    Runtime state (gitignored) + team/group config
 │   │   └── .github/workflows/       CI pipeline
 │   │
 │   ├── ucl/                         ← UEFA Champions League 2025/26 predictor (active — single-run)
 │   │   ├── __init__.py              sys.path setup, exports SimulationResult + main
-│   │   ├── main.py                  CLI entry point, Monte Carlo orchestration (321 lines)
+│   │   ├── main.py                  CLI entry point, Monte Carlo orchestration (1701 lines)
 │   │   ├── result.py                SimulationResult dataclass (display contract)
-│   │   ├── display.py               Formatted terminal output (236 lines)
+│   │   ├── display.py               Formatted terminal output (814 lines)
+│   │   ├── report.py                Structured JSON report generation
 │   │   ├── src/                     UCL-specific simulation modules
 │   │   │   ├── __init__.py          Public API: simulation, knockout, groups, elo_fetcher
+│   │   │   ├── calibrate.py             Offline weight calibration for prediction signals
 │   │   │   ├── constants.py         UCL-specific constants
 │   │   │   ├── simulation.py        Monte Carlo engine, league phase simulation
 │   │   │   ├── knockout.py          Swiss playoff + knockout bracket simulation
@@ -188,16 +189,17 @@ FOOTBALL/
 │   │   │   ├── orchestrator.py      Replay/live simulation orchestrator
 │   │   │   ├── provider.py          BSD data provider for UCL
 │   │   │   ├── result_provider.py   Match result fetching for UCL
-│   │   │   └── validation.py        Cross-check predictions vs real results
-│   │   ├── tests/                   15 test files, 246 tests
-│   │   │   ├── conftest.py          Team pots, Elo ratings, fixture data (951 lines)
+│   │   │   ├── validation.py        Cross-check predictions vs real results
+│   │   │   └── validation_suite.py     Validation suite for prediction accuracy
+│   │   ├── tests/                   20 test files, 438 tests
+│   │   │   ├── conftest.py          Team pots, Elo ratings, fixture data (1076 lines)
 │   │   │   └── test_*.py            Unit + integration tests
 │   │   ├── benchmarks/              Performance benchmarks + results
 │   │   └── data/                    Fixture data, bracket rules, team aliases, coefficients
 │   │
 │   └── euro/                        ← Euro 2024 predictor (dormant — continuous polling)
 │       ├── __init__.py              sys.path setup (also adds worldcup/src to path)
-│       ├── main.py                  CLI entry point, polling loop (213 lines)
+│       ├── main.py                  CLI entry point, polling loop (255 lines)
 │       ├── config.py                Euro-specific configuration
 │       ├── display.py               Terminal display
 │       ├── simulation.py            Match + knockout simulation
@@ -234,6 +236,7 @@ logic here.
 | **elo_sync** | `elo_sync.py` | Sync ratings from eloratings.net | `fetch_eloratings_tsv()`, `parse_eloratings_tsv()`, `validate_eloratings_data()`, `apply_graduated_correction()`, `get_staleness_level()` |
 | **elo_fetcher** | `elo_fetcher.py` | Fetch ClubElo ratings from api.clubelo.com | `fetch_team_elos()`, `resolve_clubelo_name()`, cached single-request CSV lookup |
 | **fetcher** | `fetcher.py` | BSD API match fetch + processing | `fetch_raw_matches()`, `process_group_matches()`, `process_matches()`, `find_bracket_match()`, `find_group_match()`, `normalize_team()` |
+| **glicko** | `glicko.py` | Glicko-1 Bayesian rating system | `TeamRating` dataclass, `RatingSystem` class, `expected_score_bayesian()`, `update_glicko()`, `compute_glicko_k_factor()`, `g()` |
 | **groups** | `groups.py` | Poisson group simulation | `expected_goals()`, `simulate_group_matches()`, `precompute_matchup_lambdas()`, `_tiebreak_group()` |
 | **knockout** | `knockout.py` | Generic knockout primitives | `_build_round_map()`, `_get_blended_prob()`, `simulate_single_match()`, `simulate_two_legged_tie()` |
 | **evaluation** | `evaluation.py` | Prediction accuracy metrics | `brier_score()`, `log_loss()`, `compute_metrics()`, `calibration_curve()`, `expected_calibration_error()` |
@@ -277,7 +280,7 @@ Add to `competitions/<name>/src/` when:
 Each competition has its own test suite under `competitions/<name>/tests/`.
 The core library has a small test suite under `football_core/tests/`.
 
-### Core Library Tests (85 tests)
+### Core Library Tests (109 tests)
 
 ```bash
 # From the repository root
@@ -308,7 +311,7 @@ python -m pytest competitions/worldcup/tests/ -k "test_expected_score"
 # World Cup CI is the only fully configured CI pipeline (see CI Pipeline section)
 ```
 
-### UCL Tests (246 tests)
+### UCL Tests (438 tests)
 
 ```bash
 # From the repository root
@@ -467,10 +470,12 @@ conventions have emerged organically:
 - **Descriptive variable names.** Use full words (`expected_goals` not `xg`,
   `team_a` not `ta`). Abbreviations are acceptable only when they are universal
   (e.g., `elo`, `std`, `max`).
-- **Type annotations.** Early modules (`football_core/elo.py`,
-  `football_core/groups.py`, `football_core/knockout.py`) use no type hints.
-  Newer modules (UCL's `result.py`, `display.py`) use `from __future__ import annotations`
-  and full type annotations. Follow the convention of the module you are editing.
+- **Type annotations.** All modules use basic type hints (e.g., `-> float`,
+  `param: str`). Early modules (`football_core/elo.py`,
+  `football_core/groups.py`, `football_core/knockout.py`) use inline type hints
+  without the `from __future__ import annotations` import. Newer modules (UCL's
+  `result.py`, `display.py`) use `from __future__ import annotations` and full
+  modern type annotations. Follow the convention of the module you are editing.
 - **Docstrings.** Top-level modules have a module-level docstring. Public
   functions and classes have docstrings describing purpose, arguments, and
   return values. Internal/private functions (prefixed with `_`) may omit

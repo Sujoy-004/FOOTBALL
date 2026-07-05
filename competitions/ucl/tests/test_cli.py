@@ -437,6 +437,7 @@ class TestArgValidation:
             calibrate=False, calibrate_temp=False,
             what_if_list=None, report=None,
             mode="simulate", replay_data=None, api_key=None,
+            validate_calibrated=False,
         )
         _validate_args(args)  # should not raise
 

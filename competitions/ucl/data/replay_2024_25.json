@@ -1,0 +1,866 @@
+[
+  {
+    "team_a": "Barcelona",
+    "team_b": "Aston Villa",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Sporting",
+    "team_b": "Stuttgart",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Celtic",
+    "team_b": "Bayern",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Monaco",
+    "team_b": "Feyenoord",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Red Star Belgrade",
+    "team_b": "Bayer Leverkusen",
+    "home_score": 0,
+    "away_score": 3
+  },
+  {
+    "team_a": "Bodo/Glimt",
+    "team_b": "Olympiacos",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Benfica",
+    "team_b": "Salzburg",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Dortmund",
+    "team_b": "Liverpool",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Sparta Prague",
+    "team_b": "Inter",
+    "home_score": 1,
+    "away_score": 3
+  },
+  {
+    "team_a": "Shakhtar Donetsk",
+    "team_b": "Arsenal",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Bologna",
+    "team_b": "PSG",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Man City",
+    "team_b": "Dinamo Zagreb",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Real Madrid",
+    "team_b": "Slovan Bratislava",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Young Boys",
+    "team_b": "Maccabi Tel Aviv",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Girona",
+    "team_b": "Lille",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Club Brugge",
+    "team_b": "Juventus",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "RB Leipzig",
+    "team_b": "PSV",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Atletico Madrid",
+    "team_b": "AC Milan",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Dinamo Zagreb",
+    "team_b": "Bologna",
+    "home_score": 1,
+    "away_score": 3
+  },
+  {
+    "team_a": "Bayer Leverkusen",
+    "team_b": "Atletico Madrid",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "Maccabi Tel Aviv",
+    "team_b": "Bodo/Glimt",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Club Brugge",
+    "team_b": "AC Milan",
+    "home_score": 4,
+    "away_score": 0
+  },
+  {
+    "team_a": "Salzburg",
+    "team_b": "Dortmund",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Inter",
+    "team_b": "Juventus",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Liverpool",
+    "team_b": "Arsenal",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "PSG",
+    "team_b": "Monaco",
+    "home_score": 3,
+    "away_score": 0
+  },
+  {
+    "team_a": "Sporting",
+    "team_b": "Benfica",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Stuttgart",
+    "team_b": "Red Star Belgrade",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Real Madrid",
+    "team_b": "Shakhtar Donetsk",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Feyenoord",
+    "team_b": "Young Boys",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Aston Villa",
+    "team_b": "Girona",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Barcelona",
+    "team_b": "Man City",
+    "home_score": 0,
+    "away_score": 3
+  },
+  {
+    "team_a": "Sparta Prague",
+    "team_b": "Lille",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Slovan Bratislava",
+    "team_b": "Celtic",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "RB Leipzig",
+    "team_b": "Olympiacos",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "Bayern",
+    "team_b": "PSV",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Olympiacos",
+    "team_b": "Club Brugge",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Dortmund",
+    "team_b": "Benfica",
+    "home_score": 4,
+    "away_score": 1
+  },
+  {
+    "team_a": "Man City",
+    "team_b": "Juventus",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Shakhtar Donetsk",
+    "team_b": "Inter",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "Maccabi Tel Aviv",
+    "team_b": "Sparta Prague",
+    "home_score": 0,
+    "away_score": 2
+  },
+  {
+    "team_a": "Bayern",
+    "team_b": "Girona",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Lille",
+    "team_b": "Liverpool",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Monaco",
+    "team_b": "Red Star Belgrade",
+    "home_score": 3,
+    "away_score": 0
+  },
+  {
+    "team_a": "Young Boys",
+    "team_b": "Celtic",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Dinamo Zagreb",
+    "team_b": "Feyenoord",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Real Madrid",
+    "team_b": "Salzburg",
+    "home_score": 0,
+    "away_score": 0
+  },
+  {
+    "team_a": "Atletico Madrid",
+    "team_b": "Bodo/Glimt",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Bayer Leverkusen",
+    "team_b": "RB Leipzig",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "Arsenal",
+    "team_b": "PSG",
+    "home_score": 4,
+    "away_score": 1
+  },
+  {
+    "team_a": "Aston Villa",
+    "team_b": "Slovan Bratislava",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "PSV",
+    "team_b": "Sporting",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Bologna",
+    "team_b": "Stuttgart",
+    "home_score": 3,
+    "away_score": 0
+  },
+  {
+    "team_a": "AC Milan",
+    "team_b": "Barcelona",
+    "home_score": 2,
+    "away_score": 3
+  },
+  {
+    "team_a": "Aston Villa",
+    "team_b": "Dinamo Zagreb",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Maccabi Tel Aviv",
+    "team_b": "Dortmund",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Bayern",
+    "team_b": "RB Leipzig",
+    "home_score": 0,
+    "away_score": 0
+  },
+  {
+    "team_a": "Shakhtar Donetsk",
+    "team_b": "Lille",
+    "home_score": 0,
+    "away_score": 0
+  },
+  {
+    "team_a": "Sporting",
+    "team_b": "Real Madrid",
+    "home_score": 0,
+    "away_score": 3
+  },
+  {
+    "team_a": "Celtic",
+    "team_b": "Bologna",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Feyenoord",
+    "team_b": "Atletico Madrid",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Bodo/Glimt",
+    "team_b": "Sparta Prague",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "Girona",
+    "team_b": "Barcelona",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Red Star Belgrade",
+    "team_b": "Liverpool",
+    "home_score": 2,
+    "away_score": 3
+  },
+  {
+    "team_a": "PSV",
+    "team_b": "Club Brugge",
+    "home_score": 0,
+    "away_score": 2
+  },
+  {
+    "team_a": "Benfica",
+    "team_b": "Stuttgart",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Bayer Leverkusen",
+    "team_b": "Monaco",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Inter",
+    "team_b": "PSG",
+    "home_score": 3,
+    "away_score": 0
+  },
+  {
+    "team_a": "Salzburg",
+    "team_b": "Arsenal",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Olympiacos",
+    "team_b": "AC Milan",
+    "home_score": 0,
+    "away_score": 2
+  },
+  {
+    "team_a": "Juventus",
+    "team_b": "Slovan Bratislava",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Man City",
+    "team_b": "Young Boys",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Girona",
+    "team_b": "Club Brugge",
+    "home_score": 3,
+    "away_score": 1
+  },
+  {
+    "team_a": "Sparta Prague",
+    "team_b": "Salzburg",
+    "home_score": 3,
+    "away_score": 1
+  },
+  {
+    "team_a": "Shakhtar Donetsk",
+    "team_b": "Maccabi Tel Aviv",
+    "home_score": 0,
+    "away_score": 2
+  },
+  {
+    "team_a": "Young Boys",
+    "team_b": "Arsenal",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Lille",
+    "team_b": "Real Madrid",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Bologna",
+    "team_b": "Dortmund",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Dinamo Zagreb",
+    "team_b": "Juventus",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Monaco",
+    "team_b": "Bayern",
+    "home_score": 0,
+    "away_score": 3
+  },
+  {
+    "team_a": "Celtic",
+    "team_b": "Bayer Leverkusen",
+    "home_score": 0,
+    "away_score": 0
+  },
+  {
+    "team_a": "Slovan Bratislava",
+    "team_b": "Liverpool",
+    "home_score": 0,
+    "away_score": 3
+  },
+  {
+    "team_a": "Sporting",
+    "team_b": "Red Star Belgrade",
+    "home_score": 0,
+    "away_score": 2
+  },
+  {
+    "team_a": "RB Leipzig",
+    "team_b": "Man City",
+    "home_score": 2,
+    "away_score": 3
+  },
+  {
+    "team_a": "Inter",
+    "team_b": "Aston Villa",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "PSG",
+    "team_b": "Atletico Madrid",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Bodo/Glimt",
+    "team_b": "PSV",
+    "home_score": 0,
+    "away_score": 2
+  },
+  {
+    "team_a": "AC Milan",
+    "team_b": "Feyenoord",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Olympiacos",
+    "team_b": "Stuttgart",
+    "home_score": 0,
+    "away_score": 3
+  },
+  {
+    "team_a": "Barcelona",
+    "team_b": "Benfica",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Young Boys",
+    "team_b": "Shakhtar Donetsk",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Bayern",
+    "team_b": "Real Madrid",
+    "home_score": 0,
+    "away_score": 2
+  },
+  {
+    "team_a": "Atletico Madrid",
+    "team_b": "Dinamo Zagreb",
+    "home_score": 3,
+    "away_score": 1
+  },
+  {
+    "team_a": "Slovan Bratislava",
+    "team_b": "Bayer Leverkusen",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Salzburg",
+    "team_b": "Aston Villa",
+    "home_score": 3,
+    "away_score": 1
+  },
+  {
+    "team_a": "Olympiacos",
+    "team_b": "Inter",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "AC Milan",
+    "team_b": "Bodo/Glimt",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Arsenal",
+    "team_b": "Girona",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "Stuttgart",
+    "team_b": "RB Leipzig",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "PSG",
+    "team_b": "Barcelona",
+    "home_score": 3,
+    "away_score": 0
+  },
+  {
+    "team_a": "Liverpool",
+    "team_b": "Club Brugge",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "Feyenoord",
+    "team_b": "Dortmund",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Lille",
+    "team_b": "Celtic",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Red Star Belgrade",
+    "team_b": "PSV",
+    "home_score": 0,
+    "away_score": 0
+  },
+  {
+    "team_a": "Juventus",
+    "team_b": "Monaco",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "Maccabi Tel Aviv",
+    "team_b": "Man City",
+    "home_score": 0,
+    "away_score": 2
+  },
+  {
+    "team_a": "Benfica",
+    "team_b": "Bologna",
+    "home_score": 0,
+    "away_score": 2
+  },
+  {
+    "team_a": "Sparta Prague",
+    "team_b": "Sporting",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Bologna",
+    "team_b": "Monaco",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Dortmund",
+    "team_b": "Sporting",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Bodo/Glimt",
+    "team_b": "RB Leipzig",
+    "home_score": 2,
+    "away_score": 3
+  },
+  {
+    "team_a": "PSG",
+    "team_b": "Celtic",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Lille",
+    "team_b": "Dinamo Zagreb",
+    "home_score": 3,
+    "away_score": 0
+  },
+  {
+    "team_a": "Stuttgart",
+    "team_b": "Girona",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Real Madrid",
+    "team_b": "Sparta Prague",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Arsenal",
+    "team_b": "Maccabi Tel Aviv",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Club Brugge",
+    "team_b": "Bayern",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Red Star Belgrade",
+    "team_b": "Salzburg",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Slovan Bratislava",
+    "team_b": "Feyenoord",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "Man City",
+    "team_b": "Atletico Madrid",
+    "home_score": 0,
+    "away_score": 1
+  },
+  {
+    "team_a": "Juventus",
+    "team_b": "Shakhtar Donetsk",
+    "home_score": 3,
+    "away_score": 2
+  },
+  {
+    "team_a": "Barcelona",
+    "team_b": "Young Boys",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "PSV",
+    "team_b": "Olympiacos",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "AC Milan",
+    "team_b": "Aston Villa",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Benfica",
+    "team_b": "Bayer Leverkusen",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Liverpool",
+    "team_b": "Inter",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Feyenoord",
+    "team_b": "Barcelona",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Atletico Madrid",
+    "team_b": "Bologna",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Liverpool",
+    "team_b": "Bodo/Glimt",
+    "home_score": 3,
+    "away_score": 0
+  },
+  {
+    "team_a": "Salzburg",
+    "team_b": "Olympiacos",
+    "home_score": 1,
+    "away_score": 0
+  },
+  {
+    "team_a": "Dortmund",
+    "team_b": "Real Madrid",
+    "home_score": 2,
+    "away_score": 2
+  },
+  {
+    "team_a": "RB Leipzig",
+    "team_b": "AC Milan",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Girona",
+    "team_b": "Young Boys",
+    "home_score": 3,
+    "away_score": 1
+  },
+  {
+    "team_a": "Monaco",
+    "team_b": "Slovan Bratislava",
+    "home_score": 3,
+    "away_score": 1
+  },
+  {
+    "team_a": "Celtic",
+    "team_b": "Benfica",
+    "home_score": 0,
+    "away_score": 3
+  },
+  {
+    "team_a": "Bayer Leverkusen",
+    "team_b": "Bayern",
+    "home_score": 0,
+    "away_score": 0
+  },
+  {
+    "team_a": "PSV",
+    "team_b": "Maccabi Tel Aviv",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Club Brugge",
+    "team_b": "Sparta Prague",
+    "home_score": 3,
+    "away_score": 1
+  },
+  {
+    "team_a": "Aston Villa",
+    "team_b": "Shakhtar Donetsk",
+    "home_score": 2,
+    "away_score": 0
+  },
+  {
+    "team_a": "Inter",
+    "team_b": "Red Star Belgrade",
+    "home_score": 2,
+    "away_score": 1
+  },
+  {
+    "team_a": "Juventus",
+    "team_b": "Lille",
+    "home_score": 1,
+    "away_score": 1
+  },
+  {
+    "team_a": "Arsenal",
+    "team_b": "Sporting",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Stuttgart",
+    "team_b": "Man City",
+    "home_score": 1,
+    "away_score": 2
+  },
+  {
+    "team_a": "Dinamo Zagreb",
+    "team_b": "PSG",
+    "home_score": 0,
+    "away_score": 3
+  }
+]

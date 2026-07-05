@@ -92,7 +92,7 @@ Low-Medium. The `DataProvider` trait pattern is well-established (worldcup-oracl
 
 ### Current State
 
-Single mode: full synthetic simulation from start to finish, always.
+Single mode: full synthetic simulation from start to finish, always. (Now outdated: codebase supports 3 modes — simulate, replay, live — via --mode flag.)
 
 ### Industry Practice
 
