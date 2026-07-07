@@ -1,35 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
+milestone: v2.0
 milestone_name: milestone
 status: executing
-stopped_at: None — phase idle
-last_updated: "2026-07-04T05:12:43.152Z"
+stopped_at: Phase 12 context gathered
+last_updated: "2026-07-07T18:30:00.000Z"
 progress:
-  total_phases: 11
-  completed_phases: 8
-  total_plans: 35
-  completed_plans: 31
-  percent: 89
+  total_phases: 12
+  completed_phases: 11
+  total_plans: 66
+  completed_plans: 32
+  percent: 92
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-29 after v2.0 planning)
+See: .planning/PROJECT.md (updated 2026-07-07 after Phase 12 planning)
 
 **Core value:** Adding a new competition requires only a new competition module — not changes to `football_core`
-**Current focus:** Phase null — 10
+**Current focus:** Phase 12 — UCL Live Monitor + WC Batch Research
 
 ## Current Position
 
-Milestone: v2.0 — UCL Prediction Quality
-Phase: null (10) — EXECUTING
-Plan: 3 of 3
-Plans: 3 of 3 (planned)
-Status: Partial — Plan 01 complete, Plan 02 pending, Plan 03 complete
-Note: Phase 10 Plan 02 (Glicko Elo) remains pending
+Milestone: v2.0 — UCL Prediction Quality + Cross-Platform Parity
+Phase: 12 — PLANNED
+Plans: 34 tasks across 2 parallel workstreams (A: 19 UCL, B: 15 WC)
+Status: Planned — see `.planning/phases/12-ucl-live-wc-batch/PLAN.md`
 
 ### Changes Made (2026-07-03 execution)
 
@@ -136,25 +134,36 @@ Recent decisions affecting current work:
 - (Phase 10, D-09): Wilson score interval for small-sample CIs (0 < champion_count < 5) — closed-form, no external deps
 - (Phase 10, D-10): uncertainty_contribution = full CI width when using_glicko=True — integrates match randomness + rating uncertainty
 - (Phase 11, D-01): Tiered explainability — signal breakdown (always-on) + counterfactual (on-demand)
+- (Phase 12, D-01): Two independent workstreams in one phase — UCL Live Monitor + WC Batch Research. Zero file overlap, parallel execution.
+- (Phase 12, D-02): UCL Live Monitor reuses `football_core.state` for persistence (already dual-proven by WC + UCL via Phase 4 validation fetcher). No new persistence code needed.
+- (Phase 12, D-03): WC Batch Research reuses existing `run_full_simulation()` — it already accepts `blend_params`, `xg_overrides`, and `seed`. No engine changes needed.
+- (Phase 12, D-04): Signal breakdown in WC reuses `_gather_signal_data()` which already produces per-match signal dicts. Only missing is the display function.
+- (Phase 12, D-05): CI display in WC reuses `football_core.math_utils.wilson_score_ci` which WC `output.py` already imports. Just needs formatting.
+- (Phase 12, D-06): `--weights` in WC skips Brier-optimized blending (calibrate_and_blend) and passes static weights to bled_predictions. No engine modification — blender.py already accepts parameters independently.
 
 ### Pending Todos
 
 - [x] Plan Phase 9 (Tournament Validation) ✓ Complete
-- [x] Plan Phase 10 (Calibration & Uncertainty) ✓ Planned
-- [x] Plan Phase 11 (Explainability & Production) ✓ Complete
 - [x] Execute Phase 9 (Tournament Validation) ✓ Complete
+- [x] Plan Phase 10 (Calibration & Uncertainty) ✓ Complete
 - [x] Execute Phase 10 Plan 01 (Temperature Scaling) ✓ Complete
+- [x] Execute Phase 10 Plan 02 (Glicko Elo) ✓ Complete
+- [x] Execute Phase 10 Plan 03 (Bootstrap CI & Display) ✓ Complete
+- [x] Plan Phase 11 (Explainability & Production) ✓ Complete
 - [x] Execute Phase 11 Plan 01 (Signal Contribution Breakdown) ✓ Complete
 - [x] Execute Phase 11 Plan 02 (Counterfactual Analysis & Reporting) ✓ Complete
 - [x] Execute Phase 11 Plan 03 (Windows Printing & Output Hardening) ✓ Complete
-- [x] Execute Phase 10 Plan 02 (Glicko Elo) ✓ Complete
-- [x] Execute Phase 10 Plan 03 (Bootstrap CI & Display) ✓ Complete
+- [ ] Plan Phase 12 (UCL Live Monitor + WC Batch Research) ✓ Complete
+- [ ] Execute Phase 12 — 34 tasks across 2 parallel workstreams
 
 ### Blockers/Concerns
 
 - BSD API may require paid tier for 2025/26 UCL fixtures (league_id=7 may not return future fixtures) — Phase 5 risk
 - No multi-season UCL data currently collected — Tier 1 cross-tournament backtest requires sourcing historical data for meaningful results
 - Temperature scaling calibration data limited to ~1 season — Phase 10 risk
+- UCL Live Monitor workstream A requires Phase 6 (`--mode live`, `BSDMatchResultProvider`) — already complete ✓
+- UCL `--watch` mode may hit BSD API rate limits at default 60s polling — mitigable with `--poll-interval` flag
+- WC `--simulate` mode may expose stale data file issues if `teams.json` hasn't been synced recently — add staleness warning
 
 ## Deferred Items
 
@@ -170,6 +179,9 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-04
-Stopped at: Phase 10 Plan 03 (Bootstrap CI & Display) — EXECUTED (complete)
-Next: Phase 11 — all plans complete, ready for milestone completion
+Last session: 2026-07-07
+Stopped at: Phase 12 planning — complete
+Next: Phase 12 — UCL Live Monitor + WC Batch Research execution
+Workstream A (UCL): Create live_state.py → elo_updater.py → wire polling loop → display → tests
+Workstream B (WC): Create --simulate mode → --what-if → --report → --show-breakdown → --show-ci → --validate-calibrated → --weights → benchmarks → tests
+Parallel execution: Both workstreams can run simultaneously with zero file contention
