@@ -82,8 +82,12 @@ def _compute_trend_arrow(current_prob: float, team_name: str, prob_log: list[dic
         return "→"
 
 
-def print_probability_table(probs: dict, prev_probs: dict | None = None, prob_log: list[dict] | None = None) -> None:
-    """Print the top-5 probability table with optional delta and trend columns."""
+def print_probability_table(probs: dict, prev_probs: dict | None = None,
+                            prob_log: list[dict] | None = None,
+                            show_ci: str | None = None,
+                            n_iterations: int = 50000,
+                            is_calibrated: bool = False) -> None:
+    """Print the top-5 probability table with optional delta, trend, and CI columns."""
     sorted_names = sorted(probs, key=lambda n: probs[n]["champion"], reverse=True)
     top5 = sorted_names[:5]
     remaining = sorted_names[5:]
@@ -93,20 +97,26 @@ def print_probability_table(probs: dict, prev_probs: dict | None = None, prob_lo
 
     has_delta = prev_probs is not None
     has_trend = prob_log is not None and len(prob_log) >= 6
+    has_ci = show_ci is not None and (show_ci == "on" or (show_ci == "auto" and is_calibrated))
 
     header = f"{'':>3} {'Team':<18} {'QF':>6} {'SF':>6} {'FINAL':>8} {'CHAMPION':>8}"
+    if has_ci:
+        header += f"  {'CI':>14}"
     if has_delta:
         header += f"  {'Delta':>8}"
     if has_trend:
         header += f"  {'Trend':>6}"
     print(_bold_cyan(header))
 
-    sep_len = 51 + (9 if has_delta else 0) + (8 if has_trend else 0)
+    sep_len = 51 + (14 if has_ci else 0) + (9 if has_delta else 0) + (8 if has_trend else 0)
     print(_bold_cyan("-" * sep_len))
 
     for rank, name in enumerate(top5, 1):
         p = probs[name]
         row = f"{rank:>2}. {name:<18} {p['qf']:.3f} {p['sf']:.3f} {p['final']:.3f} {p['champion']:.3f}"
+        if has_ci:
+            ci_str = _format_ci_column(p, n_iterations, show_ci, is_calibrated)
+            row += f"  {ci_str:>14}"
         if has_delta and name in prev_probs:
             delta = probs[name]["champion"] - prev_probs[name]["champion"]
             if delta > 0:
@@ -873,6 +883,101 @@ def print_focus_card(match_data: dict, match_entry: dict | None = None) -> None:
                 print(f"  {label:<12} {a_val} - {h_val}")
 
     print()
+
+
+def print_signal_breakdown(signal_data: list[dict] | None, mode: str = "summary") -> None:
+    """Print per-signal probability breakdown."""
+    if not signal_data:
+        print("No signal data available")
+        return
+
+    signal_names = set()
+    for entry in signal_data:
+        for name in entry.get("signals", {}):
+            if entry["signals"][name] is not None:
+                signal_names.add(name)
+    signal_names = sorted(signal_names)
+
+    if mode == "match":
+        print()
+        print("==== Signal Breakdown (Per-Match) ====")
+        header = f"  {'Match':<24}"
+        for s in signal_names:
+            header += f"  {s:>8}"
+        header += "  Blended"
+        print(header)
+
+        sep = "  " + "-" * 24
+        for _ in signal_names:
+            sep += "  " + "-" * 8
+        sep += "  " + "-" * 8
+        print(sep)
+
+        displayed = 0
+        for entry in signal_data:
+            if displayed >= 20:
+                remaining = len(signal_data) - displayed
+                print(f"  [... {remaining} more matches]")
+                break
+            mid = entry.get("match_id", "")
+            team_a = entry.get("team_a", "")
+            team_b = entry.get("team_b", "")
+            label = f"{team_a}-{team_b}"[:24]
+            row = f"  {label:<24}"
+            signals = entry.get("signals", {})
+            for s in signal_names:
+                val = signals.get(s)
+                if val is not None:
+                    row += f"  {val*100:>7.1f}%"
+                else:
+                    row += "  " + "---".rjust(8)
+            blended = entry.get("blended")
+            if blended is not None:
+                row += f"  {blended*100:>6.1f}%"
+            print(row)
+            displayed += 1
+        return
+
+    # Summary mode
+    print()
+    print("==== Signal Breakdown (Summary) ====")
+    print(f"  {'Signal':<16} {'Avg Prob':>10} {'Matches':>8}")
+
+    for name in signal_names:
+        values = []
+        count = 0
+        for entry in signal_data:
+            val = entry.get("signals", {}).get(name)
+            if val is not None:
+                values.append(val)
+                count += 1
+        if values:
+            avg = sum(values) / len(values)
+            print(f"  {name:<16} {avg*100:>9.1f}% {count:>8}")
+        else:
+            print(f"  {name:<16} {'---':>10} {0:>8}")
+
+
+def _format_ci_column(team_data: dict, n_iterations: int, show_ci: str, is_calibrated: bool) -> str:
+    """Format CI column for a single team.
+    
+    Returns CI string like "[21.1-25.9]" or "--" if CI not shown.
+    """
+    if show_ci == "off":
+        return "--"
+    if show_ci == "auto" and not is_calibrated:
+        return "--"
+    if n_iterations < 100:
+        return "--"
+
+    champion_prob = team_data.get("champion_prob")
+    if champion_prob is None:
+        return "--"
+
+    ci_str = wilson_ci_from_prob(champion_prob, n_iterations)
+    if ci_str is None:
+        return "--"
+    return ci_str
 
 
 def print_what_if_comparison(

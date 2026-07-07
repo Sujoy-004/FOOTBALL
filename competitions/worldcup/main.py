@@ -312,6 +312,29 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "Only available in --simulate mode.",
     )
     parser.add_argument(
+        "--report", type=str, default=None, metavar="FILE",
+        help="Export structured JSON report to FILE. Report includes simulation "
+             "metadata, champion probabilities, signal breakdown. "
+             "Available in both --simulate and polling modes.",
+    )
+    parser.add_argument(
+        "--show-breakdown", type=str, default="summary",
+        choices=["summary", "match"], nargs="?",
+        help="Signal breakdown detail level. Default: summary. "
+             "'summary': signal -> avg probability, n_matches, avg_brier. "
+             "'match': per-match signal table. "
+             "Note: signal breakdown is always displayed per D-06; "
+             "this flag controls depth only.",
+    )
+    parser.add_argument(
+        "--show-ci", type=str, default="auto", metavar="MODE",
+        choices=["on", "off", "auto"],
+        help="Show Wilson confidence intervals on champion probabilities. "
+             "'on': always show. 'off': never show. "
+             "'auto': show when calibration is active (default). "
+             "Available in both --simulate and polling modes.",
+    )
+    parser.add_argument(
         "--simulate",
         action="store_true",
         help="Offline simulation mode: load data files, run single simulation, exit. "
@@ -1636,6 +1659,61 @@ def _run_counterfactual(
     return cf_result, change_descriptions
 
 
+def _build_report(
+    result: dict,
+    args: argparse.Namespace,
+    signal_data: list[dict] | None = None,
+    counterfactual: dict | None = None,
+) -> dict:
+    """Build structured JSON report from simulation result."""
+    from datetime import timezone
+
+    teams = result.get("teams", {})
+    probabilities = {}
+    for team_name, team_data in teams.items():
+        probabilities[team_name] = {
+            "champion_pct": team_data.get("champion_prob", 0.0) * 100,
+        }
+
+    report: dict[str, Any] = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "mode": "simulate",
+        "generator": "wc-predict --simulate",
+        "parameters": {
+            "iterations": args.iterations or 50000,
+            "seed": args.seed or 42,
+        },
+        "probabilities": probabilities,
+    }
+
+    if signal_data:
+        report["signal_breakdown"] = signal_data
+    if counterfactual:
+        report["counterfactual"] = counterfactual
+
+    return report
+
+
+def _write_report_atomic(report: dict, path: str) -> None:
+    """Write report JSON atomically using tempfile + os.replace."""
+    import tempfile
+    dir_path = os.path.dirname(os.path.abspath(path)) or "."
+    os.makedirs(dir_path, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=dir_path, prefix=".report", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
     """Run offline --simulate mode: load data files, run MC, display results."""
 
@@ -1700,11 +1778,29 @@ def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
         return
 
     print_simulation_duration(sim_elapsed)
-    print_probability_table(result)
+
+    # CI check
+    calib_path = Path(data_dir) / "calibration.json"
+    is_calibrated = calib_path.exists()
+    if args.show_ci != "off" and iterations < 1000:
+        print("Note: CIs unreliable at < 1000 iterations", file=sys.stderr)
+
+    print_probability_table(result, show_ci=args.show_ci,
+                            n_iterations=iterations, is_calibrated=is_calibrated)
     print(f"\nSeed: {seed}  Iterations: {iterations}")
 
-    # Counterfactual analysis
+    # Signal breakdown (always-on per D-06)
+    signal_data = None
+    try:
+        signal_data = _gather_signal_data(teams, groups, bracket, None, None, None, None, None, played, played_groups)
+        print_signal_breakdown(signal_data, args.show_breakdown)
+    except Exception as e:
+        logger.warning("Signal breakdown unavailable: %s", e)
+
+    # Report generation
+    cf_result = None
     if args.what_if:
+        # Counterfactual runs first so we can include results in report
         if not os.path.exists(args.what_if):
             print(f"Error: Override file not found: {args.what_if}", file=sys.stderr)
             sys.exit(1)
@@ -1719,6 +1815,14 @@ def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
         )
         from competitions.worldcup.src.output import print_what_if_comparison
         print_what_if_comparison(result, cf_result, changes)
+
+    # Report generation
+    if args.report:
+        report = _build_report(
+            result, args, signal_data=signal_data, counterfactual=cf_result,
+        )
+        _write_report_atomic(report, args.report)
+        print(f"\nReport written to: {os.path.abspath(args.report)}")
 
 
 def main() -> None:

@@ -120,6 +120,41 @@ Requirements for UCL Prediction Quality milestone (Phases 5-11). Each maps to ro
 - [x] **UCLE-05**: Configuration directory (`competitions/ucl/config/`) for weights, params, providers
 - [x] **UCLE-06**: CLI cleanup — consistent flag naming, help text, argument validation
 
+### Phase 12: UCL Live Monitor + WC Batch Research
+
+#### Workstream A — UCL Live Monitor
+
+- [ ] **UCL-LIVE-01**: State persistence for played matches, elo_applied, prediction_history across restarts
+- [ ] **UCL-LIVE-02**: `competitions/ucl/src/live_state.py` — wrapper around `football_core.state` for UCL paths
+- [ ] **UCL-LIVE-03**: `competitions/ucl/src/elo_updater.py` — incremental Elo updates + 24h ClubElo sync
+- [ ] **UCL-LIVE-04**: `--watch` flag with configurable polling interval and graceful SIGINT shutdown
+- [ ] **UCL-LIVE-05**: `_run_iteration()` extracted from existing `main()` body
+- [ ] **UCL-LIVE-06**: `_historical_catch_up()` — fetch all prior finished BSD matches on first run
+- [ ] **UCL-LIVE-07**: Periodic ClubElo sync (24h) with drift handling (<10 ignore, 11–30 blend, >30 overwrite)
+- [ ] **UCL-LIVE-08**: Signal cache refresh + `_merge_signals_into_history()` on each poll
+- [ ] **UCL-LIVE-09**: Delta display (`print_delta`), heartbeat (`print_heartbeat`), match alerts, Elo changes
+- [ ] **UCL-LIVE-10**: `--once` flag for single-cycle execution
+- [ ] **UCL-LIVE-11**: Mode routing — `--mode simulate` (default) single-run, `--mode live --watch` polling loop
+- [ ] **UCL-LIVE-12**: Test persistence round-trip, Elo update edge cases, smoke test
+
+#### Workstream B — WC Batch Research
+
+- [ ] **WC-BATCH-01**: `--simulate` flag — offline simulation from data files, no API needed
+- [ ] **WC-BATCH-02**: `--iterations N` / `-n` flag for iteration count override
+- [ ] **WC-BATCH-03**: Mode routing — `--simulate` → batch mode; no flag → existing polling loop
+- [ ] **WC-BATCH-04**: `--what-if TEAM.param=VALUE` (repeatable) — counterfactual Elo analysis
+- [ ] **WC-BATCH-05**: `print_what_if_comparison()` — side-by-side baseline vs counterfactual table
+- [ ] **WC-BATCH-06**: `--report FILE` — structured JSON export with full simulation snapshot
+- [ ] **WC-BATCH-07**: `--show-breakdown [summary|match]` — per-signal probability contributions
+- [ ] **WC-BATCH-08**: `print_signal_breakdown()` — signal_name → probability display
+- [ ] **WC-BATCH-09**: `--show-ci [on|off|auto]` — Wilson confidence intervals on champion probabilities
+- [ ] **WC-BATCH-10**: CI formatting in probability table (reuse `football_core.math_utils.wilson_score_ci`)
+- [ ] **WC-BATCH-11**: `--validate-calibrated` — before/after calibration comparison
+- [ ] **WC-BATCH-12**: `--weights K=V,K=V` — static blend weight override, skip Brier optimization
+- [ ] **WC-BATCH-13**: `competitions/worldcup/benchmarks/benchmark_simulation.py`
+- [ ] **WC-BATCH-14**: `tests/test_batch_mode.py` — reproducible output
+- [ ] **WC-BATCH-15**: `tests/test_counterfactual.py` — Elo change shifts probs in expected direction
+
 ## v2 Deferred (Post-v2)
 
 ### UCL Differentiators (post-validation polish)
@@ -246,14 +281,41 @@ Requirements for UCL Prediction Quality milestone (Phases 5-11). Each maps to ro
 | UCLE-04 | Phase 11 | Completed (Plan 02) |
 | UCLE-05 | Phase 11 | Completed (Plan 03) |
 | UCLE-06 | Phase 11 | Completed (Plan 03) |
+| UCL-LIVE-01 | Phase 12 | Planned |
+| UCL-LIVE-02 | Phase 12 | Planned |
+| UCL-LIVE-03 | Phase 12 | Planned |
+| UCL-LIVE-04 | Phase 12 | Planned |
+| UCL-LIVE-05 | Phase 12 | Planned |
+| UCL-LIVE-06 | Phase 12 | Planned |
+| UCL-LIVE-07 | Phase 12 | Planned |
+| UCL-LIVE-08 | Phase 12 | Planned |
+| UCL-LIVE-09 | Phase 12 | Planned |
+| UCL-LIVE-10 | Phase 12 | Planned |
+| UCL-LIVE-11 | Phase 12 | Planned |
+| UCL-LIVE-12 | Phase 12 | Planned |
+| WC-BATCH-01 | Phase 12 | Planned |
+| WC-BATCH-02 | Phase 12 | Planned |
+| WC-BATCH-03 | Phase 12 | Planned |
+| WC-BATCH-04 | Phase 12 | Planned |
+| WC-BATCH-05 | Phase 12 | Planned |
+| WC-BATCH-06 | Phase 12 | Planned |
+| WC-BATCH-07 | Phase 12 | Planned |
+| WC-BATCH-08 | Phase 12 | Planned |
+| WC-BATCH-09 | Phase 12 | Planned |
+| WC-BATCH-10 | Phase 12 | Planned |
+| WC-BATCH-11 | Phase 12 | Planned |
+| WC-BATCH-12 | Phase 12 | Planned |
+| WC-BATCH-13 | Phase 12 | Planned |
+| WC-BATCH-14 | Phase 12 | Planned |
+| WC-BATCH-15 | Phase 12 | Planned |
 
 **Coverage:**
 - v1 requirements: 22 total — Completed: 22
-- v2 requirements: 58 total — Completed: 40, Planned: 18
-- Mapped to phases: 58
+- v2 requirements: 85 total — Completed: 52, Planned: 33
+- Mapped to phases: 85
 - Unmapped: 0 ✓
 
 ---
 
 *Requirements defined: 2026-06-27*
-*Last updated: 2026-07-03 after Phase 11 completion*
+*Last updated: 2026-07-07 after Phase 12 planning*
