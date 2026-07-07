@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WC26 — World Cup 2026 Predictor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: linear-gradient(135deg, #140C30, #14253E 50%, #153D4C); color: #F6DBC0;
+  font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", "Consolas", monospace;
+  font-size: 13px; line-height: 1.5; min-height: 100vh;
+}
+#app { max-width: 1280px; margin: 0 auto; padding: 12px 16px; }
+
+/* Tabs */
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid #153D4C; margin-bottom: 12px; }
+.tab-btn {
+  background: transparent; border: none; color: #15565B; padding: 8px 20px;
+  font-family: inherit; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: #F6DBC0; }
+.tab-btn.active { color: #16A085; border-bottom-color: #16A085; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Status bar */
+.status-bar {
+  display: flex; justify-content: space-between; padding: 6px 0; margin-top: 10px;
+  border-top: 1px solid #153D4C; color: #15565B; font-size: 11px;
+}
+.status-bar span { display: flex; align-items: center; gap: 4px; }
+
+/* — Dashboard — */
+.stats-row { display: flex; gap: 10px; margin-bottom: 14px; }
+.stat-card {
+  flex: 1; border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 10px 12px;
+  background: rgba(20,12,48,0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15); text-align: center;
+}
+.stat-card .val { font-size: 22px; color: #16A085; font-weight: bold; }
+.stat-card .lbl { font-size: 10px; color: #15565B; text-transform: uppercase; letter-spacing: 1px; }
+.stat-card .sub { font-size: 10px; color: #F6DBC088; margin-top: 2px; }
+
+.team-cards { display: flex; gap: 10px; margin-bottom: 14px; }
+.team-card {
+  flex: 1; border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 10px;
+  background: rgba(20,12,48,0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.team-card .name { color: #16A085; font-size: 14px; font-weight: bold; }
+.team-card .elo { color: #15565B; font-size: 11px; margin-bottom: 6px; }
+.team-card .ring-row { display: flex; gap: 4px; }
+.team-card .ring {
+  flex: 1; height: 4px; border-radius: 2px; background: #153D4C; position: relative; overflow: hidden;
+}
+.team-card .ring-fill { height: 100%; border-radius: 2px; transition: width 0.6s; min-width: 2px; }
+.team-card .ring-lbl { font-size: 9px; color: #F6DBC088; text-align: center; margin-top: 2px; }
+
+.chart-section { margin-bottom: 14px; }
+.chart-section .title { color: #16A085; font-size: 12px; margin-bottom: 6px; }
+.chart-row {
+  display: flex; align-items: center; margin: 2px 0; height: 20px;
+}
+.chart-row .cname { width: 120px; text-align: right; padding-right: 8px; font-size: 11px; flex-shrink: 0; }
+.chart-row .cbar-wrap { flex: 1; height: 14px; background: #153D4C; border-radius: 2px; overflow: hidden; }
+.chart-row .cbar {
+  height: 100%; background: linear-gradient(90deg, #153D4C, #16A085); border-radius: 2px;
+  transition: width 0.8s ease; width: 0;
+}
+.chart-row .cpct { width: 50px; text-align: right; font-size: 11px; color: #F6DBC0; padding-left: 6px; }
+
+.eval-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.eval-table th { color: #16A085; text-align: left; padding: 3px 8px; border-bottom: 1px solid #153D4C; font-size: 11px; }
+.eval-table td { padding: 3px 8px; border-bottom: 1px solid #153D4C; font-size: 11px; }
+.eval-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.dot-green { color: #168777; } .dot-orange { color: #15565B; } .dot-red { color: #15565B; }
+
+/* — Bracket — */
+.bracket-wrap { position: relative; overflow-x: auto; padding: 20px 0; min-height: 500px; }
+.bracket-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.bracket-grid { display: flex; gap: 0; position: relative; z-index: 2; min-width: 900px; }
+.bracket-col { display: flex; flex-direction: column; justify-content: space-around; min-width: 110px; padding: 0 2px; }
+.bracket-col:not(:last-child) { margin-right: 24px; }
+.bracket-col .col-head { text-align: center; color: #15565B; font-size: 10px; letter-spacing: 1px; margin-bottom: 6px; }
+.match-slot { display: flex; align-items: center; }
+.match-card {
+  width: 100%; border: 1px solid rgba(21,61,76,0.3); border-radius: 6px; padding: 6px 8px;
+  background: rgba(20,12,48,0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12); cursor: pointer; font-size: 11px; position: relative;
+  transition: border-color 0.15s, background 0.15s; margin: 0 2px;
+}
+.match-card:hover { border-color: #16A085; background: rgba(21,61,76,0.7); }
+.match-card.played { border-left: 3px solid #168777; }
+.match-card.upcoming { border-left: 3px solid #15565B; }
+.match-card.tbd { border-left: 3px solid #140C30; opacity: 0.5; }
+.match-card .m-teams { display: flex; justify-content: space-between; align-items: center; }
+.match-card .m-team { color: #F6DBC0; flex: 1; }
+.match-card .m-team.winner { color: #16A085; font-weight: bold; }
+.match-card .m-score { color: #16A085; font-weight: bold; padding: 0 6px; font-size: 12px; }
+.match-card .m-winner-label { font-size: 9px; color: #168777; margin-top: 1px; }
+.match-card .m-prob { font-size: 9px; color: #15565B; margin-top: 1px; }
+
+/* — Modal — */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: rgba(20,12,48,0.85); border: 1px solid rgba(21,86,91,0.3); border-radius: 12px;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3); max-width: 700px; width: 92%; max-height: 90vh; overflow-y: auto; padding: 16px 20px;
+}
+.modal-close { float: right; background: none; border: none; color: #15565B; font-size: 22px; cursor: pointer; line-height: 1; }
+.modal-close:hover { color: #F6DBC0; }
+.modal h2 { color: #16A085; font-size: 15px; margin-bottom: 2px; }
+.modal .m-sub { color: #15565B; font-size: 11px; margin-bottom: 10px; }
+.modal .sec-title { color: #16A085; font-size: 11px; font-weight: bold; margin: 12px 0 6px; border-bottom: 1px solid #153D4C; padding-bottom: 3px; }
+.modal .sec-title.warn { color: #15565B; }
+.modal .mb-wrap { display: flex; gap: 12px; }
+.modal .mb-col { flex: 1; }
+.prob-bar-wrap { height: 24px; background: #153D4C; border-radius: 3px; overflow: hidden; margin: 6px 0 10px; position: relative; }
+.prob-bar-fill { height: 100%; background: linear-gradient(90deg, #153D4C, #16A085); transition: width 0.3s; }
+.prob-bar-lbl {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; justify-content: space-between; align-items: center; padding: 0 10px;
+  font-size: 11px; color: #16A085; font-weight: bold;
+}
+.chart-box { background: rgba(20,12,48,0.55); border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 8px; margin: 4px 0; height: 110px; position: relative; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.chart-box canvas { width: 100% !important; height: 100% !important; }
+.chart-box.small { height: 50px; }
+.chart-box.medium { height: 90px; }
+.form-charts { display: flex; gap: 10px; }
+.form-chart-box { flex: 1; background: rgba(20,12,48,0.55); border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 6px; height: 70px; position: relative; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.form-chart-box .fc-label { font-size: 9px; color: #F6DBC088; margin-bottom: 2px; }
+.form-chart-box canvas { width: 100% !important; height: 44px !important; }
+.outcome-charts { display: flex; gap: 10px; }
+.outcome-chart-box { flex: 1; background: rgba(20,12,48,0.55); border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 6px; height: 110px; position: relative; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.outcome-chart-box canvas { width: 130px !important; height: 100px !important; display: block; margin: 0 auto; }
+.insight-box { background: rgba(20,12,48,0.55); border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 8px; margin: 4px 0; font-size: 11px; color: #F6DBC0; line-height: 1.6; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.whatif-input-wrap { display: flex; gap: 6px; margin: 6px 0; }
+.whatif-input-wrap input { flex: 1; background: #140C30; border: 1px solid #153D4C; border-radius: 3px; padding: 6px 8px; color: #F8F4E9; font-family: inherit; font-size: 12px; outline: none; }
+.whatif-input-wrap input:focus { border-color: #16A085; }
+.whatif-input-wrap button { background: #15565B; border: none; border-radius: 4px; padding: 6px 12px; color: #F8F4E9; font-family: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.whatif-input-wrap button:hover { background: #168777; }
+.whatif-controls { display: flex; gap: 6px; margin: 4px 0; align-items: center; }
+.whatif-controls label { font-size: 10px; color: #15565B; }
+.whatif-controls select { background: #140C30; border: 1px solid #153D4C; border-radius: 2px; color: #F8F4E9; font-family: inherit; font-size: 10px; padding: 2px; }
+.whatif-result { margin: 6px 0; padding: 8px; background: rgba(20,12,48,0.65); border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; font-size: 11px; display: none; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+.whatif-result .wir-insight { color: #F6DBC0; line-height: 1.5; margin-bottom: 4px; font-size: 11px; }
+.whatif-result .wir-head { color: #16A085; font-weight: bold; margin-bottom: 4px; font-size: 10px; }
+.whatif-result .wir-row { display: flex; justify-content: space-between; padding: 1px 0; }
+.whatif-result .wir-diff { color: #15565B; }
+.whatif-result .wir-diff-pos { color: #168777; font-weight: bold; }
+.whatif-result .wir-diff-neg { color: #ff6b6b; font-weight: bold; }
+.whatif-result .wir-explain { color: #F6DBC088; font-size: 10px; margin-top: 4px; }
+.whatif-result .wir-meta { color: #F6DBC088; font-size: 9px; margin-top: 3px; padding-top: 3px; border-top: 1px solid #153D4C; }
+.whatif-result .wir-toggle { font-size: 10px; color: #15565B; cursor: pointer; padding: 2px 0; }
+.whatif-result .wir-toggle:hover { color: #16A085; }
+.whatif-result .wir-sigs { margin: 4px 0; }
+.whatif-result .wir-sig-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 10px; }
+.whatif-result .wir-sig-row .wir-bar-wrap { flex: 1; height: 10px; background: #140C30; border-radius: 2px; overflow: hidden; }
+.whatif-result .wir-sig-row .wir-bar { display: block; height: 100%; background: #16A085; border-radius: 2px; }
+.whatif-result .wir-sig-row .wir-val { color: #F8F4E9; width: 35px; text-align: right; }
+.whatif-result .wir-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 4px; margin: 4px 0; }
+.whatif-result .wir-grid-item { background: #140C30; padding: 4px 6px; border-radius: 2px; text-align: center; }
+.whatif-result .wir-grid-item .wir-grid-team { display: block; font-size: 10px; color: #F6DBC0; }
+.whatif-result .wir-grid-item .wir-grid-val { display: block; font-size: 14px; color: #16A085; font-weight: bold; }
+.progress-bar-wrap { height: 16px; background: #153D4C; border-radius: 3px; overflow: hidden; margin: 6px 0; display: none; }
+.progress-bar-fill { height: 100%; background: #16A085; transition: width 0.3s; }
+.progress-lbl { font-size: 10px; color: #F6DBC088; text-align: center; }
+
+/* Small modal tables */
+.modal table.insight-table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 4px 0; }
+.modal table.insight-table th { color: #15565B; text-align: left; padding: 2px 6px; font-weight: normal; border-bottom: 1px solid #153D4C; }
+.modal table.insight-table td { padding: 2px 6px; border-bottom: 1px solid #153D4C; }
+.modal table.insight-table .num { text-align: right; }
+
+/* — Standings — */
+.standings-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.group-card { border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 8px; background: rgba(20,12,48,0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+.group-card .g-title { color: #16A085; font-size: 11px; margin-bottom: 4px; }
+.group-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.group-table th { color: #15565B; text-align: left; padding: 2px 4px; font-weight: normal; font-size: 9px; }
+.group-table td { padding: 2px 4px; }
+.group-table .num { text-align: right; }
+.group-table .advancing { background: rgba(22,135,119,0.2); }
+.group-table .bubble { background: rgba(21,86,91,0.2); }
+.group-table .eliminated { background: rgba(21,61,76,0.2); }
+.bubble-section { margin-top: 12px; }
+.bubble-table { width: auto; border-collapse: collapse; font-size: 10px; margin-top: 4px; }
+.bubble-table th { color: #15565B; text-align: left; padding: 2px 8px; font-weight: normal; font-size: 9px; }
+.bubble-table td { padding: 2px 8px; }
+.cutoff-line { border-top: 2px solid #15565B; }
+
+/* — Terminal — */
+.term-output { min-height: 200px; }
+.term-output .line { opacity: 0; animation: fadeIn 0.3s forwards; }
+.term-input-line { display: flex; align-items: center; margin-top: 4px; }
+.term-input-line .prompt { color: #F8F4E9; flex-shrink: 0; }
+.term-input-line .prompt::before { content: "$ "; }
+.term-input-display { color: #F8F4E9; white-space: pre; min-height: 1.5em; }
+.term-cursor { animation: blink 1s step-end infinite; color: #F8F4E9; }
+#terminal-input { position: absolute; left: -9999px; opacity: 0; width: 0; height: 0; }
+.term-output .prompt { color: #F8F4E9; }
+.term-output .prompt::before { content: "$ "; color: #F8F4E9; }
+.term-output .dim { color: #F6DBC088; }
+.term-output .highlight { color: #16A085; font-weight: bold; }
+.term-output .danger { color: #ff6b6b; }
+.term-output .ok { color: #F6DBC0; }
+.term-output .title { color: #16A085; font-weight: bold; }
+.term-output .ts { color: #15565B; }
+.term-output .banner { color: #15565B; line-height: 1.3; margin: 8px 0; white-space: pre; }
+.term-output table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.term-output th { color: #16A085; text-align: left; padding: 4px 8px; border-bottom: 1px solid #153D4C; }
+.term-output td { padding: 4px 8px; border-bottom: 1px solid #153D4C; }
+.term-output tr:hover td { background: rgba(21,61,76,0.4); }
+.term-output .num { text-align: right; font-variant-numeric: tabular-nums; }
+.term-output .bar-wrap { display: inline-block; width: 120px; height: 12px; background: #153D4C; vertical-align: middle; margin-left: 8px; }
+.term-output .bar { height: 100%; background: #16A085; transition: width 0.5s; }
+@keyframes fadeIn { to { opacity: 1; } }
+@keyframes blink { 50% { opacity: 0; } }
+
+@media (max-width: 800px) {
+  .team-cards { flex-wrap: wrap; }
+  .standings-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-row { flex-wrap: wrap; }
+  .stat-card { min-width: 80px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="dashboard">>> Dashboard</button>
+    <button class="tab-btn" data-tab="bracket">>> Bracket</button>
+    <button class="tab-btn" data-tab="standings">>> Standings</button>
+    <button class="tab-btn" data-tab="terminal">>> Terminal</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="tab-content active" id="tab-dashboard">
+    <div class="stats-row" id="statsRow"></div>
+    <div class="team-cards" id="teamCards"></div>
+    <div class="chart-section" id="chartSection"><div class="title">Champion Probability</div></div>
+    <div class="chart-section" id="evalSection"><div class="title">Signal Accuracy</div></div>
+  </div>
+
+  <!-- Bracket -->
+  <div class="tab-content" id="tab-bracket">
+    <div class="bracket-wrap" id="bracketWrap">
+      <div class="bracket-grid" id="bracketGrid"></div>
+      <svg class="bracket-svg" id="bracketSvg"></svg>
+    </div>
+  </div>
+
+  <!-- Standings -->
+  <div class="tab-content" id="tab-standings">
+    <div class="standings-grid" id="standingsGrid"></div>
+    <div class="bubble-section" id="bubbleSection"></div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="tab-content" id="tab-terminal">
+    <div class="term-output" id="termOutput"></div>
+    <div class="term-input-line" id="termInputLine" style="display:none">
+      <span class="prompt"></span><span class="term-input-display" id="termInputDisplay"></span><span class="term-cursor">&#9608;</span>
+    </div>
+  </div>
+
+  <div class="status-bar" id="statusBar">
+    <span id="statusLeft"></span>
+    <span id="statusRight"></span>
+  </div>
+</div>
+
+<input id="terminal-input" type="text" autofocus>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">&times;</button>
+    <h2 id="modalTitle"></h2>
+    <div class="m-sub" id="modalSub"></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+const appState = { data: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} };
+const sigLabels = { elo:'Elo', form:'Form', lineup_strength:'Lineup', defensive_quality:'Defense', manager_effect:'Manager', market_odds:'Odds', catboost:'CatBoost' };
+let termBuffer = '';
+let termHistory = [];
+let termHistoryIdx = -1;
+let termBooting = false;
+const termOutput = document.getElementById('termOutput');
+const termInputLine = document.getElementById('termInputLine');
+const termInputDisplay = document.getElementById('termInputDisplay');
+const termInput = document.getElementById('terminal-input');
+const termCursor = document.querySelector('.term-cursor');
+
+// ── Tab switching ──
+document.getElementById('tabBar').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  if (btn.dataset.tab === 'bracket') setTimeout(drawBracketConnectors, 300);
+  if (btn.dataset.tab === 'terminal') focusTermInput();
+});
+
+// ── Modal ──
+const modalOverlay = document.getElementById('modalOverlay');
+document.getElementById('modalClose').onclick = () => modalOverlay.classList.remove('show');
+modalOverlay.onclick = e => { if (e.target === modalOverlay) modalOverlay.classList.remove('show'); };
+
+// ── Data loading ──
+async function loadAll() {
+  const [d, s, fb, ev, bl] = await Promise.all([
+    fetch('/api/data').then(r=>r.json()),
+    fetch('/api/standings').then(r=>r.json()),
+    fetch('/api/bracket/full').then(r=>r.json()),
+    fetch('/api/evaluation').then(r=>r.json()),
+    fetch('/api/blend').then(r=>r.json()),
+  ]);
+  appState.data = d;
+  appState.standings = s;
+  appState.fullBracket = fb;
+  appState.eval = ev;
+  appState.blend = bl;
+  renderDashboard();
+  renderStandings();
+  renderBracket();
+  updateStatusBar();
+  // Preload signal data for what-if
+  const sigNames = Object.keys(bl.blend_weights || {});
+  sigNames.forEach(async name => {
+    try { appState.signalCache[name] = await (await fetch('/api/signal/' + name)).json(); } catch {}
+  });
+}
+
+// ── Status Bar ──
+function updateStatusBar() {
+  const d = appState.data;
+  if (!d) return;
+  document.getElementById('statusLeft').textContent = '>> ' + d.n_teams + ' teams  |  ' + d.n_played + ' matches played  |  ' + d.total_iterations.toLocaleString() + ' sims';
+  document.getElementById('statusRight').textContent = 'Refresh: cmd refresh';
+}
+
+// ── Dashboard ──
+function renderDashboard() {
+  const d = appState.data;
+  if (!d) return;
+  // Stats row
+  const sigs = appState.eval ? Object.keys(appState.eval).filter(k => appState.eval[k].n_matches > 0).length : 0;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="val">${d.n_teams}</div><div class="lbl">Teams</div></div>
+    <div class="stat-card"><div class="val">${d.n_played}</div><div class="lbl">Played</div><div class="sub">${d.total_iterations.toLocaleString()} simulations</div></div>
+    <div class="stat-card"><div class="val">${sigs}</div><div class="lbl">Active Signals</div></div>
+    <div class="stat-card"><div class="val">${d.teams[0].name.split(' ').pop()}</div><div class="lbl">Leader</div><div class="sub">${d.teams[0].champion}% champion</div></div>
+  `;
+
+  // Top 4 team cards
+  const top4 = d.teams.slice(0, 4);
+  const ringColors = ['#168777','#156F69','#15565B','#153D4C'];
+  document.getElementById('teamCards').innerHTML = top4.map(t => `
+    <div class="team-card">
+      <div class="name">${t.name}</div>
+      <div class="elo">Elo ${t.elo}</div>
+      <div class="ring-row">
+        ${['qf','sf','final','champion'].map((k,i) => `
+          <div><div class="ring"><div class="ring-fill" style="width:${t[k]}%;background:${ringColors[i]}"></div></div>
+          <div class="ring-lbl">${k==='champion'?'Champ':k.toUpperCase()}</div></div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // Champion bar chart (top 10)
+  const top10 = d.teams.slice(0, 10);
+  const maxC = top10[0].champion;
+  document.getElementById('chartSection').innerHTML = '<div class="title">Champion Probability</div>' +
+    top10.map(t => `
+      <div class="chart-row">
+        <div class="cname">${t.name}</div>
+        <div class="cbar-wrap"><div class="cbar" style="width:${(t.champion/maxC*100)}%"></div></div>
+        <div class="cpct">${t.champion}%</div>
+      </div>
+    `).join('');
+
+  // Signal eval table
+  const ev = appState.eval;
+  if (!ev) return;
+  const keys = Object.keys(ev).filter(k => ev[k].n_matches > 0);
+  let html = '<div class="title">Signal Accuracy</div><table class="eval-table"><tr><th>Signal</th><th>Brier</th><th>Accuracy</th><th>N</th><th></th></tr>';
+  keys.forEach(k => {
+    const s = ev[k];
+    const dot = s.brier < 0.15 ? 'dot-green' : s.brier < 0.25 ? 'dot-orange' : 'dot-red';
+    const icon = s.brier < 0.15 ? '&#9679;' : s.brier < 0.25 ? '&#9679;' : '&#9679;';
+    const status = s.brier < 0.15 ? 'Calibrated' : s.brier < 0.25 ? 'Adequate' : 'Uncalibrated';
+    html += `<tr><td>${k}</td><td class="num">${s.brier.toFixed(4)}</td><td class="num">${(s.accuracy*100).toFixed(1)}%</td><td class="num">${s.n_matches}</td><td class="num"><span class="${dot}">${icon}</span> ${status}</td></tr>`;
+  });
+  html += '</table>';
+  document.getElementById('evalSection').innerHTML = html;
+}
+
+// ── Bracket ──
+function renderBracket() {
+  const fb = appState.fullBracket;
+  if (!fb || !fb.rounds) return;
+  const rounds = ['R32','R16','QF','SF','TPP','FINAL'];
+  const grid = document.getElementById('bracketGrid');
+  grid.innerHTML = '';
+
+  // Build tree order
+  const byId = {};
+  for (const [r, ms] of Object.entries(fb.rounds)) for (const m of ms) byId[m.match_id] = m;
+
+  function getLeafOrder(mid) {
+    const m = byId[mid];
+    if (!m || !m.source_matches) return [mid];
+    return [...getLeafOrder(m.source_matches[0]), ...getLeafOrder(m.source_matches[1])];
+  }
+  const leafOrder = getLeafOrder('FINAL');
+  const leafIdx = {};
+  leafOrder.forEach((id, i) => leafIdx[id] = i);
+
+  function getRowRange(mid) {
+    const m = byId[mid];
+    if (!m) return {start: 0, end: 2};
+    if (m.round === 'FINAL' || m.round === 'TPP') return {start: 0, end: leafOrder.length};
+    const leaves = getLeafOrder(mid);
+    if (leaves.length === 0) return {start: 0, end: 2};
+    const first = leafIdx[leaves[0]];
+    const last = leafIdx[leaves[leaves.length-1]];
+    return {start: first, end: last + 1};
+  }
+
+  // Round display names
+  const roundLabel = {R32:'Round of 32',R16:'Round of 16',QF:'Quarter-Finals',SF:'Semi-Finals',TPP:'3rd Place',FINAL:'Final'};
+
+  // Build columns
+  const slotsPerRound = {R32:leafOrder.length,R16:leafOrder.length/2,QF:leafOrder.length/4,SF:leafOrder.length/8,TPP:1,FINAL:1};
+
+  rounds.forEach((r, ri) => {
+    const col = document.createElement('div');
+    col.className = 'bracket-col';
+    col.style.flex = String(1 + (ri === rounds.length-1 ? 0.5 : 0));
+    col.innerHTML = '<div class="col-head">' + (roundLabel[r] || r) + '</div>';
+
+    const ms = (fb.rounds[r] || []).slice().sort((a,b) => {
+      const ra = getRowRange(a.match_id);
+      const rb = getRowRange(b.match_id);
+      return ra.start - rb.start;
+    });
+
+    const ROW_UNIT = 28; // pixels per leaf row
+    // Add spacer rows to align matches properly
+    let lastEnd = 0;
+    ms.forEach(m => {
+      const rr = getRowRange(m.match_id);
+      const gap = rr.start - lastEnd;
+      if (gap > 0) {
+        const sp = document.createElement('div');
+        sp.className = 'match-slot';
+        sp.style.minHeight = (gap * ROW_UNIT) + 'px';
+        col.appendChild(sp);
+      }
+      lastEnd = rr.end;
+
+      const slot = document.createElement('div');
+      slot.className = 'match-slot';
+      slot.style.minHeight = Math.max((rr.end - rr.start) * ROW_UNIT, 40) + 'px';
+
+      const ta = m.team_a || 'TBD';
+      const tb = m.team_b || 'TBD';
+      const scoreStr = m.score ? m.score.home + '-' + m.score.away : '?-?';
+      const isPlayed = m.played;
+      const isTbd = !m.team_a && !m.team_b;
+      const cardClass = isTbd ? 'tbd' : isPlayed ? 'played' : 'upcoming';
+      const probStr = m.prob_a != null ? (m.prob_a*100).toFixed(1)+'%' : '';
+      const wStr = m.winner ? m.winner + ' won' : '';
+
+      slot.innerHTML = `
+        <div class="match-card ${cardClass}" data-mid="${m.match_id}">
+          <div class="m-teams">
+            <span class="m-team ${m.winner===ta?'winner':''}">${ta}</span>
+            <span class="m-score">${scoreStr}</span>
+            <span class="m-team ${m.winner===tb?'winner':''}">${tb}</span>
+          </div>
+          ${wStr ? '<div class="m-winner-label">' + wStr + '</div>' : ''}
+          ${probStr ? '<div class="m-prob">' + ta + ' win ' + probStr + '</div>' : ''}
+        </div>`;
+      slot.querySelector('.match-card').onclick = () => openMatchModal(m.match_id);
+      col.appendChild(slot);
+    });
+    grid.appendChild(col);
+  });
+
+  setTimeout(drawBracketConnectors, 50);
+}
+
+function drawBracketConnectors() {
+  const svg = document.getElementById('bracketSvg');
+  const grid = document.getElementById('bracketGrid');
+  const cols = grid.querySelectorAll('.bracket-col');
+  if (cols.length < 2) return;
+
+  // Size SVG to match the full grid extent
+  svg.style.width = grid.scrollWidth + 'px';
+  svg.style.height = grid.scrollHeight + 'px';
+
+  // Compute column positions relative to grid
+  const colRects = [];
+  cols.forEach(c => { const r = c.getBoundingClientRect(); colRects.push({left: r.left, right: r.right, top: r.top, bottom: r.bottom}); });
+  const gridRect = grid.getBoundingClientRect();
+  const relX = (colIdx, side) => colRects[colIdx][side] - gridRect.left;
+  const relY = (el) => { const r = el.getBoundingClientRect(); return (r.top + r.bottom) / 2 - gridRect.top; };
+
+  let paths = '';
+  const byId = {};
+  for (const [r, ms] of Object.entries(appState.fullBracket.rounds)) for (const m of ms) byId[m.match_id] = m;
+
+  // For each pair of adjacent columns, find parent-child connections
+  for (let ci = 0; ci < cols.length - 1; ci++) {
+    const rightCards = cols[ci+1].querySelectorAll('.match-card');
+    rightCards.forEach(card => {
+      const mid = card.dataset.mid;
+      const m = byId[mid];
+      if (!m || !m.source_matches) return;
+      const x1 = relX(ci, 'right');
+      const x2 = relX(ci+1, 'left');
+      const xm = (x1 + x2) / 2;
+      const parentY = relY(card);
+
+      m.source_matches.forEach(sm => {
+        const srcEl = cols[ci].querySelector('.match-card[data-mid="' + sm + '"]');
+        if (!srcEl) return;
+        const childY = relY(srcEl);
+        paths += `<path d="M ${x1} ${childY} L ${xm} ${childY} L ${xm} ${parentY} L ${x2} ${parentY}" fill="none" stroke="#153D4C" stroke-width="1.5"/>`;
+      });
+    });
+  }
+
+  svg.innerHTML = paths;
+}
+
+// ── Match Insight Modal (Chart.js + What-If Chat) ──
+let modalCharts = {};
+
+function destroyModalCharts() {
+  Object.values(modalCharts).forEach(c => { try { c.destroy(); } catch {} });
+  modalCharts = {};
+}
+
+async function openMatchModal(mid) {
+  const fb = appState.fullBracket;
+  let match = null;
+  for (const [r, ms] of Object.entries(fb.rounds)) {
+    const found = ms.find(m => m.match_id === mid);
+    if (found) { match = found; break; }
+  }
+  if (!match) return;
+
+  destroyModalCharts();
+  document.getElementById('modalTitle').innerHTML = (match.team_a||'TBD') + ' <span style="color:#15565B;font-weight:normal">vs</span> ' + (match.team_b||'TBD');
+  document.getElementById('modalSub').textContent = match.round + ' — ' + match.match_id + (match.score ? '  |  ' + match.score.home + '-' + match.score.away : '');
+  document.getElementById('modalBody').innerHTML = '<div class="mb-wrap"><div class="mb-col" id="mbLeft"></div><div class="mb-col" id="mbRight"></div></div><div id="modalBottom"></div>';
+
+  const bodyEl = document.getElementById('modalBody');
+  const left = document.getElementById('mbLeft');
+  const right = document.getElementById('mbRight');
+  const bottom = document.getElementById('modalBottom');
+
+  // Show modal immediately while data loads
+  modalOverlay.classList.add('show');
+
+  // Fetch insight data
+  let insight;
+  try { insight = await (await fetch('/api/match/insight?match_id=' + mid)).json(); } catch { insight = {error: 'fetch failed'}; }
+
+  if (insight.error) {
+    bodyEl.innerHTML = '<div style="color:#ff6b6b;font-size:12px">Failed to load match insight.</div>';
+    return;
+  }
+
+  const ta = insight.teams.a, tb = insight.teams.b;
+  const sigs = insight.signals || {};
+  const sigOrder = ['elo','form','lineup_strength','defensive_quality','manager_effect','market_odds','catboost'];
+
+  const ev = appState.eval || {};
+  const outcome = insight.outcome_distribution || {};
+
+  // ── LEFT COL: Form trends + Signal comparison + Outcome ──
+  let lHtml = '';
+
+  // Form trends
+  const ft = insight.form_trends || {};
+  lHtml += '<div class="sec-title">Form Trend (last 5)</div><div class="form-charts">';
+  [ta, tb].forEach(team => {
+    const tr = ft[team] || [];
+    lHtml += '<div class="form-chart-box"><div class="fc-label">' + team + '</div><canvas id="fc-' + team.replace(/\s/g,'') + '"></canvas></div>';
+  });
+  lHtml += '</div>';
+
+  // Signal comparison bar chart
+  lHtml += '<div class="sec-title">Signal Comparison</div><div class="chart-box"><canvas id="sigChart"></canvas></div>';
+
+  // Outcome distribution
+  lHtml += '<div class="sec-title">Outcome Distribution</div><div class="outcome-charts">';
+  lHtml += '<div class="outcome-chart-box"><canvas id="outcomeChart"></canvas></div>';
+  lHtml += '</div>';
+
+  left.innerHTML = lHtml;
+
+  // ── RIGHT COL: Signal performance table + Insight text + What-if ──
+  let rHtml = '';
+
+  // Signal performance table
+  rHtml += '<div class="sec-title">Signal Performance</div>';
+  rHtml += '<table class="insight-table"><tr><th>Signal</th><th>Brier</th><th>Acc</th><th></th></tr>';
+  sigOrder.forEach(sk => {
+    const se = ev[sk];
+    if (se && se.n_matches > 0) {
+      const dot = se.brier < 0.15 ? 'dot-green' : se.brier < 0.25 ? 'dot-orange' : 'dot-red';
+      rHtml += '<tr><td>' + (sigLabels[sk]||sk) + '</td><td class="num">' + se.brier.toFixed(4) + '</td><td class="num">' + (se.accuracy*100).toFixed(1) + '%</td><td class="num"><span class="' + dot + '">&#9679;</span></td></tr>';
+    }
+  });
+  rHtml += '</table>';
+
+  // NL Insight
+  rHtml += '<div class="sec-title">Match Insight</div><div class="insight-box">' + (insight.insight || 'No insight available.') + '</div>';
+
+  right.innerHTML = rHtml;
+
+  // ── BOTTOM: What-if chat ──
+  let bHtml = '<div class="sec-title warn">What-If Scenario</div>';
+  bHtml += '<div class="whatif-input-wrap">';
+  bHtml += '<input type="text" id="whatifInput" placeholder="Describe a scenario... (e.g. Messi injured, defense weak)">';
+  bHtml += '<button onclick="sendWhatIf(\'' + mid + '\')">&#9654;</button>';
+  bHtml += '</div>';
+  bHtml += '<div class="whatif-controls">';
+  bHtml += '<label>Mode:</label><select id="whatifMode"><option value="instant">Instant</option><option value="simulate">Simulate</option></select>';
+  bHtml += '<label>Iterations:</label><select id="whatifIters"><option value="10000">10K</option><option value="50000" selected>50K</option><option value="100000">100K</option><option value="500000">500K</option></select>';
+  bHtml += '</div>';
+  bHtml += '<div class="progress-bar-wrap" id="whatifProgress"><div class="progress-bar-fill" id="whatifProgressFill" style="width:0%"></div></div><div class="progress-lbl" id="whatifProgressLbl"></div>';
+  bHtml += '<div class="whatif-result" id="whatifResult"></div>';
+
+  bottom.innerHTML = bHtml;
+
+  // ── Draw charts ──
+  // Form trends
+  [ta, tb].forEach(team => {
+    const tr = ft[team] || [];
+    const canvas = document.getElementById('fc-' + team.replace(/\s/g,''));
+    if (!canvas) return;
+    const labels = tr.map((r,i) => 'M'+(i+1));
+    const vals = tr.map(r => r.result === 'W' ? 1 : r.result === 'D' ? 0.5 : 0);
+    modalCharts['form_' + team] = new Chart(canvas, {
+      type: 'line',
+      data: { labels, datasets: [{ data: vals, borderColor: '#16A085', backgroundColor: 'transparent', pointBackgroundColor: '#16A085', borderWidth: 2, tension: 0.3, pointRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { min: -0.1, max: 1.1, display: false } } }
+    });
+  });
+
+  // Signal comparison bar chart
+  const sigCanvas = document.getElementById('sigChart');
+  if (sigCanvas) {
+    const sigKeys = sigOrder.filter(sk => sigs[sk] !== undefined);
+    const sigVals = sigKeys.map(sk => Math.round((sigs[sk].probability || 0.5) * 100));
+    const sigColors = sigKeys.map(sk => sk === 'elo' ? '#16A085' : '#156F69');
+    modalCharts.signals = new Chart(sigCanvas, {
+      type: 'bar',
+      data: {
+        labels: sigKeys.map(sk => sigLabels[sk]||sk),
+        datasets: [{ data: sigVals, backgroundColor: sigColors, borderRadius: 2, borderSkipped: false }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.x + '%' } } },
+        scales: { x: { min: 0, max: 100, grid: { color: 'rgba(21,61,76,0.2)' }, ticks: { color: '#15565B', font: { size: 9 }, callback: v => v + '%' } }, y: { grid: { display: false }, ticks: { color: '#F6DBC0', font: { size: 9 } } } }
+      }
+    });
+  }
+
+  // Outcome donut
+  const ocCanvas = document.getElementById('outcomeChart');
+  if (ocCanvas) {
+    modalCharts.outcome = new Chart(ocCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: [ta + ' win', 'Draw', tb + ' win'],
+        datasets: [{ data: [outcome.a_win||0, outcome.draw||0, outcome.b_win||0], backgroundColor: ['#16A085', '#156F69', '#153D4C'], borderColor: '#140C30', borderWidth: 2 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#F6DBC0', font: { size: 9 }, boxWidth: 10, padding: 6 } },
+          tooltip: { callbacks: { label: ctx => ctx.label + ': ' + (ctx.parsed * 100).toFixed(1) + '%' } }
+        },
+        cutout: '55%'
+      }
+    });
+  }
+}
+
+// ── What-If Handler ──
+async function sendWhatIf(mid) {
+  const input = document.getElementById('whatifInput');
+  const scenario = input.value.trim();
+  if (!scenario) return;
+  const mode = document.getElementById('whatifMode').value;
+  const iters = parseInt(document.getElementById('whatifIters').value) || 50000;
+  const resultDiv = document.getElementById('whatifResult');
+  const progressWrap = document.getElementById('whatifProgress');
+  const progressFill = document.getElementById('whatifProgressFill');
+  const progressLbl = document.getElementById('whatifProgressLbl');
+
+  resultDiv.style.display = 'none';
+  resultDiv.innerHTML = '';
+
+  if (mode === 'instant') {
+    try {
+      const resp = await (await fetch('/api/what-if', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ match_id: mid, scenario, mode: 'instant' })
+      })).json();
+
+      resultDiv.style.display = 'block';
+
+      // Narrative insight (primary output)
+      const insightText = resp.insight || 'No analysis generated.';
+      let html = '<div class="wir-insight">>> ' + insightText.replace(/ >> /g, '<br>>></div><div class="wir-insight">>> ') + '</div>';
+
+      // Compact signal detail section (expandable)
+      if (resp.adjusted_signals) {
+        let sigDetail = '';
+        Object.entries(resp.adjusted_signals).forEach(([sk, sv]) => {
+          if (sv.was_adjusted) {
+            const deltaStr = (sv.delta * 100).toFixed(1);
+            const cls = sv.delta >= 0 ? 'wir-diff-pos' : 'wir-diff-neg';
+            sigDetail += '<div class="wir-sig-row"><span>' + (sigLabels[sk]||sk) + '</span><span class="wir-bar-wrap"><span class="wir-bar" style="width:' + (sv.probability * 100) + '%"></span></span><span class="wir-val">' + (sv.probability * 100).toFixed(1) + '%</span><span class="' + cls + '">' + (sv.delta >= 0 ? '+' : '') + deltaStr + '%</span></div>';
+          }
+        });
+        if (sigDetail) {
+          html += '<div class="wir-toggle" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">[+] Signal detail</div>';
+          html += '<div class="wir-sigs" style="display:none">' + sigDetail + '</div>';
+        }
+      }
+
+      // Detection info
+      if (resp.parsed && resp.parsed.explanation) {
+        const conf = resp.parsed.confidence || 0;
+        const confColor = conf >= 0.6 ? '#168777' : conf >= 0.3 ? '#15565B' : '#ff6b6b';
+        html += '<div class="wir-meta"><span style="color:' + confColor + '">Detection confidence: ' + (conf * 100).toFixed(0) + '%</span> &middot; ' + resp.parsed.explanation + '</div>';
+      }
+
+      resultDiv.innerHTML = html;
+    } catch (e) {
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + '</div>';
+    }
+  } else {
+    // Simulate mode
+    progressWrap.style.display = 'block';
+    progressFill.style.width = '0%';
+    progressLbl.textContent = 'Starting simulation...';
+
+    try {
+      const resp = await (await fetch('/api/what-if', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ match_id: mid, scenario, mode: 'simulate', iterations: iters })
+      })).json();
+
+      const taskId = resp.task_id;
+      // Poll for progress
+      const pollInterval = setInterval(async () => {
+        try {
+          const prog = await (await fetch('/api/simulation/progress/' + taskId)).json();
+          if (prog.status === 'running' || prog.status === 'complete') {
+            progressFill.style.width = prog.progress + '%';
+            progressLbl.textContent = prog.iteration + '/' + prog.total_iterations + ' (' + prog.progress.toFixed(0) + '%)';
+          }
+          if (prog.status === 'complete') {
+            clearInterval(pollInterval);
+            progressFill.style.width = '100%';
+            progressLbl.textContent = 'Complete!';
+            setTimeout(() => { progressWrap.style.display = 'none'; }, 2000);
+
+            resultDiv.style.display = 'block';
+
+            // Narrative insight (primary)
+            const simInsight = prog.insight || 'Simulation complete.';
+            let html = '<div class="wir-insight">>> ' + simInsight.replace(/ >> /g, '<br>>></div><div class="wir-insight">>> ') + '</div>';
+
+            // Compact top 5 with deltas
+            const simResult = prog.result || {};
+            const teamsList = Object.entries(simResult).sort((a,b) => b[1].champion - a[1].champion).slice(0, 5);
+            html += '<div class="wir-head">Top 5 Champion Probabilities</div>';
+            html += '<div class="wir-grid">';
+            teamsList.forEach(([team, probs]) => {
+              const pct = (probs.champion * 100).toFixed(1);
+              html += '<div class="wir-grid-item"><span class="wir-grid-team">' + team + '</span><span class="wir-grid-val">' + pct + '%</span></div>';
+            });
+            html += '</div>';
+            resultDiv.innerHTML = html;
+          }
+          if (prog.status === 'error') {
+            clearInterval(pollInterval);
+            progressLbl.textContent = 'Error';
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div style="color:#ff6b6b">Simulation error: ' + (prog.error || 'unknown') + '</div>';
+          }
+        } catch (e) {
+          clearInterval(pollInterval);
+        }
+      }, 1000);
+    } catch (e) {
+      progressWrap.style.display = 'none';
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + '</div>';
+    }
+  }
+}
+
+// ── Standings ──
+function renderStandings() {
+  const s = appState.standings;
+  if (!s || !s.standings) return;
+  const grid = document.getElementById('standingsGrid');
+  const letters = Object.keys(s.standings).sort();
+  grid.innerHTML = letters.map(letter => {
+    const rows = s.standings[letter];
+    const positions = rows.map(r => r.position);
+    const adv = positions.filter(p => p <= 2);
+    const maxPos = Math.max(...positions);
+    return '<div class="group-card"><div class="g-title">Group ' + letter + '</div>' +
+      '<table class="group-table"><tr><th>#</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th></tr>' +
+      rows.map(r => {
+        const cls = r.position <= 2 ? 'advancing' : r.position === maxPos ? 'eliminated' : 'bubble';
+        const gd = r.gd > 0 ? '+' + r.gd : String(r.gd);
+        return '<tr class="' + cls + '"><td class="num">' + r.position + '</td><td>' + r.team + '</td><td class="num">' + r.pts + '</td><td class="num">' + gd + '</td><td class="num">' + r.gs + '</td></tr>';
+      }).join('') + '</table></div>';
+  }).join('');
+
+  // Third-place bubble
+  const tp = s.third_place;
+  if (tp && tp.length >= 9) {
+    let html = '<div class="g-title">Third-Place Bubble</div><table class="bubble-table"><tr><th>#</th><th>Group</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th></tr>';
+    tp.forEach((r, i) => {
+      const cls = i < 8 ? 'advancing' : i === 8 ? 'cutoff-line' : 'eliminated';
+      const gd = r.gd > 0 ? '+' + r.gd : String(r.gd);
+      html += '<tr class="' + cls + '"><td class="num">' + (i+1) + '</td><td>' + r.group + '</td><td>' + r.team + '</td><td class="num">' + r.pts + '</td><td class="num">' + gd + '</td><td class="num">' + r.gs + '</td></tr>';
+    });
+    html += '</table>';
+    if (tp[7] && tp[8]) {
+      const e = tp[7], n = tp[8];
+      const margin = e.pts !== n.pts ? (e.pts - n.pts) + ' pts' : (e.gd !== n.gd ? 'GD ' + (e.gd - n.gd) : 'GS ' + (e.gs - n.gs));
+      html += '<div style="font-size:10px;color:#F6DBC088;margin-top:4px">>> 8th advances, 9th out. Cutoff margin = ' + margin + '.</div>';
+    }
+    document.getElementById('bubbleSection').innerHTML = html;
+  }
+}
+
+// ── Terminal (preserved from original) ──
+function termAdd(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'line';
+  if (text) {
+    const span = document.createElement('span');
+    if (cls) span.className = cls;
+    span.innerHTML = text;
+    div.appendChild(span);
+  }
+  termOutput.appendChild(div);
+}
+function termScroll() {
+  const tt = document.getElementById('tab-terminal');
+  if (tt && tt.classList.contains('active')) tt.scrollIntoView(false);
+}
+function focusTermInput() { termInput.focus(); }
+function termShowPrompt() {
+  termInputLine.style.display = 'flex';
+  termBuffer = '';
+  termInputDisplay.textContent = '';
+  termCursor.style.display = 'inline';
+  termScroll();
+  focusTermInput();
+}
+
+function buildTable(teams, cols) {
+  const show = cols || ['champion','final','sf','qf'];
+  const labels = {champion:'Champion',final:'Final',sf:'SF',qf:'QF'};
+  let h = '<tr><th>#</th><th>Team</th><th>ELO</th>';
+  show.forEach(c => h += '<th>'+(labels[c]||c)+'</th>');
+  h += '<th></th></tr>';
+  let html = '<table>' + h;
+  teams.forEach((t,i) => {
+    const pct = t[show[0]] || 0;
+    const barW = Math.max(2, pct*2);
+    html += '<tr><td class="num">'+(i+1)+'</td><td>'+t.name+'</td><td class="num">'+t.elo+'</td>';
+    show.forEach(c => html += '<td class="num">'+(t[c]||0).toFixed(1)+'%</td>');
+    html += '<td><div class="bar-wrap"><div class="bar" style="width:'+barW+'px"></div></div></td></tr>';
+  });
+  return html+'</table>';
+}
+
+async function termRenderBootStep(step) {
+  const timeStr = step.output.split(']')[0].replace('[','') || '--';
+  const statusChar = step.status === 'ok' ? 'OK' : 'FAIL';
+  const cls = step.status === 'ok' ? 'ok' : 'danger';
+  termAdd('<span class="ts">['+timeStr+']</span> <span class="dim">'+step.step+'...</span>');
+  termScroll();
+  await new Promise(r => setTimeout(r, Math.min(300 + step.elapsed*50, 800)));
+  const last = termOutput.lastElementChild;
+  if (last) last.innerHTML = '<span class="ts">['+timeStr+']</span> <span class="'+cls+'">'+statusChar+'</span> <span class="dim">'+step.step+'</span> <span class="dim">('+step.elapsed.toFixed(1)+'s)</span>';
+}
+
+async function termBoot() {
+  termBooting = true;
+  termAdd('<span class="line title">>> WC26  FIFA World Cup 2026 — Terminal Simulator</span>');
+  termAdd('<span class="banner">+------------------------------------+\n|     MONTE CARLO SIMULATION         |\n|     50 000 iterations              |\n+------------------------------------+</span>');
+  termAdd('');
+
+  let bootSteps;
+  try { bootSteps = await (await fetch('/api/boot')).json(); }
+  catch { termAdd('<span class="danger">ERROR: Server unreachable.</span>'); termShowPrompt(); termBooting = false; return; }
+
+  for (const step of bootSteps) await termRenderBootStep(step);
+  termAdd('');
+
+  try {
+    const [dr,sr,er,gr,br] = await Promise.all([
+      fetch('/api/data').then(r=>r.json()), fetch('/api/standings').then(r=>r.json()),
+      fetch('/api/evaluation').then(r=>r.json()), fetch('/api/governance').then(r=>r.json()),
+      fetch('/api/backtest').then(r=>r.json()),
+    ]);
+    appState.data = dr; appState.standings = sr; appState.eval = er;
+    // Also store for backward compat
+    window.cachedData = dr; window.cachedStandings = sr; window.cachedEval = er; window.cachedGov = gr; window.cachedBacktest = br;
+  } catch { termAdd('<span class="danger">ERROR: Failed to load prediction data.</span>'); termShowPrompt(); termBooting = false; return; }
+
+  termAdd('');
+  termAdd('<span class="highlight">== Champion Probability Table ==</span>');
+  termAdd('');
+  termAdd(buildTable(appState.data.teams));
+  termAdd('');
+
+  const ev = appState.eval;
+  if (ev && ev.elo && ev.elo.n_matches > 0) {
+    termAdd('<span class="highlight">== Elo Evaluation (replay)</span> <span class="dim">'+ev.elo.n_matches+' matches</span>');
+    termAdd('  Brier: '+ev.elo.brier.toFixed(4)+'  LogLoss: '+ev.elo.log_loss.toFixed(4)+'  Accuracy: '+(ev.elo.accuracy*100).toFixed(1)+'%');
+    termAdd('');
+    const others = Object.keys(ev).filter(k => k!=='elo' && ev[k].n_matches > 0);
+    if (others.length) {
+      termAdd('<span class="highlight">== Multi-Signal Evaluation</span>');
+      let ht = '<tr><th>Signal</th><th>Brier</th><th>LogLoss</th><th>Acc</th><th>N</th></tr>';
+      let tbl = '<table>'+ht;
+      others.forEach(sk => { const s=ev[sk]; tbl += '<tr><td>'+sk+'</td><td class="num">'+s.brier.toFixed(4)+'</td><td class="num">'+s.log_loss.toFixed(4)+'</td><td class="num">'+(s.accuracy*100).toFixed(1)+'%</td><td class="num">'+s.n_matches+'</td></tr>'; });
+      termAdd(tbl+'</table>');
+    }
+  }
+
+  if (gr && gr.status) {
+    termAdd('<span class="highlight">== Governance</span>');
+    termAdd('  Status: <span class="'+(gr.status==='HEALTHY'?'ok':'danger')+'">'+gr.status+'</span>  Data: '+gr.data_version+'  Model: '+gr.model_version+'  Run: '+gr.run_version);
+    termAdd('');
+  }
+
+  const remaining = Math.max(0, 30 - (gr ? gr.n_matches||0 : 0));
+  termAdd('<span class="dim">>> System ready. '+appState.data.n_teams+' teams simulated. '+appState.data.n_played+' matches played. '+(remaining>0?'Advanced signals need '+remaining+' more matches.':'Full signal blending active.')+' Type help to explore.</span>');
+  termAdd('');
+  termAdd('Type <span class="prompt">help</span> for available commands.', 'dim');
+  termShowPrompt();
+  termBooting = false;
+}
+
+async function termExec(cmd) {
+  const trimmed = cmd.trim();
+  if (!trimmed) { termShowPrompt(); return; }
+  const parts = trimmed.toLowerCase().split(/\s+/);
+  const main = parts[0];
+  // Use cached data from appState or window
+  const cd = window.cachedData;
+  const cs = window.cachedStandings;
+  const ce = window.cachedEval;
+  const cg = window.cachedGov;
+  const cb = window.cachedBacktest;
+
+  if (main === 'help') {
+    termAdd(''); termAdd('<span class="highlight">Available commands:</span>');
+    termAdd('<span class="prompt">top N</span>       - top N by champion probability.');
+    termAdd('<span class="prompt">elo</span>         - ranking by ELO rating.');
+    termAdd('<span class="prompt">rank</span>        - full 48-team table (QF/SF/Final/Champion).');
+    termAdd('<span class="prompt">standings</span>   - group tables + third-place bubble.');
+    termAdd('<span class="prompt">bracket</span>     - resolved R32 matchups with win odds.');
+    termAdd('<span class="prompt">eval</span>        - prediction accuracy (Brier, LogLoss, Accuracy).');
+    termAdd('<span class="prompt">form</span>        - rolling form signal statistics.');
+    termAdd('<span class="prompt">lineup</span>      - lineup strength / squad value signal.');
+    termAdd('<span class="prompt">defensive</span>   - defensive quality signal.');
+    termAdd('<span class="prompt">manager</span>     - manager effect signal.');
+    termAdd('<span class="prompt">odds</span>        - market odds signal.');
+    termAdd('<span class="prompt">catboost</span>    - CatBoost ML prediction signal.');
+    termAdd('<span class="prompt">blend</span>       - signal blending weights and calibration.');
+    termAdd('<span class="prompt">coverage</span>    - feature coverage audit report.');
+    termAdd('<span class="prompt">gov</span>         - system health check.');
+    termAdd('<span class="prompt">backtest</span>    - historical simulation (2018+2022).');
+    termAdd('<span class="prompt">refresh</span>     - live BSD API refresh + full MC recompute (~25s).');
+    termAdd('<span class="prompt">clear</span>       - reset screen.');
+    termAdd('<span class="prompt">help</span>        - this message.');
+    termAdd('');
+  } else if (main === 'clear') {
+    termOutput.innerHTML = '';
+    termAdd('<span class="banner">+------------------------------------+\n|     MONTE CARLO SIMULATION         |\n|     '+(cd?String(cd.total_iterations.toLocaleString()).padStart(10):'—'.padStart(10))+' iterations              |\n+------------------------------------+</span>');
+    termAdd('');
+  } else if (main === 'top') {
+    const n = parseInt(parts[1]) || 5;
+    if (!cd) { termAdd('No data loaded.','danger'); termShowPrompt(); return; }
+    const teams = cd.teams.slice(0, Math.min(n, cd.n_teams));
+    termAdd(''); termAdd('<span class="highlight">== Top '+teams.length+' -- Champion Probability ==</span>');
+    termAdd(buildTable(teams)); termAdd('');
+  } else if (main === 'rank') {
+    if (!cd) { termAdd('No data loaded.','danger'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== Full Ranking ('+cd.n_teams+' teams) ==</span>');
+    termAdd(buildTable(cd.teams)); termAdd('');
+  } else if (main === 'elo') {
+    if (!cd) { termAdd('No data loaded.','danger'); termShowPrompt(); return; }
+    const teams = [...cd.teams].sort((a,b) => b.elo - a.elo);
+    const show = parts[1] === 'all' ? teams : teams.slice(0, 10);
+    termAdd(''); termAdd('<span class="highlight">== Top '+show.length+' -- ELO Ranking ==</span>');
+    let html = '<table><tr><th>#</th><th>Team</th><th>ELO</th><th>Champion</th></tr>';
+    show.forEach((t,i) => html += '<tr><td class="num">'+(i+1)+'</td><td>'+t.name+'</td><td class="num">'+t.elo+'</td><td class="num">'+t.champion.toFixed(1)+'%</td></tr>');
+    termAdd(html+'</table>'); termAdd('');
+  } else if (main === 'standings') {
+    let st = cs;
+    if (!st) { try { st = await (await fetch('/api/standings')).json(); window.cachedStandings = st; } catch { termAdd('Failed.','danger'); termShowPrompt(); return; } }
+    const letters = Object.keys(st.standings).sort();
+    if (!letters.length) { termAdd('No data.','dim'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== Group Standings ==</span>');
+    letters.forEach(letter => {
+      let tbl = '<table><tr><th>#</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th></tr>';
+      st.standings[letter].forEach(r => {
+        const gd = r.gd > 0 ? '+'+r.gd : String(r.gd);
+        tbl += '<tr><td class="num">'+r.position+'</td><td>'+r.team+'</td><td class="num">'+r.pts+'</td><td class="num">'+gd+'</td><td class="num">'+r.gs+'</td></tr>';
+      });
+      termAdd('<span class="dim">Group '+letter+'</span>');
+      termAdd(tbl+'</table>');
+    });
+    if (st.third_place && st.third_place.length >= 9) {
+      const e = st.third_place[7], n = st.third_place[8];
+      termAdd('<span class="highlight">Third-Place Bubble</span>');
+      termAdd('  <span class="ok">8. '+e.team+' ('+e.pts+' pts, GD '+e.gd+')</span>');
+      termAdd('  <span class="danger">9. '+n.team+' ('+n.pts+' pts, GD '+n.gd+')</span>');
+    }
+    termAdd('');
+  } else if (main === 'bracket') {
+    termAdd('<span class="dim">Fetching bracket data...</span>');
+    let br; try { br = await (await fetch('/api/bracket')).json(); } catch { termAdd('Failed.','danger'); termShowPrompt(); return; }
+    const mups = (br.rounds && br.rounds.R32) || [];
+    if (!mups.length) { termAdd('No data.','dim'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== Round of 32 -- Resolved Matchups ==</span>');
+    let tbl = '<table><tr><th>Match</th><th>Team A</th><th>Score</th><th>Team B</th><th>Winner</th></tr>';
+    mups.forEach(m => {
+      const score = m.score ? m.score.home+'-'+m.score.away : '?-?';
+      tbl += '<tr><td class="num">'+m.match_id+'</td><td>'+m.team_a+'</td><td class="num">'+score+'</td><td>'+m.team_b+'</td><td>'+(m.winner||'TBD')+'</td></tr>';
+    });
+    termAdd(tbl+'</table>'); termAdd('');
+  } else if (main === 'eval') {
+    let ev = ce;
+    if (!ev) { try { ev = await (await fetch('/api/evaluation')).json(); window.cachedEval = ev; } catch { termAdd('Failed.','danger'); termShowPrompt(); return; } }
+    const keys = Object.keys(ev).filter(k => ev[k].n_matches > 0);
+    if (!keys.length) { termAdd('No data.','dim'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== Signal Evaluation ==</span>');
+    let tbl = '<table><tr><th>Signal</th><th>Brier</th><th>LogLoss</th><th>Accuracy</th><th>N</th></tr>';
+    keys.forEach(k => { const s=ev[k]; tbl += '<tr><td>'+k+'</td><td class="num">'+s.brier.toFixed(4)+'</td><td class="num">'+s.log_loss.toFixed(4)+'</td><td class="num">'+(s.accuracy*100).toFixed(1)+'%</td><td class="num">'+s.n_matches+'</td></tr>'; });
+    termAdd(tbl+'</table>'); termAdd('');
+  } else if (main === 'gov') {
+    let g = cg; if (!g) { try { g = await (await fetch('/api/governance')).json(); window.cachedGov = g; } catch { termAdd('Failed.','danger'); termShowPrompt(); return; } }
+    termAdd(''); termAdd('<span class="highlight">== Governance Snapshot ==</span>');
+    termAdd('  Status: <span class="'+(g.status==='HEALTHY'?'ok':'danger')+'">'+(g.status||'UNKNOWN')+'</span>');
+    termAdd('  Data: '+g.data_version+'  Model: '+g.model_version+'  Run: '+g.run_version);
+    termAdd('  Matches: '+g.n_matches);
+    termAdd('');
+  } else if (main === 'backtest') {
+    let bt = cb; if (!bt) { try { bt = await (await fetch('/api/backtest')).json(); window.cachedBacktest = bt; } catch { termAdd('Failed.','danger'); termShowPrompt(); return; } }
+    termAdd(''); termAdd('<span class="highlight">== Historical Backtest ==</span>');
+    termAdd('  Tournaments: '+(bt.tournaments||[]).join(', '));
+    termAdd('  Total matches: '+(bt.n_total_matches||0));
+    if (bt.per_signal) Object.keys(bt.per_signal).forEach(sk => { const s=bt.per_signal[sk]; termAdd('  <span class="highlight">'+sk+'</span> -- Brier: '+s.brier.toFixed(4)+'  ('+s.n+' matches)'); });
+    termAdd('');
+  } else if (['form','lineup','defensive','manager','odds','catboost'].includes(main)) {
+    const sigName = main === 'odds' ? 'market_odds' : main;
+    let sig; try { sig = await (await fetch('/api/signal/'+sigName)).json(); } catch { termAdd('Failed.','danger'); termShowPrompt(); return; }
+    const labels = {form:'Rolling Form', lineup:'Lineup Strength', defensive:'Defensive Quality', manager:'Manager Effect', odds:'Market Odds', catboost:'CatBoost ML'};
+    termAdd(''); termAdd('<span class="highlight">== '+(labels[main]||main)+' Signal ==</span>');
+    const avail = sig.matches ? sig.matches.filter(m => m.available).length : 0;
+    const probs = sig.matches ? sig.matches.filter(m => m.probability !== null).map(m => m.probability) : [];
+    const avg = probs.length ? probs.reduce((a,b)=>a+b,0)/probs.length : 0;
+    const mn = probs.length ? Math.min(...probs) : 0;
+    const mx = probs.length ? Math.max(...probs) : 0;
+    termAdd('  Matches: '+sig.n_matches+'  Available: '+avail+'/'+sig.n_matches+'  Range: '+mn.toFixed(3)+' - '+mx.toFixed(3)+'  Avg: '+avg.toFixed(3));
+    if (sig.live_eval && sig.live_eval.n > 0) {
+      termAdd('  Live Eval: Brier '+sig.live_eval.brier.toFixed(4)+'  Accuracy '+(sig.live_eval.accuracy*100).toFixed(1)+'%  ('+sig.live_eval.n+' matches)');
+      if (sig.live_eval.brier >= 0.25) termAdd('  <span class="danger">>> ! Not calibrated: Brier '+sig.live_eval.brier.toFixed(4)+' >= 0.25</span>');
+    }
+    if (sig.matches && sig.matches.length > 0) {
+      const valid = sig.matches.filter(m => m.available && m.team_a && m.team_b).slice(0, 2);
+      if (valid.length > 0) {
+        let tbl = '<table><tr><th>Match</th><th>Team A</th><th>Team B</th><th>Prob</th></tr>';
+        valid.forEach(m => tbl += '<tr><td class="num">'+m.match_id+'</td><td>'+m.team_a+'</td><td>'+m.team_b+'</td><td class="num">'+(m.probability!==null?m.probability.toFixed(3):'N/A')+'</td></tr>');
+        termAdd(tbl+'</table>');
+      }
+    }
+    termAdd('');
+  } else if (main === 'blend') {
+    let b; try { b = await (await fetch('/api/blend')).json(); } catch { termAdd('Failed.','danger'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== Signal Blend Status ==</span>');
+    termAdd('  Calibration: <span class="'+(b.calibration_status==='calibrated'?'ok':'danger')+'">'+b.calibration_status+'</span> ('+b.n_matches_for_calibration+'/'+b.threshold+' matches)');
+    if (b.blend_weights && Object.keys(b.blend_weights).length > 0) {
+      let tbl = '<table><tr><th>Signal</th><th>Brier</th><th>Weight</th></tr>';
+      Object.keys(b.blend_weights).sort().forEach(sk => {
+        tbl += '<tr><td>'+sk+'</td><td class="num">'+(b.backtest_briers[sk]!==undefined?b.backtest_briers[sk].toFixed(4):'N/A')+'</td><td class="num">'+(b.blend_weights[sk]*100).toFixed(1)+'%</td></tr>';
+      });
+      termAdd(tbl+'</table>');
+    }
+    termAdd('');
+  } else if (main === 'coverage') {
+    let c; try { c = await (await fetch('/api/coverage')).json(); } catch { termAdd('Failed.','danger'); termShowPrompt(); return; }
+    const m = c.meaningful || {};
+    termAdd(''); termAdd('<span class="highlight">== Coverage Audit ==</span>');
+    termAdd('  Overall: <span class="'+(m.target_met?'ok':'danger')+'">'+m.pct+'%</span> ('+m.covered+'/'+m.total+' reqs, target '+m.target+'%)');
+    if (c.by_category) Object.keys(c.by_category).forEach(cat => { const d=c.by_category[cat]; termAdd('  <span class="highlight">'+cat+'</span> -- '+d.pct+'% ('+d.covered+'/'+d.total+')'); });
+    termAdd('');
+  } else if (main === 'refresh') {
+    termAdd('<span class="dim">Refreshing from BSD API... ~25s</span>');
+    let r; try { r = await (await fetch('/api/refresh',{method:'POST'})).json(); } catch { termAdd('<span class="danger">Failed. No API key?</span>'); termShowPrompt(); return; }
+    termAdd('<span class="ok">Recompute complete.</span>');
+    termAdd(''); termAdd('<span class="highlight">== Refresh ==</span>');
+    termAdd('  Status: '+r.status+'  Elapsed: '+(r.elapsed||'?')+'s');
+    if (r.updated) Object.keys(r.updated).forEach(k => termAdd('  '+k+': '+(r.updated[k]===true?'ok':String(r.updated[k]))));
+    if (r.errors && r.errors.length > 0) r.errors.forEach(e => termAdd('  <span class="danger">'+e+'</span>'));
+    termAdd('');
+  } else {
+    termAdd('command not found: '+trimmed, 'danger');
+    termAdd('Type <span class="prompt">help</span> for available commands.', 'dim');
+  }
+  termShowPrompt();
+}
+
+// Terminal input
+termInput.addEventListener('keydown', e => {
+  if (termBooting) { e.preventDefault(); return; }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const cmd = termBuffer;
+    termAdd('<span class="prompt"></span>'+cmd, 'cmd');
+    termHistory.push(cmd); termHistoryIdx = termHistory.length;
+    termInputDisplay.textContent = ''; termCursor.style.display = 'none';
+    termExec(cmd);
+  } else if (e.key === 'Backspace') { termBuffer = termBuffer.slice(0,-1); termInputDisplay.textContent = termBuffer; }
+  else if (e.key === 'ArrowUp') { if (!termHistory.length) return; termHistoryIdx = Math.max(0, termHistoryIdx-1); termBuffer = termHistory[termHistoryIdx]||''; termInputDisplay.textContent = termBuffer; }
+  else if (e.key === 'ArrowDown') { termHistoryIdx = Math.min(termHistory.length, termHistoryIdx+1); termBuffer = termHistoryIdx >= termHistory.length ? '' : termHistory[termHistoryIdx]||''; termInputDisplay.textContent = termBuffer; }
+  else if (e.key.length === 1) { termBuffer += e.key; termInputDisplay.textContent = termBuffer; }
+});
+
+document.addEventListener('click', () => {
+  const termTab = document.getElementById('tab-terminal');
+  if (termTab && termTab.classList.contains('active')) focusTermInput();
+});
+termInput.addEventListener('blur', () => {
+  const termTab = document.getElementById('tab-terminal');
+  if (termTab && termTab.classList.contains('active')) setTimeout(focusTermInput, 10);
+});
+
+// ── Init ──
+loadAll();
+termBoot();
+</script>
+</body>
+</html>

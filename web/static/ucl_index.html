@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UCL 25/26 — Champions League Predictor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: linear-gradient(135deg, #140C30, #14253E 50%, #153D4C); color: #F6DBC0;
+  font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", "Consolas", monospace;
+  font-size: 13px; line-height: 1.5; min-height: 100vh;
+}
+#app { max-width: 1280px; margin: 0 auto; padding: 12px 16px; }
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid #153D4C; margin-bottom: 12px; flex-wrap: wrap; }
+.tab-btn {
+  background: transparent; border: none; color: #15565B; padding: 8px 14px;
+  font-family: inherit; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: #F6DBC0; }
+.tab-btn.active { color: #16A085; border-bottom-color: #16A085; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.status-bar {
+  display: flex; justify-content: space-between; padding: 6px 0; margin-top: 10px;
+  border-top: 1px solid #153D4C; color: #15565B; font-size: 11px;
+}
+.status-bar span { display: flex; align-items: center; gap: 4px; }
+.stats-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.stat-card {
+  flex: 1; min-width: 100px; border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 10px 12px;
+  background: rgba(20,12,48,0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15); text-align: center;
+}
+.stat-card .val { font-size: 22px; color: #16A085; font-weight: bold; }
+.stat-card .lbl { font-size: 10px; color: #15565B; text-transform: uppercase; letter-spacing: 1px; }
+.stat-card .sub { font-size: 10px; color: #F6DBC088; margin-top: 2px; }
+.team-cards { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.team-card {
+  flex: 1; min-width: 150px; border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 10px;
+  background: rgba(20,12,48,0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.team-card .name { color: #16A085; font-size: 14px; font-weight: bold; }
+.team-card .elo { color: #15565B; font-size: 11px; margin-bottom: 6px; }
+.team-card .ring-row { display: flex; gap: 4px; }
+.team-card .ring {
+  flex: 1; height: 4px; border-radius: 2px; background: #153D4C; position: relative; overflow: hidden;
+}
+.team-card .ring-fill { height: 100%; border-radius: 2px; transition: width 0.6s; min-width: 2px; }
+.team-card .ring-lbl { font-size: 9px; color: #F6DBC088; text-align: center; margin-top: 2px; }
+.chart-section { margin-bottom: 14px; }
+.chart-section .title { color: #16A085; font-size: 12px; margin-bottom: 6px; }
+.chart-row {
+  display: flex; align-items: center; margin: 2px 0; height: 20px;
+}
+.chart-row .cname { width: 130px; text-align: right; padding-right: 8px; font-size: 11px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-row .cbar-wrap { flex: 1; height: 14px; background: #153D4C; border-radius: 2px; overflow: hidden; }
+.chart-row .cbar {
+  height: 100%; background: linear-gradient(90deg, #153D4C, #16A085); border-radius: 2px;
+  transition: width 0.8s ease; width: 0;
+}
+.chart-row .cpct { width: 55px; text-align: right; font-size: 11px; color: #F6DBC0; padding-left: 6px; }
+.eval-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.eval-table th { color: #16A085; text-align: left; padding: 3px 8px; border-bottom: 1px solid #153D4C; font-size: 11px; }
+.eval-table td { padding: 3px 8px; border-bottom: 1px solid #153D4C; font-size: 11px; }
+.eval-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.dot-green { color: #168777; } .dot-orange { color: #15565B; } .dot-red { color: #ff6b6b; }
+
+/* League Table */
+.league-table-wrap { overflow-x: auto; }
+.league-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.league-table th { color: #16A085; text-align: left; padding: 4px 8px; border-bottom: 1px solid #153D4C; font-size: 11px; }
+.league-table td { padding: 4px 8px; border-bottom: 1px solid #153D4C; }
+.league-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.league-table .zone-top8 { background: rgba(22,135,119,0.15); }
+.league-table .zone-playoff { background: rgba(21,86,91,0.15); }
+.league-table .zone-eliminated { }
+.zone-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 9px; }
+.zone-badge.top8 { background: #16877733; color: #168777; }
+.zone-badge.playoff { background: #15565B33; color: #15565B; }
+.zone-badge.eliminated { background: transparent; color: #F6DBC044; }
+
+/* Bracket */
+.bracket-wrap { position: relative; overflow-x: auto; padding: 20px 0; min-height: 500px; }
+.bracket-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.bracket-grid { display: flex; gap: 0; position: relative; z-index: 2; min-width: 700px; }
+.bracket-col { display: flex; flex-direction: column; justify-content: space-around; min-width: 120px; padding: 0 2px; }
+.bracket-col:not(:last-child) { margin-right: 20px; }
+.bracket-col .col-head { text-align: center; color: #15565B; font-size: 10px; letter-spacing: 1px; margin-bottom: 6px; }
+.match-slot { display: flex; align-items: center; }
+.match-card {
+  width: 100%; border: 1px solid rgba(21,61,76,0.3); border-radius: 6px; padding: 6px 8px;
+  background: rgba(20,12,48,0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12); cursor: pointer; font-size: 11px; position: relative;
+  transition: border-color 0.15s, background 0.15s; margin: 0 2px;
+}
+.match-card:hover { border-color: #16A085; background: rgba(21,61,76,0.7); }
+.match-card.played { border-left: 3px solid #168777; }
+.match-card.upcoming { border-left: 3px solid #15565B; }
+.match-card.tbd { border-left: 3px solid #140C30; opacity: 0.5; }
+.match-card .m-teams { display: flex; justify-content: space-between; align-items: center; }
+.match-card .m-team { color: #F6DBC0; flex: 1; }
+.match-card .m-team.winner { color: #16A085; font-weight: bold; }
+.match-card .m-score { color: #16A085; font-weight: bold; padding: 0 6px; font-size: 12px; }
+.match-card .m-winner-label { font-size: 9px; color: #168777; margin-top: 1px; }
+.match-card .m-prob { font-size: 9px; color: #15565B; margin-top: 1px; }
+
+/* Playoff ties section */
+.playoff-section { margin-bottom: 16px; }
+.playoff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.playoff-card {
+  border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 8px;
+  background: rgba(20,12,48,0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.playoff-card .p-title { color: #15565B; font-size: 10px; margin-bottom: 4px; }
+.playoff-card .p-teams { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.playoff-card .p-team { color: #F6DBC0; }
+.playoff-card .p-team.winner { color: #16A085; font-weight: bold; }
+.playoff-card .p-score { color: #16A085; font-weight: bold; padding: 0 8px; }
+.playoff-card .p-detail { font-size: 9px; color: #F6DBC088; margin-top: 2px; }
+
+/* Odds table */
+.odds-wrap { overflow-x: auto; }
+.odds-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.odds-table th { color: #16A085; text-align: left; padding: 4px 8px; border-bottom: 1px solid #153D4C; font-size: 11px; }
+.odds-table td { padding: 4px 8px; border-bottom: 1px solid #153D4C; }
+.odds-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.odds-table tr:hover td { background: rgba(21,61,76,0.4); }
+.odds-bar-wrap { display: inline-block; width: 80px; height: 10px; background: #153D4C; border-radius: 2px; overflow: hidden; vertical-align: middle; margin-left: 4px; }
+.odds-bar { height: 100%; background: #16A085; border-radius: 2px; }
+
+/* What-If */
+.whatif-controls { display: flex; gap: 8px; margin: 8px 0; align-items: center; flex-wrap: wrap; }
+.whatif-controls select, .whatif-controls input {
+  background: #140C30; border: 1px solid #153D4C; border-radius: 3px; color: #F8F4E9;
+  font-family: inherit; font-size: 11px; padding: 4px 8px;
+}
+.whatif-controls select:focus, .whatif-controls input:focus { border-color: #16A085; outline: none; }
+.whatif-controls button {
+  background: #15565B; border: none; border-radius: 4px; padding: 5px 14px;
+  color: #F8F4E9; font-family: inherit; font-size: 11px; cursor: pointer;
+}
+.whatif-controls button:hover { background: #168777; }
+.whatif-result {
+  margin: 6px 0; padding: 10px; background: rgba(20,12,48,0.65);
+  border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; font-size: 11px; display: none;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.whatif-result .wir-row { display: flex; justify-content: space-between; padding: 3px 0; }
+.whatif-result .wir-label { color: #15565B; }
+.whatif-result .wir-val { color: #F6DBC0; font-weight: bold; }
+.whatif-result .wir-diff-pos { color: #168777; font-weight: bold; }
+.whatif-result .wir-diff-neg { color: #ff6b6b; font-weight: bold; }
+.whatif-result .wir-note { color: #F6DBC088; font-size: 10px; margin-top: 6px; }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: rgba(20,12,48,0.85); border: 1px solid rgba(21,86,91,0.3); border-radius: 12px;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3); max-width: 500px; width: 92%; max-height: 90vh; overflow-y: auto; padding: 16px 20px;
+}
+.modal-close { float: right; background: none; border: none; color: #15565B; font-size: 22px; cursor: pointer; line-height: 1; }
+.modal-close:hover { color: #F6DBC0; }
+.modal h2 { color: #16A085; font-size: 15px; margin-bottom: 2px; }
+.modal .m-sub { color: #15565B; font-size: 11px; margin-bottom: 10px; }
+.modal .sec-title { color: #16A085; font-size: 11px; font-weight: bold; margin: 10px 0 4px; border-bottom: 1px solid #153D4C; padding-bottom: 3px; }
+
+/* Terminal */
+.term-output { min-height: 200px; }
+.term-output .line { opacity: 0; animation: fadeIn 0.3s forwards; }
+.term-input-line { display: flex; align-items: center; margin-top: 4px; }
+.term-input-line .prompt { color: #F8F4E9; flex-shrink: 0; }
+.term-input-line .prompt::before { content: "$ "; }
+.term-input-display { color: #F8F4E9; white-space: pre; min-height: 1.5em; }
+.term-cursor { animation: blink 1s step-end infinite; color: #F8F4E9; }
+#terminal-input { position: absolute; left: -9999px; opacity: 0; width: 0; height: 0; }
+.term-output .dim { color: #F6DBC088; }
+.term-output .highlight { color: #16A085; font-weight: bold; }
+.term-output .danger { color: #ff6b6b; }
+.term-output .ok { color: #F6DBC0; }
+.term-output .title { color: #16A085; font-weight: bold; }
+.term-output .ts { color: #15565B; }
+.term-output .banner { color: #15565B; line-height: 1.3; margin: 8px 0; white-space: pre; }
+.term-output table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.term-output th { color: #16A085; text-align: left; padding: 4px 8px; border-bottom: 1px solid #153D4C; }
+.term-output td { padding: 4px 8px; border-bottom: 1px solid #153D4C; }
+.term-output tr:hover td { background: rgba(21,61,76,0.4); }
+.term-output .num { text-align: right; font-variant-numeric: tabular-nums; }
+.term-output .bar-wrap { display: inline-block; width: 120px; height: 12px; background: #153D4C; vertical-align: middle; margin-left: 8px; }
+.term-output .bar { height: 100%; background: #16A085; transition: width 0.5s; }
+
+.status-btn { background: transparent; border: 1px solid #16A085; color: #16A085; padding: 2px 10px; font-family: inherit; font-size: 11px; cursor: pointer; border-radius: 3px; }
+.status-btn:hover { background: #16A085; color: #140C30; }
+.status-btn:disabled { opacity: 0.5; cursor: default; }
+
+@keyframes fadeIn { to { opacity: 1; } }
+@keyframes blink { 50% { opacity: 0; } }
+@media (max-width: 800px) {
+  .team-cards { flex-wrap: wrap; }
+  .stats-row { flex-wrap: wrap; }
+  .stat-card { min-width: 80px; }
+  .playoff-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="overview">>> Overview</button>
+    <button class="tab-btn" data-tab="standings">>> League Table</button>
+    <button class="tab-btn" data-tab="bracket">>> Bracket</button>
+    <button class="tab-btn" data-tab="odds">>> Odds</button>
+    <button class="tab-btn" data-tab="signals">>> Signals</button>
+    <button class="tab-btn" data-tab="whatif">>> What-If</button>
+    <button class="tab-btn" data-tab="terminal">>> Terminal</button>
+  </div>
+
+  <div class="tab-content active" id="tab-overview">
+    <div class="stats-row" id="statsRow"></div>
+    <div class="team-cards" id="teamCards"></div>
+    <div class="chart-section" id="chartSection"><div class="title">Champion Probability</div></div>
+    <div class="chart-section" id="evalSection"><div class="title">Signal Statistics</div></div>
+  </div>
+
+  <div class="tab-content" id="tab-standings">
+    <div class="league-table-wrap" id="leagueTableWrap"></div>
+  </div>
+
+  <div class="tab-content" id="tab-bracket">
+    <div class="playoff-section" id="playoffSection"></div>
+    <div class="bracket-wrap" id="bracketWrap">
+      <div class="bracket-grid" id="bracketGrid"></div>
+      <svg class="bracket-svg" id="bracketSvg"></svg>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-odds">
+    <div class="odds-wrap" id="oddsWrap"></div>
+  </div>
+
+  <div class="tab-content" id="tab-signals">
+    <div id="signalsContent"></div>
+  </div>
+
+  <div class="tab-content" id="tab-whatif">
+    <div class="whatif-controls">
+      <select id="whatifRound"><option value="">-- Round --</option></select>
+      <select id="whatifMatch"><option value="">-- Match --</option></select>
+      <input type="text" id="whatifInput" placeholder="Scenario (e.g. Man City stronger)">
+      <button onclick="sendWhatIf()">&#9654;</button>
+    </div>
+    <div id="whatifMatchInfo" style="color:#15565B;font-size:11px;margin-bottom:6px;"></div>
+    <div class="whatif-result" id="whatifResult"></div>
+  </div>
+
+  <div class="tab-content" id="tab-terminal">
+    <div class="term-output" id="termOutput"></div>
+    <div class="term-input-line" id="termInputLine" style="display:none">
+      <span class="prompt"></span><span class="term-input-display" id="termInputDisplay"></span><span class="term-cursor">&#9608;</span>
+    </div>
+  </div>
+
+  <div class="status-bar" id="statusBar">
+    <span id="statusLeft"></span>
+    <span id="statusRight"></span>
+  </div>
+</div>
+
+<input id="terminal-input" type="text" autofocus>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">&times;</button>
+    <h2 id="modalTitle"></h2>
+    <div class="m-sub" id="modalSub"></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, matches: [] };
+let termBuffer = '';
+let termHistory = [];
+let termHistoryIdx = -1;
+let termBooting = false;
+const termOutput = document.getElementById('termOutput');
+const termInputLine = document.getElementById('termInputLine');
+const termInputDisplay = document.getElementById('termInputDisplay');
+const termInput = document.getElementById('terminal-input');
+
+document.getElementById('tabBar').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  if (btn.dataset.tab === 'bracket') setTimeout(drawBracketConnectors, 300);
+  if (btn.dataset.tab === 'terminal') focusTermInput();
+  if (btn.dataset.tab === 'whatif') populateWhatIfSelectors();
+});
+
+const modalOverlay = document.getElementById('modalOverlay');
+document.getElementById('modalClose').onclick = () => modalOverlay.classList.remove('show');
+modalOverlay.onclick = e => { if (e.target === modalOverlay) modalOverlay.classList.remove('show'); };
+
+async function loadAll() {
+  try {
+    const [d, s, br, o, sig] = await Promise.all([
+      fetch('/api/data').then(r=>r.json()),
+      fetch('/api/standings').then(r=>r.json()),
+      fetch('/api/bracket').then(r=>r.json()),
+      fetch('/api/odds').then(r=>r.json()),
+      fetch('/api/signals').then(r=>r.json()),
+    ]);
+    appState.data = d;
+    appState.standings = s.standings || [];
+    appState.bracket = br;
+    appState.odds = o.odds || [];
+    appState.signals = sig.signals || {};
+    // Build match list for what-if
+    const matches = [];
+    if (br.playoff) br.playoff.forEach(m => matches.push({...m, round: 'Playoff', match_id: 'po_' + m.tie_num}));
+    if (br.bracket_rounds) {
+      Object.entries(br.bracket_rounds).forEach(([rnd, ms]) => {
+        ms.forEach(m => matches.push({...m, round: rnd}));
+      });
+    }
+    appState.matches = matches;
+    renderOverview();
+    renderStandings();
+    renderBracket();
+    renderOdds();
+    renderSignals();
+    updateStatusBar();
+  } catch (e) {
+    document.getElementById('statsRow').innerHTML = '<div class="stat-card" style="color:#ff6b6b">Failed to load data</div>';
+  }
+}
+
+function updateStatusBar() {
+  const d = appState.data;
+  if (!d) return;
+  const mode = d.mode || 'simulation';
+  const modeLabel = mode === 'results' ? 'Live Results 2025/26' : 'MC Simulation';
+  const modeColor = mode === 'results' ? '#168777' : '#15565B';
+  document.getElementById('statusLeft').innerHTML = '<span style="color:' + modeColor + '">' + modeLabel + '</span>  |  ' + d.n_teams + ' teams  |  ' + d.n_iterations.toLocaleString() + (mode === 'results' ? '' : ' sims');
+  const rightHtml = mode === 'results'
+    ? '<button class="status-btn" onclick="runSimulation()">>> Run Simulation</button>'
+    : '<button class="status-btn" onclick="resetResults()">>> Back to Real Results</button>';
+  document.getElementById('statusRight').innerHTML = rightHtml;
+}
+
+async function runSimulation() {
+  const btn = document.querySelector('#statusRight .status-btn');
+  if (btn) { btn.textContent = 'Running...'; btn.disabled = true; }
+  try {
+    const resp = await (await fetch('/api/simulate', {method: 'POST'})).json();
+    // Reload all data in simulation mode
+    const [d, s, br, o, sig] = await Promise.all([
+      fetch('/api/data').then(r=>r.json()),
+      fetch('/api/standings').then(r=>r.json()),
+      fetch('/api/bracket').then(r=>r.json()),
+      fetch('/api/odds').then(r=>r.json()),
+      fetch('/api/signals').then(r=>r.json()),
+    ]);
+    appState.data = d; appState.standings = s.standings || [];
+    appState.bracket = br; appState.odds = o.odds || [];
+    appState.signals = sig.signals || {};
+    renderOverview(); renderStandings(); renderBracket();
+    renderOdds(); renderSignals(); updateStatusBar();
+  } catch (e) {
+    if (btn) { btn.textContent = '>> Run Simulation'; btn.disabled = false; }
+  }
+}
+
+async function resetResults() {
+  try {
+    const resp = await (await fetch('/api/reset', {method: 'POST'})).json();
+    const [d, s, br, o, sig] = await Promise.all([
+      fetch('/api/data').then(r=>r.json()),
+      fetch('/api/standings').then(r=>r.json()),
+      fetch('/api/bracket').then(r=>r.json()),
+      fetch('/api/odds').then(r=>r.json()),
+      fetch('/api/signals').then(r=>r.json()),
+    ]);
+    appState.data = d; appState.standings = s.standings || [];
+    appState.bracket = br; appState.odds = o.odds || [];
+    appState.signals = sig.signals || {};
+    renderOverview(); renderStandings(); renderBracket();
+    renderOdds(); renderSignals(); updateStatusBar();
+  } catch (e) {}
+}
+
+function renderOverview() {
+  const d = appState.data;
+  if (!d) return;
+  const mode = d.mode || 'simulation';
+  const ch = d.champion || '—';
+  const champData = d.all_teams && d.all_teams.length ? d.all_teams[0] : null;
+  const champName = champData ? champData.team : ch;
+  const champPct = champData ? (mode === 'results' ? '100.0' : (champData.champion_prob * 100).toFixed(1)) : '?';
+  const subtitle = mode === 'results' ? 'Actual Champion 2025/26' : 'champion probability';
+
+  const sigCount = Object.keys(appState.signals).length;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="val">${d.n_teams}</div><div class="lbl">Teams</div></div>
+    <div class="stat-card"><div class="val">${d.n_iterations.toLocaleString()}</div><div class="lbl">${mode === 'results' ? 'Matchdays' : 'Simulations'}</div></div>
+    <div class="stat-card"><div class="val">${sigCount}</div><div class="lbl">Active Signals</div></div>
+    <div class="stat-card"><div class="val">${champName.split(' ').pop()}</div><div class="lbl">Champion</div><div class="sub">${subtitle}: ${champPct}%</div></div>
+  `;
+
+  // Top 4 team cards
+  const top4 = (d.teams || []).slice(0, 4);
+  const ringColors = ['#168777','#156F69','#15565B','#153D4C'];
+  const stageKeys = ['qf_prob','sf_prob','final_prob','champion_prob'];
+  const stageLabels = {qf_prob:'QF',sf_prob:'SF',final_prob:'Final',champion_prob:'Champ'};
+
+  document.getElementById('teamCards').innerHTML = top4.map(t => {
+    // Get full data for this team
+    const full = (d.all_teams || []).find(x => x.team === t.team) || t;
+    return '<div class="team-card">' +
+      '<div class="name">' + full.team + '</div>' +
+      '<div class="elo">Avg pos ' + (full.avg_position || '?').toFixed(1) + '</div>' +
+      '<div class="ring-row">' +
+      stageKeys.map((k, i) => {
+        const pct = (full[k.replace('_prob','_prob')] !== undefined ? full[k.replace('_prob','_prob')] : (full[k] || 0)) * 100;
+        const label = k === 'champion_prob' ? 'Champ' : k.replace('_prob','').toUpperCase();
+        return '<div><div class="ring"><div class="ring-fill" style="width:' + Math.max(2, pct) + '%;background:' + ringColors[i] + '"></div></div>' +
+          '<div class="ring-lbl">' + label + '</div></div>';
+      }).join('') +
+      '</div></div>';
+  }).join('');
+
+  // Champion bar chart (top 10)
+  const allTeams = d.all_teams || [];
+  if (allTeams.length > 0) {
+    const top10 = allTeams.slice(0, 10);
+    const maxC = Math.max(0.01, top10[0].champion_prob);
+    document.getElementById('chartSection').innerHTML = '<div class="title">Champion Probability</div>' +
+      top10.map(t => '<div class="chart-row">' +
+        '<div class="cname">' + t.team + '</div>' +
+        '<div class="cbar-wrap"><div class="cbar" style="width:' + (t.champion_prob / maxC * 100) + '%"></div></div>' +
+        '<div class="cpct">' + (t.champion_prob * 100).toFixed(1) + '%</div>' +
+      '</div>').join('');
+  }
+
+  // Signal stats table
+  const sigs = appState.signals;
+  const sigKeys = Object.keys(sigs);
+  if (sigKeys.length > 0) {
+    let html = '<div class="title">Signal Statistics</div><table class="eval-table"><tr><th>Signal</th><th>Avg Prob</th><th>Matches</th><th>Available</th><th>Weight</th></tr>';
+    sigKeys.forEach(k => {
+      const s = sigs[k];
+      html += '<tr><td>' + k + '</td><td class="num">' + (s.avg_probability || 0).toFixed(3) + '</td><td class="num">' + s.n_matches + '</td><td class="num">' + (s.available_pct || 0) + '%</td><td class="num">' + ((s.weight || 0) * 100).toFixed(1) + '%</td></tr>';
+    });
+    html += '</table>';
+    document.getElementById('evalSection').innerHTML = html;
+  } else {
+    document.getElementById('evalSection').innerHTML = '<div class="title">Signal Statistics</div><div style="color:#15565B;font-size:11px">No signal data available.</div>';
+  }
+}
+
+function renderStandings() {
+  const st = appState.standings;
+  if (!st || !st.length) return;
+  let html = '<table class="league-table"><tr><th>Pos</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th><th>Zone</th></tr>';
+  st.forEach(r => {
+    const zone = r.zone || 'eliminated';
+    const cls = zone === 'top_8' ? 'zone-top8' : zone === 'playoff' ? 'zone-playoff' : '';
+    const zoneLabel = zone === 'top_8' ? 'TOP 8' : zone === 'playoff' ? 'PLAYOFF' : 'OUT';
+    const zoneCls = zone === 'top_8' ? 'top8' : zone === 'playoff' ? 'playoff' : 'eliminated';
+    const gd = r.gd > 0 ? '+' + r.gd : String(r.gd);
+    const pts = r.pts !== undefined && r.pts !== null ? r.pts : '?';
+    html += '<tr class="' + cls + '"><td class="num">' + r.position + '</td><td>' + r.team + '</td><td class="num">' + pts + '</td><td class="num">' + gd + '</td><td class="num">' + (r.gs || 0) + '</td><td><span class="zone-badge ' + zoneCls + '">' + zoneLabel + '</span></td></tr>';
+  });
+  html += '</table>';
+  document.getElementById('leagueTableWrap').innerHTML = html;
+}
+
+function renderBracket() {
+  const br = appState.bracket;
+  if (!br) return;
+
+  // Playoff ties
+  const playoff = br.playoff || [];
+  const poHtml = playoff.length ? '<div class="g-title" style="color:#16A085;font-size:12px;margin-bottom:6px">Playoff Round (9-24)</div><div class="playoff-grid">' +
+    playoff.map(t => {
+      const aggStr = t.aggregate_a + '-' + t.aggregate_b;
+      let detail = aggStr + ' agg';
+      if (t.et_played) detail += ' (ET)';
+      if (t.penalties_played) detail += ' (pens)';
+      return '<div class="playoff-card"><div class="p-title">Tie ' + t.tie_num + '</div>' +
+        '<div class="p-teams"><span class="p-team winner">' + t.team_a + '</span><span class="p-score">' + aggStr + '</span><span class="p-team">' + t.team_b + '</span></div>' +
+        '<div class="p-detail">' + detail + '</div></div>';
+    }).join('') + '</div>' : '';
+  document.getElementById('playoffSection').innerHTML = poHtml;
+
+  // Knockout bracket
+  const rounds = br.bracket_rounds || {};
+  const grid = document.getElementById('bracketGrid');
+  grid.innerHTML = '';
+
+  const roundOrder = ['R16','QF','SF','FINAL'];
+  const roundLabel = {R16:'Round of 16',QF:'Quarter-Finals',SF:'Semi-Finals',FINAL:'Final'};
+
+  // Compute leaf order from FINAL
+  const byId = {};
+  for (const [r, ms] of Object.entries(rounds)) for (const m of ms) byId[m.match_id] = m;
+
+  function getLeafOrder(mid) {
+    const m = byId[mid];
+    if (!m || !m.source_matches) return [mid];
+    return [...getLeafOrder(m.source_matches[0]), ...getLeafOrder(m.source_matches[1])];
+  }
+  const leafOrder = getLeafOrder('final_01');
+  const leafIdx = {};
+  leafOrder.forEach((id, i) => leafIdx[id] = i);
+
+  function getRowRange(mid) {
+    const m = byId[mid];
+    if (!m) return {start: 0, end: 2};
+    if (m.round === 'FINAL') return {start: 0, end: leafOrder.length};
+    const leaves = getLeafOrder(mid);
+    if (!leaves.length) return {start: 0, end: 2};
+    const first = leafIdx[leaves[0]];
+    const last = leafIdx[leaves[leaves.length - 1]];
+    return {start: first, end: last + 1};
+  }
+
+  const ROW_UNIT = 28;
+  const slotsPerRound = {R16: 8, QF: 4, SF: 2, FINAL: 1};
+
+  roundOrder.forEach((r, ri) => {
+    const col = document.createElement('div');
+    col.className = 'bracket-col';
+    col.style.flex = String(1 + (ri === roundOrder.length - 1 ? 0.5 : 0));
+    col.innerHTML = '<div class="col-head">' + (roundLabel[r] || r) + '</div>';
+
+    const ms = (rounds[r] || []).slice().sort((a, b) => {
+      const ra = getRowRange(a.match_id);
+      const rb = getRowRange(b.match_id);
+      return ra.start - rb.start;
+    });
+
+    let lastEnd = 0;
+    ms.forEach(m => {
+      const rr = getRowRange(m.match_id);
+      const gap = rr.start - lastEnd;
+      if (gap > 0) {
+        const sp = document.createElement('div');
+        sp.className = 'match-slot';
+        sp.style.minHeight = (gap * ROW_UNIT) + 'px';
+        col.appendChild(sp);
+      }
+      lastEnd = rr.end;
+
+      const slot = document.createElement('div');
+      slot.className = 'match-slot';
+      slot.style.minHeight = Math.max((rr.end - rr.start) * ROW_UNIT, 40) + 'px';
+
+      const ta = m.team_a || 'TBD';
+      const tb = m.team_b || 'TBD';
+      const r = m.result || {};
+      const scoreStr = r.score_a !== undefined ? r.score_a + '-' + r.score_b : (r.aggregate_a !== undefined ? r.aggregate_a + '-' + r.aggregate_b : '?-?');
+      const isPlayed = m.winner ? true : false;
+      const isTbd = !m.team_a && !m.team_b;
+      const cardClass = isTbd ? 'tbd' : isPlayed ? 'played' : 'upcoming';
+
+      slot.innerHTML = '<div class="match-card ' + cardClass + '" data-mid="' + m.match_id + '">' +
+        '<div class="m-teams"><span class="m-team ' + (m.winner === ta ? 'winner' : '') + '">' + ta + '</span>' +
+        '<span class="m-score">' + scoreStr + '</span>' +
+        '<span class="m-team ' + (m.winner === tb ? 'winner' : '') + '">' + tb + '</span></div>' +
+        (m.winner ? '<div class="m-winner-label">' + m.winner + ' advances</div>' : '') +
+        '</div>';
+      slot.querySelector('.match-card').onclick = () => openMatchModal(m);
+      col.appendChild(slot);
+    });
+    grid.appendChild(col);
+  });
+
+  setTimeout(drawBracketConnectors, 50);
+}
+
+function drawBracketConnectors() {
+  const svg = document.getElementById('bracketSvg');
+  const grid = document.getElementById('bracketGrid');
+  const cols = grid.querySelectorAll('.bracket-col');
+  if (cols.length < 2) return;
+
+  svg.style.width = grid.scrollWidth + 'px';
+  svg.style.height = grid.scrollHeight + 'px';
+
+  const colRects = [];
+  cols.forEach(c => {
+    const r = c.getBoundingClientRect();
+    colRects.push({left: r.left, right: r.right, top: r.top, bottom: r.bottom});
+  });
+  const gridRect = grid.getBoundingClientRect();
+  const relX = (colIdx, side) => colRects[colIdx][side] - gridRect.left;
+  const relY = (el) => { const r = el.getBoundingClientRect(); return (r.top + r.bottom) / 2 - gridRect.top; };
+
+  const br = appState.bracket;
+  const byId = {};
+  if (br && br.bracket_rounds) for (const [r, ms] of Object.entries(br.bracket_rounds)) for (const m of ms) byId[m.match_id] = m;
+
+  let paths = '';
+  for (let ci = 0; ci < cols.length - 1; ci++) {
+    const rightCards = cols[ci + 1].querySelectorAll('.match-card');
+    rightCards.forEach(card => {
+      const mid = card.dataset.mid;
+      const m = byId[mid];
+      if (!m || !m.source_matches) return;
+      const x1 = relX(ci, 'right');
+      const x2 = relX(ci + 1, 'left');
+      const xm = (x1 + x2) / 2;
+      const parentY = relY(card);
+
+      m.source_matches.forEach(sm => {
+        const srcEl = cols[ci].querySelector('.match-card[data-mid="' + sm + '"]');
+        if (!srcEl) return;
+        const childY = relY(srcEl);
+        paths += '<path d="M ' + x1 + ' ' + childY + ' L ' + xm + ' ' + childY + ' L ' + xm + ' ' + parentY + ' L ' + x2 + ' ' + parentY + '" fill="none" stroke="#153D4C" stroke-width="1.5"/>';
+      });
+    });
+  }
+  svg.innerHTML = paths;
+}
+
+function openMatchModal(m) {
+  document.getElementById('modalTitle').innerHTML = (m.team_a || 'TBD') + ' <span style="color:#15565B;font-weight:normal">vs</span> ' + (m.team_b || 'TBD');
+  document.getElementById('modalSub').textContent = m.round + ' — ' + m.match_id;
+  const r = m.result || {};
+  const scoreStr = r.score_a !== undefined ? r.score_a + '-' + r.score_b : (r.aggregate_a !== undefined ? r.aggregate_a + '-' + r.aggregate_b : 'No result');
+  const detailLines = [];
+  if (r.et_played) detailLines.push('Extra time played');
+  if (r.penalties_played) detailLines.push('Penalties: ' + r.penalty_a + '-' + r.penalty_b);
+  document.getElementById('modalBody').innerHTML =
+    '<div class="sec-title">Result</div>' +
+    '<div style="font-size:16px;text-align:center;padding:12px 0;color:#16A085;font-weight:bold">' + scoreStr + '</div>' +
+    (m.winner ? '<div style="text-align:center;color:#168777;font-size:12px">' + m.winner + ' ' + (m.round === 'FINAL' ? 'wins the Champions League!' : 'advances') + '</div>' : '') +
+    (detailLines.length ? '<div class="sec-title">Details</div><div style="font-size:11px;color:#F6DBC088">' + detailLines.join('<br>') + '</div>' : '');
+  modalOverlay.classList.add('show');
+}
+
+function renderOdds() {
+  const odds = appState.odds;
+  if (!odds || !odds.length) return;
+  let html = '<table class="odds-table"><tr><th>#</th><th>Team</th><th>Champion</th><th>Final</th><th>SF</th><th>QF</th><th>Top 8</th></tr>';
+  odds.forEach(t => {
+    html += '<tr><td class="num">' + t.rank + '</td><td>' + t.team + '</td>' +
+      '<td class="num">' + (t.champion_prob * 100).toFixed(1) + '%<span class="odds-bar-wrap"><span class="odds-bar" style="width:' + Math.max(2, t.champion_prob * 200) + '%"></span></span></td>' +
+      '<td class="num">' + (t.final_prob * 100).toFixed(1) + '%</td>' +
+      '<td class="num">' + (t.sf_prob * 100).toFixed(1) + '%</td>' +
+      '<td class="num">' + (t.qf_prob * 100).toFixed(1) + '%</td>' +
+      '<td class="num">' + (t.top_8_prob * 100).toFixed(1) + '%</td></tr>';
+  });
+  html += '</table>';
+  document.getElementById('oddsWrap').innerHTML = html;
+}
+
+function renderSignals() {
+  const sigs = appState.signals;
+  const keys = Object.keys(sigs);
+  const mode = (appState.data || {}).mode || 'simulation';
+  const hasBrier = mode === 'results' && sigs[keys[0]] && sigs[keys[0]].brier !== undefined;
+  if (!keys.length) {
+    document.getElementById('signalsContent').innerHTML = '<div style="color:#15565B;font-size:12px">No signal data available.</div>';
+    return;
+  }
+  let html = '<table class="eval-table"><tr><th>Signal</th><th>Avg Prob</th><th>Matches</th><th>Avail</th><th>Weight</th>';
+  if (hasBrier) html += '<th>Brier</th><th>Accuracy</th>';
+  html += '<th></th></tr>';
+  keys.forEach(k => {
+    const s = sigs[k];
+    const pct = s.available_pct || 0;
+    const dot = pct >= 80 ? 'dot-green' : pct >= 50 ? 'dot-orange' : 'dot-red';
+    const icon = '&#9679;';
+    const status = pct >= 80 ? 'High' : pct >= 50 ? 'Medium' : 'Low';
+    html += '<tr><td>' + k + '</td><td class="num">' + (s.avg_probability || 0).toFixed(3) + '</td><td class="num">' + s.n_matches + '</td><td class="num">' + pct + '%</td><td class="num">' + ((s.weight || 0) * 100).toFixed(1) + '%</td>';
+    if (hasBrier) {
+      const b = s.brier || 0;
+      const acc = (s.accuracy || 0) * 100;
+      const brierDot = b < 0.15 ? 'dot-green' : b < 0.25 ? 'dot-orange' : 'dot-red';
+      html += '<td class="num"><span class="' + brierDot + '">' + icon + '</span> ' + b.toFixed(4) + '</td><td class="num">' + acc.toFixed(1) + '%</td>';
+    }
+    html += '<td class="num"><span class="' + dot + '">' + icon + '</span> ' + status + '</td></tr>';
+  });
+  html += '</table>';
+  document.getElementById('signalsContent').innerHTML = html;
+}
+
+// ── What-If ──
+function populateWhatIfSelectors() {
+  const matches = appState.matches;
+  const roundSel = document.getElementById('whatifRound');
+  const matchSel = document.getElementById('whatifMatch');
+  if (roundSel.options.length > 1) return;
+
+  const rounds = [...new Set(matches.map(m => m.round))];
+  rounds.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r; opt.textContent = r;
+    roundSel.appendChild(opt);
+  });
+
+  roundSel.onchange = () => {
+    const r = roundSel.value;
+    matchSel.innerHTML = '<option value="">-- Match --</option>';
+    matches.filter(m => m.round === r).forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.match_id;
+      const ta = m.team_a || 'TBD';
+      const tb = m.team_b || 'TBD';
+      opt.textContent = ta + ' vs ' + tb;
+      matchSel.appendChild(opt);
+    });
+    updateMatchInfo();
+  };
+  matchSel.onchange = updateMatchInfo;
+}
+
+function updateMatchInfo() {
+  const matchId = document.getElementById('whatifMatch').value;
+  const info = document.getElementById('whatifMatchInfo');
+  if (!matchId) { info.textContent = ''; return; }
+  const m = appState.matches.find(x => x.match_id === matchId);
+  if (m) info.textContent = m.round + ' — ' + (m.team_a || 'TBD') + ' vs ' + (m.team_b || 'TBD');
+}
+
+async function sendWhatIf() {
+  const matchId = document.getElementById('whatifMatch').value;
+  const scenario = document.getElementById('whatifInput').value.trim();
+  const resultDiv = document.getElementById('whatifResult');
+  if (!matchId || !scenario) { resultDiv.style.display = 'none'; return; }
+
+  resultDiv.style.display = 'none';
+  resultDiv.innerHTML = '';
+
+  try {
+    const resp = await (await fetch('/api/what-if', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({match_id: matchId, scenario}),
+    })).json();
+
+    resultDiv.style.display = 'block';
+
+    const note = resp.note ? '<div class="wir-note">' + resp.note + '</div>' : '';
+    const adjStr = resp.adjustments ? Object.entries(resp.adjustments).map(([t, d]) => t + ': ' + (d > 0 ? '+' : '') + d + ' Elo').join(', ') : '';
+
+    const deltaCls = resp.delta >= 0 ? 'wir-diff-pos' : 'wir-diff-neg';
+    const deltaSign = resp.delta >= 0 ? '+' : '';
+    const aName = resp.team_a || 'Team A';
+    const bName = resp.team_b || 'Team B';
+
+    resultDiv.innerHTML =
+      '<div class="wir-row"><span class="wir-label">Match</span><span class="wir-val">' + aName + ' vs ' + bName + '</span></div>' +
+      '<div class="wir-row"><span class="wir-label">Original</span><span class="wir-val">' + aName + ' ' + (resp.original_prob_a * 100).toFixed(1) + '%</span></div>' +
+      '<div class="wir-row"><span class="wir-label">After scenario</span><span class="wir-val ' + deltaCls + '">' + aName + ' ' + (resp.adjusted_prob_a * 100).toFixed(1) + '% <span class="' + deltaCls + '">(' + deltaSign + resp.delta_pct + '%)</span></span></div>' +
+      (adjStr ? '<div class="wir-row"><span class="wir-label">Adjustments</span><span class="wir-val" style="font-weight:normal;font-size:10px">' + adjStr + '</span></div>' : '') +
+      note;
+  } catch (e) {
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + '</div>';
+  }
+}
+
+// ── Terminal ──
+function termAdd(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'line';
+  if (text) {
+    const span = document.createElement('span');
+    if (cls) span.className = cls;
+    span.innerHTML = text;
+    div.appendChild(span);
+  }
+  termOutput.appendChild(div);
+}
+
+function termScroll() {
+  const tt = document.getElementById('tab-terminal');
+  if (tt && tt.classList.contains('active')) tt.scrollIntoView(false);
+}
+
+function focusTermInput() { termInput.focus(); }
+
+function termShowPrompt() {
+  termInputLine.style.display = 'flex';
+  termBuffer = '';
+  termInputDisplay.textContent = '';
+  termScroll();
+  focusTermInput();
+}
+
+function buildTable(teams, cols) {
+  const show = cols || ['champion_prob','final_prob','sf_prob','qf_prob'];
+  const labels = {champion_prob:'Champion',final_prob:'Final',sf_prob:'SF',qf_prob:'QF'};
+  let h = '<tr><th>#</th><th>Team</th>';
+  show.forEach(c => h += '<th>' + (labels[c] || c) + '</th>');
+  h += '</tr>';
+  let html = '<table>' + h;
+  teams.forEach((t, i) => {
+    html += '<tr><td class="num">' + (i + 1) + '</td><td>' + t.team + '</td>';
+    show.forEach(c => html += '<td class="num">' + ((t[c] || 0) * 100).toFixed(1) + '%</td>');
+    html += '</tr>';
+  });
+  return html + '</table>';
+}
+
+async function termRenderBootStep(step) {
+  const timeStr = step.output.split(']')[0].replace('[','') || '--';
+  const statusChar = step.status === 'ok' ? 'OK' : 'FAIL';
+  const cls = step.status === 'ok' ? 'ok' : 'danger';
+  termAdd('<span class="ts">[' + timeStr + ']</span> <span class="dim">' + step.step + '...</span>');
+  termScroll();
+  await new Promise(r => setTimeout(r, Math.min(300 + step.elapsed * 50, 800)));
+  const last = termOutput.lastElementChild;
+  if (last) last.innerHTML = '<span class="ts">[' + timeStr + ']</span> <span class="' + cls + '">' + statusChar + '</span> <span class="dim">' + step.step + '</span> <span class="dim">(' + step.elapsed.toFixed(1) + 's)</span>';
+}
+
+async function termBoot() {
+  termBooting = true;
+  termAdd('<span class="title">>> UCL 2025/26 — Champions League Predictor</span>');
+  termAdd('<span class="banner">+------------------------------------+\n|      MONTE CARLO SIMULATION        |\n|      10 000 iterations             |\n+------------------------------------+</span>');
+  termAdd('');
+
+  let bootSteps;
+  try { bootSteps = await (await fetch('/api/boot')).json(); }
+  catch { termAdd('<span class="danger">ERROR: Server unreachable.</span>'); termShowPrompt(); termBooting = false; return; }
+
+  for (const step of bootSteps) await termRenderBootStep(step);
+  termAdd('');
+
+  const d = appState.data;
+  if (d && d.all_teams) {
+    termAdd('<span class="highlight">== Champion Probability Table ==</span>');
+    termAdd('');
+    termAdd(buildTable(d.all_teams));
+    termAdd('');
+    termAdd('<span class="dim">>> System ready. ' + d.n_teams + ' teams simulated. Type help to explore.</span>');
+  } else {
+    termAdd('<span class="danger">ERROR: Failed to load prediction data.</span>');
+  }
+  termAdd('');
+  termAdd('Type <span class="prompt">help</span> for available commands.', 'dim');
+  termShowPrompt();
+  termBooting = false;
+}
+
+async function termExec(cmd) {
+  const trimmed = cmd.trim();
+  if (!trimmed) { termShowPrompt(); return; }
+  const parts = trimmed.toLowerCase().split(/\s+/);
+  const main = parts[0];
+  const d = appState.data;
+
+  if (main === 'help') {
+    termAdd(''); termAdd('<span class="highlight">Available commands:</span>');
+    termAdd('<span class="prompt">top N</span>       - top N by champion probability.');
+    termAdd('<span class="prompt">table</span>       - full 36-team league table.');
+    termAdd('<span class="prompt">odds</span>        - champion/qualification odds.');
+    termAdd('<span class="prompt">bracket</span>     - knockout bracket rounds.');
+    termAdd('<span class="prompt">playoff</span>     - playoff round results.');
+    termAdd('<span class="prompt">signals</span>     - signal blend statistics.');
+    termAdd('<span class="prompt">champion</span>    - show champion prediction.');
+    termAdd('<span class="prompt">clear</span>       - reset screen.');
+    termAdd('<span class="prompt">help</span>        - this message.');
+    termAdd('');
+  } else if (main === 'clear') {
+    termOutput.innerHTML = '';
+    termAdd('<span class="banner">+------------------------------------+\n|      MONTE CARLO SIMULATION        |\n|     ' + String((d ? d.n_iterations.toLocaleString() : '—')).padStart(10) + ' iterations           |\n+------------------------------------+</span>');
+    termAdd('');
+  } else if (main === 'top') {
+    const n = parseInt(parts[1]) || 5;
+    const teams = (d && d.all_teams) ? d.all_teams.slice(0, Math.min(n, d.all_teams.length)) : [];
+    if (!teams.length) { termAdd('No data.','dim'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== Top ' + teams.length + ' -- Champion Probability ==</span>');
+    termAdd(buildTable(teams)); termAdd('');
+  } else if (main === 'table') {
+    const st = appState.standings;
+    if (!st || !st.length) { termAdd('No data.','dim'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== League Table (36 teams) ==</span>');
+    let tbl = '<table><tr><th>Pos</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th><th>Zone</th></tr>';
+    st.forEach(r => {
+      const gd = r.gd > 0 ? '+' + r.gd : String(r.gd);
+      tbl += '<tr><td class="num">' + r.position + '</td><td>' + r.team + '</td><td class="num">' + (r.pts !== null && r.pts !== undefined ? r.pts : '?') + '</td><td class="num">' + gd + '</td><td class="num">' + (r.gs || 0) + '</td><td>' + (r.zone || '') + '</td></tr>';
+    });
+    termAdd(tbl + '</table>'); termAdd('');
+  } else if (main === 'odds') {
+    const odds = appState.odds;
+    if (!odds || !odds.length) { termAdd('No data.','dim'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== Champion / Qualification Odds ==</span>');
+    termAdd(buildTable(odds)); termAdd('');
+  } else if (main === 'bracket') {
+    const br = appState.bracket;
+    if (!br) { termAdd('No data.','dim'); termShowPrompt(); return; }
+    const rounds = br.bracket_rounds || {};
+    termAdd(''); termAdd('<span class="highlight">== Knockout Bracket ==</span>');
+    const roundOrder = ['R16','QF','SF','FINAL'];
+    roundOrder.forEach(r => {
+      const ms = rounds[r] || [];
+      if (!ms.length) return;
+      termAdd('<span class="highlight">--- ' + r + ' ---</span>');
+      ms.forEach(m => {
+        const r2 = m.result || {};
+        const scoreStr = r2.score_a !== undefined ? r2.score_a + '-' + r2.score_b : (r2.aggregate_a !== undefined ? r2.aggregate_a + '-' + r2.aggregate_b + ' agg' : '?-?');
+        const suffix = r2.et_played ? ' (ET)' : r2.penalties_played ? ' (pens)' : '';
+        termAdd('  ' + (m.team_a||'TBD') + ' ' + scoreStr + suffix + '  ' + (m.team_b||'TBD') + (m.winner ? ' -> ' + m.winner : ''));
+      });
+    });
+    const po = br.playoff || [];
+    if (po.length) {
+      termAdd(''); termAdd('<span class="highlight">--- Playoff Results ---</span>');
+      po.forEach(t => termAdd('  Tie ' + t.tie_num + ': ' + t.team_a + ' ' + t.aggregate_a + '-' + t.aggregate_b + ' ' + t.team_b + (t.et_played ? ' (ET)' : '') + (t.penalties_played ? ' (pens)' : '') + ' -> ' + t.winner));
+    }
+    termAdd('');
+  } else if (main === 'playoff') {
+    const po = (appState.bracket && appState.bracket.playoff) || [];
+    if (!po.length) { termAdd('No data.','dim'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== Playoff Round (9-24) ==</span>');
+    po.forEach(t => termAdd('  Tie ' + t.tie_num + ': ' + t.team_a + ' ' + t.aggregate_a + '-' + t.aggregate_b + ' ' + t.team_b + ' -> ' + t.winner));
+    termAdd('');
+  } else if (main === 'signals') {
+    const sigs = appState.signals;
+    const keys = Object.keys(sigs);
+    if (!keys.length) { termAdd('No signal data.','dim'); termShowPrompt(); return; }
+    termAdd(''); termAdd('<span class="highlight">== Signal Blend Status ==</span>');
+    let tbl = '<table><tr><th>Signal</th><th>Avg Prob</th><th>Matches</th><th>Avail</th><th>Weight</th></tr>';
+    keys.forEach(k => {
+      const s = sigs[k];
+      tbl += '<tr><td>' + k + '</td><td class="num">' + (s.avg_probability||0).toFixed(3) + '</td><td class="num">' + s.n_matches + '</td><td class="num">' + (s.available_pct||0) + '%</td><td class="num">' + ((s.weight||0)*100).toFixed(1) + '%</td></tr>';
+    });
+    termAdd(tbl + '</table>'); termAdd('');
+  } else if (main === 'champion') {
+    const ch = d ? d.champion : null;
+    const odds2 = appState.odds;
+    const top = odds2 && odds2.length ? odds2[0] : null;
+    termAdd('');
+    if (ch) termAdd('Representative champion: <span class="highlight">' + ch + '</span>');
+    if (top) termAdd('Probability favorite:   <span class="highlight">' + top.team + '</span> (' + (top.champion_prob * 100).toFixed(1) + '%)');
+    else termAdd('<span class="dim">No champion data available.</span>');
+    termAdd('');
+  } else {
+    termAdd('command not found: ' + trimmed, 'danger');
+    termAdd('Type <span class="prompt">help</span> for available commands.', 'dim');
+  }
+  termShowPrompt();
+}
+
+termInput.addEventListener('keydown', e => {
+  if (termBooting) { e.preventDefault(); return; }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const cmd = termBuffer;
+    termAdd('<span class="prompt"></span>' + cmd, 'cmd');
+    termHistory.push(cmd); termHistoryIdx = termHistory.length;
+    termInputDisplay.textContent = ''; document.querySelector('.term-cursor').style.display = 'none';
+    termExec(cmd);
+  } else if (e.key === 'Backspace') { termBuffer = termBuffer.slice(0, -1); termInputDisplay.textContent = termBuffer; }
+  else if (e.key === 'ArrowUp') { if (!termHistory.length) return; termHistoryIdx = Math.max(0, termHistoryIdx - 1); termBuffer = termHistory[termHistoryIdx] || ''; termInputDisplay.textContent = termBuffer; }
+  else if (e.key === 'ArrowDown') { termHistoryIdx = Math.min(termHistory.length, termHistoryIdx + 1); termBuffer = termHistoryIdx >= termHistory.length ? '' : termHistory[termHistoryIdx] || ''; termInputDisplay.textContent = termBuffer; }
+  else if (e.key.length === 1) { termBuffer += e.key; termInputDisplay.textContent = termBuffer; }
+});
+
+document.addEventListener('click', e => {
+  const termTab = document.getElementById('tab-terminal');
+  if (termTab && termTab.classList.contains('active') && !e.target.closest('.tab-btn')) {
+    setTimeout(focusTermInput, 10);
+  }
+});
+
+loadAll();
+termBoot();
+</script>
+</body>
+</html>

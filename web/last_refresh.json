@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-07-06T11:20:08.959360+00:00",
+  "status": "ok",
+  "elapsed": 10.35,
+  "updated": {
+    "matches_fetched": 93,
+    "new_group_matches": 0,
+    "bracket_resolved": 26,
+    "new_ko_matches": 19,
+    "match_results": true,
+    "catboost": true
+  },
+  "errors": null
+}
