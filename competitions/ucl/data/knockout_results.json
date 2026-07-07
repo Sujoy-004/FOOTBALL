@@ -1,0 +1,188 @@
+{
+  "playoff": [
+    {
+      "tie_num": 1,
+      "team_a": "Benfica",
+      "team_b": "Real Madrid",
+      "aggregate_a": 0,
+      "aggregate_b": 1,
+      "winner": "Real Madrid"
+    },
+    {
+      "tie_num": 2,
+      "team_a": "AS Monaco",
+      "team_b": "PSG",
+      "aggregate_a": 2,
+      "aggregate_b": 3,
+      "winner": "PSG"
+    },
+    {
+      "tie_num": 3,
+      "team_a": "Galatasaray",
+      "team_b": "Juventus",
+      "aggregate_a": 5,
+      "aggregate_b": 2,
+      "winner": "Galatasaray"
+    },
+    {
+      "tie_num": 4,
+      "team_a": "Borussia Dortmund",
+      "team_b": "Atalanta",
+      "aggregate_a": 2,
+      "aggregate_b": 0,
+      "winner": "Atalanta"
+    },
+    {
+      "tie_num": 5,
+      "team_a": "Qarabag",
+      "team_b": "Newcastle",
+      "aggregate_a": 1,
+      "aggregate_b": 6,
+      "winner": "Newcastle"
+    },
+    {
+      "tie_num": 6,
+      "team_a": "Bodo/Glimt",
+      "team_b": "Inter",
+      "aggregate_a": 3,
+      "aggregate_b": 1,
+      "winner": "Bodo/Glimt"
+    },
+    {
+      "tie_num": 7,
+      "team_a": "Club Brugge",
+      "team_b": "Atletico Madrid",
+      "aggregate_a": 3,
+      "aggregate_b": 3,
+      "winner": "Atletico Madrid"
+    },
+    {
+      "tie_num": 8,
+      "team_a": "Olympiacos",
+      "team_b": "Bayer Leverkusen",
+      "aggregate_a": 0,
+      "aggregate_b": 2,
+      "winner": "Bayer Leverkusen"
+    }
+  ],
+  "rounds": {
+    "R16": [
+      {
+        "team_a": "Galatasaray",
+        "team_b": "Liverpool",
+        "score_a": 1,
+        "score_b": 4,
+        "winner": "Liverpool"
+      },
+      {
+        "team_a": "Newcastle",
+        "team_b": "Barcelona",
+        "score_a": 1,
+        "score_b": 1,
+        "winner": "Barcelona"
+      },
+      {
+        "team_a": "Atletico Madrid",
+        "team_b": "Tottenham",
+        "score_a": 5,
+        "score_b": 2,
+        "winner": "Atletico Madrid"
+      },
+      {
+        "team_a": "Atalanta",
+        "team_b": "Bayern",
+        "score_a": 1,
+        "score_b": 6,
+        "winner": "Bayern"
+      },
+      {
+        "team_a": "Bayer Leverkusen",
+        "team_b": "Arsenal",
+        "score_a": 1,
+        "score_b": 1,
+        "winner": "Arsenal"
+      },
+      {
+        "team_a": "PSG",
+        "team_b": "Chelsea",
+        "score_a": 5,
+        "score_b": 2,
+        "winner": "PSG"
+      },
+      {
+        "team_a": "Bodo/Glimt",
+        "team_b": "Sporting",
+        "score_a": 3,
+        "score_b": 0,
+        "winner": "Sporting"
+      },
+      {
+        "team_a": "Real Madrid",
+        "team_b": "Man City",
+        "score_a": 3,
+        "score_b": 0,
+        "winner": "Real Madrid"
+      }
+    ],
+    "QF": [
+      {
+        "team_a": "Real Madrid",
+        "team_b": "Bayern",
+        "score_a": 1,
+        "score_b": 2,
+        "winner": "Bayern"
+      },
+      {
+        "team_a": "Sporting",
+        "team_b": "Arsenal",
+        "score_a": 0,
+        "score_b": 1,
+        "winner": "Arsenal"
+      },
+      {
+        "team_a": "PSG",
+        "team_b": "Liverpool",
+        "score_a": 2,
+        "score_b": 0,
+        "winner": "PSG"
+      },
+      {
+        "team_a": "Barcelona",
+        "team_b": "Atletico Madrid",
+        "score_a": 0,
+        "score_b": 2,
+        "winner": "Atletico Madrid"
+      }
+    ],
+    "SF": [
+      {
+        "team_a": "PSG",
+        "team_b": "Bayern",
+        "score_a": 5,
+        "score_b": 4,
+        "winner": "PSG"
+      },
+      {
+        "team_a": "Atletico Madrid",
+        "team_b": "Arsenal",
+        "score_a": 1,
+        "score_b": 1,
+        "winner": "Arsenal"
+      }
+    ],
+    "FINAL": [
+      {
+        "team_a": "PSG",
+        "team_b": "Arsenal",
+        "score_a": 1,
+        "score_b": 1,
+        "winner": "PSG",
+        "penalties": {
+          "winner": "PSG",
+          "score": "4-3"
+        }
+      }
+    ]
+  },
+  "champion": "PSG"
+}
