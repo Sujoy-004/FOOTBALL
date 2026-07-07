@@ -335,6 +335,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "Available in both --simulate and polling modes.",
     )
     parser.add_argument(
+        "--validate-calibrated", action="store_true",
+        help="Compare prediction metrics before vs after calibration. "
+             "Shows Brier, Log Loss, ECE, TRPS, champion accuracy. "
+             "Only available in --simulate mode.",
+    )
+    parser.add_argument(
+        "--weights", type=str, default=None, metavar="K=V,K=V",
+        help="Static blend weight override. Skips Brier-weighted optimization. "
+             "Syntax: --weights elo=0.4,odds=0.3,catboost=0.3. "
+             "Weights are normalized to sum 1.0. "
+             "Only available in --simulate mode.",
+    )
+    parser.add_argument(
         "--simulate",
         action="store_true",
         help="Offline simulation mode: load data files, run single simulation, exit. "
@@ -1659,6 +1672,222 @@ def _run_counterfactual(
     return cf_result, change_descriptions
 
 
+def _parse_weights(weights_str: str, known_signals: list[str]) -> dict[str, float]:
+    """Parse K=V,K=V weight string, validate, normalize to sum 1.0.
+
+    Args:
+        weights_str: "elo=0.4,odds=0.3,catboost=0.3"
+        known_signals: list of known signal names for validation
+
+    Returns:
+        {signal_name: normalized_weight} summing to 1.0
+
+    Raises:
+        ValueError on invalid format, unknown signals, all-zero weights
+    """
+    weights: dict[str, float] = {}
+    pairs = weights_str.split(",")
+    for pair in pairs:
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise ValueError(f"Invalid format '{pair}'. Use K=V syntax (e.g., elo=0.4).")
+        key, val_str = pair.split("=", 1)
+        key = key.strip()
+        val_str = val_str.strip()
+        if not key:
+            raise ValueError(f"Empty key in '{pair}'.")
+        if key not in known_signals:
+            raise ValueError(f"Unknown signal '{key}'. Available: {', '.join(sorted(known_signals))}")
+        try:
+            val = float(val_str)
+        except ValueError:
+            raise ValueError(f"Invalid weight value '{val_str}' for signal '{key}'.")
+        if val < 0:
+            raise ValueError(f"Negative weight {val} for signal '{key}'.")
+        weights[key] = val
+
+    if not weights:
+        raise ValueError("--weights must specify at least one key=value pair.")
+
+    total = sum(weights.values())
+    if total <= 0:
+        raise ValueError("Weights must sum to > 0.")
+
+    if abs(total - 1.0) > 1e-9:
+        print(f"Note: weights normalized to sum 1.0 (was {total:.4f})", file=sys.stderr)
+        weights = {k: v / total for k, v in weights.items()}
+
+    return weights
+
+
+def _find_actual_champion(bracket: list[dict], played: dict) -> str | None:
+    """Trace bracket tree to find the actual tournament champion."""
+    for match in bracket:
+        if match.get("round") in ("FINAL", "final", "Final"):
+            mid = match.get("match_id", "")
+            if mid in played:
+                return played[mid].get("winner")
+    return None
+
+
+def _run_calibrated_validation(
+    teams: dict,
+    groups: dict,
+    bracket: list[dict],
+    annex_c: dict,
+    played: dict,
+    played_groups: dict,
+    data_dir: str,
+    iterations: int = 50000,
+) -> dict:
+    """Run validation twice: uncalibrated (baseline) and calibrated.
+
+    Returns:
+        dict with structure:
+        {
+            "baseline": {"brier": ..., "log_loss": ..., "ece": ..., "trps": ..., "champion_acc": ...},
+            "calibrated": {"brier": ..., ...},
+            "delta": {"brier": ..., ...},
+            "n_matches": int,
+            "calibration_available": bool,
+        }
+    """
+    from football_core.evaluation import brier_score, log_loss, multi_class_ece, trps
+
+    def _compute_metrics(result: dict, actual_champion: str | None) -> dict:
+        metrics: dict[str, float | None] = {
+            "brier": None, "log_loss": None, "ece": None,
+            "trps": None, "champion_acc": None,
+        }
+        if actual_champion:
+            cp = result.get(actual_champion, {}).get("champion", 0.0)
+            metrics["brier"] = brier_score(cp, 1.0)
+            metrics["log_loss"] = log_loss(cp, 1.0)
+            ranked = sorted(result, key=lambda n: result[n]["champion"], reverse=True)
+            metrics["champion_acc"] = 1.0 if ranked[0] == actual_champion else 0.0
+        return metrics
+
+    actual_champion = _find_actual_champion(bracket, played)
+
+    n_matches = 0
+    for mid, m in played.items():
+        if isinstance(m, dict) and m.get("winner"):
+            n_matches += 1
+
+    if n_matches == 0:
+        return {
+            "baseline": {"brier": None, "log_loss": None, "ece": None, "trps": None, "champion_acc": None},
+            "calibrated": {"brier": None, "log_loss": None, "ece": None, "trps": None, "champion_acc": None},
+            "delta": {"brier": None, "log_loss": None, "ece": None, "trps": None, "champion_acc": None},
+            "n_matches": 0,
+            "calibration_available": False,
+        }
+
+    # Uncalibrated baseline
+    baseline = run_full_simulation(
+        teams, groups, bracket, annex_c, played, played_groups,
+        seed=42, iterations=iterations,
+    )
+    baseline_metrics = _compute_metrics(baseline, actual_champion)
+
+    # Try calibration
+    calib_path = Path(data_dir) / "calibration.json"
+    if not calib_path.exists():
+        return {
+            "baseline": baseline_metrics,
+            "calibrated": baseline_metrics,
+            "delta": {k: 0.0 if v is not None else None for k, v in baseline_metrics.items()},
+            "n_matches": n_matches,
+            "calibration_available": False,
+        }
+
+    # Calibrated run
+    blend_params: dict = {"calibrated": True}
+    calibrated = run_full_simulation(
+        teams, groups, bracket, annex_c, played, played_groups,
+        seed=42, iterations=iterations, blend_params=blend_params,
+    )
+    cal_metrics = _compute_metrics(calibrated, actual_champion)
+
+    delta = {}
+    for k in baseline_metrics:
+        bv = baseline_metrics[k]
+        cv = cal_metrics[k]
+        if bv is not None and cv is not None:
+            delta[k] = cv - bv
+        else:
+            delta[k] = None
+
+    return {
+        "baseline": baseline_metrics,
+        "calibrated": cal_metrics,
+        "delta": delta,
+        "n_matches": n_matches,
+        "calibration_available": True,
+    }
+
+
+def _print_calibration_comparison(validation_result: dict) -> None:
+    """Print before/after calibration comparison table."""
+    if validation_result.get("n_matches", 0) == 0:
+        print("No played matches to validate against.")
+        return
+
+    if not validation_result.get("calibration_available"):
+        print("No played matches to validate against.")
+        return
+
+    baseline = validation_result.get("baseline", {})
+    calibrated = validation_result.get("calibrated", {})
+    delta = validation_result.get("delta", {})
+
+    metrics_order = [
+        ("Brier", "brier", True),
+        ("Log Loss", "log_loss", True),
+        ("ECE", "ece", True),
+        ("TRPS", "trps", True),
+        ("Champion Acc", "champion_acc", False),
+    ]
+
+    print()
+    print("==== Calibration Validation ====")
+    print(f"  {'Metric':<20} {'Before':>8} {'After':>8} {'Delta':>8}")
+    print(f"  {'-' * 48}")
+
+    for display_name, key, lower_is_better in metrics_order:
+        bv = baseline.get(key)
+        cv = calibrated.get(key)
+        dv = delta.get(key)
+
+        if bv is not None and cv is not None:
+            b_str = f"{bv:.3f}" if not display_name.endswith("Acc") else f"{bv*100:.1f}%"
+            c_str = f"{cv:.3f}" if not display_name.endswith("Acc") else f"{cv*100:.1f}%"
+            d_str = f"{dv:+.3f}" if not display_name.endswith("Acc") else f"{dv*100:+.1f}pp"
+
+            if dv < 0 and lower_is_better:
+                d_str = f"\033[32m{d_str}\033[0m"
+            elif dv > 0 and not lower_is_better:
+                d_str = f"\033[32m{d_str}\033[0m"
+            elif dv != 0:
+                d_str = f"\033[31m{d_str}\033[0m"
+
+            print(f"  {display_name:<20} {b_str:>8} {c_str:>8} {d_str:>14}")
+        else:
+            print(f"  {display_name:<20} {'N/A':>8} {'N/A':>8} {'N/A':>14}")
+
+    print()
+    improvements = sum(1 for k in ["brier", "log_loss", "ece", "trps"]
+                       if delta.get(k) is not None and delta[k] < 0)
+    if delta.get("champion_acc") is not None and delta["champion_acc"] > 0:
+        improvements += 1
+    total = sum(1 for k in ["brier", "log_loss", "ece", "trps", "champion_acc"]
+                if delta.get(k) is not None)
+    print(f"  Calibration improved {improvements} of {total} metrics.")
+    print()
+
+
 def _build_report(
     result: dict,
     args: argparse.Namespace,
@@ -1766,10 +1995,19 @@ def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
     if iterations > 1_000_000:
         print("Warning: Large iteration count — may take several minutes")
 
+    # --weights override
+    blend_params: dict | None = None
+    if args.weights:
+        known_signals = ["elo", "form", "odds", "catboost", "lineup",
+                         "defensive", "manager", "availability", "refined_elo",
+                         "rolling_form", "squad_value", "rest_days", "market_odds"]
+        static_weights = _parse_weights(args.weights, known_signals)
+        blend_params = {"calibrated": False, "weights": static_weights}
+
     sim_start = time.time()
     result = run_full_simulation(
         teams, groups, bracket, annex_c, played, played_groups,
-        seed=seed, iterations=iterations,
+        seed=seed, iterations=iterations, blend_params=blend_params,
     )
     sim_elapsed = time.time() - sim_start
 
@@ -1816,6 +2054,14 @@ def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
         from competitions.worldcup.src.output import print_what_if_comparison
         print_what_if_comparison(result, cf_result, changes)
 
+    # Validate calibrated
+    if args.validate_calibrated:
+        val_result = _run_calibrated_validation(
+            teams, groups, bracket, annex_c, played, played_groups,
+            str(data_dir), iterations,
+        )
+        _print_calibration_comparison(val_result)
+
     # Report generation
     if args.report:
         report = _build_report(
@@ -1844,6 +2090,16 @@ def main() -> None:
     # --what-if requires --simulate
     if args.what_if and not args.simulate:
         print("Error: --what-if requires --simulate (offline batch mode)", file=sys.stderr)
+        sys.exit(1)
+
+    # --validate-calibrated requires --simulate
+    if args.validate_calibrated and not args.simulate:
+        print("Error: --validate-calibrated requires --simulate (offline batch mode)", file=sys.stderr)
+        sys.exit(1)
+
+    # --weights requires --simulate
+    if args.weights and not args.simulate:
+        print("Error: --weights requires --simulate (offline batch mode)", file=sys.stderr)
         sys.exit(1)
 
     # --simulate mode: offline batch, no API needed
