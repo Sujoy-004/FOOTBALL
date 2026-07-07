@@ -19,9 +19,12 @@ import json
 import logging
 import os
 import random
+import signal
 import sys
+import time as _time_module
 from dataclasses import asdict
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from typing import Any
 
 from competitions.ucl.display import (
@@ -262,6 +265,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--mode", type=str, default="simulate",
         choices=["simulate", "replay", "live"],
         help="Simulation mode: simulate (default), replay, or live",
+    )
+    data_group.add_argument(
+        "--watch", action="store_true",
+        help="Enable continuous polling loop. Requires --mode live.",
+    )
+    data_group.add_argument(
+        "--once", action="store_true",
+        help="Single-cycle live execution: fetch, process, display, exit. Requires --mode live.",
+    )
+    data_group.add_argument(
+        "--poll-interval", type=int, default=60,
+        help="Polling interval in seconds (default: 60). Requires --mode live --watch.",
     )
     data_group.add_argument(
         "--replay-data", type=str, default=None,
@@ -1266,10 +1281,166 @@ def _merge_signals_into_history(
     return prediction_history
 
 
+def _next_poll_sleep(interval: float, state: SimpleNamespace) -> None:
+    """Sleep in 0.5s increments, checking running flag for responsive shutdown."""
+    deadline = _time_module.time() + interval
+    while state.running and _time_module.time() < deadline:
+        _time_module.sleep(0.5)
+
+
+def _historical_catch_up(
+    data_dir: str,
+    elo_ratings: dict[str, float],
+    played: dict[str, dict],
+    elo_applied: list[str],
+) -> tuple[dict[str, dict], list[str]]:
+    """Fetch all prior finished BSD matches on first run and process chronologically.
+
+    Returns updated (played, elo_applied).
+    """
+    if played:
+        return played, elo_applied
+
+    from competitions.ucl.src.fetcher import fetch_raw_matches
+    from competitions.ucl.src.live_state import save_ucl_played, save_ucl_elo_applied
+    from competitions.ucl.src.elo_updater import apply_elo_update
+
+    backoff = [1, 2, 4]
+    raw = None
+    for attempt, delay in enumerate(backoff):
+        try:
+            raw = fetch_raw_matches(data_dir=data_dir)
+            if raw:
+                break
+        except Exception as e:
+            logger.warning("BSD fetch failed (attempt %d/3): %s", attempt + 1, e)
+            if attempt < len(backoff) - 1:
+                _time_module.sleep(delay)
+            continue
+
+    if not raw:
+        logger.warning("Historical catch-up: no data from BSD API")
+        return played, elo_applied
+
+    finished = [m for m in raw if m.get("status") == "finished"]
+    finished.sort(key=lambda m: m.get("event_date", ""))
+
+    ingested = 0
+    for match in finished:
+        mid = match.get("match_id", "")
+        if not mid or mid in played:
+            continue
+        update = apply_elo_update(match, elo_ratings, elo_applied)
+        if update:
+            played[mid] = match
+            ingested += 1
+
+    if ingested:
+        save_ucl_played(played, data_dir)
+        save_ucl_elo_applied(elo_applied, data_dir)
+        print(f"Historical catch-up: ingested {ingested} prior match(es)")
+
+    return played, elo_applied
+
+
+def _run_iteration(
+    args: argparse.Namespace,
+    data_dir: str,
+    elo_ratings: dict[str, float],
+    played: dict[str, dict],
+    elo_applied: list[str],
+    prediction_history: list[dict],
+    state: SimpleNamespace,
+) -> tuple[dict | None, dict[str, float] | None]:
+    """Run one live monitor cycle: fetch -> process -> simulate -> display."""
+    from competitions.ucl.src.live_state import save_ucl_played, save_ucl_elo_appended, save_ucl_prediction_history
+    from competitions.ucl.src.elo_updater import apply_elo_update, sync_elo_from_clubelo
+    from competitions.ucl.display import print_match_alert, print_elo_changes, print_heartbeat, print_simulation_duration, print_delta
+    from competitions.ucl.src.fetcher import fetch_raw_matches
+    from competitions.ucl.src.simulation import run_monte_carlo
+    from competitions.ucl.result import SimulationResult
+
+    try:
+        raw = fetch_raw_matches(data_dir=data_dir)
+    except Exception as e:
+        logger.warning("BSD fetch failed: %s", e)
+        print_heartbeat(
+            datetime.now().strftime("%H:%M:%S"),
+            args.poll_interval, 0,
+        )
+        return state.prev_probs, None
+
+    new_matches: list[dict] = []
+    if raw:
+        for match in raw:
+            mid = match.get("match_id", "")
+            if not mid or mid in played:
+                continue
+            if match.get("status") != "finished":
+                continue
+            update = apply_elo_update(match, elo_ratings, elo_applied)
+            if update:
+                played[mid] = match
+                new_matches.append(match)
+                print_match_alert(match)
+                print_elo_changes([update])
+
+    if new_matches:
+        save_ucl_played(played, data_dir)
+        save_ucl_elo_applied(elo_applied, data_dir)
+
+    # ClubElo sync (24h)
+    if state.elo_last_sync_time == 0 or _time_module.time() - state.elo_last_sync_time > 86400:
+        try:
+            corrections = sync_elo_from_clubelo(
+                {"_": {"elo": 1500}}, [], data_dir=data_dir,
+            )
+            if corrections:
+                state.elo_last_sync_time = _time_module.time()
+        except Exception as e:
+            logger.warning("ClubElo sync failed: %s", e)
+
+    if not new_matches:
+        print_heartbeat(
+            datetime.now().strftime("%H:%M:%S"),
+            args.poll_interval, 0,
+        )
+        return state.prev_probs, None
+
+    # Run MC simulation
+    _sim_start = _time_module.time()
+    try:
+        from competitions.ucl.src.simulation import run_monte_carlo
+        result = run_monte_carlo(
+            teams=list(elo_ratings.keys()),
+            elo_ratings=elo_ratings,
+            n_iterations=args.iterations,
+            seed=args.seed or 42,
+        )
+    except Exception as e:
+        logger.error("Simulation failed: %s", e)
+        return state.prev_probs, None
+    sim_elapsed = _time_module.time() - _sim_start
+    print_simulation_duration(sim_elapsed)
+
+    return None, None
+
+
 def main() -> None:
     """Entry point: parse args, run simulation, display results, optionally export JSON."""
     _ensure_utf8_mode()
     args = _parse_args()
+
+    # --watch / --once / --poll-interval validation
+    if args.watch and args.mode != "live":
+        print("Error: --watch requires --mode live", file=sys.stderr)
+        sys.exit(1)
+    if args.once and args.mode != "live":
+        print("Error: --once requires --mode live", file=sys.stderr)
+        sys.exit(1)
+    if args.poll_interval < 10:
+        print(f"Warning: --poll-interval minimum is 10 seconds (got {args.poll_interval})", file=sys.stderr)
+        args.poll_interval = 10
 
     # ── Phase 11: Logging setup and argument validation ──
     _setup_logging(args.verbose)
