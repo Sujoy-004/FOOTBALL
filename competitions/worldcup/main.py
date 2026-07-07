@@ -303,6 +303,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         dest="list_leagues",
         help="Print all available league IDs and names, then exit",
     )
+    parser.add_argument(
+        "--simulate",
+        action="store_true",
+        help="Offline simulation mode: load data files, run single simulation, exit. "
+             "No API needed. Compatible with: -n, --seed, --what-if, --report, "
+             "--show-breakdown, --show-ci, --validate-calibrated, --weights.",
+    )
+    parser.add_argument(
+        "-n", "--iterations",
+        type=int,
+        default=None,
+        help="Override simulation iteration count. Default: 50000.",
+    )
     return parser.parse_args(argv)
 
 
@@ -1492,6 +1505,74 @@ def _resolve_league_id(args: argparse.Namespace) -> tuple[int, Path]:
     return league_id, league_data_dir
 
 
+def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
+    """Run offline --simulate mode: load data files, run MC, display results."""
+
+    from src.state import (
+        load_teams, load_groups, load_bracket, load_annex_c,
+        load_played, load_played_groups,
+    )
+    from src.output import print_probability_table, print_simulation_duration
+    from src.knockout import run_full_simulation
+
+    # Check all required files exist
+    required_files = ["teams.json", "groups.json", "bracket.json",
+                      "annex_c.json", "played.json", "played_groups.json"]
+    missing = []
+    for fname in required_files:
+        if not (Path(data_dir) / fname).exists() and not (Path(constants.DATA_DIR) / fname).exists():
+            missing.append(fname)
+    if missing:
+        print(f"Error: Missing required data files: {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
+
+    # Staleness check
+    now = time.time()
+    for fname in required_files:
+        path = Path(data_dir) / fname
+        if not path.exists():
+            path = Path(constants.DATA_DIR) / fname
+        if path.exists():
+            age_hours = (now - path.stat().st_mtime) / 3600
+            if age_hours > 24:
+                print(f"Warning: {fname} last modified {age_hours:.0f}h ago — data may be stale")
+
+    try:
+        teams = load_teams(data_dir)
+        groups = load_groups(data_dir)
+        bracket = load_bracket(data_dir)
+        annex_c = load_annex_c(data_dir)
+        played = load_played(data_dir)
+        played_groups = load_played_groups(data_dir)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error loading data files: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    seed = args.seed or 42
+    iterations = args.iterations or 50000
+
+    if iterations < 100:
+        print("Error: Minimum iterations is 100", file=sys.stderr)
+        sys.exit(1)
+    if iterations > 1_000_000:
+        print("Warning: Large iteration count — may take several minutes")
+
+    sim_start = time.time()
+    result = run_full_simulation(
+        teams, groups, bracket, annex_c, played, played_groups,
+        seed=seed, iterations=iterations,
+    )
+    sim_elapsed = time.time() - sim_start
+
+    if not result:
+        print("Warning: Simulation produced no results")
+        return
+
+    print_simulation_duration(sim_elapsed)
+    print_probability_table(result)
+    print(f"\nSeed: {seed}  Iterations: {iterations}")
+
+
 def main() -> None:
     """Load state, then enter continuous polling loop until signal."""
     args = _parse_args()
@@ -1507,6 +1588,12 @@ def main() -> None:
 
     # Resolve league_id with precedence: CLI > config.json > 27
     league_id, league_data_dir = _resolve_league_id(args)
+
+    # --simulate mode: offline batch, no API needed
+    if args.simulate:
+        _run_batch_mode(args, league_data_dir)
+        return
+
     # Windows Console Host ANSI initialization (Python 3.10/3.11 quirk)
     if sys.platform == "win32":
         os.system("")
