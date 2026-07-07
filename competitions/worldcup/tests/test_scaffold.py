@@ -99,13 +99,16 @@ def test_team_aliases_includes_known_ambiguities():
     assert "Korea Republic" in aliases["South Korea"], "'South Korea' should include 'Korea Republic'"
 
 
-def test_played_json_is_empty_dict():
-    """Test 7: data/played.json is a valid JSON object `{}`."""
+def test_played_json_is_valid():
+    """Test 7: data/played.json is a valid JSON object (may have live match data)."""
     played_path = Path(__file__).resolve().parent.parent / "data" / "played.json"
     assert played_path.exists(), "played.json not found"
     with open(played_path, encoding="utf-8") as f:
         played = json.load(f)
-    assert played == {}, f"Expected empty dict, got: {played}"
+    assert isinstance(played, dict), "played.json must be a dict"
+    for match_id, match in played.items():
+        assert isinstance(match, dict), f"Match {match_id} must be a dict"
+        assert "team_a" in match and "team_b" in match, f"Match {match_id} missing teams"
 
 
 

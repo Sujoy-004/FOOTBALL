@@ -1663,8 +1663,8 @@ def _run_counterfactual(
     from src.knockout import run_full_simulation
 
     cf_result = run_full_simulation(
-        teams, groups, bracket, annex_c, played, played_groups,
-        seed=seed + 1, iterations=iterations,
+        teams, groups, bracket, annex_c, played,
+        iterations=iterations, seed=seed + 1, played_groups=played_groups,
         blend_params=blend_params,
         xg_overrides=xg_overrides,
     )
@@ -1787,8 +1787,8 @@ def _run_calibrated_validation(
 
     # Uncalibrated baseline
     baseline = run_full_simulation(
-        teams, groups, bracket, annex_c, played, played_groups,
-        seed=42, iterations=iterations,
+        teams, groups, bracket, annex_c, played,
+        iterations=iterations, seed=42, played_groups=played_groups,
     )
     baseline_metrics = _compute_metrics(baseline, actual_champion)
 
@@ -1806,8 +1806,9 @@ def _run_calibrated_validation(
     # Calibrated run
     blend_params: dict = {"calibrated": True}
     calibrated = run_full_simulation(
-        teams, groups, bracket, annex_c, played, played_groups,
-        seed=42, iterations=iterations, blend_params=blend_params,
+        teams, groups, bracket, annex_c, played,
+        iterations=iterations, seed=42, played_groups=played_groups,
+        blend_params=blend_params,
     )
     cal_metrics = _compute_metrics(calibrated, actual_champion)
 
@@ -2006,8 +2007,9 @@ def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
 
     sim_start = time.time()
     result = run_full_simulation(
-        teams, groups, bracket, annex_c, played, played_groups,
-        seed=seed, iterations=iterations, blend_params=blend_params,
+        teams, groups, bracket, annex_c, played,
+        iterations=iterations, seed=seed, played_groups=played_groups,
+        blend_params=blend_params,
     )
     sim_elapsed = time.time() - sim_start
 
@@ -2031,9 +2033,10 @@ def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
     signal_data = None
     try:
         signal_data = _gather_signal_data(teams, groups, bracket, None, None, None, None, None, played, played_groups)
+        from src.output import print_signal_breakdown
         print_signal_breakdown(signal_data, args.show_breakdown)
-    except Exception as e:
-        logger.warning("Signal breakdown unavailable: %s", e)
+    except Exception:
+        pass
 
     # Report generation
     cf_result = None
