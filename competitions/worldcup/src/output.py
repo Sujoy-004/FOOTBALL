@@ -875,6 +875,53 @@ def print_focus_card(match_data: dict, match_entry: dict | None = None) -> None:
     print()
 
 
+def print_what_if_comparison(
+    baseline_result: dict,
+    counterfactual_result: dict,
+    change_descriptions: list[str],
+    n_top: int = 10,
+) -> None:
+    """Print side-by-side comparison of baseline vs counterfactual simulation."""
+    print()
+    print("==== Counterfactual Analysis ====")
+    print()
+
+    if change_descriptions:
+        print("Changes:")
+        for desc in change_descriptions:
+            print(f"  {desc}")
+        print()
+
+    baseline_teams = baseline_result.get("teams", {})
+    cf_teams = counterfactual_result.get("teams", {})
+
+    all_teams = set(baseline_teams.keys()) | set(cf_teams.keys())
+    rows: list[tuple[str, float, float, float]] = []
+    for team in all_teams:
+        base_pct = baseline_teams.get(team, {}).get("champion_prob", 0.0) * 100
+        cf_pct = cf_teams.get(team, {}).get("champion_prob", 0.0) * 100
+        delta = cf_pct - base_pct
+        if abs(delta) > 0.1:
+            rows.append((team, base_pct, cf_pct, delta))
+
+    if not rows:
+        print("No material change detected")
+        return
+
+    rows.sort(key=lambda r: r[1], reverse=True)
+    print(f"Top-{min(n_top, len(rows))} Champion Probabilities:")
+    print(f"  {'Team':<24} {'Baseline':>9} {'Counterfactual':>14} {'Delta':>7}")
+    print(f"  {'-'*24} {'-'*9} {'-'*14} {'-'*7}")
+    for team, base_pct, cf_pct, delta in rows[:n_top]:
+        delta_str = f"{delta:+.1f}%"
+        if delta > 0:
+            delta_str = _green(delta_str)
+        elif delta < 0:
+            delta_str = _red(delta_str)
+        print(f"  {team:<24} {base_pct:>8.1f}% {cf_pct:>13.1f}% {delta_str:>7}")
+    print()
+
+
 def print_drift_alert(drift_info: dict) -> None:
     """Print the expanded drift detection block (D-18, drift variant).
 

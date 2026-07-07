@@ -17,6 +17,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -302,6 +303,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         dest="list_leagues",
         help="Print all available league IDs and names, then exit",
+    )
+    parser.add_argument(
+        "--what-if", type=str, default=None, metavar="FILE",
+        help="JSON override file for counterfactual analysis. "
+             "Supported keys: elo_changes (dict), blend_weights (dict), "
+             "xg_overrides (dict), calibration_temperature (float). "
+             "Only available in --simulate mode.",
     )
     parser.add_argument(
         "--simulate",
@@ -1505,6 +1513,129 @@ def _resolve_league_id(args: argparse.Namespace) -> tuple[int, Path]:
     return league_id, league_data_dir
 
 
+def _parse_what_if_file(what_if_path: str, teams: dict) -> dict:
+    """Parse and validate --what-if JSON override file.
+
+    Returns validated overrides dict, or raises ValueError on invalid content.
+    """
+    if not os.path.exists(what_if_path):
+        raise FileNotFoundError(f"Override file not found: {what_if_path}")
+
+    with open(what_if_path, encoding="utf-8") as f:
+        try:
+            overrides: dict[str, Any] = json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in override file: {e}")
+
+    if not isinstance(overrides, dict):
+        raise ValueError("Override file must contain a JSON object")
+
+    allowed_keys = {"elo_changes", "blend_weights", "xg_overrides", "calibration_temperature"}
+    unknown = set(overrides.keys()) - allowed_keys
+    if unknown:
+        raise ValueError(f"Unknown override keys: {', '.join(sorted(unknown))}. "
+                         f"Allowed: {', '.join(sorted(allowed_keys))}")
+
+    validated: dict[str, Any] = {}
+
+    if "elo_changes" in overrides:
+        elo = overrides["elo_changes"]
+        if not isinstance(elo, dict):
+            raise ValueError("elo_changes must be a dict mapping team -> rating")
+        for team, rating in elo.items():
+            if team not in teams:
+                raise ValueError(f"Unknown team in elo_changes: '{team}'")
+            if not isinstance(rating, (int, float)):
+                raise ValueError(f"Invalid Elo value for '{team}': must be a number")
+            if rating <= 0:
+                raise ValueError(f"Elo rating for '{team}' must be positive (got {rating})")
+        validated["elo_changes"] = elo
+
+    if "blend_weights" in overrides:
+        bw = overrides["blend_weights"]
+        if not isinstance(bw, dict):
+            raise ValueError("blend_weights must be a dict mapping signal -> weight")
+        if sum(bw.values()) == 0:
+            raise ValueError("blend_weights must not sum to 0")
+        validated["blend_weights"] = bw
+
+    if "xg_overrides" in overrides:
+        xg = overrides["xg_overrides"]
+        if not isinstance(xg, dict):
+            raise ValueError("xg_overrides must be a dict mapping match_id -> overrides")
+        for mid, val in xg.items():
+            if not isinstance(val, dict):
+                raise ValueError(f"xg_overrides['{mid}'] must be a dict with home_xg and away_xg")
+            if "home_xg" not in val or "away_xg" not in val:
+                raise ValueError(f"xg_overrides['{mid}'] must have 'home_xg' and 'away_xg' keys")
+            if val["home_xg"] <= 0 or val["away_xg"] <= 0:
+                raise ValueError(f"xg_overrides['{mid}'] values must be positive")
+        validated["xg_overrides"] = xg
+
+    if "calibration_temperature" in overrides:
+        ct = overrides["calibration_temperature"]
+        if not isinstance(ct, (int, float)):
+            raise ValueError("calibration_temperature must be a number")
+        if ct <= 0:
+            raise ValueError(f"calibration_temperature must be positive (got {ct})")
+        validated["calibration_temperature"] = ct
+
+    return validated
+
+
+def _run_counterfactual(
+    baseline_teams: dict,
+    baseline_groups: dict,
+    baseline_bracket: list[dict],
+    annex_c: dict,
+    played: dict,
+    played_groups: dict,
+    overrides: dict,
+    seed: int,
+    iterations: int,
+) -> tuple[dict, list[str]]:
+    """Run counterfactual simulation with overrides applied.
+
+    Returns:
+        (cf_result, change_descriptions)
+    """
+    teams = copy.deepcopy(baseline_teams)
+    groups = copy.deepcopy(baseline_groups)
+    bracket = copy.deepcopy(baseline_bracket)
+
+    change_descriptions: list[str] = []
+
+    elo_changes = overrides.get("elo_changes", {})
+    for team, new_rating in elo_changes.items():
+        old = teams[team]["elo"]
+        teams[team]["elo"] = new_rating
+        delta = new_rating - old
+        change_descriptions.append(f"{team}.elo: {int(old)} -> {int(new_rating)} ({delta:+d})")
+
+    blend_params: dict | None = None
+    if "blend_weights" in overrides or "calibration_temperature" in overrides:
+        blend_params = {}
+        if "blend_weights" in overrides:
+            blend_params["weights"] = overrides["blend_weights"]
+            change_descriptions.append(f"blend_weights: {overrides['blend_weights']}")
+        if "calibration_temperature" in overrides:
+            blend_params["calibration_temperature"] = overrides["calibration_temperature"]
+            change_descriptions.append(f"calibration_temperature: {overrides['calibration_temperature']}")
+
+    xg_overrides = overrides.get("xg_overrides", None)
+
+    from src.knockout import run_full_simulation
+
+    cf_result = run_full_simulation(
+        teams, groups, bracket, annex_c, played, played_groups,
+        seed=seed + 1, iterations=iterations,
+        blend_params=blend_params,
+        xg_overrides=xg_overrides,
+    )
+
+    return cf_result, change_descriptions
+
+
 def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
     """Run offline --simulate mode: load data files, run MC, display results."""
 
@@ -1572,6 +1703,23 @@ def _run_batch_mode(args: argparse.Namespace, data_dir: Path | str) -> None:
     print_probability_table(result)
     print(f"\nSeed: {seed}  Iterations: {iterations}")
 
+    # Counterfactual analysis
+    if args.what_if:
+        if not os.path.exists(args.what_if):
+            print(f"Error: Override file not found: {args.what_if}", file=sys.stderr)
+            sys.exit(1)
+        try:
+            overrides = _parse_what_if_file(args.what_if, teams)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        cf_result, changes = _run_counterfactual(
+            teams, groups, bracket, annex_c, played, played_groups,
+            overrides, seed, iterations,
+        )
+        from competitions.worldcup.src.output import print_what_if_comparison
+        print_what_if_comparison(result, cf_result, changes)
+
 
 def main() -> None:
     """Load state, then enter continuous polling loop until signal."""
@@ -1588,6 +1736,11 @@ def main() -> None:
 
     # Resolve league_id with precedence: CLI > config.json > 27
     league_id, league_data_dir = _resolve_league_id(args)
+
+    # --what-if requires --simulate
+    if args.what_if and not args.simulate:
+        print("Error: --what-if requires --simulate (offline batch mode)", file=sys.stderr)
+        sys.exit(1)
 
     # --simulate mode: offline batch, no API needed
     if args.simulate:
