@@ -153,6 +153,32 @@
 - [x] 11-03-PLAN.md — Production Architecture Refinements: CLI cleanup, --verbose, centralized argument validation, config standardization (UCLE-05, UCLE-06)
 **Status**: Complete ✓ (2026-07-03)
 
+### Phase 12: UCL Live Monitor + WC Batch Research
+
+**Goal**: Two parallel workstreams cross-pollinating features between competition modules. UCL gets the continuous polling, state persistence, and incremental Elo that WorldCup already has. WorldCup gets the offline simulation, counterfactual analysis, structured reports, and signal breakdown that UCL already has.
+**Depends on**: Phase 6 (UCL simulation modes for workstream A). Workstream B has no phase dependency.
+**Plans**: 10 plans (5 UCL + 5 WC) across 5 waves
+
+**Wave 1** *(foundation — parallel)*:
+- [ ] 12-01-PLAN.md — live_state.py: UCL state persistence wrapper (UCL-LIVE-01, UCL-LIVE-02)
+- [ ] 12-06-PLAN.md — --simulate mode: offline batch routing (WC-BATCH-01, WC-BATCH-02, WC-BATCH-03)
+
+**Wave 2** *(parallel within workstreams)*:
+- [ ] 12-02-PLAN.md — elo_updater.py: incremental Elo + 24h ClubElo sync (UCL-LIVE-03, UCL-LIVE-07)
+- [ ] 12-04-PLAN.md — display + signal cache: delta, heartbeat, alerts, cache refresh (UCL-LIVE-08, UCL-LIVE-09)
+- [ ] 12-07-PLAN.md — --what-if: counterfactual JSON analysis (WC-BATCH-04, WC-BATCH-05)
+
+**Wave 3** *(serial, depends on wave 2)*:
+- [ ] 12-03-PLAN.md — polling loop: --watch, _run_iteration, _historical_catch_up (UCL-LIVE-04, UCL-LIVE-05, UCL-LIVE-06, UCL-LIVE-10, UCL-LIVE-11)
+- [ ] 12-08-PLAN.md — report + breakdown + CI: --report, --show-breakdown, --show-ci (WC-BATCH-06, WC-BATCH-07, WC-BATCH-08, WC-BATCH-09, WC-BATCH-10)
+
+**Wave 4** *(testing + advanced features)*:
+- [ ] 12-05-PLAN.md — UCL: test_live_state, test_elo_updater, test_live_smoke (UCL-LIVE-12)
+- [ ] 12-09-PLAN.md — WC: --validate-calibrated, --weights (WC-BATCH-11, WC-BATCH-12)
+
+**Wave 5** *(WC final)*:
+- [ ] 12-10-PLAN.md — WC: benchmarks + test_batch_mode + test_counterfactual (WC-BATCH-13, WC-BATCH-14, WC-BATCH-15)
+
 </details>
 
 ## Progress
@@ -170,3 +196,4 @@
 | 9. Tournament Validation | v2.0 | 3/3 | ✓ Complete | 2026-07-03 |
 | 10. Probability Calibration & Uncertainty | v2.0 | 3/3 | ✓ Complete | 2026-07-04 |
 | 11. Explainability & Production | v2.0 | 3/3 | ✓ Complete | 2026-07-03 |
+| 12. UCL Live Monitor + WC Batch Research | v2.0 | 0/10 | 🟡 Planned | — |
