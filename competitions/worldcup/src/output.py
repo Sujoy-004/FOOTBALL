@@ -636,6 +636,7 @@ def coverage_audit() -> dict:
     extracted_operational = {
         "id", "status", "home_team", "away_team",
         "league.id", "group_name", "winner",
+        "period", "current_minute",
     }
     total_extracted = extracted_display | extracted_prediction | extracted_operational
 

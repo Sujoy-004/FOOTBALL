@@ -69,28 +69,48 @@ def process_matches(
         home_score = match.get("home_score", 0)
         away_score = match.get("away_score", 0)
 
+        winner = None
         if home_score > away_score:
             winner = home_norm
-            is_draw = False
         elif away_score > home_score:
             winner = away_norm
-            is_draw = False
         else:
-            bsd_winner = match.get("winner")
-            if bsd_winner:
-                bsd_winner_lower = bsd_winner.strip().lower()
-                home_lower = home_name.strip().lower()
-                away_lower = away_name.strip().lower()
-                if bsd_winner_lower == home_lower:
-                    winner = home_norm
-                elif bsd_winner_lower == away_lower:
-                    winner = away_norm
-                else:
-                    winner = None
-                is_draw = False
-            else:
-                winner = None
-                is_draw = True
+            # Tied — try extra time score (extra_time_score.home/away)
+            ets = match.get("extra_time_score")
+            if isinstance(ets, dict):
+                et_h, et_a = ets.get("home"), ets.get("away")
+                if et_h is not None and et_a is not None and et_h != et_a:
+                    winner = home_norm if et_h > et_a else away_norm
+            # Try penalty shootout (penalty_shootout.home/away)
+            if winner is None:
+                ps = match.get("penalty_shootout")
+                if isinstance(ps, dict):
+                    ps_h, ps_a = ps.get("home"), ps.get("away")
+                    if ps_h is not None and ps_a is not None and ps_h != ps_a:
+                        winner = home_norm if ps_h > ps_a else away_norm
+            # Try flat penalty fields
+            if winner is None:
+                pen_home = match.get("penalty_home") or match.get("home_penalty") or match.get("pen_home")
+                pen_away = match.get("penalty_away") or match.get("away_penalty") or match.get("pen_away")
+                if pen_home is not None and pen_away is not None and pen_home != pen_away:
+                    winner = home_norm if pen_home > pen_away else away_norm
+            # Try winner / result field (string or dict with name)
+            if winner is None:
+                bsd_winner = match.get("winner") or match.get("result")
+                if bsd_winner:
+                    w_name = None
+                    if isinstance(bsd_winner, str):
+                        w_name = bsd_winner
+                    elif isinstance(bsd_winner, dict):
+                        w_name = bsd_winner.get("name") or bsd_winner.get("full_name")
+                    if w_name:
+                        w_norm = normalize_team(w_name, alias_lookup) or alias_lookup.get(w_name.strip().lower())
+                        if w_norm == home_norm:
+                            winner = home_norm
+                        elif w_norm == away_norm:
+                            winner = away_norm
+
+        is_draw = winner is None
 
         entry: dict = {
             "match_id": bracket_id,
