@@ -160,7 +160,11 @@ def _build_signal_engine(
     elo_ratings: dict[str, float],
     weights_override: dict[str, float] | None = None,
 ) -> EnsembleEngine:
-    """Build EnsembleEngine with 5 pre-configured signals and calibrated weights.
+    """Build EnsembleEngine with 8 pre-configured signals and calibrated weights.
+
+    Signals 1-5 use no external data (fallback to uniform when missing).
+    Signals 6-8 require context.manager_data / context.player_data from BSD API
+    and gracefully fall back to uniform when unavailable.
 
     Args:
         elo_ratings: {team: elo} dict for PredictionContext.
@@ -174,6 +178,9 @@ def _build_signal_engine(
     from football_core.signals.rolling_form import RollingFormSignal
     from football_core.signals.squad_value import SquadValueSignal
     from football_core.signals.rest_days import RestDaysSignal
+    from football_core.signals.availability import AvailabilitySignal
+    from football_core.signals.manager_effect import ManagerEffectSignal
+    from football_core.signals.defensive_quality import DefensiveQualitySignal
 
     signals = [
         RefinedEloSignal(),
@@ -181,6 +188,9 @@ def _build_signal_engine(
         RollingFormSignal(result_provider=_EmptyResultProvider()),
         SquadValueSignal(),
         RestDaysSignal(),
+        AvailabilitySignal(),
+        ManagerEffectSignal(),
+        DefensiveQualitySignal(),
     ]
 
     logger.debug("Building ensemble engine with %d signals: %s",

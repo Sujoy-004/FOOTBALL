@@ -356,8 +356,8 @@ def build_r16_bracket(
                 "match_id": match["match_id"],
                 "round": "R16",
                 "quarter": match["quarter"],
-                "team_a": team_seed,       # home leg 1
-                "team_b": team_pw,          # away leg 1
+                "team_a": team_pw,          # playoff winner hosts leg 1
+                "team_b": team_seed,        # seed hosts leg 2 (advantage)
                 "seed_position": seed_pos,
                 "playoff_tie": playoff_tie,
                 "resolved": False,

@@ -702,12 +702,16 @@ def run_monte_carlo_glicko(
         # different sample, propagating uncertainty into champion variance
         sampled_elos = _sample_glicko_elos(rating_system, rng)
 
+        # Recompute lambdas per iteration from sampled Elos (fix Glicko decoupling)
+        iter_lambdas = precompute_swiss_matchup_lambdas(
+            fixtures, sampled_elos, EXPECTED_GOALS_BASE_RATE,
+        )
         standings = simulate_league_phase(
             fixtures,
             sampled_elos,
             rng,
             uefa_coefficients=uefa_coefficients,
-            matchup_lambdas=matchup_lambdas,
+            matchup_lambdas=iter_lambdas,
             played_matches=played_matches,
         )
 
