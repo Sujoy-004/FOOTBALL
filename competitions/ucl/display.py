@@ -23,6 +23,7 @@ import sys
 
 from competitions.ucl.result import SimulationResult
 from football_core.signal import BlendedPrediction
+from typing import Any
 
 # ── Module-level constants ──────────────────────────────────────────────
 
@@ -403,7 +404,87 @@ def show_breakdown(
                 sd = bp.signal_breakdown[sig]
                 print(f"  {sig:<20} {sd['home']:>6.3f} {sd['draw']:>6.3f} "
                       f"{sd['away']:>6.3f} {sd['weight']:>7.4f}")
-            print()
+    print()
+
+
+# ── Live Monitor display functions (Phase 12) ────────────────────────────
+
+
+def print_delta(probs: dict[str, float], prev_probs: dict[str, float] | None) -> None:
+    """Print compact delta column comparing current vs previous probabilities."""
+    if prev_probs is None or not prev_probs:
+        return
+    rows: list[tuple[str, float, float, float]] = []
+    for team, prob in probs.items():
+        prev = prev_probs.get(team, 0.0)
+        delta = prob - prev
+        if abs(delta) >= 0.5:
+            rows.append((team, prob, prev, delta))
+    if not rows:
+        return
+    rows.sort(key=lambda r: abs(r[3]), reverse=True)
+    print(f"\n{'Team':<24} {'Curr':>7} {'Prev':>7} {'Delta':>7}")
+    print("-" * 48)
+    for team, prob, prev, delta in rows:
+        delta_str = f"{delta:+.1f}%"
+        if delta > 0:
+            delta_str = _green(delta_str)
+        elif delta < 0:
+            delta_str = _red(delta_str)
+        print(f"  {team:<24} {prob:>6.1f}% {prev:>6.1f}% {delta_str:>7}")
+
+
+def print_heartbeat(timestamp: str, next_poll_seconds: int, new_matches: int) -> None:
+    """Print a timestamped status line for idle or active cycles."""
+    if new_matches > 0:
+        print(f"[{timestamp}] Ingested {new_matches} new match(es) -- next poll in {next_poll_seconds}s")
+    else:
+        print(f"[{timestamp}] No new matches -- next poll in {next_poll_seconds}s")
+
+
+def print_match_alert(match: dict[str, Any]) -> None:
+    """Print a single-line alert when a new match result is ingested."""
+    home = match.get("home_team", "?")
+    away = match.get("away_team", "?")
+    hs = match.get("home_score", "?")
+    a_s = match.get("away_score", "?")
+    mid = match.get("match_id", "???")
+    print(f"> {home} {hs}-{a_s} {away} ({mid})")
+
+
+def print_elo_changes(updates: list[dict[str, Any]]) -> None:
+    """Print Elo changes after match processing."""
+    if not updates:
+        return
+    parts: list[str] = []
+    for update in updates:
+        home = update.get("home", {})
+        away = update.get("away", {})
+        if home:
+            h_team = home.get("team", "?")
+            h_before = home.get("elo_before", 0)
+            h_after = home.get("elo_after", 0)
+            h_delta = h_after - h_before
+            parts.append(f"{h_team}: {int(h_before)} -> {int(h_after)} ({h_delta:+d})")
+        if away:
+            a_team = away.get("team", "?")
+            a_before = away.get("elo_before", 0)
+            a_after = away.get("elo_after", 0)
+            a_delta = a_after - a_before
+            parts.append(f"{a_team}: {int(a_before)} -> {int(a_after)} ({a_delta:+d})")
+    if parts:
+        print(f"  {', '.join(parts)}")
+
+
+def print_simulation_duration(seconds: float) -> None:
+    """Print MC simulation duration."""
+    if seconds < 60:
+        print(f"Simulation: {seconds:.1f}s")
+    else:
+        minutes = int(seconds // 60)
+        secs = seconds % 60
+        print(f"Simulation: {minutes}m {secs:.1f}s")
+
 
 
 def print_value_plays(

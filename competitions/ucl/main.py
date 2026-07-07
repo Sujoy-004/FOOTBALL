@@ -22,6 +22,7 @@ import random
 import sys
 from dataclasses import asdict
 from datetime import datetime, timezone
+from typing import Any
 
 from competitions.ucl.display import (
     print_summary,
@@ -40,6 +41,11 @@ from competitions.ucl.src.knockout import (
     track_knockout_stages,
 )
 from competitions.ucl.src.elo_fetcher import fetch_team_elos
+from competitions.ucl.src.live_state import (
+    load_ucl_cache,
+    save_ucl_cache,
+    ucl_is_cache_valid,
+)
 from football_core.provider import FixtureSchedule, FixtureProviderError
 from football_core.signal import PredictionContext
 from football_core.blender import EnsembleEngine, compute_signal_contributions
@@ -1201,6 +1207,63 @@ def _save_validation_baseline(
         json.dump(existing, f, indent=2)
 
     return existing
+
+
+def _load_cache_ttls(data_dir: str) -> dict[str, int]:
+    """Load per-signal cache TTLs from config/cache_ttls.json.
+
+    Returns dict with defaults: {"odds": 12, "catboost": 24}.
+    """
+    config_path = os.path.join(data_dir, "..", "config", "cache_ttls.json")
+    try:
+        with open(config_path) as f:
+            return dict(json.load(f))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"odds": 12, "catboost": 24}
+
+
+def _merge_signals_into_history(
+    matches: list[dict],
+    signal_caches: dict[str, dict],
+    prediction_history: list[dict],
+) -> list[dict]:
+    """Merge signal cache data into prediction_history for each match.
+
+    Args:
+        matches: List of BSD match event dicts (finished matches).
+        signal_caches: {cache_key: {match_id: signal_data}} from cache files.
+        prediction_history: Existing history list (mutated in-place for new entries).
+
+    Returns:
+        Updated prediction_history with new entries appended.
+    """
+    existing_mids = {e.get("match_id", "") for e in prediction_history if isinstance(e, dict)}
+
+    for match in matches:
+        mid = match.get("match_id", "")
+        if not mid or mid in existing_mids:
+            continue
+
+        signals: dict[str, Any] = {}
+        for cache_key, cache_data in signal_caches.items():
+            if isinstance(cache_data, dict):
+                match_signal = cache_data.get(mid)
+                if match_signal is not None:
+                    signals[cache_key] = match_signal
+
+        entry: dict[str, Any] = {
+            "match_id": mid,
+            "home_team": match.get("home_team", ""),
+            "away_team": match.get("away_team", ""),
+            "home_score": match.get("home_score"),
+            "away_score": match.get("away_score"),
+            "signals": signals,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        prediction_history.append(entry)
+        existing_mids.add(mid)
+
+    return prediction_history
 
 
 def main() -> None:
