@@ -712,42 +712,6 @@ def api_simulate(req: dict = None):
     return JSONResponse({"status": "ok", "task_id": task_id, "mode": _mode})
 
 
-@ucl_app.post("/api/refresh")
-def api_refresh():
-    global cache
-    t0 = time.time()
-    refresh_log: list[str] = []
-    try:
-        new_elos = boot_step("Re-fetch ClubElo", lambda: fetch_team_elos(
-            [t["name"] for t in cache.get("all_teams", [])] or
-            list(cache.get("elo_ratings", {}).keys())
-        ), [])
-        refresh_log.append(f"ClubElo: {len(new_elos) if new_elos else 0} ratings")
-        if new_elos:
-            cache["elo_ratings"] = new_elos
-    except Exception as e:
-        refresh_log.append(f"ClubElo error: {e}")
-    if BSD_API_KEY:
-        try:
-            mgr_data = _fetch_ucl_managers(BSD_API_KEY)
-            if mgr_data:
-                cache["bsd_manager_data"] = mgr_data
-                refresh_log.append(f"BSD managers: {len(mgr_data)} teams")
-        except Exception as e:
-            refresh_log.append(f"BSD error: {e}")
-    try:
-        _run_mc_simulation()
-        refresh_log.append("MC re-simulated")
-        elapsed = round(time.time() - t0, 2)
-        return JSONResponse({
-            "status": "ok", "elapsed": elapsed, "updated": refresh_log,
-        })
-    except Exception as e:
-        elapsed = round(time.time() - t0, 2)
-        return JSONResponse({
-            "status": "error", "elapsed": elapsed, "error": str(e),
-        })
-
 
 def _run_mc_simulation(progress_cb=None, n_iterations=10000):
     global boot_log_local, sim_result, _mode, cache
@@ -901,6 +865,88 @@ def api_simulation_progress(task_id: str):
     return JSONResponse(response)
 
 
+# ── Match insight helpers ──
+
+
+def _ucl_form_trend(team: str, results: list[dict]) -> list[dict]:
+    """Return last 5 results for a team from results list."""
+    entries: list[dict] = []
+    for m in results:
+        ta, tb = m["team_a"], m["team_b"]
+        hs, aws = m["home_score"], m["away_score"]
+        if ta == team:
+            winner = ta if hs > aws else (tb if aws > hs else None)
+            r = "W" if winner == ta else ("L" if winner == tb else "D")
+            entries.append({"result": r, "gf": hs, "ga": aws, "opponent": tb, "match_id": m["match_id"]})
+        elif tb == team:
+            winner = ta if hs > aws else (tb if aws > hs else None)
+            r = "W" if winner == tb else ("L" if winner == ta else "D")
+            entries.append({"result": r, "gf": aws, "ga": hs, "opponent": ta, "match_id": m["match_id"]})
+    return entries[-5:]
+
+
+def _ucl_head_to_head(ta: str, tb: str, results: list[dict]) -> dict:
+    """Return H2H stats between two teams from results list."""
+    a_wins = b_wins = draws = 0
+    matches: list[dict] = []
+    for m in results:
+        mt_a, mt_b = m["team_a"], m["team_b"]
+        if (mt_a == ta and mt_b == tb) or (mt_a == tb and mt_b == ta):
+            swapped = mt_a == tb
+            hs, aws = m["home_score"], m["away_score"]
+            a_score, b_score = (aws, hs) if swapped else (hs, aws)
+            if a_score > b_score:
+                a_wins += 1
+            elif b_score > a_score:
+                b_wins += 1
+            else:
+                draws += 1
+            matches.append({"match_id": m["match_id"], "team_a": ta, "score": f"{a_score}-{b_score}", "team_b": tb})
+    return {"matches": matches, "a_wins": a_wins, "b_wins": b_wins, "draws": draws, "total": a_wins + b_wins + draws}
+
+
+def _ucl_outcome_dist(blended_prob: float, elo_a: float, elo_b: float) -> dict:
+    """Estimate outcome distribution from blended probability."""
+    elo_diff = abs(elo_a - elo_b)
+    draw_est = 0.26 if elo_diff < 50 else (0.20 if elo_diff < 150 else (0.14 if elo_diff < 300 else 0.09))
+    a_win = round(blended_prob * (1 - draw_est), 4)
+    draw = round(draw_est, 4)
+    b_win = round((1 - blended_prob) * (1 - draw_est), 4)
+    total = a_win + draw + b_win
+    if abs(total - 1.0) > 0.001:
+        a_win = round(a_win / total, 4)
+        draw = round(draw / total, 4)
+        b_win = round(b_win / total, 4)
+    return {"a_win": a_win, "draw": draw, "b_win": b_win}
+
+
+def _ucl_insight_text(ta: str, tb: str, signals: dict, form_trends: dict, h2h: dict, outcome: dict, eval_data: dict) -> str:
+    lines: list[str] = []
+    if signals:
+        winner_sig = max(signals.items(), key=lambda x: x[1].get("weight", 0) * x[1].get("probability", 0.5))[0]
+        sp = signals[winner_sig]
+        label = winner_sig.replace("_", " ").title()
+        lines.append(f"{ta} is led by {label} (P={sp.get('probability', 0.5)*100:.0f}%).")
+    for team in (ta, tb):
+        ft = form_trends.get(team, [])
+        if ft:
+            streak = "".join(r["result"] for r in ft)
+            lines.append(f"{team} form: {streak} in last {len(ft)}.")
+    if h2h and h2h["total"] > 0:
+        lines.append(f"H2H: {ta} {h2h['a_wins']}-{h2h['draws']}-{h2h['b_wins']} {tb} ({h2h['total']} meetings).")
+    if outcome:
+        lines.append(f"Predicted: {ta} {outcome['a_win']*100:.0f}% / Draw {outcome['draw']*100:.0f}% / {tb} {outcome['b_win']*100:.0f}%.")
+    if eval_data:
+        valid = {k: v for k, v in eval_data.items() if v.get("n_matches", 0) > 5}
+        if valid:
+            best = max(valid.items(), key=lambda x: x[1].get("accuracy", 0))
+            lines.append(f"Most reliable: {best[0].replace('_',' ').title()} ({best[1]['accuracy']*100:.0f}% accuracy).")
+            worst = max(valid.items(), key=lambda x: x[1].get("brier", 0))
+            if worst[1].get("brier", 0) >= 0.25:
+                lines.append(f"Warning: {worst[0].replace('_',' ').title()} signal unreliable (Brier {worst[1]['brier']:.2f}).")
+    return " >> ".join(lines) if lines else f"{ta} vs {tb}: no insight data available."
+
+
 @ucl_app.get("/api/match/insight")
 def api_match_insight(match_id: str = ""):
     if not match_id:
@@ -918,20 +964,64 @@ def api_match_insight(match_id: str = ""):
         return JSONResponse({"error": "match not found"})
     ta = match_data.get("team_a", "")
     tb = match_data.get("team_b", "")
-    sigs = cache.get("signals", {})
+    if not ta or not tb:
+        return JSONResponse({"error": "match teams not set"})
+
     elo_map = cache.get("elo_ratings", {})
     elo_a = elo_map.get(ta, 1500.0)
     elo_b = elo_map.get(tb, 1500.0)
-    prob_a = expected_score(elo_a, elo_b)
+    elo_prob = expected_score(elo_a, elo_b)
+
+    engine = cache.get("_signal_engine")
+    signals_with_weights: dict = {}
+    blended_prob = 0.5
+
+    if engine:
+        try:
+            ctx = PredictionContext(
+                fixtures=[{"team_a": ta, "team_b": tb, "match_id": match_id}],
+                elo_ratings=elo_map,
+                played_results=[],
+                manager_data=cache.get("bsd_manager_data", {}),
+            )
+            bp = engine.evaluate({"team_a": ta, "team_b": tb, "match_id": match_id}, ctx)
+            blended_prob = bp.home_prob
+            for sig, sd in bp.signal_breakdown.items():
+                prob = sd.get("home", 0.5)
+                weight = sd.get("weight", 0)
+                signals_with_weights[sig] = {
+                    "probability": round(prob, 4),
+                    "weight": round(weight, 4),
+                    "label": sig.replace("_", " ").title(),
+                }
+        except Exception:
+            pass
+
+    results = cache.get("_results", [])
+    form_trends: dict = {}
+    h2h: dict = {"a_wins": 0, "b_wins": 0, "draws": 0, "total": 0}
+    if results:
+        form_trends = {ta: _ucl_form_trend(ta, results), tb: _ucl_form_trend(tb, results)}
+        h2h = _ucl_head_to_head(ta, tb, results)
+
+    outcome = _ucl_outcome_dist(blended_prob, elo_a, elo_b)
+    eval_data = cache.get("signals", {})
+    insight = _ucl_insight_text(ta, tb, signals_with_weights, form_trends, h2h, outcome, eval_data)
+
     return JSONResponse({
         "match_id": match_id,
-        "team_a": ta,
-        "team_b": tb,
-        "elo_prob_a": round(prob_a, 4),
-        "elo_prob_b": round(1 - prob_a, 4),
+        "round": match_data.get("round"),
+        "teams": {"a": ta, "b": tb},
+        "played": bool(match_data.get("winner")),
+        "score": match_data.get("score"),
         "winner": match_data.get("winner"),
-        "result": match_data.get("result"),
-        "signals": sigs,
+        "signals": signals_with_weights,
+        "blended_prob": round(blended_prob, 4),
+        "elo_prob": round(elo_prob, 4),
+        "form_trends": form_trends,
+        "head_to_head": h2h,
+        "outcome_distribution": outcome,
+        "insight": insight,
     })
 
 

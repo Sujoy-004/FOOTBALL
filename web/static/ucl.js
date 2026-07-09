@@ -10,9 +10,6 @@ const appState = { data: null, standings: [], bracket: null, odds: [], signals: 
 
 let pollTimer = null;
 let simTaskId = null;
-let refreshing = false;
-let autoRefreshOn = false;
-let autoTimer = null;
 
 export function init(comp) {
   renderTerminalShell();
@@ -75,52 +72,16 @@ function updateStatus() {
   const mode = d.mode || "simulation";
   const modeLabel = mode === "results" ? "Live Results 2025/26" : "MC Simulation";
   const modeColor = mode === "results" ? "#168777" : "#15565B";
-  const autoBadge = autoRefreshOn
-    ? '<span style="color:#16A085;font-size:10px;margin-left:8px">[AUTO 60s]</span>'
-    : '';
-  const refreshBtn = refreshing
-    ? '<span style="color:#15565B;font-size:11px;margin-left:8px">refreshing...</span>'
-    : '<button class="status-btn" onclick="window.__doRefresh()" style="margin-left:8px">&#x21bb;</button>';
   const rightHtml = (mode === "results"
     ? '<input id="simIterInput" type="number" min="10" max="1000000" step="1000" value="10000" style="width:80px;font-size:11px;padding:2px 4px;margin-right:4px;background:#0D1B2A;border:1px solid #15565B;color:#fff;border-radius:3px;text-align:right">'
     + '<span style="color:#15565B;font-size:10px;margin-right:6px">sims</span>'
     + '<button class="status-btn" onclick="window.__runSimulation()">>> Run Simulation</button>'
-    : '<button class="status-btn" onclick="window.__resetResults()">>> Back to Real Results</button>')
-    + refreshBtn
-    + '<button class="status-btn" onclick="window.__toggleAuto()" style="margin-left:4px">' + (autoRefreshOn ? "Stop Auto" : "Auto") + '</button>'
-    + autoBadge;
+    : '<button class="status-btn" onclick="window.__resetResults()">>> Back to Real Results</button>');
   updateStatusBar(
     '<span style="color:' + modeColor + '">' + modeLabel + '</span>  |  ' + d.n_teams + " teams  |  " + d.n_iterations.toLocaleString() + (mode === "results" ? "" : " sims"),
     rightHtml
   );
 }
-
-window.__doRefresh = async function () {
-  if (refreshing) return;
-  refreshing = true;
-  updateStatus();
-  try {
-    const resp = await (await fetch(API + "/refresh", { method: "POST" })).json();
-    if (resp.status === "error") {
-      console.error("Refresh error:", resp.error);
-    }
-    await loadAll();
-  } catch (e) {
-    console.error("Refresh failed:", e);
-  }
-  refreshing = false;
-  updateStatus();
-};
-
-window.__toggleAuto = function () {
-  autoRefreshOn = !autoRefreshOn;
-  if (autoRefreshOn) {
-    autoTimer = setInterval(window.__doRefresh, 60000);
-  } else {
-    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-  }
-  updateStatus();
-};
 
 window.__runSimulation = async function () {
   try {
@@ -471,20 +432,129 @@ function renderBracket() {
   setTimeout(drawBracketConnectors, 50);
 }
 
-function openMatchModal(m) {
-  document.getElementById("modalTitle").innerHTML = (m.team_a || "TBD") + ' <span style="color:#15565B;font-weight:normal">vs</span> ' + (m.team_b || "TBD");
-  document.getElementById("modalSub").textContent = m.round + " — " + m.match_id;
-  const scoreStr = m.score ? m.score.home + "-" + m.score.away : (m.result && m.result.score_a !== undefined ? m.result.score_a + "-" + m.result.score_b : (m.home_score !== undefined ? m.home_score + "-" + m.away_score : "No result"));
+const sigLabels = {
+  refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form",
+  squad_value: "Squad Value", rest_days: "Rest Days", availability: "Availability",
+  manager_effect: "Manager Effect", defensive_quality: "Defensive Quality",
+  player_form: "Player Form", team_synergy: "Team Synergy",
+};
+
+const sigOrder = ["refined_elo", "rolling_form", "market_odds", "defensive_quality",
+  "manager_effect", "squad_value", "player_form", "team_synergy", "availability", "rest_days"];
+
+function getScoreStr(m) {
+  if (m.score) return m.score.home + "-" + m.score.away;
+  if (m.result && m.result.score_a !== undefined) return m.result.score_a + "-" + m.result.score_b;
+  if (m.home_score !== undefined) return m.home_score + "-" + m.away_score;
+  return "No result";
+}
+
+async function openMatchModal(m) {
+  destroyModalCharts();
   const mid = m.match_id || m.tie_num || "";
-  document.getElementById("modalBody").innerHTML =
-    '<div class="sec-title">Result</div>' +
-    '<div style="font-size:16px;text-align:center;padding:12px 0;color:#16A085;font-weight:bold">' + scoreStr + "</div>" +
-    (m.winner ? '<div style="text-align:center;color:#168777;font-size:12px">' + m.winner + " " + (m.round === "FINAL" ? "wins the Champions League!" : "advances") + "</div>" : "") +
-    '<div class="sec-title warn" style="margin-top:12px">What-If Scenario</div>' +
-    '<div class="whatif-input-wrap"><input type="text" id="modalWhatifInput" placeholder="Describe a scenario... (e.g. PSG weaker, Arsenal stronger)">' +
-    '<button onclick="window.__sendModalWhatIf(\'' + mid + '\',\'' + (m.team_a || "") + '\',\'' + (m.team_b || "") + '\')">&#9654;</button></div>' +
-    '<div class="whatif-modal-result" id="modalWhatifResult"></div>';
+  document.getElementById("modalTitle").innerHTML = (m.team_a || "TBD") + ' <span style="color:#15565B;font-weight:normal">vs</span> ' + (m.team_b || "TBD");
+  document.getElementById("modalSub").textContent = m.round + " — " + mid + "  |  " + getScoreStr(m);
+  document.getElementById("modalBody").innerHTML = '<div class="mb-wrap"><div class="mb-col" id="mbLeft"></div><div class="mb-col" id="mbRight"></div></div><div id="modalBottom"></div>';
   document.getElementById("modalOverlay").classList.add("show");
+
+  const bodyEl = document.getElementById("modalBody");
+  const left = document.getElementById("mbLeft");
+  const right = document.getElementById("mbRight");
+  const bottom = document.getElementById("modalBottom");
+
+  let insight;
+  try { insight = await (await fetch(API + "/match/insight?match_id=" + mid)).json(); } catch { insight = { error: "fetch failed" }; }
+  if (insight.error) {
+    bodyEl.innerHTML = '<div style="color:#ff6b6b;font-size:12px">Failed to load match insight.</div>';
+    return;
+  }
+
+  const ta = insight.teams.a, tb = insight.teams.b;
+  const sigs = insight.signals || {};
+  const ev = appState.signals || {};
+  const outcome = insight.outcome_distribution || {};
+  const ft = insight.form_trends || {};
+
+  left.innerHTML = `
+    <div class="sec-title">Form Trend (last 5)</div><div class="form-charts">
+      ${[ta, tb].map(team => '<div class="form-chart-box"><div class="fc-label">' + team + '</div><canvas id="fc-' + team.replace(/\s/g, "") + '"></canvas></div>').join("")}
+    </div>
+    <div class="sec-title">Signal Comparison</div><div class="chart-box"><canvas id="sigChart"></canvas></div>
+    <div class="sec-title">Outcome Distribution</div><div class="outcome-charts">
+      <div class="outcome-chart-box"><canvas id="outcomeChart"></canvas></div>
+    </div>
+  `;
+
+  right.innerHTML = `
+    <div class="sec-title">Signal Performance</div>
+    <table class="insight-table"><tr><th>Signal</th><th>Brier</th><th>Acc</th><th></th></tr>
+    ${sigOrder.map(sk => {
+      const se = ev[sk];
+      if (se && se.n_matches > 0 && se.brier !== undefined) {
+        const dot = se.brier < 0.15 ? "dot-green" : se.brier < 0.25 ? "dot-orange" : "dot-red";
+        return '<tr><td>' + (sigLabels[sk] || sk) + '</td><td class="num">' + se.brier.toFixed(4) + '</td><td class="num">' + (se.accuracy * 100).toFixed(1) + '%</td><td class="num"><span class="' + dot + '">&#9679;</span></td></tr>';
+      }
+      return "";
+    }).join("")}
+    ${sigOrder.every(sk => { const se = ev[sk]; return !se || !se.n_matches || se.brier === undefined; }) ? '<tr><td colspan="4" style="color:#15565B;text-align:center">No eval data available</td></tr>' : ""}
+    </table>
+    <div class="sec-title">Match Insight</div>
+    <div class="insight-box">${insight.insight || "No insight available."}</div>
+  `;
+
+  bottom.innerHTML = `
+    <div class="sec-title warn">What-If Scenario</div>
+    <div class="whatif-input-wrap">
+      <input type="text" id="modalWhatifInput" placeholder="Describe a scenario... (e.g. PSG weaker, Arsenal stronger)">
+      <button onclick="window.__sendModalWhatIf('${mid}','${ta}','${tb}')">&#9654;</button>
+    </div>
+    <div class="whatif-modal-result" id="modalWhatifResult"></div>
+  `;
+
+  // Form trend charts
+  [ta, tb].forEach(team => {
+    const tr = ft[team] || [];
+    const canvas = document.getElementById("fc-" + team.replace(/\s/g, ""));
+    if (!canvas) return;
+    const labels = tr.map((_, i) => "M" + (i + 1));
+    const vals = tr.map(r => r.result === "W" ? 1 : r.result === "D" ? 0.5 : 0);
+    modalCharts["form_" + team] = new Chart(canvas, {
+      type: "line",
+      data: { labels, datasets: [{ data: vals, borderColor: "#16A085", backgroundColor: "transparent", pointBackgroundColor: "#16A085", borderWidth: 2, tension: 0.3, pointRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { min: -0.1, max: 1.1, display: false } } }
+    });
+  });
+
+  // Signal comparison bar chart
+  const sigCanvas = document.getElementById("sigChart");
+  if (sigCanvas) {
+    const sigKeys = sigOrder.filter(sk => sigs[sk] !== undefined);
+    const sigVals = sigKeys.map(sk => Math.round((sigs[sk].probability || 0.5) * 100));
+    const sigColors = sigKeys.map((sk, i) => i === 0 ? "#16A085" : "#156F69");
+    modalCharts.signals = new Chart(sigCanvas, {
+      type: "bar",
+      data: { labels: sigKeys.map(sk => sigLabels[sk] || sk), datasets: [{ data: sigVals, backgroundColor: sigColors, borderRadius: 2, borderSkipped: false }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, indexAxis: "y",
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.x + "%" } } },
+        scales: { x: { min: 0, max: 100, grid: { color: "rgba(21,61,76,0.2)" }, ticks: { color: "#15565B", font: { size: 9 }, callback: v => v + "%" } }, y: { grid: { display: false }, ticks: { color: "#F6DBC0", font: { size: 9 } } } }
+      }
+    });
+  }
+
+  // Outcome distribution doughnut
+  const ocCanvas = document.getElementById("outcomeChart");
+  if (ocCanvas) {
+    modalCharts.outcome = new Chart(ocCanvas, {
+      type: "doughnut",
+      data: { labels: [ta + " win", "Draw", tb + " win"], datasets: [{ data: [outcome.a_win || 0, outcome.draw || 0, outcome.b_win || 0], backgroundColor: ["#16A085", "#156F69", "#153D4C"], borderColor: "#140C30", borderWidth: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { color: "#F6DBC0", font: { size: 9 }, boxWidth: 10, padding: 6 } }, tooltip: { callbacks: { label: ctx => ctx.label + ": " + (ctx.parsed * 100).toFixed(1) + "%" } } },
+        cutout: "55%"
+      }
+    });
+  }
 }
 
 window.__sendModalWhatIf = async function (matchId, teamA, teamB) {
@@ -854,7 +924,6 @@ async function termExec(cmd) {
     termAdd('<span class="prompt">signals</span>     - signal blend statistics.');
     termAdd('<span class="prompt">champion</span>    - show champion prediction.');
     termAdd('<span class="prompt">clear</span>       - reset screen.');
-    termAdd('<span class="prompt">auto</span>        - toggle auto-refresh (60s).');
     termAdd('<span class="prompt">help</span>        - this message.');
     termAdd("");
   } else if (main === "clear") {
@@ -938,13 +1007,6 @@ async function termExec(cmd) {
     if (ch) termAdd('Representative champion: <span class="highlight">' + ch + "</span>");
     if (top) termAdd('Probability favorite:   <span class="highlight">' + top.team + "</span> (" + (top.champion_prob * 100).toFixed(1) + "%)");
     else termAdd('<span class="dim">No champion data available.</span>');
-    termAdd("");
-  } else if (main === "auto") {
-    window.__toggleAuto();
-    termAdd("");
-    termAdd(autoRefreshOn
-      ? '<span class="highlight">Auto-refresh enabled</span> <span class="dim">(every 60s)</span>'
-      : '<span class="dim">Auto-refresh disabled</span>');
     termAdd("");
   } else {
     termAdd("command not found: " + trimmed, "danger");
