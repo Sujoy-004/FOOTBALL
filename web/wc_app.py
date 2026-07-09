@@ -211,7 +211,7 @@ def compute_signal_eval(teams, played, played_groups, ledger):
     return {"elo": elo_report, "all_signals": all_report}
 
 
-def compute_all():
+def compute_all(skip_simulation: bool = False):
     global boot_log
     boot_log = []
     data = {"boot": []}
@@ -238,9 +238,12 @@ def compute_all():
     n_played_grp = sum(1 for m in played_groups.values() if m.get("winner"))
     total_played = n_played_ko + n_played_grp
 
-    sim = boot_step("Monte Carlo Simulation", lambda:
-        run_full_simulation(teams, ld["groups"], bracket, annex_c, played, played_groups=played_groups)
-    , boot_log)
+    if skip_simulation:
+        sim = None
+    else:
+        sim = boot_step("Monte Carlo Simulation", lambda:
+            run_full_simulation(teams, ld["groups"], bracket, annex_c, played, played_groups=played_groups)
+        , boot_log)
 
     gs = boot_step("Group Standings", lambda:
         compute_group_standings(ld["groups"], teams, played_groups)
@@ -352,7 +355,7 @@ def compute_or_load():
         loaded = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
         if loaded.get("boot") and len(loaded["boot"]) > 5:
             return loaded
-    result = compute_all()
+    result = compute_all(skip_simulation=True)
     CACHE_FILE.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
     return result
 
@@ -487,7 +490,7 @@ def compute_blend_info():
     }
 
 
-def refresh_from_api():
+def refresh_from_api(progress_cb=None):
     global cache
     if not BSD_API_KEY:
         return {"status": "error", "message": "No BSD_API_KEY configured. Add to .env file."}
@@ -538,55 +541,70 @@ def refresh_from_api():
         updated["new_ko_matches"] = len(new_ko)
         updated["match_results"] = True
     except Exception as e:
-        errors.append(f"match_fetch: {repr(e)}")
+        errors.append(f"match_fetch: {str(e)}")
         updated["match_results"] = False
+    if progress_cb:
+        progress_cb(10, "Matches fetched and processed")
+
     try:
         from competitions.worldcup.src.predictors.catboost import fetch_and_cache_catboost as fetch_cb
         cb_result = fetch_cb(BSD_API_KEY, aliases, groups, bracket_raw)
         updated["catboost"] = True
     except Exception as e:
-        errors.append(f"catboost: {repr(e)}")
+        errors.append(f"catboost: {str(e)}")
         updated["catboost"] = False
+    if progress_cb:
+        progress_cb(20, "Catboost model predictions done")
 
     try:
         from competitions.worldcup.src.predictors.lineup import compute_lineup_signal
         compute_lineup_signal(groups, bracket=bracket_raw)
         updated["lineup_signal"] = True
     except Exception as e:
-        errors.append(f"lineup_signal: {repr(e)}")
+        errors.append(f"lineup_signal: {str(e)}")
         updated["lineup_signal"] = False
+    if progress_cb:
+        progress_cb(30, "Lineup strength signal computed")
 
     try:
         from competitions.worldcup.src.predictors.form import compute_form_signal
-        compute_form_signal(teams, groups, bracket=bracket_raw)
+        compute_form_signal(teams, groups, played=played, played_groups=played_groups, bracket=bracket_raw)
         updated["form_signal"] = True
     except Exception as e:
-        errors.append(f"form_signal: {repr(e)}")
+        errors.append(f"form_signal: {str(e)}")
         updated["form_signal"] = False
+    if progress_cb:
+        progress_cb(40, "Team form signal computed")
 
     try:
         from competitions.worldcup.src.predictors.odds import fetch_and_cache_odds as fetch_odds
         fetch_odds(BSD_API_KEY, raw_matches, aliases, groups, bracket=bracket_raw)
         updated["odds_signal"] = True
     except Exception as e:
-        errors.append(f"odds_signal: {repr(e)}")
+        errors.append(f"odds_signal: {str(e)}")
         updated["odds_signal"] = False
+    if progress_cb:
+        progress_cb(50, "Market odds signal computed")
 
     try:
         from competitions.worldcup.src.predictors.manager_signals import fetch_and_cache_manager_signals as fetch_mgr
         fetch_mgr(BSD_API_KEY, groups, bracket=bracket_raw)
         updated["manager_signals"] = True
     except Exception as e:
-        errors.append(f"manager_signals: {repr(e)}")
+        errors.append(f"manager_signals: {str(e)}")
         updated["manager_signals"] = False
+    if progress_cb:
+        progress_cb(60, "Manager & defensive quality signals computed")
 
     try:
         from competitions.worldcup.src.predictors.availability import fetch_and_cache_availability_signal as fetch_avail
         fetch_avail(BSD_API_KEY, groups, bracket=bracket_raw)
         updated["availability_signal"] = True
     except Exception as e:
-        errors.append(f"availability_signal: {repr(e)}")
+        errors.append(f"availability_signal: {str(e)}")
         updated["availability_signal"] = False
+    if progress_cb:
+        progress_cb(70, "Player availability signal computed")
 
     elapsed = time.time() - t0
     status = "ok" if not errors else ("partial" if updated.get("match_results") else "error")
@@ -691,22 +709,25 @@ def _run_refresh_task(task_id: str):
         with sim_lock:
             active_simulations[task_id] = {"status": "running", "progress": 0, "stage": "Loading data files..."}
 
-        result = refresh_from_api()
+        def _progress(pct, stage):
+            with sim_lock:
+                active_simulations[task_id]["progress"] = pct
+                active_simulations[task_id]["stage"] = stage
+
+        result = refresh_from_api(progress_cb=_progress)
         if result["status"] == "error":
             with sim_lock:
                 active_simulations[task_id]["status"] = "error"
                 active_simulations[task_id]["error"] = result.get("message", "refresh failed")
             return
 
-        with sim_lock:
-            active_simulations[task_id]["progress"] = 60
-            active_simulations[task_id]["stage"] = "Recomputing predictions..."
+        _progress(75, "Recomputing predictions...")
 
         global cache
-        cache = compute_all()
+        cache = compute_all(skip_simulation=True)
 
+        _progress(100, "Complete")
         with sim_lock:
-            active_simulations[task_id]["progress"] = 100
             active_simulations[task_id]["status"] = "complete"
             active_simulations[task_id]["result"] = result
     except Exception as e:

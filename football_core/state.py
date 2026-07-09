@@ -49,6 +49,8 @@ def save_teams(teams: dict[str, dict], data_dir: Path | str | None = None) -> No
 
 def load_played(data_dir: Path | str | None = None) -> dict[str, dict]:
     path = _resolve_data_dir(data_dir) / "played.json"
+    if not path.exists():
+        return {}
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
