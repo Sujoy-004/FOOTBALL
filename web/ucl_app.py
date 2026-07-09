@@ -1,20 +1,4 @@
-"""UCL 2025/26 dashboard — FastAPI server.
-
-Separate from the WC server (port 8081). Serves real results by default
-(season completed, PSG champion) with MC simulation available on demand.
-
-Endpoints:
-    GET  /              — serve ucl_index.html
-    GET  /api/data      — summary stats (teams, champion, mode)
-    GET  /api/standings — 36-row Swiss league table with zones
-    GET  /api/bracket   — playoff ties + bracket_rounds (R16→Final)
-    GET  /api/odds      — teams sorted by champion probability
-    GET  /api/signals   — per-signal aggregate statistics
-    GET  /api/boot      — boot step log for terminal animation
-    POST /api/simulate  — run MC simulation (switches to sim mode)
-    POST /api/reset     — back to real results mode
-    POST /api/what-if   — instant Elo-driven scenario analysis
-"""
+"""UCL 2025/26 — FastAPI sub-app mounted under /ucl."""
 
 from __future__ import annotations
 
@@ -23,7 +7,9 @@ import os
 import random
 import re
 import sys
+import threading
 import time
+import uuid
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -45,10 +31,12 @@ from football_core.constants import EXPECTED_GOALS_BASE_RATE
 from football_core.elo import expected_score
 from football_core.signal import PredictionContext
 
+from web.common import ts, boot_step
+from web.whatif_engine import handle_instant_scenario, parse_scenario
+
 BSD_API_KEY: str = os.environ.get("BSD_API_KEY", "")
 UCL_LEAGUE_ID: int = 7
 
-# BSD team name → our fixture team name alias mapping
 _BSD_TEAM_ALIASES: dict[str, str] = {
     "Real Madrid": "Real Madrid",
     "FC Bayern M\u00fcnchen": "Bayern",
@@ -95,47 +83,19 @@ DATA_DIR = Path(__file__).parent.parent / "competitions" / "ucl" / "data"
 UCL_DIR = Path(__file__).parent.parent / "competitions" / "ucl"
 
 cache: dict = {}
-boot_log: list[dict] = []
+boot_log_local: list[dict] = []
 sim_result: SimulationResult | None = None
-_mode: str = "results"  # "results" or "simulation"
+_mode: str = "results"
 
-
-def ts() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
-
-def boot_step(step_name: str, action):
-    t0 = time.time()
-    try:
-        result = action()
-        elapsed = time.time() - t0
-        boot_log.append({
-            "step": step_name, "status": "ok",
-            "elapsed": round(elapsed, 2),
-            "output": f"[{ts()}] {step_name} — done in {elapsed:.1f}s",
-        })
-        return result
-    except Exception as e:
-        elapsed = time.time() - t0
-        boot_log.append({
-            "step": step_name, "status": "error",
-            "elapsed": round(elapsed, 2),
-            "output": f"[{ts()}] {step_name} — FAILED ({e})",
-        })
-        return None
+active_simulations: dict[str, dict] = {}
+sim_lock = threading.Lock()
 
 
 def _parse_what_if_scenario(scenario: str, match: dict) -> dict | None:
-    """Parse a natural-language scenario into Elo delta adjustments.
-
-    Returns {team_name: elo_delta} or None if no adjustment.
-    """
     ta = match.get("team_a", "")
     tb = match.get("team_b", "")
     text = scenario.lower()
-
     deltas: dict[str, float] = {}
-
     for team, direction, base_delta in [
         (ta, ["stronger", "boosted", "improved", "better", "upgraded", "advantage", "favorite"], 50),
         (ta, ["weaker", "injured", "suspended", "down", "struggling", "worse", "underdog"], -50),
@@ -144,26 +104,19 @@ def _parse_what_if_scenario(scenario: str, match: dict) -> dict | None:
     ]:
         for kw in direction:
             if kw in text:
-                team_key = team.lower().replace(" ", "")
                 name_key = team.lower().replace(" ", "")
                 text_key = text.replace(" ", "")
                 if name_key in text_key:
-                    # Scale delta by intensity modifiers
                     delta = base_delta
                     if "very" in text or "significantly" in text or "major" in text:
                         delta = int(delta * 2)
                     if "slightly" in text or "somewhat" in text or "a bit" in text:
                         delta = int(delta * 0.5)
                     deltas[team] = deltas.get(team, 0) + delta
-
     return deltas if deltas else None
 
 
 def _fetch_ucl_managers(api_key: str) -> dict[str, dict]:
-    """Fetch UCL manager data from BSD API and map team names to our fixture names.
-
-    Returns {our_team_name: manager_profile_dict} for teams found in BSD.
-    """
     try:
         url = f"https://sports.bzzoiro.com/api/managers/?league={UCL_LEAGUE_ID}"
         resp = requests.get(url, headers={"Authorization": f"Token {api_key}"}, timeout=15)
@@ -202,31 +155,27 @@ def _fetch_ucl_managers(api_key: str) -> dict[str, dict]:
         return {}
 
 
-# ── Deterministic (real results) mode ─────────────────────────────────────
-
-
 def _load_results() -> list[dict]:
-    """Load league phase results from results.json."""
     path = DATA_DIR / "results.json"
     if not path.exists():
         return []
-    return json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(data, dict) and "matches" in data:
+        return data["matches"]
+    return data if isinstance(data, list) else []
 
 
 def _load_knockout_results() -> dict | None:
-    """Load knockout results from knockout_results.json."""
     path = DATA_DIR / "knockout_results.json"
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(data, dict) and "matches" in data:
+        return data["matches"]
+    return data if isinstance(data, dict) else None
 
 
 def _compute_deterministic_standings(results: list[dict]) -> list[dict]:
-    """Compute actual league phase standings from real results.
-    
-    Returns per-team dicts with pts, gd, gs, ga, wins, away_wins, away_gs,
-    then sorts by UCL tiebreaker chain (pts → gd → gs → away_gs → wins → away_wins).
-    """
     from collections import defaultdict
     stats: dict[str, dict] = defaultdict(lambda: {
         "pts": 0, "gd": 0, "gs": 0, "ga": 0,
@@ -262,30 +211,15 @@ def _compute_deterministic_standings(results: list[dict]) -> list[dict]:
             stats[tb]["pts"] += 1
             stats[ta]["draws"] += 1
             stats[tb]["draws"] += 1
-
-    # Build list and sort by UCL tiebreaker: pts → gd → gs → away_gs → wins → away_wins
     standings_list = []
     for team, s in stats.items():
         standings_list.append({
-            "team": team,
-            "pts": s["pts"],
-            "gd": s["gd"],
-            "gs": s["gs"],
-            "ga": s["ga"],
-            "wins": s["wins"],
-            "draws": s["draws"],
-            "losses": s["losses"],
-            "away_wins": s["away_wins"],
-            "away_gs": s["away_gs"],
-            "home_wins": s["home_wins"],
-            "home_gs": s["home_gs"],
+            "team": team, "pts": s["pts"], "gd": s["gd"], "gs": s["gs"], "ga": s["ga"],
+            "wins": s["wins"], "draws": s["draws"], "losses": s["losses"],
+            "away_wins": s["away_wins"], "away_gs": s["away_gs"],
+            "home_wins": s["home_wins"], "home_gs": s["home_gs"],
         })
-
-    standings_list.sort(
-        key=lambda x: (-x["pts"], -x["gd"], -x["gs"], -x["away_gs"], -x["wins"], -x["away_wins"])
-    )
-
-    # Assign positions and zones
+    standings_list.sort(key=lambda x: (-x["pts"], -x["gd"], -x["gs"], -x["away_gs"], -x["wins"], -x["away_wins"]))
     for i, entry in enumerate(standings_list, start=1):
         entry["position"] = i
         if i <= 8:
@@ -294,134 +228,92 @@ def _compute_deterministic_standings(results: list[dict]) -> list[dict]:
             entry["zone"] = "playoff"
         else:
             entry["zone"] = "eliminated"
-
     return standings_list
 
 
-def _build_deterministic_bracket(knockout: dict, standings: list[dict]) -> dict:
-    """Build bracket display data from known knockout results.
+def _build_league_matchdays(results: list[dict]) -> dict[str, list[dict]]:
+    from collections import defaultdict
+    mds: dict[str, list[dict]] = defaultdict(list)
+    for m in results:
+        prefix = m.get("match_id", "").split("_")[0]
+        mds[prefix].append(m)
+    return dict(sorted(mds.items()))
 
-    Returns {playoff: [...], bracket_rounds: {R16:[], QF:[], SF:[], FINAL:[]}}.
-    Uses bracket_rules.json for match_ids and tree structure so bracket
-    connectors render correctly.
-    """
+
+def _build_deterministic_bracket(knockout: dict, standings: list[dict]) -> dict:
     bracket_rules_path = DATA_DIR / "bracket_rules.json"
     try:
         bracket_rules = json.loads(bracket_rules_path.read_text(encoding="utf-8"))
     except Exception:
         bracket_rules = {"matches": []}
-
-    # Build source_map
     source_map: dict[str, list[str]] = {}
     for m in bracket_rules.get("matches", []):
         if m.get("source_matches"):
             source_map[m["match_id"]] = m["source_matches"]
-
-    # Map real R16 teams to bracket_rules slots
-    # Real bracket mapped to match the slot quarters so tree connectors work:
-    # Q1: PSG/Chelsea + Liverpool/Galatasaray → PSG/Liverpool → PSG
-    # Q2: Bayern/Atalanta + Real/ManCity → Bayern/Real → Bayern
-    # Q3: Atletico/Tottenham + Barca/Newcastle → Atletico/Barca → Atletico
-    # Q4: Arsenal/Leverkusen + Sporting/Bodo → Arsenal/Sporting → Arsenal
-    r16_real = {
-        "r16_01": ("PSG", "Chelsea", "PSG", 8, 2),
-        "r16_02": ("Liverpool", "Galatasaray", "Liverpool", 4, 1),
-        "r16_03": ("Bayern", "Atalanta", "Bayern", 10, 2),
-        "r16_04": ("Real Madrid", "Man City", "Real Madrid", 5, 1),
-        "r16_05": ("Atletico Madrid", "Tottenham", "Atletico Madrid", 7, 5),
-        "r16_06": ("Barcelona", "Newcastle", "Barcelona", 8, 3),
-        "r16_07": ("Arsenal", "Bayer Leverkusen", "Arsenal", 3, 1),
-        "r16_08": ("Sporting", "Bodo/Glimt", "Sporting", 5, 3),
-    }
-    qf_real = {
-        "qf_01": ("PSG", "Liverpool", "PSG", 4, 0),
-        "qf_02": ("Bayern", "Real Madrid", "Bayern", 6, 4),
-        "qf_03": ("Atletico Madrid", "Barcelona", "Atletico Madrid", 3, 2),
-        "qf_04": ("Arsenal", "Sporting", "Arsenal", 1, 0),
-    }
-    sf_real = {
-        "sf_01": ("PSG", "Bayern", "PSG", 6, 5),
-        "sf_02": ("Atletico Madrid", "Arsenal", "Arsenal", 2, 1),
-    }
-    final_real = {
-        "final_01": ("PSG", "Arsenal", "PSG", 1, 1),
-    }
-
+    mid_index: dict[str, int] = {"R16": 0, "QF": 0, "SF": 0, "FINAL": 0}
+    def _next_mid(rnd: str) -> str:
+        mid_index[rnd] += 1
+        prefix = rnd.lower().replace("final", "final")
+        if rnd == "R16":
+            return f"r16_{mid_index[rnd]:02d}"
+        if rnd == "QF":
+            return f"qf_{mid_index[rnd]:02d}"
+        if rnd == "SF":
+            return f"sf_{mid_index[rnd]:02d}"
+        return f"final_{mid_index[rnd]:02d}"
     rounds_out: dict[str, list[dict]] = {"R16": [], "QF": [], "SF": [], "FINAL": []}
-
-    for mid, (ta, tb, winner, ha, aa) in r16_real.items():
-        rounds_out["R16"].append({
-            "match_id": mid, "round": "R16",
-            "team_a": ta, "team_b": tb,
-            "score": {"home": ha, "away": aa},
-            "winner": winner, "played": True,
-        })
-    for mid, (ta, tb, winner, ha, aa) in qf_real.items():
-        rounds_out["QF"].append({
-            "match_id": mid, "round": "QF",
-            "team_a": ta, "team_b": tb,
-            "score": {"home": ha, "away": aa},
-            "winner": winner, "played": True,
-            "source_matches": source_map.get(mid, []),
-        })
-    for mid, (ta, tb, winner, ha, aa) in sf_real.items():
-        rounds_out["SF"].append({
-            "match_id": mid, "round": "SF",
-            "team_a": ta, "team_b": tb,
-            "score": {"home": ha, "away": aa},
-            "winner": winner, "played": True,
-            "source_matches": source_map.get(mid, []),
-        })
-    for mid, (ta, tb, winner, ha, aa) in final_real.items():
-        rounds_out["FINAL"].append({
-            "match_id": mid, "round": "FINAL",
-            "team_a": ta, "team_b": tb,
-            "score": {"home": ha, "away": aa},
-            "winner": winner, "played": True,
-            "source_matches": source_map.get(mid, []),
-            "penalties": {"winner": "PSG", "loser": "Arsenal", "psg": 4, "arsenal": 3},
-        })
-
-    # Build playoff display from knockout data
+    ko_rounds = knockout.get("rounds", {})
+    for rnd in ["R16", "QF", "SF", "FINAL"]:
+        for m in ko_rounds.get(rnd, []):
+            mid = _next_mid(rnd)
+            entry = {
+                "match_id": mid,
+                "round": rnd,
+                "team_a": m.get("team_a", ""),
+                "team_b": m.get("team_b", ""),
+                "score": {"home": m.get("score_a", 0), "away": m.get("score_b", 0)},
+                "winner": m.get("winner", ""),
+                "played": True,
+                "source_matches": source_map.get(mid, []),
+            }
+            if rnd == "FINAL" and m.get("penalties"):
+                pens = m["penalties"]
+                entry["penalties"] = {
+                    "winner": pens.get("winner", m.get("winner", "")),
+                    "loser": pens.get("loser", ""),
+                }
+                ps = pens.get("score", "0-0").split("-")
+                if len(ps) == 2:
+                    entry["penalties"]["home"] = int(ps[0])
+                    entry["penalties"]["away"] = int(ps[1])
+            rounds_out[rnd].append(entry)
     playoff_display: list[dict] = []
-    ko_playoff = knockout.get("playoff", [])
-    for tie in ko_playoff:
+    for tie in knockout.get("playoff", []):
+        ta = tie.get("team_a", "")
+        tb = tie.get("team_b", "")
+        winner = tie.get("winner", "")
+        loser = tb if winner == ta else ta
         playoff_display.append({
             "tie_num": tie.get("tie_num"),
-            "team_a": tie.get("winner") or tie.get("team_a", ""),
-            "team_b": tie.get("loser") or tie.get("team_b", ""),
-            "winner": tie.get("winner"),
+            "team_a": winner or ta,
+            "team_b": loser or tb,
+            "winner": winner,
             "aggregate_a": tie.get("aggregate_a", 0),
             "aggregate_b": tie.get("aggregate_b", 0),
             "et_played": tie.get("et_played", False),
             "penalties_played": tie.get("penalties_played", False),
         })
-
-    return {
-        "playoff": playoff_display,
-        "bracket_rounds": rounds_out,
-    }
+    return {"playoff": playoff_display, "bracket_rounds": rounds_out}
 
 
-def _compute_signal_eval(results: list[dict], engine, elo_ratings: dict[str, float],
-                         bsd_manager_data: dict) -> dict:
-    """Compute per-signal Brier scores and accuracy against real results."""
-    # Build match lookup: {(team_a, team_b): (home_score, away_score)}
+def _compute_signal_eval(results: list[dict], engine, elo_ratings: dict[str, float], bsd_manager_data: dict) -> dict:
     result_lookup = {}
     for m in results:
         result_lookup[(m["team_a"], m["team_b"])] = (m["home_score"], m["away_score"])
-
     signal_matches = []
     for m in results:
         signal_matches.append({"team_a": m["team_a"], "team_b": m["team_b"], "match_id": m["match_id"]})
-
-    ctx = PredictionContext(
-        fixtures=signal_matches,
-        elo_ratings=elo_ratings,
-        played_results=[],
-        manager_data=bsd_manager_data,
-    )
-
+    ctx = PredictionContext(fixtures=signal_matches, elo_ratings=elo_ratings, played_results=[], manager_data=bsd_manager_data)
     sig_data: dict[str, dict] = {}
     try:
         blended = [engine.evaluate(m, ctx) for m in signal_matches]
@@ -429,36 +321,30 @@ def _compute_signal_eval(results: list[dict], engine, elo_ratings: dict[str, flo
             m = results[i]
             ta, tb = m["team_a"], m["team_b"]
             hs, aws = m["home_score"], m["away_score"]
-            # Determine actual outcome encoded as [1,0,0] for home win, [0,1,0] for draw, [0,0,1] for away win
             if hs > aws:
                 actual = [1.0, 0.0, 0.0]
             elif hs < aws:
                 actual = [0.0, 0.0, 1.0]
             else:
                 actual = [0.0, 1.0, 0.0]
-
             for sig, sd in bp.signal_breakdown.items():
                 if sig not in sig_data:
-                    sig_data[sig] = {"probs": [], "n": 0, "available": 0,
-                                     "brier_sum": 0.0, "correct": 0, "n_eval": 0}
+                    sig_data[sig] = {"probs": [], "n": 0, "available": 0, "brier_sum": 0.0, "correct": 0, "n_eval": 0}
                 sig_data[sig]["n"] += 1
                 if sd.get("available", True):
                     sig_data[sig]["available"] += 1
                 prob_h = sd.get("home", 0.5)
                 prob_d = sd.get("draw", 0.0)
                 prob_a = sd.get("away", 0.5)
-                # Brier score for 3-outcome
                 brier = (prob_h - actual[0])**2 + (prob_d - actual[1])**2 + (prob_a - actual[2])**2
                 sig_data[sig]["brier_sum"] += brier
                 sig_data[sig]["n_eval"] += 1
-                # Accuracy: predicted winner (or draw) matches actual
                 pred_idx = 0 if prob_h >= prob_d and prob_h >= prob_a else (1 if prob_d >= prob_a else 2)
                 actual_idx = 0 if actual[0] == 1 else (1 if actual[1] == 1 else 2)
                 if pred_idx == actual_idx:
                     sig_data[sig]["correct"] += 1
                 if sd.get("weight", 0) > 0:
                     sig_data[sig].setdefault("probs", []).extend([prob_h, prob_d, prob_a])
-
         sig_stats = {}
         for sig, sd in sorted(sig_data.items()):
             probs = sd.get("probs", [])
@@ -466,13 +352,11 @@ def _compute_signal_eval(results: list[dict], engine, elo_ratings: dict[str, flo
             brier_avg = sd["brier_sum"] / sd["n_eval"] if sd["n_eval"] else 0
             acc = sd["correct"] / sd["n_eval"] if sd["n_eval"] else 0
             sig_stats[sig] = {
-                "n_matches": sd["n"],
-                "available": sd["available"],
+                "n_matches": sd["n"], "available": sd["available"],
                 "available_pct": round(sd["available"] / sd["n"] * 100, 1) if sd["n"] else 0,
                 "avg_probability": round(avg, 4),
                 "weight": round(engine.weights.get(sig, 0), 4),
-                "brier": round(brier_avg, 4),
-                "accuracy": round(acc, 4),
+                "brier": round(brier_avg, 4), "accuracy": round(acc, 4),
             }
         return sig_stats
     except Exception:
@@ -480,42 +364,25 @@ def _compute_signal_eval(results: list[dict], engine, elo_ratings: dict[str, flo
 
 
 def deterministic_compute() -> dict:
-    """Compute dashboard data from real results (no MC simulation).
-    
-    Loads results.json and knockout_results.json, computes standings
-    and bracket display deterministically. All probabilities are 0/100
-    (real outcomes). Mode = "results".
-    """
-    global boot_log, _mode
-    boot_log = []
-    data: dict = {"boot": boot_log}
+    global boot_log_local, _mode
+    boot_log_local = []
+    data: dict = {"boot": boot_log_local}
     _mode = "results"
-
-    results = boot_step("Load real results",
-                        lambda: _load_results())
+    results = boot_step("Load real results", lambda: _load_results(), boot_log_local)
     if not results:
         data["error"] = "results.json not found"
         return data
-
-    knockout = boot_step("Load knockout results",
-                         lambda: _load_knockout_results())
+    knockout = boot_step("Load knockout results", lambda: _load_knockout_results(), boot_log_local)
     if not knockout:
         data["error"] = "knockout_results.json not found"
         return data
-
-    # Load fixtures for team info
     fixtures_path = str(DATA_DIR / "fixtures.json")
-    provider = boot_step("Load fixtures",
-                         lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load())
+    provider = boot_step("Load fixtures", lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load(), boot_log_local)
     if not provider:
         data["error"] = "fixtures load failed"
         return data
-
     team_names = [t.name for t in provider.teams]
-
-    # Elo ratings (for signals, not simulation)
-    elo_ratings = boot_step("Fetch Elo ratings",
-                            lambda: fetch_team_elos(team_names))
+    elo_ratings = boot_step("Fetch Elo ratings", lambda: fetch_team_elos(team_names), boot_log_local)
     if not elo_ratings:
         elo_ratings = {}
         coefficients = {t.name: t.coefficient for t in provider.teams}
@@ -523,43 +390,24 @@ def deterministic_compute() -> dict:
         for t in team_names:
             c = coefficients.get(t, 50)
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
-        boot_log.append({
-            "step": "Elo fallback (coefficients)", "status": "ok",
-            "elapsed": 0.0,
-            "output": f"[{ts()}] Elo fallback — using UEFA coefficients for {len(elo_ratings)} teams",
-        })
-
-    # BSD manager data (for signals)
+        boot_log_local.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback — using UEFA coefficients for {len(elo_ratings)} teams"})
     bsd_manager_data: dict[str, dict] = {}
     if BSD_API_KEY:
-        bsd_manager_data = boot_step("Fetch BSD managers",
-                                     lambda: _fetch_ucl_managers(BSD_API_KEY))
+        bsd_manager_data = boot_step("Fetch BSD managers", lambda: _fetch_ucl_managers(BSD_API_KEY), boot_log_local)
     cache["bsd_manager_data"] = bsd_manager_data
-
-    # Compute standings from real results
-    standings = boot_step("Compute standings",
-                          lambda: _compute_deterministic_standings(results))
-
-    # Build bracket from real knockout results
-    bracket_data = boot_step("Build bracket",
-                             lambda: _build_deterministic_bracket(knockout, standings))
-
-    # Build signal engine
-    engine = boot_step("Build signal engine",
-                       lambda: _build_signal_engine(elo_ratings))
-
-    # Signal evaluation against real results
-    signal_stats = boot_step("Evaluate signals",
-                             lambda: _compute_signal_eval(results, engine, elo_ratings, bsd_manager_data))
-
-    # Build odds display — deterministic (champion prob 1.0/0.0)
+    standings = boot_step("Compute standings", lambda: _compute_deterministic_standings(results), boot_log_local)
+    if not standings:
+        data["error"] = "standings computation failed"
+        return data
+    bracket_data = boot_step("Build bracket", lambda: _build_deterministic_bracket(knockout, standings), boot_log_local)
+    engine = boot_step("Build signal engine", lambda: _build_signal_engine(elo_ratings), boot_log_local)
+    signal_stats = boot_step("Evaluate signals", lambda: _compute_signal_eval(results, engine, elo_ratings, bsd_manager_data), boot_log_local)
     odds_display = []
     champ = knockout.get("champion", "")
     for i, entry in enumerate(standings, start=1):
         is_champ = entry["team"] == champ
         odds_display.append({
-            "rank": i,
-            "team": entry["team"],
+            "rank": i, "team": entry["team"],
             "champion_prob": 1.0 if is_champ else 0.0,
             "final_prob": 1.0 if is_champ else 0.0,
             "sf_prob": 1.0 if is_champ or _was_in_semis(entry["team"], knockout) else 0.0,
@@ -568,30 +416,29 @@ def deterministic_compute() -> dict:
             "playoff_prob": 1.0 if entry.get("zone") == "playoff" else 0.0,
             "avg_position": float(entry.get("position", 36)),
         })
-
-    # Top 4 by position
+    odds_display.sort(key=lambda x: (0 if x["team"] == champ else 1, x["rank"]))
     top4 = [odds_display[i] for i in range(min(4, len(odds_display)))]
-
-    # Build bracket rounds display
     enriched_bracket: dict[str, list[dict]] = {}
     for round_name, matches in bracket_data.get("bracket_rounds", {}).items():
         enriched_bracket[round_name] = matches
-
     data["mode"] = "results"
     data["teams"] = top4
     data["all_teams"] = odds_display
     data["n_teams"] = len(standings)
-    data["n_iterations"] = 1
+    n_total_matches = len(results)
+    n_matchdays = len({m.get("match_id", "").split("_")[0] for m in results if "_" in m.get("match_id", "")}) or 1
+    data["n_iterations"] = n_matchdays
+    data["n_total_matches"] = n_total_matches
     data["seed"] = 0
     data["snapshot_date"] = "2025/26 Season — Real Results"
     data["champion"] = champ
     data["standings"] = standings
     data["playoff"] = bracket_data.get("playoff", [])
     data["bracket_rounds"] = enriched_bracket
+    data["league_matchdays"] = _build_league_matchdays(results)
     data["odds"] = odds_display
     data["signals"] = signal_stats
     data["elo_ratings"] = elo_ratings
-
     return data
 
 
@@ -609,61 +456,36 @@ def _was_in_qf(team: str, knockout: dict) -> bool:
     return False
 
 
-# ── Main compute entry point ──────────────────────────────────────────────
-
-
 def compute_all() -> dict:
-    """Main compute entry point — defaults to real results if results.json exists."""
     results_path = DATA_DIR / "results.json"
     ko_path = DATA_DIR / "knockout_results.json"
     if results_path.exists() and ko_path.exists():
         return deterministic_compute()
-
-    global boot_log, sim_result, _mode
+    global boot_log_local, sim_result, _mode
     _mode = "simulation"
-    boot_log = []
-
-    data: dict = {"boot": boot_log}
-
+    boot_log_local = []
+    data: dict = {"boot": boot_log_local}
     fixtures_path = str(DATA_DIR / "fixtures.json")
-    provider = boot_step("Load fixtures",
-                         lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load())
+    provider = boot_step("Load fixtures", lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load(), boot_log_local)
     if not provider:
         data["error"] = "fixtures load failed"
         return data
-
     team_names = [t.name for t in provider.teams]
-
-    elo_ratings = boot_step("Fetch Elo ratings",
-                            lambda: fetch_team_elos(team_names))
+    elo_ratings = boot_step("Fetch Elo ratings", lambda: fetch_team_elos(team_names), boot_log_local)
     if not elo_ratings:
-        # Fallback: derive approximate Elo from UEFA coefficients
         elo_ratings = {}
         coefficients = {t.name: t.coefficient for t in provider.teams}
         max_coeff = max(coefficients.values()) if coefficients else 100
         for t in team_names:
             c = coefficients.get(t, 50)
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
-        boot_log.append({
-            "step": "Elo fallback (coefficients)", "status": "ok",
-            "elapsed": 0.0,
-            "output": f"[{ts()}] Elo fallback — using UEFA coefficients for {len(elo_ratings)} teams",
-        })
-
-    # ── BSD API: fetch manager data ──
+        boot_log_local.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback — using UEFA coefficients for {len(elo_ratings)} teams"})
     bsd_manager_data: dict[str, dict] = {}
     if BSD_API_KEY:
-        bsd_manager_data = boot_step("Fetch BSD managers",
-                                     lambda: _fetch_ucl_managers(BSD_API_KEY))
+        bsd_manager_data = boot_step("Fetch BSD managers", lambda: _fetch_ucl_managers(BSD_API_KEY), boot_log_local)
     else:
-        boot_log.append({
-            "step": "BSD managers", "status": "ok",
-            "elapsed": 0.0,
-            "output": f"[{ts()}] BSD_API_KEY not set — skipping manager data",
-        })
+        boot_log_local.append({"step": "BSD managers", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] BSD_API_KEY not set — skipping manager data"})
     cache["bsd_manager_data"] = bsd_manager_data
-
-    # ── Blend BSD manager win rates into Elo for better simulation ──
     if bsd_manager_data and elo_ratings:
         blended_count = 0
         for t in team_names:
@@ -676,42 +498,25 @@ def compute_all() -> dict:
                     elo_ratings[t] = round(base * 0.7 + mgr_elo * 0.3, 1)
                     blended_count += 1
         if blended_count > 0:
-            boot_log.append({
-                "step": "Elo blend (BSD managers)", "status": "ok",
-                "elapsed": 0.0,
-                "output": f"[{ts()}] Blended manager win% into Elo for {blended_count} teams",
-            })
-
-    # Use a fixed seed for reproducibility
+            boot_log_local.append({"step": "Elo blend (BSD managers)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Blended manager win% into Elo for {blended_count} teams"})
     seed = 42
     n_iterations = 10000
-
-    result = boot_step("Monte Carlo simulation",
-                       lambda: build_simulation_result(
-                           provider, elo_ratings, seed, n_iterations))
+    result = boot_step("Monte Carlo simulation", lambda: build_simulation_result(provider, elo_ratings, seed, n_iterations), boot_log_local)
     if not result:
         data["error"] = "simulation failed"
         return data
-
     sim_result = result
-
-    # Build signal engine for per-match breakdown
-    engine = boot_step("Build signal engine",
-                       lambda: _build_signal_engine(elo_ratings))
-
-    # Enrich bracket matches with source_matches from bracket_rules
+    engine = boot_step("Build signal engine", lambda: _build_signal_engine(elo_ratings), boot_log_local)
     bracket_rules_path = DATA_DIR / "bracket_rules.json"
     bracket_rules = {}
     try:
         bracket_rules = json.loads(bracket_rules_path.read_text(encoding="utf-8"))
     except Exception:
         pass
-
     source_map: dict[str, list[str]] = {}
     for m in bracket_rules.get("matches", []):
         if m.get("source_matches"):
             source_map[m["match_id"]] = m["source_matches"]
-
     enriched_bracket: dict[str, list[dict]] = {}
     for round_name, matches in result.bracket_rounds.items():
         enriched_bracket[round_name] = []
@@ -720,8 +525,6 @@ def compute_all() -> dict:
             if m["match_id"] in source_map:
                 entry["source_matches"] = source_map[m["match_id"]]
             enriched_bracket[round_name].append(entry)
-
-    # Build playoff ties display
     playoff_display: list[dict] = []
     for tie_num in sorted(result.playoff_ties):
         tie = result.playoff_ties[tie_num]
@@ -732,30 +535,17 @@ def compute_all() -> dict:
         et_played = tie.get("et_played", False)
         penalties_played = tie.get("penalties_played", False)
         playoff_display.append({
-            "tie_num": tie_num,
-            "team_a": winner,
-            "team_b": loser,
-            "winner": winner,
-            "aggregate_a": agg_a,
-            "aggregate_b": agg_b,
-            "et_played": et_played,
-            "penalties_played": penalties_played,
-            "et_a": tie.get("et_a", 0),
-            "et_b": tie.get("et_b", 0),
-            "penalty_a": tie.get("penalty_a", 0),
-            "penalty_b": tie.get("penalty_b", 0),
+            "tie_num": tie_num, "team_a": winner, "team_b": loser,
+            "winner": winner, "aggregate_a": agg_a, "aggregate_b": agg_b,
+            "et_played": et_played, "penalties_played": penalties_played,
+            "et_a": tie.get("et_a", 0), "et_b": tie.get("et_b", 0),
+            "penalty_a": tie.get("penalty_a", 0), "penalty_b": tie.get("penalty_b", 0),
         })
-
-    # Build odds display: sort teams by champion_prob descending
-    sorted_teams = sorted(
-        result.teams.items(),
-        key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]),
-    )
+    sorted_teams = sorted(result.teams.items(), key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]))
     odds_display: list[dict] = []
     for rank, (name, td) in enumerate(sorted_teams, start=1):
         odds_display.append({
-            "rank": rank,
-            "team": name,
+            "rank": rank, "team": name,
             "champion_prob": td.get("champion_prob", 0.0),
             "final_prob": td.get("stage_final_prob", 0.0),
             "sf_prob": td.get("stage_sf_prob", 0.0),
@@ -764,44 +554,24 @@ def compute_all() -> dict:
             "playoff_prob": td.get("playoff_prob", 0.0),
             "avg_position": td.get("avg_position", 0.0),
         })
-
-    # Build standings display
     standings_display: list[dict] = []
     for entry in result.standings:
         zone = entry.get("zone", "eliminated")
         standings_display.append({
-            "position": entry.get("position"),
-            "team": entry.get("team"),
-            "pts": entry.get("pts"),
-            "gd": entry.get("gd"),
-            "gs": entry.get("gs"),
-            "zone": zone,
+            "position": entry.get("position"), "team": entry.get("team"),
+            "pts": entry.get("pts"), "gd": entry.get("gd"),
+            "gs": entry.get("gs"), "zone": zone,
         })
-
-    # Build champion leader card data (top 4)
     top4 = [odds_display[i] for i in range(min(4, len(odds_display)))]
-
-    # Signal stats (aggregate from engine if possible)
     signal_stats: dict[str, dict] = {}
     try:
-        fixture_dict = {"schedule": asdict(provider)}
         signal_matches: list[dict] = []
         for md in provider.matchdays:
             for m in md:
-                signal_matches.append({
-                    "team_a": m.team_a,
-                    "team_b": m.team_b,
-                    "match_id": m.match_id,
-                })
+                signal_matches.append({"team_a": m.team_a, "team_b": m.team_b, "match_id": m.match_id})
         manager_data = cache.get("bsd_manager_data", {})
-        signal_context = PredictionContext(
-            fixtures=signal_matches,
-            elo_ratings=elo_ratings,
-            played_results=[],
-            manager_data=manager_data,
-        )
+        signal_context = PredictionContext(fixtures=signal_matches, elo_ratings=elo_ratings, played_results=[], manager_data=manager_data)
         blended = [engine.evaluate(m, signal_context) for m in signal_matches]
-        # Collect per-signal stats
         sig_data: dict[str, dict] = {}
         for bp in blended:
             for sig, sd in bp.signal_breakdown.items():
@@ -814,23 +584,18 @@ def compute_all() -> dict:
                     sig_data[sig].setdefault("not_available", 0)
                     sig_data[sig]["not_available"] += 1
                 if sd.get("weight", 0) > 0:
-                    sig_data[sig]["probs"].extend(
-                        [sd.get("home", 0.5), sd.get("draw", 0), sd.get("away", 0)]
-                    )
-
+                    sig_data[sig]["probs"].extend([sd.get("home", 0.5), sd.get("draw", 0), sd.get("away", 0)])
         for sig, sd in sorted(sig_data.items()):
             probs = [p for p in sd["probs"] if p is not None]
             avg = sum(probs) / len(probs) if probs else 0
             signal_stats[sig] = {
-                "n_matches": sd["n"],
-                "available": sd["available"],
+                "n_matches": sd["n"], "available": sd["available"],
                 "available_pct": round(sd["available"] / sd["n"] * 100, 1) if sd["n"] else 0,
                 "avg_probability": round(avg, 4),
                 "weight": round(engine.weights.get(sig, 0), 4),
             }
     except Exception:
         signal_stats = {}
-
     data["teams"] = top4
     data["all_teams"] = odds_display
     data["n_teams"] = len(result.teams)
@@ -844,12 +609,9 @@ def compute_all() -> dict:
     data["odds"] = odds_display
     data["signals"] = signal_stats
     data["elo_ratings"] = elo_ratings
+    data["league_matchdays"] = {}
     data["mode"] = _mode
-
     return data
-
-
-cache = {}
 
 
 @asynccontextmanager
@@ -859,17 +621,10 @@ async def lifespan(app: fastapi.FastAPI):
     yield
 
 
-app = fastapi.FastAPI(lifespan=lifespan)
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+ucl_app = fastapi.FastAPI(lifespan=lifespan)
 
 
-@app.get("/")
-def index():
-    html = (Path(__file__).parent / "static" / "ucl_index.html").read_text(encoding="utf-8")
-    return HTMLResponse(html)
-
-
-@app.get("/api/data")
+@ucl_app.get("/api/data")
 def api_data():
     return JSONResponse({
         "teams": cache.get("teams", []),
@@ -882,63 +637,124 @@ def api_data():
     })
 
 
-@app.get("/api/boot")
+@ucl_app.get("/api/boot")
 def api_boot():
     return JSONResponse(cache.get("boot", []))
 
 
-@app.get("/api/standings")
+@ucl_app.get("/api/standings")
 def api_standings():
-    return JSONResponse({
-        "standings": cache.get("standings", []),
-        "mode": _mode,
-    })
+    return JSONResponse({"standings": cache.get("standings", []), "mode": _mode})
 
 
-@app.get("/api/bracket")
+@ucl_app.get("/api/bracket")
 def api_bracket():
     return JSONResponse({
         "playoff": cache.get("playoff", []),
         "bracket_rounds": cache.get("bracket_rounds", {}),
+        "league_matchdays": cache.get("league_matchdays", {}),
         "champion": cache.get("champion"),
         "mode": _mode,
     })
 
 
-@app.get("/api/odds")
+@ucl_app.get("/api/odds")
 def api_odds():
-    return JSONResponse({
-        "odds": cache.get("odds", []),
-        "mode": _mode,
-    })
+    return JSONResponse({"odds": cache.get("odds", []), "mode": _mode})
 
 
-@app.get("/api/signals")
+@ucl_app.get("/api/signals")
 def api_signals():
-    return JSONResponse({
-        "signals": cache.get("signals", {}),
-        "mode": _mode,
-    })
+    return JSONResponse({"signals": cache.get("signals", {}), "mode": _mode})
 
 
-@app.post("/api/simulate")
-def api_simulate():
-    """Run MC simulation and switch to simulation mode."""
+@ucl_app.post("/api/simulate")
+def api_simulate(req: dict = None):
     global _mode
-    _run_mc_simulation()
-    return JSONResponse({"status": "ok", "mode": _mode})
-
-
-def _run_mc_simulation():
-    """Internal: run MC simulation without played_matches."""
-    global boot_log, sim_result, _mode, cache
     _mode = "simulation"
-    boot_log = []
+    task_id = str(uuid.uuid4())
+    n_iterations = max(10, min(1000000, int((req or {}).get("n_iterations", 10000))))
+    with sim_lock:
+        active_simulations[task_id] = {
+            "status": "starting", "progress": 0, "iteration": 0,
+            "total_iterations": n_iterations, "error": None, "result": None,
+        }
 
+    def _task(tid):
+        try:
+            def on_progress(pct, iteration):
+                with sim_lock:
+                    s = active_simulations.get(tid)
+                    if s:
+                        s["status"] = "running"
+                        s["progress"] = pct
+                        if iteration:
+                            s["iteration"] = iteration
+            _run_mc_simulation(progress_cb=on_progress, n_iterations=n_iterations)
+            with sim_lock:
+                s = active_simulations.get(tid)
+                if s:
+                    s["status"] = "complete"
+                    s["progress"] = 100.0
+                    s["iteration"] = n_iterations
+        except Exception as e:
+            with sim_lock:
+                s = active_simulations.get(tid)
+                if s:
+                    s["status"] = "error"
+                    s["error"] = str(e)
+
+    t = threading.Thread(target=_task, args=(task_id,), daemon=True)
+    t.start()
+    return JSONResponse({"status": "ok", "task_id": task_id, "mode": _mode})
+
+
+@ucl_app.post("/api/refresh")
+def api_refresh():
+    global cache
+    t0 = time.time()
+    refresh_log: list[str] = []
+    try:
+        new_elos = boot_step("Re-fetch ClubElo", lambda: fetch_team_elos(
+            [t["name"] for t in cache.get("all_teams", [])] or
+            list(cache.get("elo_ratings", {}).keys())
+        ), [])
+        refresh_log.append(f"ClubElo: {len(new_elos) if new_elos else 0} ratings")
+        if new_elos:
+            cache["elo_ratings"] = new_elos
+    except Exception as e:
+        refresh_log.append(f"ClubElo error: {e}")
+    if BSD_API_KEY:
+        try:
+            mgr_data = _fetch_ucl_managers(BSD_API_KEY)
+            if mgr_data:
+                cache["bsd_manager_data"] = mgr_data
+                refresh_log.append(f"BSD managers: {len(mgr_data)} teams")
+        except Exception as e:
+            refresh_log.append(f"BSD error: {e}")
+    try:
+        _run_mc_simulation()
+        refresh_log.append("MC re-simulated")
+        elapsed = round(time.time() - t0, 2)
+        return JSONResponse({
+            "status": "ok", "elapsed": elapsed, "updated": refresh_log,
+        })
+    except Exception as e:
+        elapsed = round(time.time() - t0, 2)
+        return JSONResponse({
+            "status": "error", "elapsed": elapsed, "error": str(e),
+        })
+
+
+def _run_mc_simulation(progress_cb=None, n_iterations=10000):
+    global boot_log_local, sim_result, _mode, cache
+    _mode = "simulation"
+    boot_log_local = []
+    if progress_cb: progress_cb(0, 0)
     fixtures_path = str(DATA_DIR / "fixtures.json")
     provider = RepoFixtureProvider(fixtures_path=fixtures_path).load()
+    if progress_cb: progress_cb(5, 0)
     team_names = [t.name for t in provider.teams]
-
     elo_ratings = fetch_team_elos(team_names)
     if not elo_ratings:
         elo_ratings = {}
@@ -947,11 +763,10 @@ def _run_mc_simulation():
         for t in team_names:
             c = coefficients.get(t, 50)
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
-
+    if progress_cb: progress_cb(10, 0)
     bsd_manager_data = cache.get("bsd_manager_data", {})
     if not bsd_manager_data and BSD_API_KEY:
         bsd_manager_data = _fetch_ucl_managers(BSD_API_KEY)
-
     if bsd_manager_data and elo_ratings:
         for t in team_names:
             base = elo_ratings.get(t, 1400.0)
@@ -961,26 +776,27 @@ def _run_mc_simulation():
                 if win_pct > 0:
                     mgr_elo = 1400.0 + (win_pct - 0.5) * 400.0
                     elo_ratings[t] = round(base * 0.7 + mgr_elo * 0.3, 1)
-
     seed = 42
-    n_iterations = 10000
-
-    result = build_simulation_result(provider, elo_ratings, seed, n_iterations)
+    if progress_cb:
+        def _mc_progress(current, total):
+            pct = 10 + (current / total) * 75
+            progress_cb(pct, current)
+    else:
+        _mc_progress = None
+    result = build_simulation_result(provider, elo_ratings, seed, n_iterations, progress_cb=_mc_progress)
+    if progress_cb: progress_cb(85, n_iterations)
     sim_result = result
     engine = _build_signal_engine(elo_ratings)
-
     bracket_rules_path = DATA_DIR / "bracket_rules.json"
     bracket_rules = {}
     try:
         bracket_rules = json.loads(bracket_rules_path.read_text(encoding="utf-8"))
     except Exception:
         pass
-
     source_map = {}
     for m in bracket_rules.get("matches", []):
         if m.get("source_matches"):
             source_map[m["match_id"]] = m["source_matches"]
-
     enriched_bracket = {}
     for round_name, matches in result.bracket_rounds.items():
         enriched_bracket[round_name] = []
@@ -989,7 +805,6 @@ def _run_mc_simulation():
             if m["match_id"] in source_map:
                 entry["source_matches"] = source_map[m["match_id"]]
             enriched_bracket[round_name].append(entry)
-
     playoff_display = []
     for tie_num in sorted(result.playoff_ties):
         tie = result.playoff_ties[tie_num]
@@ -997,55 +812,24 @@ def _run_mc_simulation():
         loser = tie.get("loser", "?")
         agg_a = tie.get("aggregate_a", 0)
         agg_b = tie.get("aggregate_b", 0)
-        playoff_display.append({
-            "tie_num": tie_num, "team_a": winner, "team_b": loser,
-            "winner": winner, "aggregate_a": agg_a, "aggregate_b": agg_b,
-            "et_played": tie.get("et_played", False),
-            "penalties_played": tie.get("penalties_played", False),
-            "et_a": tie.get("et_a", 0), "et_b": tie.get("et_b", 0),
-            "penalty_a": tie.get("penalty_a", 0), "penalty_b": tie.get("penalty_b", 0),
-        })
-
-    sorted_teams = sorted(
-        result.teams.items(),
-        key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]),
-    )
+        playoff_display.append({"tie_num": tie_num, "team_a": winner, "team_b": loser, "winner": winner, "aggregate_a": agg_a, "aggregate_b": agg_b, "et_played": tie.get("et_played", False), "penalties_played": tie.get("penalties_played", False), "et_a": tie.get("et_a", 0), "et_b": tie.get("et_b", 0), "penalty_a": tie.get("penalty_a", 0), "penalty_b": tie.get("penalty_b", 0)})
+    sorted_teams = sorted(result.teams.items(), key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]))
     odds_display = []
     for rank, (name, td) in enumerate(sorted_teams, start=1):
-        odds_display.append({
-            "rank": rank, "team": name,
-            "champion_prob": td.get("champion_prob", 0.0),
-            "final_prob": td.get("stage_final_prob", 0.0),
-            "sf_prob": td.get("stage_sf_prob", 0.0),
-            "qf_prob": td.get("stage_qf_prob", 0.0),
-            "top_8_prob": td.get("top_8_prob", 0.0),
-            "playoff_prob": td.get("playoff_prob", 0.0),
-            "avg_position": td.get("avg_position", 0.0),
-        })
-
+        odds_display.append({"rank": rank, "team": name, "champion_prob": td.get("champion_prob", 0.0), "final_prob": td.get("stage_final_prob", 0.0), "sf_prob": td.get("stage_sf_prob", 0.0), "qf_prob": td.get("stage_qf_prob", 0.0), "top_8_prob": td.get("top_8_prob", 0.0), "playoff_prob": td.get("playoff_prob", 0.0), "avg_position": td.get("avg_position", 0.0)})
     standings_display = []
     for entry in result.standings:
         zone = entry.get("zone", "eliminated")
-        standings_display.append({
-            "position": entry.get("position"), "team": entry.get("team"),
-            "pts": entry.get("pts"), "gd": entry.get("gd"),
-            "gs": entry.get("gs"), "zone": zone,
-        })
-
+        standings_display.append({"position": entry.get("position"), "team": entry.get("team"), "pts": entry.get("pts"), "gd": entry.get("gd"), "gs": entry.get("gs"), "zone": zone})
     top4 = [odds_display[i] for i in range(min(4, len(odds_display)))]
-
     signal_stats = {}
     try:
-        fixture_dict = {"schedule": asdict(provider)}
         signal_matches = []
         for md in provider.matchdays:
             for m in md:
                 signal_matches.append({"team_a": m.team_a, "team_b": m.team_b, "match_id": m.match_id})
         manager_data = cache.get("bsd_manager_data", {})
-        signal_context = PredictionContext(
-            fixtures=signal_matches, elo_ratings=elo_ratings,
-            played_results=[], manager_data=manager_data,
-        )
+        signal_context = PredictionContext(fixtures=signal_matches, elo_ratings=elo_ratings, played_results=[], manager_data=manager_data)
         blended = [engine.evaluate(m, signal_context) for m in signal_matches]
         sig_data = {}
         for bp in blended:
@@ -1059,47 +843,65 @@ def _run_mc_simulation():
                     sig_data[sig].setdefault("not_available", 0)
                     sig_data[sig]["not_available"] += 1
                 if sd.get("weight", 0) > 0:
-                    sig_data[sig]["probs"].extend(
-                        [sd.get("home", 0.5), sd.get("draw", 0), sd.get("away", 0)]
-                    )
+                    sig_data[sig]["probs"].extend([sd.get("home", 0.5), sd.get("draw", 0), sd.get("away", 0)])
         for sig, sd in sorted(sig_data.items()):
             probs = [p for p in sd["probs"] if p is not None]
             avg = sum(probs) / len(probs) if probs else 0
-            signal_stats[sig] = {
-                "n_matches": sd["n"], "available": sd["available"],
-                "available_pct": round(sd["available"] / sd["n"] * 100, 1) if sd["n"] else 0,
-                "avg_probability": round(avg, 4),
-                "weight": round(engine.weights.get(sig, 0), 4),
-            }
+            signal_stats[sig] = {"n_matches": sd["n"], "available": sd["available"], "available_pct": round(sd["available"] / sd["n"] * 100, 1) if sd["n"] else 0, "avg_probability": round(avg, 4), "weight": round(engine.weights.get(sig, 0), 4)}
     except Exception:
         signal_stats = {}
-
+    if progress_cb: progress_cb(95, n_iterations)
     cache = {
-        "mode": "simulation",
-        "teams": top4, "all_teams": odds_display,
+        "mode": "simulation", "teams": top4, "all_teams": odds_display,
         "n_teams": len(result.teams), "n_iterations": result.n_iterations,
         "seed": result.seed, "snapshot_date": result.snapshot_date,
-        "champion": result.bracket_champion,
-        "standings": standings_display, "playoff": playoff_display,
-        "bracket_rounds": enriched_bracket, "odds": odds_display,
-        "signals": signal_stats, "elo_ratings": elo_ratings,
+        "champion": result.bracket_champion, "standings": standings_display,
+        "playoff": playoff_display, "bracket_rounds": enriched_bracket,
+        "odds": odds_display, "signals": signal_stats, "elo_ratings": elo_ratings,
         "boot": [],
     }
+    if progress_cb: progress_cb(100, n_iterations)
 
 
-@app.post("/api/reset")
+@ucl_app.post("/api/reset")
 def api_reset():
-    """Reset back to real results mode."""
     global cache, _mode
-    cache = compute_all()
-    return JSONResponse({"status": "ok", "mode": _mode})
+    try:
+        cache = compute_all()
+        return JSONResponse({"status": "ok", "mode": _mode})
+    except Exception as e:
+        return JSONResponse({"status": "error", "error": str(e)})
 
 
-@app.get("/api/match/insight")
+@ucl_app.get("/api/simulation/progress/{task_id}")
+def api_simulation_progress(task_id: str):
+    with sim_lock:
+        sim = active_simulations.get(task_id)
+    if not sim:
+        return JSONResponse({"error": "task not found"})
+    response = {
+        "status": sim["status"],
+        "progress": sim.get("progress", 0),
+        "iteration": sim.get("iteration", 0),
+        "total_iterations": sim.get("total_iterations", 0),
+    }
+    if sim["status"] == "complete" and sim.get("result"):
+        response["result"] = sim["result"]
+        if sim.get("insight"):
+            response["insight"] = sim["insight"]
+        with sim_lock:
+            del active_simulations[task_id]
+    if sim["status"] == "error":
+        response["error"] = sim.get("error")
+        with sim_lock:
+            del active_simulations[task_id]
+    return JSONResponse(response)
+
+
+@ucl_app.get("/api/match/insight")
 def api_match_insight(match_id: str = ""):
     if not match_id:
         return JSONResponse({"error": "match_id parameter required"})
-
     br = cache.get("bracket_rounds", {})
     match_data = None
     for r, matches in br.items():
@@ -1109,20 +911,15 @@ def api_match_insight(match_id: str = ""):
                 break
         if match_data:
             break
-
     if not match_data:
         return JSONResponse({"error": "match not found"})
-
     ta = match_data.get("team_a", "")
     tb = match_data.get("team_b", "")
     sigs = cache.get("signals", {})
-
-    # Compute Elo probability from actual ratings (not avg_position proxy)
     elo_map = cache.get("elo_ratings", {})
     elo_a = elo_map.get(ta, 1500.0)
     elo_b = elo_map.get(tb, 1500.0)
     prob_a = expected_score(elo_a, elo_b)
-
     return JSONResponse({
         "match_id": match_id,
         "team_a": ta,
@@ -1135,12 +932,14 @@ def api_match_insight(match_id: str = ""):
     })
 
 
-@app.post("/api/what-if")
+@ucl_app.post("/api/what-if")
 def api_what_if(req: dict = None):
+    """What-if with instant AND simulate modes (mirrors WC pattern)."""
     if not req:
         return JSONResponse({"error": "request body required"})
     match_id = req.get("match_id", "")
     scenario = req.get("scenario", "")
+    mode = req.get("mode", "instant")
 
     if not match_id or not scenario:
         return JSONResponse({"error": "match_id and scenario required"})
@@ -1161,48 +960,117 @@ def api_what_if(req: dict = None):
     ta = match_data.get("team_a", "") or "?"
     tb = match_data.get("team_b", "") or "?"
 
-    # Parse scenario
-    adjustments = _parse_what_if_scenario(scenario, {"team_a": ta, "team_b": tb})
-
-    if not adjustments:
-        return JSONResponse({
-            "match_id": match_id,
-            "team_a": ta,
-            "team_b": tb,
-            "original_prob_a": 0.5,
-            "adjusted_prob_a": 0.5,
-            "delta": 0,
-            "note": "Could not parse scenario. Try: 'Team X stronger/weaker'",
-        })
-
-    # Compute original probability from actual Elo ratings
+    # Use the whatif_engine for rich response — same as WC
     elo_map = cache.get("elo_ratings", {})
     elo_a = elo_map.get(ta, 1500.0)
     elo_b = elo_map.get(tb, 1500.0)
-    rating_a = elo_a
-    rating_b = elo_b
+    elo_p = expected_score(elo_a, elo_b)
+    elo_p = round(max(0.01, min(0.99, elo_p)), 4)
 
-    orig_prob_a = expected_score(rating_a, rating_b)
+    # Build original signals from cache data
+    sigs = cache.get("signals", {})
+    original_signals = {}
+    for sk, sv in sigs.items():
+        w = sv.get("weight", 0)
+        p = sv.get("avg_probability", 0.5)
+        original_signals[sk] = {"probability": p, "weight": w}
+    if "elo" not in original_signals:
+        original_signals["elo"] = {"probability": elo_p, "weight": 0.1874}
 
-    # Apply adjustments
-    adj_a = rating_a + adjustments.get(ta, 0)
-    adj_b = rating_b + adjustments.get(tb, 0)
-    adj_prob_a = expected_score(adj_a, adj_b)
+    if mode == "instant":
+        result = handle_instant_scenario(scenario, ta, tb, original_signals, {}, elo_prob=elo_p)
+        return JSONResponse({"mode": "instant", **result})
 
-    delta = adj_prob_a - orig_prob_a
+    elif mode == "simulate":
+        task_id = str(uuid.uuid4())
+        with sim_lock:
+            active_simulations[task_id] = {
+                "status": "starting", "progress": 0, "iteration": 0,
+                "total_iterations": 0, "error": None, "result": None,
+            }
 
-    return JSONResponse({
-        "match_id": match_id,
-        "team_a": ta,
-        "team_b": tb,
-        "original_prob_a": round(orig_prob_a, 4),
-        "adjusted_prob_a": round(adj_prob_a, 4),
-        "delta": round(delta, 4),
-        "delta_pct": round(delta * 100, 1),
-        "adjustments": {t: d for t, d in adjustments.items()},
-        "note": None,
-    })
+        def _run_sim(task_id, scenario, match_id, ta, tb):
+            try:
+                with sim_lock:
+                    active_simulations[task_id]["status"] = "running"
+                fixtures_path = str(DATA_DIR / "fixtures.json")
+                provider = RepoFixtureProvider(fixtures_path=fixtures_path).load()
+                team_names = [t.name for t in provider.teams]
+                elo_ratings = fetch_team_elos(team_names)
+                if not elo_ratings:
+                    elo_ratings = {}
+                    coefficients = {t.name: t.coefficient for t in provider.teams}
+                    max_coeff = max(coefficients.values()) if coefficients else 100
+                    for t in team_names:
+                        c = coefficients.get(t, 50)
+                        elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
 
+                n_iterations = 10000
+                with sim_lock:
+                    active_simulations[task_id]["total_iterations"] = n_iterations
 
-if __name__ == "__main__":
-    uvicorn.run("web.ucl_server:app", host="127.0.0.1", port=8081, reload=False)
+                def _on_progress(current, total):
+                    with sim_lock:
+                        pct = round(current / total * 100, 1)
+                        active_simulations[task_id]["progress"] = pct
+                        active_simulations[task_id]["iteration"] = current
+
+                baseline_elos = dict(elo_ratings)
+                result = build_simulation_result(
+                    provider, baseline_elos, seed=42, n_iterations=n_iterations,
+                    progress_cb=_on_progress,
+                )
+
+                baseline_champ_probs = {
+                    t: td.get("champion_prob", 0)
+                    for t, td in result.teams.items()
+                }
+
+                adjustments = handle_instant_scenario(
+                    scenario, ta, tb, original_signals, {}, elo_prob=elo_p
+                ).get("adjusted_signals", {})
+
+                adj_factor = 1.0
+                for sk, sv in adjustments.items():
+                    if sv.get("was_adjusted"):
+                        orig = original_signals.get(sk, {}).get("probability", 0.5)
+                        if orig > 0:
+                            adj_factor *= sv["probability"] / orig
+
+                adjusted_elos = dict(baseline_elos)
+                if ta in adjusted_elos:
+                    adjusted_elos[ta] = adjusted_elos[ta] * (1.0 + 0.1 * (adj_factor - 1.0))
+                if tb in adjusted_elos:
+                    adjusted_elos[tb] = adjusted_elos[tb] * (1.0 - 0.1 * (adj_factor - 1.0))
+
+                adj_result = build_simulation_result(
+                    provider, adjusted_elos, seed=42, n_iterations=n_iterations,
+                    progress_cb=_on_progress,
+                )
+
+                insight_parts = [f"Scenario: {scenario}"]
+                for t in [ta, tb]:
+                    base = baseline_champ_probs.get(t, 0)
+                    adj = adj_result.teams.get(t, {}).get("champion_prob", 0)
+                    delta_str = f"+{adj-base:.1%}" if adj >= base else f"{adj-base:.1%}"
+                    insight_parts.append(f"{t}: {base:.1%} → {adj:.1%} ({delta_str})")
+
+                with sim_lock:
+                    active_simulations[task_id]["status"] = "complete"
+                    active_simulations[task_id]["progress"] = 100.0
+                    active_simulations[task_id]["iteration"] = n_iterations
+                    active_simulations[task_id]["result"] = {
+                        "baseline": {t: baseline_champ_probs.get(t, 0) for t in [ta, tb]},
+                        "adjusted": {t: adj_result.teams.get(t, {}).get("champion_prob", 0) for t in [ta, tb]},
+                    }
+                    active_simulations[task_id]["insight"] = "\n>> ".join(insight_parts)
+            except Exception as e:
+                with sim_lock:
+                    active_simulations[task_id]["status"] = "error"
+                    active_simulations[task_id]["error"] = str(e)
+
+        t = threading.Thread(target=_run_sim, args=(task_id, scenario, match_id, ta, tb), daemon=True)
+        t.start()
+        return JSONResponse({"mode": "simulate", "task_id": task_id, "status": "started"})
+
+    return JSONResponse({"error": f"unknown mode: {mode}"})
