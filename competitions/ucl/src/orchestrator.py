@@ -62,6 +62,12 @@ def resolve_played_matches(
         )
         return provider.load()
 
+    results_path = os.path.join(data_dir, "results.json")
+    if os.path.exists(results_path):
+        from competitions.ucl.src.result_provider import ReplayMatchResultProvider
+        provider = ReplayMatchResultProvider(results_path)
+        return provider.load()
+
     return None
 
 
