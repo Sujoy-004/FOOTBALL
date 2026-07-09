@@ -17,6 +17,11 @@ under `wc-predict` below).
 | Environment variables | Per-session | Optional `.env` file (loaded via `python-dotenv`) |
 | File-based config | None | Not used |
 
+**Web server note:** The web server (`web/server.py`) uses hardcoded
+configuration — `127.0.0.1:8080` with no-cache middleware for static assets.
+These values are not configurable via CLI arguments or environment variables
+(see "Web Server" under CLI Reference below).
+
 ### Environment variable loading
 
 The `wc-predict` and `euro-predict` tools call `load_dotenv()` at startup,
@@ -199,6 +204,54 @@ graceful shutdown with final probabilities.
 **Environment variable:** `BSD_API_KEY` is optional — the tool runs
 Elo-only simulation when the key is missing.
 
+### Web Server
+
+**Entry point:** `web/server.py`
+
+**Invocation:**
+
+```bash
+python -m web.server
+```
+
+The web server is a FastAPI application served via uvicorn. It mounts two
+competition sub-apps and serves a single-page application (SPA) shell:
+
+| Mount Point | Sub-app | Source |
+|-------------|---------|--------|
+| `/` | Landing page (SPA shell) | `web/static/index.html` |
+| `/worldcup` | World Cup predictor | `web/wc_app.py` |
+| `/worldcup/api/*` | World Cup REST API | `web/wc_app.py` |
+| `/ucl` | UCL predictor | `web/ucl_app.py` |
+| `/ucl/api/*` | UCL REST API | `web/ucl_app.py` |
+| `/euro` | Euro placeholder (stub) | `web/server.py` `/euro` route |
+| `/static` | Static assets | `web/static/` directory |
+
+**Configuration:** The server host (`127.0.0.1`), port (`8080`), and live
+reload (`False`) are hardcoded in `server.py` line 80. To change them,
+edit the `uvicorn.run()` call in the `__main__` block directly.
+
+**Caching:** On startup (`lifespan` event), the server pre-computes all
+prediction data and caches it in memory. The World Cup sub-app also
+persists a `cache.json` file under `web/`. The server adds
+`Cache-Control: no-cache` headers to all `/static/` responses to prevent
+stale asset serving during development.
+
+**API refresh (World Cup):** POST to `/worldcup/api/refresh` triggers a
+background data fetch from the BSD API and recomputes all predictions.
+Progress can be polled via `/worldcup/api/refresh/progress/{task_id}`.
+
+**API simulation (UCL):** POST to `/ucl/api/simulate` triggers a
+background Monte Carlo simulation. Progress can be polled via
+`/ucl/api/simulation/progress/{task_id}`.
+
+**What-if analysis (both):** Both sub-apps expose POST `/api/what-if`
+endpoints for counterfactual analysis with `instant` and `simulate` modes.
+
+**Environment variable:** `BSD_API_KEY` is used by the web apps for live
+data refresh (World Cup) and manager data fetch (UCL). See the
+Environment Variables section above for details.
+
 ---
 
 ## Required vs Optional Settings
@@ -244,6 +297,9 @@ defaults file is used.
 | `--show-ci` (ucl-predict) | `auto` | `competitions/ucl/main.py` line 330 |
 | `--verbose` (ucl-predict) | `False` | `competitions/ucl/main.py` line 339 |
 | `--validate-calibrated` (ucl-predict) | `False` | `competitions/ucl/main.py` line 294 |
+| `host` (web server) | `127.0.0.1` | `web/server.py` line 80 |
+| `port` (web server) | `8080` | `web/server.py` line 80 |
+| `reload` (web server) | `False` | `web/server.py` line 80 |
 
 ---
 

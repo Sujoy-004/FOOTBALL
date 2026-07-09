@@ -34,16 +34,18 @@ FOOTBALL/
 │   ├── test_manager_provider.py          Manager data parsing (providers.manager)
 │   └── test_player_provider.py           Player data parsing (providers.player)
 │
-├── competitions/worldcup/tests/          ← World Cup 2026 (24 test files, 614 tests)
+├── competitions/worldcup/tests/          ← World Cup 2026 (26 test files, 614 tests)
 │   ├── __init__.py
 │   ├── conftest.py                        Shared fixtures (sample_teams, sample_groups, etc.)
 │   ├── fixtures/                          TSV data files
 │   │   ├── eloratings_en_teams.tsv
 │   │   └── eloratings_world.tsv
+│   ├── test_batch_mode.py
 │   ├── test_blender.py
 │   ├── test_catboost.py
 │   ├── test_cli.py
 │   ├── test_config.py
+│   ├── test_counterfactual.py
 │   ├── test_elo.py
 │   ├── test_elo_sync.py
 │   ├── test_enrichment.py
@@ -56,7 +58,7 @@ FOOTBALL/
 │   ├── test_integration.py
 │   ├── test_knockout.py
 │   ├── test_lineup.py
-│   ├── test_live_smoke.py                Skipped without BSD_API_KEY
+│   ├── test_live_smoke.py                Skip without BSD_API_KEY
 │   ├── test_main_loop.py
 │   ├── test_migration.py
 │   ├── test_odds.py
@@ -65,19 +67,22 @@ FOOTBALL/
 │   ├── test_state.py
 │   └── test_state_load.py
 │
-├── competitions/ucl/tests/               ← UCL 2025/26 (20 test files, 438 tests)
+├── competitions/ucl/tests/               ← UCL 2025/26 (23 test files, 438 tests)
 │   ├── __init__.py
 │   ├── conftest.py                        Shared fixtures (36-team data, schedule, etc.)
 │   ├── test_calibrate.py                  Calibration pipeline (fit, transform, save/load)
 │   ├── test_cli.py
 │   ├── test_counterfactual.py             Counterfactual analysis (what-if scenarios)
 │   ├── test_display.py
+│   ├── test_elo_updater.py
 │   ├── test_ensemble.py                   Ensemble signal blending
 │   ├── test_explainability.py             Explainability metrics (SHAP, feature importance)
 │   ├── test_fetcher.py
 │   ├── test_fixture_validation.py
 │   ├── test_knockout.py
 │   ├── test_live.py                       Live mode: BSD fetch + played_matches injection
+│   ├── test_live_smoke.py                 Live smoke test
+│   ├── test_live_state.py
 │   ├── test_monte_carlo.py
 │   ├── test_orchestrator.py               Simulation mode orchestrator
 │   ├── test_provider.py                   Fixture providers: Protocol conformance, schedule validation
@@ -269,57 +274,13 @@ python -m pytest --cov=src --cov-report=html
 
 ## CI Test Configuration
 
-Only the **World Cup** competition has a CI pipeline. It is defined in:
+<!-- VERIFY: The following CI configuration is documented from a previously known workflow. No `.github/workflows/` directory exists in the repository — the workflow may be managed externally or has not been committed. Verify the actual CI pipeline before relying on this section. -->
+
+Only the **World Cup** competition is known to have a dedicated CI pipeline, historically defined at:
 
 `competitions/worldcup/.github/workflows/ci.yml`
 
-```yaml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: competitions/worldcup
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install requests numpy
-
-      - name: Test with pytest
-        run: |
-          python -m pytest -v --cov=src --cov-report=term-missing
-        env:
-          BSD_API_KEY: ${{ secrets.BSD_API_KEY }}
-```
-
-Key points:
-- **Trigger:** Push or pull request to `main`.
-- **Matrix:** Python 3.10, 3.11, and 3.12 on `ubuntu-latest`.
-- **Install:** Requirements + `requests` + `numpy` (runtime dependencies not in `requirements.txt`).
-- **Command:** `python -m pytest -v --cov=src --cov-report=term-missing`.
-- **BSD_API_KEY:** Pulled from GitHub Actions secrets. This means tests that require the key (like `test_live_smoke.py`) run in CI, not just locally.
-
+<!-- VERIFY: workflow location and actual CI steps -->
 No CI pipeline exists at the repository root level or for the UCL/football_core test suites.
 
 ---

@@ -2,8 +2,8 @@
 # Development Guide
 
 This document covers how to set up a development environment, navigate the project
-structure, run tests, add a new competition, and understand the shared library for
-the FOOTBALL Monte Carlo Prediction Engine.
+structure, run tests, add a new competition, understand the shared library, and
+develop the web dashboard for the FOOTBALL Monte Carlo Prediction Engine.
 
 ---
 
@@ -12,6 +12,7 @@ the FOOTBALL Monte Carlo Prediction Engine.
 - [Development Environment Setup](#development-environment-setup)
 - [Project Structure](#project-structure)
 - [Understanding the Shared Library](#understanding-the-shared-library)
+- [Web Dashboard](#web-dashboard)
 - [Running Tests](#running-tests)
 - [Adding a New Competition](#adding-a-new-competition)
 - [Code Style Guidelines](#code-style-guidelines)
@@ -37,21 +38,26 @@ git clone <repo-url>
 cd FOOTBALL
 ```
 
-For **World Cup development**, install the required dependencies:
+**Web dashboard dependencies** (if you plan to work on the web interface):
+
+```bash
+pip install fastapi uvicorn python-dotenv requests
+```
+
+**World Cup development:**
 
 ```bash
 pip install -r competitions/worldcup/requirements.txt
 pip install requests numpy
 ```
 
-For **UCL development**, install the same base dependencies (there is no separate
-requirements file for UCL):
+**UCL development** (same base dependencies — no separate requirements file):
 
 ```bash
 pip install requests numpy pytest pytest-cov
 ```
 
-For **Euro development**, same dependencies as World Cup.
+**Euro development** — same dependencies as World Cup.
 
 ### API Key (optional for development)
 
@@ -205,6 +211,30 @@ FOOTBALL/
 │       ├── simulation.py            Match + knockout simulation
 │       └── data/                    Teams, groups, bracket data
 │
+├── web/                              ← FastAPI web dashboard (port 8080)
+│   ├── __init__.py
+│   ├── server.py                    Unified FastAPI app, mounts WC + UCL sub-apps
+│   ├── wc_app.py                    World Cup FastAPI sub-app (REST API, cache, what-if)
+│   ├── ucl_app.py                   UCL FastAPI sub-app (REST API, simulation, insight)
+│   ├── common.py                    Shared utilities (timestamps, boot steps, JSON helpers)
+│   ├── insight.py                   Signal insight computation for World Cup
+│   ├── whatif_engine.py             What-if scenario parsing and adjustment engine
+│   ├── dashboard-plan.md            Design notes
+│   ├── last_refresh.json            Timestamp of last API refresh
+│   ├── static/                      Single-page application frontend
+│   │   ├── index.html               SPA shell (Chart.js, custom CSS/JS)
+│   │   ├── shared.css               Global styles
+│   │   ├── shared.js                Competition registry, navigation, terminal UI
+│   │   ├── wc.js                    World Cup dashboard views
+│   │   └── ucl.js                   UCL dashboard views
+│   └── __pycache__/
+│
+├── tests/                            ← Root-level shared tests
+│   ├── test_calibrated_pipeline.py
+│   ├── test_calibration_pipeline.py
+│   ├── test_confidence_intervals.py
+│   └── test_glicko.py
+│
 └── docs/                            Project documentation
 ```
 
@@ -219,6 +249,10 @@ FOOTBALL/
 - **Simpson's paradox avoidance:** The `result.py` / `display.py` separation in UCL
   ensures the display layer never imports simulation internals — only the result
   contract dataclass.
+- **Web dashboard as unified layer:** The `web/` package provides a FastAPI-based
+  SPA that wraps both World Cup and UCL engines behind a REST API, adding
+  caching, signal evaluation, and what-if scenario features on top of the CLI
+  logic.
 
 ---
 
@@ -230,7 +264,7 @@ around pure math and data pipeline functions — avoid adding competition-specif
 logic here.
 
 | Module | File | Purpose | Key Functions |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 | **constants** | `constants.py` | Shared configuration constants | `K_FACTOR`, `DEFAULT_ELO`, `MAX_EXPECTED_GOALS`, `HOME_ADVANTAGE_MULTIPLIER`, `POISSON_TABLE_BITS`, `API_TIMEOUT`, `ELORATINGS_TSV_URL` |
 | **elo** | `elo.py` | Elo rating engine | `expected_score()`, `update_ratings()`, `compute_k_factor()` |
 | **elo_sync** | `elo_sync.py` | Sync ratings from eloratings.net | `fetch_eloratings_tsv()`, `parse_eloratings_tsv()`, `validate_eloratings_data()`, `apply_graduated_correction()`, `get_staleness_level()` |
@@ -275,10 +309,120 @@ Add to `competitions/<name>/src/` when:
 
 ---
 
+## Web Dashboard
+
+The project includes a FastAPI-based web dashboard that provides a browser-based
+interface for both the World Cup and UCL predictors.
+
+### How It Works
+
+- **`web/server.py`** — The entry point. Creates a unified FastAPI app and runs on
+  `http://127.0.0.1:8080`. Mounts `wc_app` under `/worldcup` and `ucl_app` under
+  `/ucl`. Serves the SPA shell from `web/static/index.html` at `/`.
+- **`web/wc_app.py`** — World Cup sub-app. On startup, loads all data files,
+  runs the Monte Carlo simulation, and caches the result. Exposes REST API
+  endpoints (`/api/data`, `/api/standings`, `/api/bracket`, `/api/evaluation`,
+  `/api/signals`, `/api/governance`, `/api/blend`, `/api/refresh`,
+  `/api/what-if`, `/api/match/insight`).
+- **`web/ucl_app.py`** — UCL sub-app. On startup, loads real results (if
+  available) or runs a Monte Carlo simulation. Exposes REST API endpoints
+  (`/api/data`, `/api/standings`, `/api/bracket`, `/api/odds`, `/api/signals`,
+  `/api/simulate`, `/api/what-if`, `/api/match/insight`).
+- **Caching layer:** Both sub-apps compute their data on startup and store it in
+  an in-memory `cache` dict. The World Cup sub-app also writes to a
+  `web/cache.json` file so data survives a server restart. The `/api/refresh`
+  endpoint invalidates the cache and re-fetches live data from the BSD API.
+
+### Running the Web Server
+
+```bash
+# From the repository root
+python -m web.server
+```
+
+The server starts on `http://127.0.0.1:8080`. The World Cup data loads
+automatically on startup; UCL data loads only if
+`competitions/ucl/data/results.json` exists (real results mode), otherwise it
+runs a fresh Monte Carlo simulation.
+
+No `--reload` flag is used in production; add it for development:
+
+```bash
+uvicorn web.server:asgi_app --reload --host 127.0.0.1 --port 8080
+```
+
+### Dependencies
+
+The web dashboard requires these additional packages beyond the base engine
+dependencies:
+
+- `fastapi` — Web framework
+- `uvicorn` — ASGI server
+- `python-dotenv` — Environment variable loading (also used by World Cup CLI)
+- `requests` — HTTP client (also used by competitions)
+
+There is no root-level `requirements.txt` — install manually:
+
+```bash
+pip install fastapi uvicorn python-dotenv requests
+```
+
+### Frontend
+
+The SPA frontend lives in `web/static/`:
+
+- **`index.html`** — Shell page that loads Chart.js from CDN and mounts the
+  competition registry UI.
+- **`shared.css`** — Global styles (Playfair Display + Orbitron fonts, dark
+  theme, status bar, terminal input).
+- **`shared.js`** — Competition registry (WC, UCL, Euro), navigation bar,
+  terminal input handler, and page routing.
+- **`wc.js`** — World Cup-specific views: dashboard with team probabilities,
+  bracket visualizer with signal breakdowns, standings table with third-place
+  rankings, and a terminal-style boot log display.
+- **`ucl.js`** — UCL-specific views: overview with top-4 teams, league table
+  with zone coloring (top 8 / playoff / eliminated), bracket with Swiss playoff,
+  odds breakdown, signal availability, and match insight.
+
+The frontend uses the `fetch()` API to call the FastAPI backends. There is no
+frontend build step — the HTML imports JS modules directly.
+
+### Adding a New API Endpoint
+
+1. Add the route handler to `web/wc_app.py` or `web/ucl_app.py` (or
+   `web/server.py` for cross-competition endpoints).
+2. If the endpoint computes fresh data (rather than returning from cache), ensure
+   it updates `cache` accordingly.
+3. Add the corresponding JavaScript fetch call in `wc.js` or `ucl.js` and mount
+   the results into the appropriate tab view.
+4. For endpoints that modify state (refresh, simulate, what-if), use the
+   async task pattern: create a task ID, spawn a background thread, and poll
+   `/api/.../progress/{task_id}` from the frontend.
+
+---
+
 ## Running Tests
 
 Each competition has its own test suite under `competitions/<name>/tests/`.
 The core library has a small test suite under `football_core/tests/`.
+There are also root-level shared tests in `tests/`.
+
+### Root-Level Tests (4 test files)
+
+```bash
+# From the repository root
+python -m pytest tests/ -v
+```
+
+These test files cover Glicko system and calibration pipeline concepts that
+span across competitions:
+
+| File | Description |
+|---|---|
+| `test_glicko.py` | Glicko-1 rating system, K-factor, uncertainty |
+| `test_calibrated_pipeline.py` | Full calibration pipeline integration |
+| `test_calibration_pipeline.py` | Signal calibration and blending |
+| `test_confidence_intervals.py` | Monte Carlo confidence interval estimation |
 
 ### Core Library Tests (109 tests)
 
@@ -331,8 +475,12 @@ Euro currently has **no test suite** (`competitions/euro/tests/` does not exist)
 ### Running All Tests
 
 ```bash
-python -m pytest football_core/tests/ competitions/worldcup/tests/ competitions/ucl/tests/ -v
+python -m pytest root_tests/ football_core/tests/ competitions/worldcup/tests/ competitions/ucl/tests/ -v
 ```
+
+> **Note:** The root-level `tests/` directory may need to be run as `tests/`
+> rather than `root_tests/`. If you encounter import conflicts due to the
+> common `tests` package name, use the explicit path above.
 
 ### Test Conventions
 
@@ -501,6 +649,9 @@ python -m pytest competitions/<name>/tests/ -v
 
 # If you modified the core library
 python -m pytest football_core/tests/ -v
+
+# If you modified the web dashboard
+python -m pytest tests/ -v
 ```
 
 ---

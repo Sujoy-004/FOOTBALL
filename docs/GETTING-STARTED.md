@@ -44,7 +44,7 @@ source venv/bin/activate
 
 ```bash
 pip install -r competitions/worldcup/requirements.txt
-pip install requests numpy
+pip install requests numpy fastapi uvicorn
 ```
 
 The core dependencies are:
@@ -147,6 +147,28 @@ Three simulation modes are available:
 
 The `--fixture-source` flag controls where fixtures are loaded from: `auto` (try BSD, fall back to local repo), `repo` (local fixtures only), or `bsd` (BSD API only, fails if unavailable).
 
+### Web Dashboard
+
+```bash
+# Start the FastAPI web server (World Cup + UCL dashboards)
+python -m web.server
+```
+
+The server starts on **http://127.0.0.1:8080** and serves:
+
+| URL | Content |
+|---|---|
+| `http://127.0.0.1:8080/` | Landing page (SPA shell) — choose World Cup or UCL |
+| `http://127.0.0.1:8080/worldcup` | World Cup dashboard — standings, bracket, odds, evaluation, what-if |
+| `http://127.0.0.1:8080/ucl` | UCL dashboard — Swiss standings, playoff bracket, signal breakdowns |
+| `http://127.0.0.1:8080/euro` | Euro placeholder (stub) |
+
+On first startup, the server pre-computes all prediction data and caches it in memory — this may take 10–30 seconds. The World Cup sub-app writes a persistent `web/cache.json` file so subsequent restarts are faster.
+
+To stop the server, press **Ctrl+C** in the terminal.
+
+> **Note:** The web server uses the same BSD API key (`BSD_API_KEY` in your `.env`) for live data refresh. Without the key, the dashboard falls back to cached prediction data and Elo-only mode.
+
 ### UEFA Euro 2024 (`euro-predict` — dormant)
 
 ```bash
@@ -221,10 +243,39 @@ Make sure you are running commands from the project root (`FOOTBALL/`), not from
 
 The BSD API at `https://sports.bzzoiro.com/` must be reachable for live data. If you are behind a corporate firewall or have no internet connection, the engine will fall back to cached data or Elo-only mode.
 
+### `ModuleNotFoundError: No module named 'fastapi'` / `No module named 'uvicorn'`
+
+The web server requires `fastapi` and `uvicorn`. Install them:
+
+```bash
+pip install fastapi uvicorn
+```
+
+If you already installed dependencies, you may need to re-run the full install command:
+
+```bash
+pip install -r competitions/worldcup/requirements.txt
+pip install requests numpy fastapi uvicorn
+```
+
+### `Address already in use` when starting the web server
+
+Port **8080** is already occupied. Either stop the process using that port or change the port in `web/server.py` (the `uvicorn.run()` call on line 80).
+
+To find the process using port 8080:
+
+```bash
+# Windows
+netstat -ano | findstr :8080
+
+# macOS / Linux
+lsof -i :8080
+```
+
 ---
 
 ## Next Steps
 
-- **[ARCHITECTURE.md](FOOTBALL_ENGINE_ARCHITECTURE.md)** — Deep dive into system architecture, component relationships, and data flow.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — Deep dive into system architecture, component relationships, data flow, and web dashboard layout.
 - **[CONFIGURATION.md](CONFIGURATION.md)** — Full environment variable reference and configuration options.
 - **[README.md](../README.md)** — Project overview, usage examples for all three competitions, and directory structure.
