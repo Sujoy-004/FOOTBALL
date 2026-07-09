@@ -75,3 +75,6 @@ Thumbs.db
 .DS_Store
 Desktop.ini
 
+# Runtime refresh artifacts (auto-generated per-session)
+web/last_refresh.json
+
