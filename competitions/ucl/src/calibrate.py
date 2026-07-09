@@ -49,6 +49,8 @@ def _build_signal_registry() -> SignalRegistry:
     from football_core.signals.rolling_form import RollingFormSignal
     from football_core.signals.squad_value import SquadValueSignal
     from football_core.signals.rest_days import RestDaysSignal
+    from football_core.signals.player_form import PlayerFormSignal
+    from football_core.signals.team_synergy import TeamSynergySignal
 
     registry = SignalRegistry()
     registry.register(RefinedEloSignal())
@@ -56,6 +58,8 @@ def _build_signal_registry() -> SignalRegistry:
     registry.register(RollingFormSignal(result_provider=_EmptyResultProvider()))
     registry.register(SquadValueSignal())
     registry.register(RestDaysSignal())
+    registry.register(PlayerFormSignal())
+    registry.register(TeamSynergySignal())
     return registry
 
 

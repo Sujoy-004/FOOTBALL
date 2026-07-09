@@ -1,20 +1,52 @@
 {
   "version": 1,
-  "calibrated_at": null,
-  "n_matches": 0,
+  "calibrated_at": "2026-07-08T09:42:26.805514+00:00",
+  "n_matches": 288,
   "threshold": 20,
   "weights": {
-    "refined_elo": 0.25,
-    "market_odds": 0.30,
-    "rolling_form": 0.15,
-    "squad_value": 0.10,
-    "rest_days": 0.05
+    "market_odds": 0.144396,
+    "player_form": 0.144396,
+    "refined_elo": 0.135471,
+    "rest_days": 0.144396,
+    "rolling_form": 0.139814,
+    "squad_value": 0.147131,
+    "team_synergy": 0.144396
   },
   "per_signal": {
-    "refined_elo": {"log_loss": null, "n_matches": 0, "excluded": false},
-    "market_odds": {"log_loss": null, "n_matches": 0, "excluded": false},
-    "rolling_form": {"log_loss": null, "n_matches": 0, "excluded": false},
-    "squad_value": {"log_loss": null, "n_matches": 0, "excluded": false},
-    "rest_days": {"log_loss": null, "n_matches": 0, "excluded": false}
+    "market_odds": {
+      "log_loss": 0.6365,
+      "n_matches": 288,
+      "excluded": false
+    },
+    "player_form": {
+      "log_loss": 0.6365,
+      "n_matches": 288,
+      "excluded": false
+    },
+    "refined_elo": {
+      "log_loss": 0.6784,
+      "n_matches": 288,
+      "excluded": false
+    },
+    "rest_days": {
+      "log_loss": 0.6365,
+      "n_matches": 288,
+      "excluded": false
+    },
+    "rolling_form": {
+      "log_loss": 0.6574,
+      "n_matches": 288,
+      "excluded": false
+    },
+    "squad_value": {
+      "log_loss": 0.6247,
+      "n_matches": 288,
+      "excluded": false
+    },
+    "team_synergy": {
+      "log_loss": 0.6365,
+      "n_matches": 288,
+      "excluded": false
+    }
   }
 }

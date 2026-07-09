@@ -190,6 +190,8 @@ def _build_signal_engine(
     from football_core.signals.availability import AvailabilitySignal
     from football_core.signals.manager_effect import ManagerEffectSignal
     from football_core.signals.defensive_quality import DefensiveQualitySignal
+    from football_core.signals.player_form import PlayerFormSignal
+    from football_core.signals.team_synergy import TeamSynergySignal
 
     signals = [
         RefinedEloSignal(),
@@ -200,6 +202,8 @@ def _build_signal_engine(
         AvailabilitySignal(),
         ManagerEffectSignal(),
         DefensiveQualitySignal(),
+        PlayerFormSignal(),
+        TeamSynergySignal(),
     ]
 
     logger.debug("Building ensemble engine with %d signals: %s",
