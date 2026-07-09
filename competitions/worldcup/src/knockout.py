@@ -179,6 +179,7 @@ def run_full_simulation(
     played_groups: dict[str, dict] | None = None,
     blend_params: dict | None = None,
     xg_overrides: dict[str, tuple[float, float]] | None = None,
+    progress_cb: callable = None,
 ) -> dict[str, dict[str, float]]:
     rng = random.Random(seed)
     round_map = _build_round_map(bracket)
@@ -188,7 +189,9 @@ def run_full_simulation(
 
     matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings, base_rate=constants.EXPECTED_GOALS_BASE_RATE, xg_overrides=xg_overrides)
 
-    for _ in range(iterations):
+    report_interval = max(1, iterations // 100)
+
+    for i in range(iterations):
         winner_progression: dict[str, str] = {}
         sf_losers: dict[str, str | None] = {}
 
@@ -230,6 +233,9 @@ def run_full_simulation(
 
         if "FINAL" in winner_progression:
             counts[winner_progression["FINAL"]]["champion"] += 1
+
+        if progress_cb and (i % report_interval == 0 or i == iterations - 1):
+            progress_cb(i + 1, iterations)
 
     result: dict[str, dict[str, float]] = {}
     for team in teams:

@@ -65,6 +65,8 @@ def process_matches(
         if bracket_id is None:
             logger.warning("No bracket match found for %s vs %s", home_norm, away_norm)
             continue
+        if bracket_id in played_ids:
+            continue
 
         home_score = match.get("home_score", 0)
         away_score = match.get("away_score", 0)
