@@ -24,7 +24,7 @@ from competitions.worldcup.src.groups import (
 )
 
 from web.insight import compute_team_signal_strengths, compute_ko_signal_probs, compute_match_insight, compute_form_trend, compute_head_to_head, compute_match_outcome
-from web.whatif_engine import handle_instant_scenario, generate_simulate_insight
+from web.whatif_engine import parse_scenario, handle_instant_scenario, generate_simulate_insight
 from web.common import ts, boot_step, load_json, load_json_list
 
 load_dotenv()
@@ -643,14 +643,64 @@ def api_blend():
     return JSONResponse(compute_blend_info())
 
 
+def _run_refresh_task(task_id: str):
+    """Background refresh with progress reporting."""
+    try:
+        with sim_lock:
+            active_simulations[task_id] = {"status": "running", "progress": 0, "stage": "Loading data files..."}
+
+        result = refresh_from_api()
+        if result["status"] == "error":
+            with sim_lock:
+                active_simulations[task_id]["status"] = "error"
+                active_simulations[task_id]["error"] = result.get("message", "refresh failed")
+            return
+
+        with sim_lock:
+            active_simulations[task_id]["progress"] = 60
+            active_simulations[task_id]["stage"] = "Recomputing predictions..."
+
+        global cache
+        cache = compute_all()
+
+        with sim_lock:
+            active_simulations[task_id]["progress"] = 100
+            active_simulations[task_id]["status"] = "complete"
+            active_simulations[task_id]["result"] = result
+    except Exception as e:
+        with sim_lock:
+            active_simulations[task_id]["status"] = "error"
+            active_simulations[task_id]["error"] = str(e)
+
+
 @wc_app.post("/api/refresh")
 def api_refresh():
-    global cache
-    result = refresh_from_api()
-    if result["status"] != "error":
-        cache = compute_all()
-        result["recomputed"] = True
-    return JSONResponse(result)
+    task_id = str(uuid.uuid4())
+    t = threading.Thread(target=_run_refresh_task, args=(task_id,), daemon=True)
+    t.start()
+    return JSONResponse({"task_id": task_id, "status": "started"})
+
+
+@wc_app.get("/api/refresh/progress/{task_id}")
+def api_refresh_progress(task_id: str):
+    with sim_lock:
+        task = active_simulations.get(task_id)
+    if not task:
+        return JSONResponse({"error": "task not found"})
+    resp = {
+        "status": task["status"],
+        "progress": task.get("progress", 0),
+        "stage": task.get("stage", ""),
+    }
+    if task["status"] == "complete" and task.get("result"):
+        resp["result"] = task["result"]
+        with sim_lock:
+            del active_simulations[task_id]
+    if task["status"] == "error":
+        resp["error"] = task.get("error")
+        with sim_lock:
+            del active_simulations[task_id]
+    return JSONResponse(resp)
 
 
 @wc_app.get("/api/match/insight")
@@ -694,6 +744,9 @@ def api_what_if(req: dict = None):
     tb = match_data.get("team_b", "")
     blend_info = compute_blend_info()
     blend_weights = blend_info.get("blend_weights", {})
+    parsed = parse_scenario(scenario, ta, tb, blend_weights)
+    if parsed.confidence == 0.0:
+        return JSONResponse({"mode": mode, "error": "No meaningful scenario detected. Try describing a specific condition (e.g., 'injury', 'strong form', 'weak defense')."})
     if mode == "instant":
         teams_raw = load_json(DATA_DIR, "teams.json")
         elo_ratings = {n: d["elo"] for n, d in teams_raw.items()}

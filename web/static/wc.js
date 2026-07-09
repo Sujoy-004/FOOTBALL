@@ -60,12 +60,19 @@ async function loadAll() {
   }
 }
 
+let refreshProgressEl = null;
+
+function refreshProgressHTML() {
+  return '<div id="wcRefreshProgress" class="progress-bar-wrap" style="display:flex;margin:0 0 4px">' +
+    '<div class="progress-bar-fill" id="wcRefreshFill" style="width:0%"></div>' +
+    '</div><div class="progress-lbl" id="wcRefreshLbl" style="font-size:9px;margin-bottom:2px">Starting...</div>';
+}
+
 function updateStatus() {
   const d = appState.data;
   if (!d) return;
-  const btn = refreshing
-    ? '<span style="color:#15565B">Refreshing...</span>'
-    : '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh</button>';
+  if (refreshing) return;
+  const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh</button>';
   updateStatusBar(
     ">> " + d.n_teams + " teams  |  " + d.n_played + " matches played  |  " + d.total_iterations.toLocaleString() + " sims",
     btn + (autoRefreshOn ? '  <span style="color:#168777;font-size:10px">auto</span>' : "")
@@ -75,18 +82,58 @@ function updateStatus() {
 async function doRefresh() {
   if (refreshing) return;
   refreshing = true;
-  updateStatus();
-  const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh</button>';
-  updateStatusBar('<span style="color:#15565B">Refreshing... fetching matches</span>', btn);
+
+  const statusEl = document.getElementById("statusBar");
+  if (statusEl) {
+    const prog = document.getElementById("wcRefreshProgress");
+    if (!prog) {
+      statusEl.insertAdjacentHTML("beforebegin", refreshProgressHTML());
+    } else {
+      prog.style.display = "flex";
+      document.getElementById("wcRefreshFill").style.width = "0%";
+      document.getElementById("wcRefreshLbl").textContent = "Starting...";
+    }
+  }
+
   try {
-    const resp = await (await fetch(API + "/refresh", { method: "POST" })).json();
+    const { task_id } = await (await fetch(API + "/refresh", { method: "POST" })).json();
+    if (!task_id) throw new Error("no task_id");
+
+    await new Promise((resolve, reject) => {
+      const poll = setInterval(async () => {
+        try {
+          const p = await (await fetch(API + "/refresh/progress/" + task_id)).json();
+          if (p.error) { clearInterval(poll); reject(new Error(p.error)); return; }
+          const fill = document.getElementById("wcRefreshFill");
+          const lbl = document.getElementById("wcRefreshLbl");
+          if (fill) fill.style.width = p.progress + "%";
+          if (lbl) lbl.textContent = (p.stage || "Working...") + "  " + Math.round(p.progress) + "%";
+          if (p.status === "complete") {
+            clearInterval(poll);
+            resolve(p.result || {});
+          }
+          if (p.status === "error") {
+            clearInterval(poll);
+            reject(new Error(p.error || "refresh failed"));
+          }
+        } catch (e) {
+          clearInterval(poll);
+          reject(e);
+        }
+      }, 300);
+    });
+
     await loadAll();
-    const n = resp.updated?.new_ko_matches || 0;
-    const msg = '<span style="color:#168777">Refresh OK</span>  |  ' + (resp.elapsed || "?") + "s  |  " + n + " new KO";
-    updateStatusBar(msg, btn);
-    setTimeout(() => updateStatus(), 5000);
-  } catch {
-    updateStatusBar('<span style="color:#ff6b6b">Refresh failed</span>', btn);
+    const prog = document.getElementById("wcRefreshProgress");
+    if (prog) prog.style.display = "none";
+    const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh</button>';
+    updateStatusBar('<span style="color:#168777">Refresh complete</span>', btn);
+    setTimeout(() => updateStatus(), 3000);
+  } catch (e) {
+    const prog = document.getElementById("wcRefreshProgress");
+    if (prog) prog.style.display = "none";
+    const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh</button>';
+    updateStatusBar('<span style="color:#ff6b6b">Refresh failed: ' + (e.message || "") + '</span>', btn);
     setTimeout(() => updateStatus(), 5000);
   }
   refreshing = false;
@@ -436,6 +483,12 @@ window.__sendWhatIf = async function (mid) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ match_id: mid, scenario, mode: "simulate", iterations: iters })
       })).json();
+      if (resp.error) {
+        progressWrap.style.display = "none";
+        resultDiv.style.display = "block";
+        resultDiv.innerHTML = '<div style="color:#ff6b6b">' + resp.error + "</div>";
+        return;
+      }
       const taskId = resp.task_id;
       let t0 = Date.now();
       let prevPct = 0;

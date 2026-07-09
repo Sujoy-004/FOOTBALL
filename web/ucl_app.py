@@ -1070,6 +1070,9 @@ def api_what_if(req: dict = None):
     if "elo" not in original_signals:
         original_signals["elo"] = {"probability": elo_p, "weight": 0.1874}
 
+    parsed = parse_scenario(scenario, ta, tb, {})
+    if parsed.confidence == 0.0:
+        return JSONResponse({"mode": mode, "error": "No meaningful scenario detected. Try describing a specific condition (e.g., 'injury', 'strong form', 'weak defense')."})
     if mode == "instant":
         result = handle_instant_scenario(scenario, ta, tb, original_signals, {}, elo_prob=elo_p)
         return JSONResponse({"mode": "instant", **result})
