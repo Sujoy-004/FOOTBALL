@@ -431,6 +431,7 @@ def run_monte_carlo(
     team_aliases: dict[str, str] | None = None,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
     compute_ci: bool = False,
+    progress_cb: callable | None = None,
 ) -> dict:
     """Run Monte Carlo simulation of UCL league phase.
 
@@ -513,7 +514,8 @@ def run_monte_carlo(
         _bracket_data = json.load(f)
 
     # ── 5. Main iteration loop ──────────────────────────────────────────
-    for _ in range(n_iterations):
+    report_interval = max(1, n_iterations // 100)
+    for i in range(n_iterations):
         standings = simulate_league_phase(
             fixtures,
             elo_ratings,
@@ -554,6 +556,9 @@ def run_monte_carlo(
                 champions[team] += 1
             # D-09: track stage value for post-aggregation
             stage_collectors[team].append(STAGE_TO_VALUE[stages[team]])
+
+        if progress_cb and (i % report_interval == 0 or i == n_iterations - 1):
+            progress_cb(i + 1, n_iterations)
 
     # ── 6. Aggregate and return ─────────────────────────────────────────
     from competitions.ucl.src.elo_fetcher import get_clubelo_snapshot_date
@@ -619,6 +624,7 @@ def run_monte_carlo_glicko(
     team_aliases: dict[str, str] | None = None,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
     compute_ci: bool = False,
+    progress_cb: callable | None = None,
 ) -> dict:
     """Monte Carlo simulation with Glicko-1 uncertainty sampling.
 
@@ -698,7 +704,8 @@ def run_monte_carlo_glicko(
         _bracket_data = json.load(f)
 
     # ── 4. Main iteration loop ──────────────────────────────────────────
-    for _ in range(n_iterations):
+    report_interval = max(1, n_iterations // 100)
+    for i in range(n_iterations):
         # Sample team strengths from N(μ, σ²) — each iteration gets a
         # different sample, propagating uncertainty into champion variance
         sampled_elos = _sample_glicko_elos(rating_system, rng)
@@ -745,6 +752,9 @@ def run_monte_carlo_glicko(
             if stages[team] == "champion":
                 champions[team] += 1
             stage_collectors[team].append(STAGE_TO_VALUE[stages[team]])
+
+        if progress_cb and (i % report_interval == 0 or i == n_iterations - 1):
+            progress_cb(i + 1, n_iterations)
 
     # ── 5. Aggregate and return ─────────────────────────────────────────
     from competitions.ucl.src.elo_fetcher import get_clubelo_snapshot_date

@@ -625,6 +625,7 @@ def build_simulation_result(
     n_iterations: int,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
     rating_system=None,
+    progress_cb: callable | None = None,
 ) -> SimulationResult:
     """Run MC simulation + one representative bracket iteration, return SimulationResult.
 
@@ -664,6 +665,7 @@ def build_simulation_result(
             n_iterations=n_iterations,
             seed=seed,
             played_matches=played_matches,
+            progress_cb=progress_cb,
         )
     else:
         mc_result = run_monte_carlo(
@@ -672,6 +674,7 @@ def build_simulation_result(
             n_iterations=n_iterations,
             seed=seed,
             played_matches=played_matches,
+            progress_cb=progress_cb,
         )
 
     # ── 2. Run one representative iteration for bracket display ──
