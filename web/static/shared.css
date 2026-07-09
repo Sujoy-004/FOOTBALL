@@ -4,7 +4,7 @@ body {
   font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas", monospace;
   font-size: 13px; line-height: 1.5; min-height: 100vh;
 }
-#app { max-width: 1280px; margin: 0 auto; padding: 12px 16px; }
+#app { max-width: 1280px; margin: 0 auto; padding: 12px 16px; position: relative; z-index: 1; }
 
 /* Tabs */
 .tab-bar { display: flex; gap: 0; border-bottom: 1px solid #153D4C; margin-bottom: 12px; flex-wrap: wrap; }
@@ -327,4 +327,102 @@ body {
   .team-cards { flex-wrap: wrap; }
   .stats-row { flex-wrap: wrap; }
   .stat-card { min-width: 80px; }
+}
+
+/* ── Stadium Backdrop (landing page only) ── */
+.landing-backdrop {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100vh; z-index: 0;
+  pointer-events: none; overflow: hidden; display: none;
+}
+.landing-backdrop.show { display: block; }
+
+/* Sky — top 40% */
+.bd-sky {
+  position: absolute; top: 0; left: 0; width: 100%; height: 40%;
+  background: linear-gradient(180deg, #050a0f 0%, #071018 30%, #0a1628 60%, #0d1f30 100%);
+  overflow: hidden;
+}
+.bd-sky-glow {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 80%; height: 55%;
+  background: radial-gradient(ellipse at 50% 100%, rgba(22,160,133,0.12) 0%, rgba(22,160,133,0.04) 40%, transparent 70%);
+}
+.bd-cloud {
+  position: absolute; border-radius: 50%; background: rgba(13,31,48,0.4);
+  filter: blur(30px); pointer-events: none;
+}
+.bd-cloud-1 { top: 18%; left: -5%; width: 55%; height: 35%; }
+.bd-cloud-2 { top: 8%; right: -8%; width: 60%; height: 40%; background: rgba(10,22,40,0.5); }
+
+/* Mid layer — stands + goal (40%–65% of vh) */
+.bd-mid {
+  position: absolute; top: 40%; left: 0; width: 100%; height: 25%;
+}
+
+/* Stands — dark trapezoids converging toward centre */
+.bd-stand {
+  position: absolute; top: 0; height: 100%;
+  background: linear-gradient(90deg, #050a0f 0%, #0a1628 60%, #0d1f30 100%);
+}
+.bd-stand::after {
+  content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(255,255,255,0.015) 3px, rgba(255,255,255,0.015) 4px);
+  pointer-events: none;
+}
+.bd-stand-left {
+  left: 0; width: 100%;
+  clip-path: polygon(0% 0%, 42% 0%, 5% 100%, 0% 100%);
+}
+.bd-stand-right {
+  right: 0; width: 100%;
+  clip-path: polygon(58% 0%, 100% 0%, 100% 100%, 95% 100%);
+}
+
+/* Floodlight arc + bloom at top of stands */
+.bd-floodlight-bar {
+  position: absolute; top: 0; left: 12%; width: 76%; height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(22,160,133,0.5) 20%, rgba(22,160,133,0.7) 50%, rgba(22,160,133,0.5) 80%, transparent 100%);
+  filter: blur(1px); z-index: 3;
+}
+.bd-floodlight-bloom {
+  position: absolute; top: -12px; left: 8%; width: 84%; height: 40px;
+  background: radial-gradient(ellipse at 50% 30%, rgba(22,160,133,0.18) 0%, rgba(22,160,133,0.05) 40%, transparent 70%);
+  filter: blur(14px); z-index: 2;
+}
+
+/* Goal — minimalist vector posts at centre vanishing point */
+.bd-goal {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 55px; z-index: 2;
+}
+.bd-goal svg { display: block; width: 100%; height: auto; }
+
+/* Center circle — faint outline just below goal */
+.bd-circle-wrap {
+  position: absolute; bottom: 6%; left: 50%; transform: translateX(-50%); z-index: 2;
+}
+.bd-circle {
+  width: 48px; height: 48px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.1); opacity: 0.6;
+}
+
+/* Pitch — bottom 35% */
+.bd-pitch {
+  position: absolute; bottom: 0; left: 0; width: 100%; height: 35%;
+  background: linear-gradient(180deg, #0a281e 0%, #061a10 100%); overflow: hidden;
+}
+.bd-pitch-field {
+  position: absolute; top: -60%; left: -5%; width: 110%; height: 180%;
+  transform-origin: 50% 25%; transform: perspective(700px) rotateX(40deg);
+  background: repeating-linear-gradient(90deg,
+    rgba(10,42,26,0.35) 0px, rgba(10,42,26,0.35) 12px,
+    rgba(13,59,42,0.12) 12px, rgba(13,59,42,0.12) 24px
+  );
+}
+
+/* Bottom vignette — fades to black for readability */
+.bd-vignette {
+  position: absolute; bottom: 0; left: 0; width: 100%; height: 35%;
+  background: linear-gradient(to top, #000 0%, transparent 40%, transparent 100%);
+  z-index: 3; pointer-events: none;
 }

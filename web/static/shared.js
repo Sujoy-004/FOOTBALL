@@ -62,6 +62,7 @@ document.addEventListener("click", e => {
 // ── Landing Page ──
 function renderLanding() {
   currentCompetition = null;
+  document.getElementById("landingBackdrop").classList.add("show");
   document.getElementById("contentArea").innerHTML = `
     <div class="landing-header">
       <div class="landing-title">FOOTBALL</div>
@@ -91,6 +92,7 @@ function renderLanding() {
 async function loadCompetition(slug) {
   const comp = competitions[slug];
   if (!comp) { renderLanding(); return; }
+  document.getElementById("landingBackdrop").classList.remove("show");
   currentCompetition = comp;
 
   // Highlight nav
