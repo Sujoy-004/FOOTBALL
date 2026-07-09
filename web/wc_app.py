@@ -221,11 +221,11 @@ def compute_all():
         "groups": load_groups(DATA_DIR, teams=load_json(DATA_DIR, "teams.json")),
         "bracket": json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8")),
         "annex_c": json.loads((DATA_DIR / "annex_c.json").read_text(encoding="utf-8")),
-        "played": json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")),
-        "played_groups": json.loads((DATA_DIR / "played_groups.json").read_text(encoding="utf-8")),
-        "ledger": json.loads((DATA_DIR / "predictions_ledger.json").read_text(encoding="utf-8")),
-        "versions": json.loads((DATA_DIR / "versions.json").read_text(encoding="utf-8")),
-        "backtest": json.loads((DATA_DIR / "eval_backtest_report.json").read_text(encoding="utf-8")),
+        "played": json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {},
+        "played_groups": json.loads((DATA_DIR / "played_groups.json").read_text(encoding="utf-8")) if (DATA_DIR / "played_groups.json").exists() else {},
+        "ledger": json.loads((DATA_DIR / "predictions_ledger.json").read_text(encoding="utf-8")) if (DATA_DIR / "predictions_ledger.json").exists() else {},
+        "versions": json.loads((DATA_DIR / "versions.json").read_text(encoding="utf-8")) if (DATA_DIR / "versions.json").exists() else {},
+        "backtest": json.loads((DATA_DIR / "eval_backtest_report.json").read_text(encoding="utf-8")) if (DATA_DIR / "eval_backtest_report.json").exists() else {},
     }, boot_log)
     if not ld:
         return {"boot": boot_log, "error": "data load failed"}
@@ -509,7 +509,7 @@ def refresh_from_api():
         raw_matches = fetch_raw_matches(BSD_API_KEY, url, constants.DEFAULT_LEAGUE_ID)
         updated["matches_fetched"] = len(raw_matches)
         played_groups_path = data_dir / "played_groups.json"
-        played_groups = json.loads(played_groups_path.read_text(encoding="utf-8"))
+        played_groups = json.loads(played_groups_path.read_text(encoding="utf-8")) if played_groups_path.exists() else {}
         played_group_ids = set(played_groups.keys())
         new_grp = process_group_matches(raw_matches, teams, groups, aliases, played_group_ids, set())
         for m in new_grp:
