@@ -6,14 +6,22 @@ team_aliases.json file supplied by the caller.
 
 Fetch strategy
 --------------
-Rather than making N individual HTTP requests (one per team), this module
-issues a *single* request to the ClubElo date-based ranking endpoint:
+Primary: issues a *single* request to the ClubElo date-based ranking endpoint:
 
     http://api.clubelo.com/YYYY-MM-DD
 
 which returns a CSV of all clubs ranked on that date.  The Elo for each team
 is extracted by looking up its ClubElo name (from the alias file) in the
 ranking dict.
+
+Fallback: if a team is not found in the daily snapshot (e.g. its ranking
+period has expired), the per-team history endpoint is queried:
+
+    http://api.clubelo.com/{team_name}
+
+which returns the team's full historical CSV.  The most recent Elo rating
+is used.  This ensures teams with expired rankings still get a real value
+rather than the DEFAULT_ELO fallback.
 """
 
 from __future__ import annotations
@@ -22,6 +30,7 @@ import csv
 import functools
 import json
 import logging
+import time
 import urllib.request
 from datetime import date
 
@@ -66,6 +75,28 @@ def _parse_ranking_csv(csv_text: str) -> dict[str, float]:
     return ranking
 
 
+@functools.lru_cache(maxsize=128)
+def _fetch_team_history(clubelo_name: str) -> float | None:
+    """Hit the per-team ClubElo endpoint and return the most recent Elo."""
+    url = f"{_API_BASE}/{clubelo_name}"
+    logger.debug("Fetching ClubElo team history from %s", url)
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            csv_text = resp.read().decode("utf-8")
+    except Exception:
+        logger.warning("Failed to fetch ClubElo history for '%s'", clubelo_name)
+        return None
+
+    reader = csv.DictReader(line for line in csv_text.splitlines() if line.strip())
+    latest_elo = None
+    for row in reader:
+        try:
+            latest_elo = float(row["Elo"])
+        except (ValueError, KeyError):
+            continue
+    return latest_elo
+
+
 def fetch_team_elos(
     team_names: list[str],
     alias_path: str,
@@ -82,12 +113,25 @@ def fetch_team_elos(
         if elo is not None:
             elos[team_name] = elo
         else:
-            logger.warning(
-                "ClubElo name '%s' (for team '%s') not found in ranking — "
-                "falling back to DEFAULT_ELO=%d",
-                clubelo_name, team_name, DEFAULT_ELO,
+            logger.info(
+                "ClubElo name '%s' (for team '%s') not found in daily snapshot — "
+                "trying per-team history endpoint",
+                clubelo_name, team_name,
             )
-            elos[team_name] = float(DEFAULT_ELO)
+            hist_elo = _fetch_team_history(clubelo_name)
+            if hist_elo is not None:
+                logger.info(
+                    "Found historical Elo %.1f for '%s' (team '%s')",
+                    hist_elo, clubelo_name, team_name,
+                )
+                elos[team_name] = hist_elo
+            else:
+                logger.warning(
+                    "ClubElo name '%s' (for team '%s') not found in history either — "
+                    "falling back to DEFAULT_ELO=%d",
+                    clubelo_name, team_name, DEFAULT_ELO,
+                )
+                elos[team_name] = float(DEFAULT_ELO)
 
     return elos
 
