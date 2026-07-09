@@ -274,7 +274,7 @@ def _build_deterministic_bracket(knockout: dict, standings: list[dict]) -> dict:
                 "score": {"home": m.get("score_a", 0), "away": m.get("score_b", 0)},
                 "winner": m.get("winner", ""),
                 "played": True,
-                "source_matches": source_map.get(mid, []),
+                "source_matches": source_map.get(mid) or None,
             }
             if rnd == "FINAL" and m.get("penalties"):
                 pens = m["penalties"]
@@ -372,6 +372,7 @@ def deterministic_compute() -> dict:
     if not results:
         data["error"] = "results.json not found"
         return data
+    data["_results"] = results
     knockout = boot_step("Load knockout results", lambda: _load_knockout_results(), boot_log_local)
     if not knockout:
         data["error"] = "knockout_results.json not found"
@@ -401,6 +402,7 @@ def deterministic_compute() -> dict:
         return data
     bracket_data = boot_step("Build bracket", lambda: _build_deterministic_bracket(knockout, standings), boot_log_local)
     engine = boot_step("Build signal engine", lambda: _build_signal_engine(elo_ratings), boot_log_local)
+    data["_signal_engine"] = engine
     signal_stats = boot_step("Evaluate signals", lambda: _compute_signal_eval(results, engine, elo_ratings, bsd_manager_data), boot_log_local)
     odds_display = []
     champ = knockout.get("champion", "")
@@ -507,6 +509,7 @@ def compute_all() -> dict:
         return data
     sim_result = result
     engine = boot_step("Build signal engine", lambda: _build_signal_engine(elo_ratings), boot_log_local)
+    data["_signal_engine"] = engine
     bracket_rules_path = DATA_DIR / "bracket_rules.json"
     bracket_rules = {}
     try:
