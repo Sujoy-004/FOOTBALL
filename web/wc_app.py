@@ -502,6 +502,7 @@ def refresh_from_api():
         aliases = json.loads((data_dir / "team_aliases.json").read_text(encoding="utf-8"))
     except Exception as e:
         return {"status": "error", "message": f"Failed to load data files: {e}"}
+    raw_matches = []
     try:
         from competitions.worldcup.src.fetcher import build_historic_url, process_matches, process_group_matches
         from football_core.fetcher import fetch_raw_matches
@@ -546,6 +547,47 @@ def refresh_from_api():
     except Exception as e:
         errors.append(f"catboost: {repr(e)}")
         updated["catboost"] = False
+
+    try:
+        from competitions.worldcup.src.predictors.lineup import compute_lineup_signal
+        compute_lineup_signal(groups, bracket=bracket_raw)
+        updated["lineup_signal"] = True
+    except Exception as e:
+        errors.append(f"lineup_signal: {repr(e)}")
+        updated["lineup_signal"] = False
+
+    try:
+        from competitions.worldcup.src.predictors.form import compute_form_signal
+        compute_form_signal(teams, groups, bracket=bracket_raw)
+        updated["form_signal"] = True
+    except Exception as e:
+        errors.append(f"form_signal: {repr(e)}")
+        updated["form_signal"] = False
+
+    try:
+        from competitions.worldcup.src.predictors.odds import fetch_and_cache_odds as fetch_odds
+        fetch_odds(BSD_API_KEY, raw_matches, aliases, groups, bracket=bracket_raw)
+        updated["odds_signal"] = True
+    except Exception as e:
+        errors.append(f"odds_signal: {repr(e)}")
+        updated["odds_signal"] = False
+
+    try:
+        from competitions.worldcup.src.predictors.manager_signals import fetch_and_cache_manager_signals as fetch_mgr
+        fetch_mgr(BSD_API_KEY, groups, bracket=bracket_raw)
+        updated["manager_signals"] = True
+    except Exception as e:
+        errors.append(f"manager_signals: {repr(e)}")
+        updated["manager_signals"] = False
+
+    try:
+        from competitions.worldcup.src.predictors.availability import fetch_and_cache_availability_signal as fetch_avail
+        fetch_avail(BSD_API_KEY, groups, bracket=bracket_raw)
+        updated["availability_signal"] = True
+    except Exception as e:
+        errors.append(f"availability_signal: {repr(e)}")
+        updated["availability_signal"] = False
+
     elapsed = time.time() - t0
     status = "ok" if not errors else ("partial" if updated.get("match_results") else "error")
     refresh_record = {
