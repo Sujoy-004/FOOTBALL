@@ -84,6 +84,30 @@ python -m competitions.ucl.main --mode replay --replay-data matches.json
 
 The UCL competition uses a Swiss-system league phase (36 teams, 8 matchdays) followed by a playoff round and a 16-team knockout bracket.
 
+## Web Dashboard (Unified)
+
+The project ships with a unified FastAPI web dashboard on port 8080 that serves an SPA for all competitions.
+
+```bash
+# Start the unified web server
+python -m web.server
+
+# Open in browser: http://127.0.0.1:8080
+```
+
+| Path | Competition | Status |
+|---|---|---|
+| `/` | Landing page (competition selector) | Active |
+| `/worldcup` | World Cup 2026 dashboard | Active |
+| `/worldcup/api/*` | WC backend endpoints | Active |
+| `/ucl` | UCL 2025/26 dashboard | Active |
+| `/ucl/api/*` | UCL backend endpoints | Active |
+| `/euro` | Euro 2028 placeholder | Stub (coming soon) |
+
+The dashboard is a vanilla JS SPA (no bundler). Each competition has a separate JS module (`static/wc.js`, `static/ucl.js`) loaded dynamically. Development requires only editing `static/*.js` and reloading the browser.
+
+*The old dual-server architecture (`web/server.py` + `web/ucl_server.py` on ports 8080/8081) has been replaced by a single unified server.*
+
 ### Euro 2024 (dormant)
 
 Continuous polling predictor for UEFA Euro 2024. Shares architecture with the World Cup predictor but is currently in a dormant state.
@@ -171,6 +195,22 @@ FOOTBALL/
 │       ├── simulation.py       Euro-specific simulation logic
 │       ├── __init__.py         Package init + sys.path bootstrap
 │       └── data/               Teams, groups, bracket data
+│
+├── web/                        ← Unified FastAPI web dashboard (port 8080)
+│   ├── __init__.py              Package marker
+│   ├── server.py                Parent FastAPI — mounts sub-apps, serves static
+│   ├── common.py                Shared backend utilities (boot_step, ts, load_json)
+│   ├── wc_app.py                WC sub-app (mounted at /worldcup)
+│   ├── ucl_app.py               UCL sub-app (mounted at /ucl)
+│   ├── insight.py               WC match insight engine
+│   ├── whatif_engine.py         Shared what-if scenario engine
+│   ├── cache.json               Web data cache (auto-generated)
+│   └── static/
+│       ├── index.html            SPA shell (landing + dynamic competition loading)
+│       ├── shared.css            Unified design system CSS
+│       ├── shared.js             Shared components (terminal, modal, tabs, router)
+│       ├── wc.js                 WC module (dashboard, bracket, standings, what-if)
+│       └── ucl.js                UCL module (overview, league table, bracket, odds, what-if)
 │
 └── docs/
     ├── ARCHITECTURE.md            System architecture, data flow, design decisions
