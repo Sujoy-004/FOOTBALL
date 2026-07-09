@@ -531,12 +531,13 @@ def run_monte_carlo(
         bracket = build_r16_bracket(
             standings, playoff_result,
             bracket_data=_bracket_data,
+            rng=rng,
         )
         tree_result = simulate_knockout_tree(
             bracket, elo_dict, rng,
         )
         stages = track_knockout_stages(standings, tree_result)
-        # ── end knockout pipeline ──────────────────────────────────────
+        # ── end knockout pipeline ──────────────────────────────────────────
 
         for entry in standings:
             team = entry["team"]
@@ -723,6 +724,7 @@ def run_monte_carlo_glicko(
         bracket = build_r16_bracket(
             standings, playoff_result,
             bracket_data=_bracket_data,
+            rng=rng,
         )
         tree_result = simulate_knockout_tree(
             bracket, sampled_elos, rng,

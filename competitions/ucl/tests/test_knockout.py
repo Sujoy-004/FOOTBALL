@@ -245,7 +245,10 @@ class TestPlayoffRound:
     def test_playoff_round_pairings_correct(self, sample_playoff_standings, sample_playoff_pairings, sample_rng):
         """Pairings match the dedicated data file (9v24, 10v23, etc.)."""
         elos = {e["team"]: e["elo"] for e in sample_playoff_standings}
-        result = simulate_playoff_round(sample_playoff_standings, elos, sample_rng)
+        result = simulate_playoff_round(
+            sample_playoff_standings, elos, sample_rng,
+            pairings_data=sample_playoff_pairings,
+        )
         pairings = sample_playoff_pairings["pairings"]
         pos_to_team = {e["position"]: e["team"] for e in sample_playoff_standings}
         for pairing in pairings:
@@ -290,7 +293,10 @@ class TestPlayoffRound:
         gets second-leg home advantage.
         """
         elos = {e["team"]: e["elo"] for e in sample_playoff_standings}
-        result = simulate_playoff_round(sample_playoff_standings, elos, sample_rng)
+        result = simulate_playoff_round(
+            sample_playoff_standings, elos, sample_rng,
+            pairings_data=sample_playoff_pairings,
+        )
         pos_to_team = {e["position"]: e["team"] for e in sample_playoff_standings}
         pairings = sample_playoff_pairings["pairings"]
         for pairing in pairings:
@@ -395,7 +401,7 @@ class TestR16Bracket:
         result = build_r16_bracket(sample_tie_standings, {"winners": sample_playoff_winners})
         for match in result["matchups"]:
             if match["round"] == "R16":
-                assert match["team_a"] == seed_map[match["seed_position"]]
+                assert match["team_b"] == seed_map[match["seed_position"]]
 
     def test_bracket_playoff_winners_mapped(self, sample_tie_standings, sample_playoff_winners):
         """Each playoff tie winner appears in correct bracket slot."""
@@ -403,7 +409,7 @@ class TestR16Bracket:
         for match in result["matchups"]:
             if match["round"] == "R16":
                 expected = sample_playoff_winners[match["playoff_tie"]]
-                assert match["team_b"] == expected
+                assert match["team_a"] == expected
 
     def test_top4_protection_separate_quarters(self, sample_tie_standings, sample_playoff_winners):
         """Seeds 1-4 are in quarters 1-2 (different SF halves)."""

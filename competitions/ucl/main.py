@@ -701,6 +701,7 @@ def build_simulation_result(
     bracket = build_r16_bracket(
         standings, playoff_result,
         bracket_data=bracket_data,
+        rng=rng,
     )
     tree_result = simulate_knockout_tree(bracket, bracket_elos, rng)
     stages = track_knockout_stages(standings, tree_result)

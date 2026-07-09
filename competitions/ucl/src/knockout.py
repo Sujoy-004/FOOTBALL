@@ -125,7 +125,27 @@ def simulate_playoff_round(
             f"Expected 8 pairings, got {len(pairings)}"
         )
 
-    # ── 3. Build position-to-team lookup from standings ──────────────────
+    # ── 3. Draw step: shuffle positions within each draw_group ────────────
+    # Simulates the UEFA draw ceremony: seeded pairs (9/10, 11/12, etc.)
+    # and challenger pairs (23/24, 21/22, etc.) are randomly assigned
+    # to silver/blue bracket sides.
+    draw_groups: dict[str, list[dict]] = {}
+    for p in pairings:
+        dg = p.get("draw_group")
+        if dg:
+            draw_groups.setdefault(dg, []).append(p)
+    for g in draw_groups.values():
+        if len(g) != 2:
+            continue
+        seeds = [p["position_a"] for p in g]
+        challs = [p["position_b"] for p in g]
+        rng.shuffle(seeds)
+        rng.shuffle(challs)
+        for i, p in enumerate(g):
+            p["position_a"] = seeds[i]
+            p["position_b"] = challs[i]
+
+    # ── 4. Build position-to-team lookup from standings ──────────────────
     pos_to_team: dict[int, str] = {}
     elo: dict[str, float] = {}
     for entry in standings:
@@ -255,6 +275,7 @@ def build_r16_bracket(
     playoff_results: dict,
     bracket_data: dict | None = None,
     bracket_rules_path: str | None = None,
+    rng: random.Random | None = None,
 ) -> dict:
     """Construct the seeded R16 bracket from league standings and playoff results.
 
@@ -328,7 +349,27 @@ def build_r16_bracket(
                         f"unknown source_match '{src}'"
                     )
 
-    # ── 4. Build seed-to-team lookup from standings ───────────────────────
+    # ── 4. Draw step: shuffle seeds and playoff ties within each group ────
+    # Simulates the UEFA R16 draw: paired seeds (1/2, 3/4, etc.) and their
+    # corresponding playoff tie winners are randomly assigned within each
+    # quarter.  Skips if no rng provided (backward compat).
+    if rng is not None:
+        r16_groups: dict[str, list[dict]] = {}
+        for m in bracket_data["matches"]:
+            if m["round"] == "R16" and "draw_group" in m:
+                r16_groups.setdefault(m["draw_group"], []).append(m)
+        for g in r16_groups.values():
+            if len(g) != 2:
+                continue
+            seeds = [m["home_seed"] for m in g]
+            ties = [m["away_playoff_tie"] for m in g]
+            rng.shuffle(seeds)
+            rng.shuffle(ties)
+            for i, m in enumerate(g):
+                m["home_seed"] = seeds[i]
+                m["away_playoff_tie"] = ties[i]
+
+    # ── 5. Build seed-to-team lookup from standings ───────────────────────
     seed_to_team: dict[int, str] = {}
     for entry in standings:
         if entry["zone"] == "top_8":
@@ -339,10 +380,10 @@ def build_r16_bracket(
             f"Expected 8 seeds (zone='top_8'), got {len(seed_to_team)}"
         )
 
-    # ── 5. Build playoff winner lookup ────────────────────────────────────
+    # ── 6. Build playoff winner lookup ────────────────────────────────────
     playoff_winners: dict[int, str] = playoff_results["winners"]
 
-    # ── 6. Construct matchups ─────────────────────────────────────────────
+    # ── 7. Construct matchups ─────────────────────────────────────────────
     matchups = []
     tree: dict[str, list[str]] = {}
 
