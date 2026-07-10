@@ -3,6 +3,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
 import fastapi
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -24,6 +25,7 @@ from competitions.worldcup.src.groups import (
 )
 
 from web.insight import compute_team_signal_strengths, compute_ko_signal_probs, compute_match_insight, compute_form_trend, compute_head_to_head, compute_match_outcome
+from web.engine_helpers import compute_predictions, compute_team_strengths_from_predictions
 from web.whatif_engine import parse_scenario, handle_instant_scenario, generate_simulate_insight
 from web.common import ts, boot_step, load_json, load_json_list
 
@@ -70,7 +72,8 @@ def compute_bracket_display(groups, teams, bracket, annex_c, played, played_grou
     return {"rounds": {"R32": matchups}, "n_matchups": len(matchups)}
 
 
-def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups, ledger=None):
+def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups, engine_predictions=None):
+    from web.engine_helpers import compute_team_strengths_from_predictions
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
     known_winners = {mid: data["winner"] for mid, data in played.items() if data.get("winner")}
     slot_teams = resolve_knockout_slot_teams(groups, teams, played_groups, bracket, annex_c, known_winners)
@@ -82,9 +85,17 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
                 return b
         return None
 
-    if ledger:
-        played_groups_flat = played_groups or {}
-        team_strengths = compute_team_signal_strengths(ledger, played_groups_flat)
+    team_strengths = {}
+    all_matches = []
+    groups_data = groups.get("groups", groups) if isinstance(groups, dict) else groups
+    for g in groups_data.values():
+        for m in g.get("matches", []):
+            all_matches.append(m)
+    for m in bracket:
+        all_matches.append(m)
+
+    if engine_predictions and len(engine_predictions) == len(all_matches):
+        team_strengths = compute_team_strengths_from_predictions(engine_predictions, all_matches)
     else:
         team_strengths = {}
 
@@ -179,18 +190,31 @@ def compute_group_standings(groups, teams, played_groups):
     return standings, third
 
 
-def compute_signal_eval(teams, played, played_groups, ledger):
-    elo_report = evaluate_all_matches(teams, played, played_groups, signal_name="elo")
-    history = []
-    for mid, signals in ledger.items():
-        actual = None
-        if mid in played:
-            m = played[mid]
-        elif mid in played_groups:
-            m = played_groups[mid]
-        else:
+def compute_signal_briers_from_predictions(
+    engine_predictions: list,
+    all_matches: list[dict],
+    played: dict,
+    played_groups: dict,
+) -> dict[str, dict]:
+    """Compute per-signal Brier/log-loss/accuracy from engine predictions.
+
+    Uses zip() to associate each BlendedPrediction with its match fixture
+    (since BlendedPrediction has no match_id field).
+
+    Returns: {signal_name: {"brier": ..., "log_loss": ..., "accuracy": ..., "n": ...}}
+    """
+    played_all = dict(played)
+    if played_groups:
+        played_all.update(played_groups)
+
+    accum: dict[str, list[tuple[float, float]]] = {}
+
+    for bp, match in zip(engine_predictions, all_matches):
+        mid = match.get("match_id", "")
+        if not mid or mid not in played_all:
             continue
-        t_a, t_b = m["team_a"], m["team_b"]
+        m = played_all[mid]
+        t_a, t_b = m.get("team_a", ""), m.get("team_b", "")
         winner = m.get("winner")
         if winner == t_a:
             actual = 1.0
@@ -198,17 +222,70 @@ def compute_signal_eval(teams, played, played_groups, ledger):
             actual = 0.0
         elif winner is None:
             actual = 0.5
-        if actual is None:
+        else:
+            continue
+        for sig_name, sd in (bp.signal_breakdown or {}).items():
+            prob = sd.get("home", 0.33)
+            accum.setdefault(sig_name, []).append((prob, actual))
+
+    from football_core.evaluation import compute_metrics
+    result = {}
+    for sig_name, pairs in sorted(accum.items()):
+        preds = [p for p, _ in pairs]
+        actuals = [a for _, a in pairs]
+        metrics = compute_metrics(preds, actuals)
+        result[sig_name] = {
+            "brier": round(metrics["brier"], 6),
+            "log_loss": round(metrics["log_loss"], 6),
+            "accuracy": round(metrics["accuracy"], 6),
+            "n": metrics["n"],
+        }
+    return result
+
+
+def compute_signal_eval(teams, played, played_groups, engine_predictions, all_matches):
+    """Evaluate signals from engine predictions — no ledger dependency."""
+    elo_report = evaluate_all_matches(teams, played, played_groups, signal_name="elo")
+    signal_briers = compute_signal_briers_from_predictions(
+        engine_predictions, all_matches, played, played_groups)
+    all_report = evaluate_all_matches(
+        teams, played, played_groups, signal_name=None,
+        history=_build_eval_history_from_predictions(engine_predictions, all_matches, played, played_groups))
+    return {"elo": elo_report, "all_signals": all_report}
+
+
+def _build_eval_history_from_predictions(predictions, all_matches, played, played_groups):
+    """Build eval history from BlendedPrediction list + match fixtures.
+
+    Uses zip() since BlendedPrediction has no match_id field.
+    """
+    played_all = dict(played)
+    if played_groups:
+        played_all.update(played_groups)
+    played_mids = set(played_all.keys())
+    history = []
+    for bp, match in zip(predictions, all_matches):
+        mid = match.get("match_id", "")
+        if not mid or mid not in played_mids:
+            continue
+        m = played_all[mid]
+        t_a, t_b = m.get("team_a", ""), m.get("team_b", "")
+        winner = m.get("winner")
+        if winner == t_a:
+            actual = 1.0
+        elif winner == t_b:
+            actual = 0.0
+        elif winner is None:
+            actual = 0.5
+        else:
             continue
         sigs = {}
-        for sk, sv in signals.items():
-            prob = sv.get("probability")
-            if prob is not None and sv.get("available"):
-                sigs[sk] = {"probability": prob, "available": True}
+        for sk, sd in (bp.signal_breakdown or {}).items():
+            prob = sd.get("home", 0.33)
+            sigs[sk] = {"probability": prob, "available": True}
         if sigs:
             history.append({"match_id": mid, "actual": actual, "signals": sigs})
-    all_report = evaluate_all_matches(teams, played, played_groups, signal_name=None, history=history)
-    return {"elo": elo_report, "all_signals": all_report}
+    return history
 
 
 def compute_all(skip_simulation: bool = False):
@@ -223,7 +300,6 @@ def compute_all(skip_simulation: bool = False):
         "annex_c": json.loads((DATA_DIR / "annex_c.json").read_text(encoding="utf-8")),
         "played": json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {},
         "played_groups": json.loads((DATA_DIR / "played_groups.json").read_text(encoding="utf-8")) if (DATA_DIR / "played_groups.json").exists() else {},
-        "ledger": json.loads((DATA_DIR / "predictions_ledger.json").read_text(encoding="utf-8")) if (DATA_DIR / "predictions_ledger.json").exists() else {},
         "versions": json.loads((DATA_DIR / "versions.json").read_text(encoding="utf-8")) if (DATA_DIR / "versions.json").exists() else {},
         "backtest": json.loads((DATA_DIR / "eval_backtest_report.json").read_text(encoding="utf-8")) if (DATA_DIR / "eval_backtest_report.json").exists() else {},
     }, boot_log)
@@ -232,11 +308,24 @@ def compute_all(skip_simulation: bool = False):
     teams, groups_data = ld["teams"], ld["groups"]["groups"]
     bracket, annex_c = ld["bracket"], ld["annex_c"]
     played, played_groups = ld["played"], ld["played_groups"]
-    ledger, versions, backtest = ld["ledger"], ld["versions"], ld["backtest"]
+    versions, backtest = ld["versions"], ld["backtest"]
 
     n_played_ko = sum(1 for m in played.values() if m.get("winner"))
     n_played_grp = sum(1 for m in played_groups.values() if m.get("winner"))
     total_played = n_played_ko + n_played_grp
+
+    # Build full match list (needed for engine prediction alignment)
+    all_matches: list[dict] = []
+    for g in groups_data.values():
+        for m in g.get("matches", []):
+            all_matches.append(m)
+    for m in bracket:
+        all_matches.append(m)
+
+    # Compute engine predictions from on-disk signal caches
+    engine_predictions, match_probs, blend_weights = boot_step("Engine Predictions", lambda:
+        compute_predictions(teams, ld["groups"], bracket, played, played_groups)
+    , boot_log) or ([], {}, {})
 
     if skip_simulation:
         sim = None
@@ -255,13 +344,13 @@ def compute_all(skip_simulation: bool = False):
     , boot_log)
 
     eval_result = boot_step("Signal Evaluation", lambda:
-        compute_signal_eval(teams, played, played_groups, ledger)
+        compute_signal_eval(teams, played, played_groups, engine_predictions, all_matches)
     , boot_log)
 
     gov = boot_step("Governance", lambda: {
         "versions": versions,
         "n_matches": len(played) + len(played_groups),
-        "n_signals": len(ledger),
+        "n_signals": len(blend_weights) if blend_weights else 0,
         "status": "COLD_START" if (len(played) + len(played_groups)) < 30 else "HEALTHY",
         "backtest_summary": backtest.get("governance_recommendation", ""),
     }, boot_log)
@@ -330,7 +419,8 @@ def compute_all(skip_simulation: bool = False):
     data["n_played"] = total_played
 
     data["full_bracket"] = boot_step("Full Bracket Resolution", lambda:
-        compute_full_bracket(ld["groups"], teams, bracket, annex_c, played, played_groups, ledger=ledger)
+        compute_full_bracket(ld["groups"], teams, bracket, annex_c, played, played_groups,
+                             engine_predictions=engine_predictions)
     , boot_log)
 
     data["standings"] = standings_display
@@ -361,37 +451,43 @@ def compute_or_load():
 
 
 def compute_signal_stats():
+    """Signal statistics from on-disk caches — no ledger dependency."""
+    from competitions.worldcup.src.state import load_signal_cache
     data_dir = constants.DATA_DIR
-    ledger_path = data_dir / "predictions_ledger.json"
-    if not ledger_path.exists():
-        return {"signals": {}, "n_total": 0}
-    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    cache_files: list[tuple[str, str]] = [
+        ("odds_cache.json", "market_odds"),
+        ("catboost_cache.json", "catboost"),
+        ("form_cache.json", "form"),
+        ("lineup_cache.json", "lineup_strength"),
+        ("defensive_cache.json", "defensive_quality"),
+        ("manager_effect_cache.json", "manager_effect"),
+        ("availability_cache.json", "availability"),
+    ]
     signal_data: dict[str, dict] = {}
-    for mid, signals in ledger.items():
-        for sk, sv in signals.items():
-            if sk not in signal_data:
-                signal_data[sk] = {"n": 0, "probs": [], "available": 0}
-            signal_data[sk]["n"] += 1
-            if sv.get("available"):
-                signal_data[sk]["available"] += 1
-            prob = sv.get("probability")
+    n_total = 0
+    for fname, sname in cache_files:
+        cache = load_signal_cache(fname, data_dir)
+        matches = (cache or {}).get("matches", {})
+        if not matches:
+            continue
+        n_total += len(matches)
+        probs = []
+        avail = 0
+        for mid, entry in matches.items():
+            if entry.get("available", False):
+                avail += 1
+            prob = entry.get("probability")
             if prob is not None:
-                signal_data[sk]["probs"].append(prob)
-    result = {}
-    for sk, sd in sorted(signal_data.items()):
-        probs = sd["probs"]
-        avg = sum(probs) / len(probs) if probs else 0
-        mn = min(probs) if probs else 0
-        mx = max(probs) if probs else 0
-        result[sk] = {
-            "n_matches": sd["n"],
-            "available": sd["available"],
-            "available_pct": round(sd["available"] / sd["n"] * 100, 1) if sd["n"] else 0,
-            "avg_probability": round(avg, 4),
-            "min_probability": round(mn, 4),
-            "max_probability": round(mx, 4),
+                probs.append(prob)
+        signal_data[sname] = {
+            "n_matches": len(matches),
+            "available": avail,
+            "available_pct": round(avail / len(matches) * 100, 1) if matches else 0,
+            "avg_probability": round(sum(probs) / len(probs), 4) if probs else 0,
+            "min_probability": round(min(probs), 4) if probs else 0,
+            "max_probability": round(max(probs), 4) if probs else 0,
         }
-    return {"signals": result, "n_total_ledger": len(ledger)}
+    return {"signals": signal_data, "n_total": n_total}
 
 
 def compute_signal_detail(name: str):
@@ -453,35 +549,34 @@ def compute_signal_detail(name: str):
 
 
 def compute_blend_info():
+    """Blend info from cache.json engine weights + backtest — no ledger dependency."""
     data_dir = constants.DATA_DIR
     backtest_path = data_dir / "eval_backtest_report.json"
     backtest = json.loads(backtest_path.read_text(encoding="utf-8")) if backtest_path.exists() else {}
-    ledger_path = data_dir / "predictions_ledger.json"
-    ledger = json.loads(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else {}
-    signals_in_ledger = set()
-    for mid, sigs in ledger.items():
-        signals_in_ledger.update(sigs.keys())
+    cache_file = Path(__file__).parent / "cache.json"
+    if cache_file.exists():
+        cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
+    else:
+        cache_data = {}
+    eval_data = cache_data.get("evaluation", {})
+    available_signals = sorted(k for k in eval_data if k != "elo" and eval_data[k].get("n_matches", 0) > 0)
+    n_available = len(available_signals)
     per_signal = backtest.get("per_signal", {})
     briers = {}
     for sk, sv in per_signal.items():
         b = sv.get("brier")
         if b is not None:
             briers[sk] = b
-    for sk in signals_in_ledger:
+    for sk in available_signals:
         if sk not in briers:
             briers[sk] = 0.25
     total_inv = sum(1.0 / max(b, 0.01) for b in briers.values()) if briers else 1
     weights = {sk: round((1.0 / max(b, 0.01)) / total_inv, 4) for sk, b in briers.items()} if total_inv else {}
-    cache_file = Path(__file__).parent / "cache.json"
-    if cache_file.exists():
-        cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
-    else:
-        cache_data = {}
     gov = cache_data.get("governance", {})
     n_matches = gov.get("n_matches", 0)
     return {
-        "n_signals_available": len(signals_in_ledger),
-        "available_signals": sorted(signals_in_ledger),
+        "n_signals_available": n_available,
+        "available_signals": available_signals,
         "blend_weights": weights,
         "backtest_briers": {sk: round(b, 4) for sk, b in briers.items()},
         "calibration_status": "cold_start" if n_matches < 30 else "calibrated",
@@ -546,6 +641,7 @@ def refresh_from_api(progress_cb=None):
     if progress_cb:
         progress_cb(10, "Matches fetched and processed")
 
+    cb_result = {}
     try:
         from competitions.worldcup.src.predictors.catboost import fetch_and_cache_catboost as fetch_cb
         cb_result = fetch_cb(BSD_API_KEY, aliases, groups, bracket_raw)
@@ -556,9 +652,10 @@ def refresh_from_api(progress_cb=None):
     if progress_cb:
         progress_cb(20, "Catboost model predictions done")
 
+    lineup_cache = {}
     try:
         from competitions.worldcup.src.predictors.lineup import compute_lineup_signal
-        compute_lineup_signal(groups, bracket=bracket_raw)
+        lineup_cache = compute_lineup_signal(groups, bracket=bracket_raw)
         updated["lineup_signal"] = True
     except Exception as e:
         errors.append(f"lineup_signal: {str(e)}")
@@ -566,9 +663,10 @@ def refresh_from_api(progress_cb=None):
     if progress_cb:
         progress_cb(30, "Lineup strength signal computed")
 
+    form_cache = {}
     try:
         from competitions.worldcup.src.predictors.form import compute_form_signal
-        compute_form_signal(teams, groups, played=played, played_groups=played_groups, bracket=bracket_raw)
+        form_cache = compute_form_signal(teams, groups, played=played, played_groups=played_groups, bracket=bracket_raw)
         updated["form_signal"] = True
     except Exception as e:
         errors.append(f"form_signal: {str(e)}")
@@ -576,9 +674,10 @@ def refresh_from_api(progress_cb=None):
     if progress_cb:
         progress_cb(40, "Team form signal computed")
 
+    odds_cache = {}
     try:
         from competitions.worldcup.src.predictors.odds import fetch_and_cache_odds as fetch_odds
-        fetch_odds(BSD_API_KEY, raw_matches, aliases, groups, bracket=bracket_raw)
+        odds_cache = fetch_odds(BSD_API_KEY, raw_matches, aliases, groups, bracket=bracket_raw)
         updated["odds_signal"] = True
     except Exception as e:
         errors.append(f"odds_signal: {str(e)}")
@@ -586,9 +685,11 @@ def refresh_from_api(progress_cb=None):
     if progress_cb:
         progress_cb(50, "Market odds signal computed")
 
+    defensive_cache = {}
+    manager_cache = {}
     try:
         from competitions.worldcup.src.predictors.manager_signals import fetch_and_cache_manager_signals as fetch_mgr
-        fetch_mgr(BSD_API_KEY, groups, bracket=bracket_raw)
+        defensive_cache, manager_cache = fetch_mgr(BSD_API_KEY, groups, bracket=bracket_raw)
         updated["manager_signals"] = True
     except Exception as e:
         errors.append(f"manager_signals: {str(e)}")
@@ -596,15 +697,43 @@ def refresh_from_api(progress_cb=None):
     if progress_cb:
         progress_cb(60, "Manager & defensive quality signals computed")
 
+    availability_cache = {}
     try:
         from competitions.worldcup.src.predictors.availability import fetch_and_cache_availability_signal as fetch_avail
-        fetch_avail(BSD_API_KEY, groups, bracket=bracket_raw)
-        updated["availability_signal"] = True
-    except Exception as e:
-        errors.append(f"availability_signal: {str(e)}")
-        updated["availability_signal"] = False
+        ex = ThreadPoolExecutor(max_workers=1)
+        try:
+            f = ex.submit(fetch_avail, BSD_API_KEY, groups, bracket=bracket_raw)
+            availability_cache = f.result(timeout=30)
+            updated["availability_signal"] = True
+        except FuturesTimeout:
+            errors.append("availability_signal: timeout after 30s")
+            updated["availability_signal"] = False
+        except Exception as e:
+            errors.append(f"availability_signal: {str(e)}")
+            updated["availability_signal"] = False
+        finally:
+            ex.shutdown(wait=False)
+    except Exception:
+        pass
     if progress_cb:
         progress_cb(70, "Player availability signal computed")
+
+    # Batch-write all signal results into prediction ledger (single atomic write)
+    try:
+        from competitions.worldcup.src.state import ledger_batch_upsert
+        _ledger_pairs = []
+        for cache, name in [(odds_cache, "market_odds"), (cb_result, "catboost"),
+                             (form_cache, "form"), (lineup_cache, "lineup_strength"),
+                             (defensive_cache, "defensive_quality"),
+                             (manager_cache, "manager_effect"),
+                             (availability_cache, "availability")]:
+            if cache and cache.get("matches"):
+                for mid, entry in cache["matches"].items():
+                    _ledger_pairs.append((mid, name, entry))
+        if _ledger_pairs:
+            ledger_batch_upsert(_ledger_pairs)
+    except Exception:
+        errors.append("ledger_batch_upsert: failed to write prediction ledger")
 
     elapsed = time.time() - t0
     status = "ok" if not errors else ("partial" if updated.get("match_results") else "error")
@@ -725,6 +854,7 @@ def _run_refresh_task(task_id: str):
 
         global cache
         cache = compute_all(skip_simulation=True)
+        CACHE_FILE.write_text(json.dumps(cache, indent=2, default=str), encoding="utf-8")
 
         _progress(100, "Complete")
         with sim_lock:

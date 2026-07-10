@@ -1,0 +1,13 @@
+{
+  "weights": {
+    "elo": 0.125,
+    "market_odds": 0.125,
+    "catboost": 0.125,
+    "form": 0.125,
+    "lineup_strength": 0.125,
+    "defensive_quality": 0.125,
+    "manager_effect": 0.125,
+    "availability": 0.125
+  },
+  "description": "Default uniform weights for 8 signals. Will be updated dynamically by the EnsembleEngine weight computer."
+}

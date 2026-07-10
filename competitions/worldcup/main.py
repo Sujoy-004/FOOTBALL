@@ -27,6 +27,7 @@ from src import constants
 from src import elo, elo_sync, output, state
 from src.constants import API_TIMEOUT, ELO_SYNC_INTERVAL_HOURS, POLL_INTERVAL
 from src.constants import ODDS_CACHE_TTL_HOURS, CATBOOST_CACHE_TTL_HOURS, ODDS_CACHE_FILE, CATBOOST_CACHE_FILE
+from football_core.signal import PredictionContext, BlendedPrediction
 from src.fetcher import build_historic_url, fetch_raw_matches, process_group_matches, process_matches
 from src.knockout import resolve_knockout_slot_teams, run_full_simulation
 from src.output import print_sync_results, print_staleness_warning, print_drift_flags
@@ -77,18 +78,88 @@ def _should_run_gov() -> bool:
     return False
 
 
+def _build_signal_engine(
+    odds_cache: dict | None = None,
+    cb_cache: dict | None = None,
+    form_cache: dict | None = None,
+    lineup_cache: dict | None = None,
+    defensive_cache: dict | None = None,
+    manager_cache: dict | None = None,
+    availability_cache: dict | None = None,
+    weights: dict[str, float] | None = None,
+    weights_path: str | None = None,
+) -> Any:
+    """Build an EnsembleEngine with all 8 WC signals wrapping their caches.
+
+    Each signal reads from a pre-loaded cache dict (keyed by match_id).
+    Falls back to uniform (1/3) on cache miss.
+    """
+    from football_core.blender import EnsembleEngine
+    from football_core.signal import Signal, SignalOutput, PredictionContext
+
+    _caches = {
+        "market_odds": (odds_cache or {}).get("matches", {}),
+        "catboost": (cb_cache or {}).get("matches", {}),
+        "form": (form_cache or {}).get("matches", {}),
+        "lineup_strength": (lineup_cache or {}).get("matches", {}),
+        "defensive_quality": (defensive_cache or {}).get("matches", {}),
+        "manager_effect": (manager_cache or {}).get("matches", {}),
+        "availability": (availability_cache or {}).get("matches", {}),
+    }
+
+    class _CacheSignal(Signal):
+        name: str = ""
+
+        def __init__(self, name: str, cache: dict) -> None:
+            self.name = name
+            self._cache = cache
+
+        def predict(
+            self, match: dict, context: PredictionContext
+        ) -> SignalOutput:
+            mid = match.get("match_id", "")
+            entry = self._cache.get(mid) if self._cache else None
+            if entry:
+                prob = entry.get("probability", 1 / 3)
+                draw_prob = 0.25
+                return SignalOutput(prob, draw_prob, 1.0 - prob - draw_prob)
+            return SignalOutput(1 / 3, 1 / 3, 1 / 3)
+
+    class _EloSignal(Signal):
+        name: str = "elo"
+
+        def predict(
+            self, match: dict, context: PredictionContext
+        ) -> SignalOutput:
+            from football_core.elo import expected_score
+            team_a = match.get("team_a", "")
+            team_b = match.get("team_b", "")
+            elo_ratings = context.elo_ratings or {}
+            home = elo_ratings.get(team_a, 1500)
+            away = elo_ratings.get(team_b, 1500)
+            home_prob = expected_score(home, away, home_advantage=100)
+            draw_prob = max(0.0, 1.0 - abs(home_prob - 0.5) * 2.0) * 0.35
+            away_prob = 1.0 - home_prob - draw_prob
+            return SignalOutput(home_prob, draw_prob, away_prob)
+
+    signals: list[Signal] = [_EloSignal()]
+    for name, cache in _caches.items():
+        signals.append(_CacheSignal(name, cache))
+
+    if weights is not None:
+        return EnsembleEngine(signals, weights=weights)
+    if weights_path is not None:
+        return EnsembleEngine(signals, weights_path=weights_path)
+    return EnsembleEngine(signals)
+
+
 def _merge_signals_into_history(
     data_dir: Path | str | None = None,
 ) -> None:
-    """Merge retained signal data into prediction_history entries.
+    """Merge signal cache data into prediction_history entries.
 
-    CRITICAL DATA FLOW: Without this, evaluate_all_matches(signal_name="market_odds")
-    returns n_matches=0 because prediction_history only has elo signals.
-
-    For each prediction_history entry that lacks market_odds or catboost signals,
-    looks up the match_id in the permanent prediction ledger (Phase 14a).
-    If a signal is available for that match, adds it to the entry's signals dict.
-    Saves updated history atomically via save_prediction_history().
+    Reads from on-disk signal caches instead of the prediction ledger.
+    Falls back gracefully if caches are absent.
 
     Args:
         data_dir: Per-league data directory. Defaults to constants.DATA_DIR.
@@ -96,37 +167,36 @@ def _merge_signals_into_history(
     history = state.load_prediction_history(data_dir)
     if not history:
         return
-    ledger = state.load_prediction_ledger(data_dir)
-    if not ledger:
+
+    _cache_files: list[tuple[str, str]] = [
+        ("odds_cache.json", "market_odds"),
+        ("catboost_cache.json", "catboost"),
+        ("form_cache.json", "form"),
+        ("lineup_cache.json", "lineup_strength"),
+        ("defensive_cache.json", "defensive_quality"),
+        ("manager_effect_cache.json", "manager_effect"),
+        ("availability_cache.json", "availability"),
+    ]
+
+    caches: dict[str, dict] = {}
+    for fname, sname in _cache_files:
+        cache = state.load_signal_cache(fname, data_dir)
+        if cache and cache.get("matches"):
+            caches[sname] = cache["matches"]
+
+    if not caches:
         return
+
     changed = False
     for entry in history:
         signals = entry.get("signals", {})
         if not isinstance(signals, dict):
             continue
         mid = entry.get("match_id", "")
-        match_signals = ledger.get(mid, {})
-        if "market_odds" in match_signals and "market_odds" not in signals:
-            signals["market_odds"] = dict(match_signals["market_odds"])
-            changed = True
-        if "catboost" in match_signals and "catboost" not in signals:
-            signals["catboost"] = dict(match_signals["catboost"])
-            changed = True
-        if "form" in match_signals and "form" not in signals:
-            signals["form"] = dict(match_signals["form"])
-            changed = True
-        if "lineup_strength" in match_signals and "lineup_strength" not in signals:
-            signals["lineup_strength"] = dict(match_signals["lineup_strength"])
-            changed = True
-        if "defensive_quality" in match_signals and "defensive_quality" not in signals:
-            signals["defensive_quality"] = dict(match_signals["defensive_quality"])
-            changed = True
-        if "manager_effect" in match_signals and "manager_effect" not in signals:
-            signals["manager_effect"] = dict(match_signals["manager_effect"])
-            changed = True
-        if "availability" in match_signals and "availability" not in signals:
-            signals["availability"] = dict(match_signals["availability"])
-            changed = True
+        for sname, matches in caches.items():
+            if sname not in signals and mid in matches:
+                signals[sname] = dict(matches[mid])
+                changed = True
     if changed:
         state.save_prediction_history(history, data_dir)
 
@@ -1096,6 +1166,20 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
                 if not availability_cache or not availability_cache.get("matches"):
                     signal_warnings.append("Availability signal unavailable — no cached data")
 
+    # ══ Batch-write all signal results into prediction ledger ══
+    # Single atomic write replaces per-signal ledger writes removed from predictors.
+    _ledger_pairs: list[tuple[str, str, dict]] = []
+    for cache, name in [(odds_cache, "market_odds"), (cb_cache, "catboost"),
+                         (form_cache, "form"), (lineup_cache, "lineup_strength"),
+                         (defensive_cache, "defensive_quality"),
+                         (manager_cache, "manager_effect"),
+                         (availability_cache, "availability")]:
+        if cache and cache.get("matches"):
+            for mid, entry in cache["matches"].items():
+                _ledger_pairs.append((mid, name, entry))
+    if _ledger_pairs:
+        state.ledger_batch_upsert(_ledger_pairs, data_dir)
+
     # ══ Architecture Q4+Q5: Capture pre-mutation state ══
     # Capture prev_history for data_version change detection.
     # Must happen BEFORE _merge_signals_into_history().
@@ -1105,14 +1189,47 @@ def _run_iteration(teams, groups, bracket, annex_c, played, played_groups, api_k
     # Merge signal cache data into prediction_history entries
     _merge_signals_into_history(data_dir=data_dir)
 
-    # ── Calibrate, blend, inject into simulation (Phase 14 + Phase 21) ──
-    blend_params = _run_calibrate_and_blend(
-        teams, groups, bracket, odds_cache, cb_cache,
-        form_cache=form_cache, lineup_cache=lineup_cache,
-        defensive_cache=defensive_cache, manager_cache=manager_cache,
-        availability_cache=availability_cache,
-        data_dir=data_dir,
-    )
+    # ── EnsembleEngine: evaluate signals + blend per match ──
+    try:
+        engine = _build_signal_engine(
+            odds_cache=odds_cache, cb_cache=cb_cache,
+            form_cache=form_cache, lineup_cache=lineup_cache,
+            defensive_cache=defensive_cache, manager_cache=manager_cache,
+            availability_cache=availability_cache,
+        )
+        elo_ratings = {name: data["elo"] for name, data in teams.items()}
+        all_matches = _collect_matches_from_groups(groups)
+        all_matches += _collect_matches_from_bracket(bracket, played)
+        context = PredictionContext(
+            fixtures=all_matches,
+            elo_ratings=elo_ratings,
+            played_results=list(played.values()) + list((played_groups or {}).values()),
+            team_aliases=aliases,
+        )
+        match_probs: dict[str, float] = {}
+        blend_weights: dict[str, float] = {}
+        predictions: list[BlendedPrediction] = []
+        for m in all_matches:
+            mid = m.get("match_id", "")
+            if not mid:
+                continue
+            bp = engine.evaluate(m, context)
+            predictions.append(bp)
+            match_probs[mid] = bp.home_prob
+        blend_weights = dict(engine.weights)
+        blend_params = {
+            "match_probs": match_probs,
+            "blend_weights": blend_weights,
+            "calibration_params": {},
+        }
+        n_matches = len(blend_params.get("match_probs", {}))
+        n_signals = len(blend_params.get("blend_weights", {}))
+        if blend_params:
+            print(f"Blending active: {n_matches} matches, {n_signals} signals")
+        else:
+            print("Blending inactive (insufficient data)")
+    except Exception:
+        blend_params = None
 
     # ── Attach version IDs to prediction_history entries (D-05) ──
     # Tracks which data/model/run produced each entry's state.
@@ -2271,10 +2388,21 @@ def main() -> None:
         # Shutdown path
         shutdown_odds = state.load_signal_cache(ODDS_CACHE_FILE, league_data_dir)
         shutdown_cb = state.load_signal_cache(CATBOOST_CACHE_FILE, league_data_dir)
-        shutdown_blend = _run_calibrate_and_blend(
-            teams, groups, bracket, shutdown_odds, shutdown_cb,
-            data_dir=league_data_dir,
+        shutdown_engine = _build_signal_engine(
+            odds_cache=shutdown_odds, cb_cache=shutdown_cb,
         )
+        shutdown_matches = _collect_matches_from_groups(groups)
+        shutdown_matches += _collect_matches_from_bracket(bracket, played)
+        shutdown_elo = {name: data["elo"] for name, data in teams.items()}
+        shutdown_ctx = PredictionContext(
+            fixtures=shutdown_matches, elo_ratings=shutdown_elo,
+        )
+        shutdown_probs_map: dict[str, float] = {}
+        for m in shutdown_matches:
+            mid = m.get("match_id", "")
+            if mid:
+                shutdown_probs_map[mid] = shutdown_engine.evaluate(m, shutdown_ctx).home_prob
+        shutdown_blend = {"match_probs": shutdown_probs_map, "blend_weights": {}, "calibration_params": {}}
         final_probs = run_full_simulation(teams, groups, bracket, annex_c, played, played_groups=played_groups, iterations=50000, seed=args.seed, blend_params=shutdown_blend)
         output.print_shutdown_banner(final_probs)
 

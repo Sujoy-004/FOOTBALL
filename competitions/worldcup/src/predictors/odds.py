@@ -1,4 +1,7 @@
-"""Market odds ingestion — re-exports from football_core with WC ledger upsert."""
+"""Market odds ingestion — re-exports from football_core.
+
+DEPRECATED — use football_core.signals.market_odds.MarketOddsSignal instead.
+Kept for backward compatibility with legacy refresh_from_api()."""
 
 import logging
 
@@ -25,12 +28,4 @@ def fetch_and_cache_odds(
         api_key, bsd_events, alias_lookup, groups,
         cache_ttl_hours=cache_ttl_hours, bracket=bracket,
     )
-    parsed = result.get("matches", {})
-    if parsed:
-        try:
-            from src.state import ledger_upsert
-            for mid, entry in parsed.items():
-                ledger_upsert(mid, "market_odds", entry)
-        except Exception:
-            logger.warning("Failed to upsert market_odds into prediction ledger", exc_info=True)
     return result

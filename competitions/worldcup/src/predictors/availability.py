@@ -1,4 +1,7 @@
-"""Availability / Injury Impact signal — squad fitness from player data.
+"""Availability / Injury Impact signal — squad fitness from player data — DEPRECATED.
+
+Use football_core.signals.availability.AvailabilitySignal instead.
+Kept for backward compatibility with legacy refresh_from_api()."""
 
 WC-specific orchestration layer. Fetches player data via
 football_core.providers.player, computes availability signal,
@@ -70,17 +73,5 @@ def fetch_and_cache_availability_signal(
         "expires_at": expires_at,
         "matches": matches,
     }
-
-    if matches:
-        try:
-            from src.state import load_prediction_ledger, save_prediction_ledger
-            ledger = load_prediction_ledger()
-            for mid, entry in matches.items():
-                if mid not in ledger:
-                    ledger[mid] = {}
-                ledger[mid]["availability"] = entry
-            save_prediction_ledger(ledger)
-        except Exception:
-            logger.warning("Failed to persist availability signal to prediction ledger", exc_info=True)
 
     return cache

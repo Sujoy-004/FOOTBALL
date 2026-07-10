@@ -1,4 +1,8 @@
-"""Manager-based signals — defensive quality + manager effect.
+"""Manager-based signals — defensive quality + manager effect — DEPRECATED.
+
+Use football_core.signals.defensive_quality.DefensiveQualitySignal and
+football_core.signals.manager_effect.ManagerEffectSignal instead.
+Kept for backward compatibility with legacy refresh_from_api()."""
 
 WC-specific orchestration layer. Fetches manager data once via
 football_core.providers.manager, then computes both signals,
@@ -88,22 +92,5 @@ def fetch_and_cache_manager_signals(
         "expires_at": expires_at,
         "matches": manager_matches,
     }
-
-    # Persist to prediction ledger (batched — single load/save)
-    if defensive_matches or manager_matches:
-        try:
-            from src.state import load_prediction_ledger, save_prediction_ledger
-            ledger = load_prediction_ledger()
-            for mid, entry in defensive_matches.items():
-                if mid not in ledger:
-                    ledger[mid] = {}
-                ledger[mid]["defensive_quality"] = entry
-            for mid, entry in manager_matches.items():
-                if mid not in ledger:
-                    ledger[mid] = {}
-                ledger[mid]["manager_effect"] = entry
-            save_prediction_ledger(ledger)
-        except Exception:
-            logger.warning("Failed to persist manager signals to prediction ledger", exc_info=True)
 
     return defensive_cache, manager_cache_out

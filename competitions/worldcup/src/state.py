@@ -309,6 +309,21 @@ def ledger_upsert(
     save_prediction_ledger(ledger, data_dir)
 
 
+def ledger_batch_upsert(
+    match_signal_pairs: list[tuple[str, str, dict]],
+    data_dir: Path | str | None = None,
+) -> None:
+    ledger = load_prediction_ledger(data_dir)
+    changed = False
+    for match_id, signal_name, entry in match_signal_pairs:
+        if match_id not in ledger:
+            ledger[match_id] = {}
+        ledger[match_id][signal_name] = entry
+        changed = True
+    if changed:
+        save_prediction_ledger(ledger, data_dir)
+
+
 # ─── Eval / Calibration ─────────────────────────────────────────────────
 
 def save_eval_baseline_report(

@@ -1,4 +1,7 @@
-"""CatBoost prediction ingestion — re-exports from football_core with WC ledger upsert."""
+"""CatBoost prediction ingestion — re-exports from football_core.
+
+DEPRECATED — use football_core.signals.catboost.CatBoostSignal instead.
+Kept for backward compatibility with legacy refresh_from_api() in wc_app.py."""
 
 import logging
 
@@ -27,12 +30,4 @@ def fetch_and_cache_catboost(
         api_key, alias_lookup, groups, bracket,
         cache_ttl_hours=cache_ttl_hours, league_id=league_id,
     )
-    parsed = result.get("matches", {})
-    if parsed:
-        try:
-            from src.state import ledger_upsert
-            for mid, entry in parsed.items():
-                ledger_upsert(mid, "catboost", entry)
-        except Exception:
-            logger.warning("Failed to upsert catboost into prediction ledger", exc_info=True)
     return result

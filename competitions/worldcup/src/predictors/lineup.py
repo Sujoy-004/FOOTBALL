@@ -1,5 +1,8 @@
 """Lineup strength (market value log-ratio) signal computation.
 
+DEPRECATED — Use football_core.signals.lineup.LineupStrengthSignal instead.
+Kept for backward compatibility with legacy refresh_from_api().
+
 Computes a strength signal for each match based on the log-ratio of squad
 market values between the two teams.
 
@@ -172,18 +175,6 @@ def compute_lineup_signal(
             team_values, k,
         )
         result[mid] = entry
-
-    # Upsert into permanent prediction ledger — T-15-09
-    if result:
-        try:
-            from src.state import ledger_upsert
-            for mid, entry in result.items():
-                ledger_upsert(mid, "lineup_strength", entry)
-        except Exception:
-            logger.warning(
-                "Failed to upsert lineup strength into prediction ledger",
-                exc_info=True,
-            )
 
     return {
         "fetched_at": now.isoformat(),

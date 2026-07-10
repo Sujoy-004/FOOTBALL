@@ -1,5 +1,9 @@
 """Form (Elo-based residual) signal computation.
 
+DEPRECATED — Use football_core.signals.form.RollingFormSignal or the
+EnsembleEngine in main.py:_build_signal_engine() instead.
+Kept for backward compatibility with legacy refresh_from_api().
+
 Computes a form signal for each match based on the difference in average
 Elo residuals between the two teams over their most recent matches.
 
@@ -325,15 +329,6 @@ def compute_form_signal(
             team_residuals, teams, k, window,
         )
         result[mid] = entry
-
-    # Upsert into permanent prediction ledger — T-15-04
-    if result:
-        try:
-            from src.state import ledger_upsert
-            for mid, entry in result.items():
-                ledger_upsert(mid, "form", entry)
-        except Exception:
-            logger.warning("Failed to upsert form signal into prediction ledger", exc_info=True)
 
     return {
         "fetched_at": now.isoformat(),
