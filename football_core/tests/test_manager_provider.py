@@ -14,14 +14,14 @@ class TestParseManagers:
                 "name": "Didier Deschamps",
                 "current_team": {"name": "France"},
                 "id": 1,
-                "win_pct": 0.65,
+                "win_pct": 65.0,
                 "avg_goals_scored": 2.1,
                 "avg_goals_conceded": 0.8,
                 "avg_xg_for": 2.0,
                 "avg_xg_against": 0.7,
-                "clean_sheet_pct": 0.45,
-                "btts_pct": 0.35,
-                "over_25_pct": 0.55,
+                "clean_sheet_pct": 45.0,
+                "btts_pct": 35.0,
+                "over_25_pct": 55.0,
                 "avg_possession": 58.0,
                 "preferred_formation": "4-3-3",
                 "formations_used": ["4-3-3", "4-2-3-1", "3-4-3"],
@@ -45,7 +45,7 @@ class TestParseManagers:
             {
                 "name": "Lionel Scaloni",
                 "current_team": "Argentina",
-                "win_pct": 0.7,
+                "win_pct": 70.0,
             }
         ]
         result = parse_managers(raw)

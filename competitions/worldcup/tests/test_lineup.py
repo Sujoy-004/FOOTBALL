@@ -232,32 +232,24 @@ class TestLineupComputeSignal:
 
 
 class TestLineupLedger:
-    """Ledger upsert from compute_lineup_signal."""
+    """Lineup signal output from compute_lineup_signal."""
 
-    def test_ledger_upsert_called(self, team_values, sample_groups, monkeypatch):
-        """compute_lineup_signal calls ledger_upsert for each match."""
-        ledger_calls = []
-        monkeypatch.setattr(
-            "src.state.ledger_upsert",
-            lambda mid, key, entry: ledger_calls.append((mid, key)),
-        )
-        compute_lineup_signal(
+    def test_returns_matches(self, team_values, sample_groups, monkeypatch):
+        """compute_lineup_signal returns matches in cache dict."""
+        result = compute_lineup_signal(
             groups=sample_groups,
             team_values=team_values,
             bracket=[],
         )
-        assert len(ledger_calls) >= 1
+        assert "matches" in result
+        assert len(result["matches"]) >= 1
 
-    def test_ledger_key_lineup_strength(self, team_values, sample_groups, monkeypatch):
-        """Ledger upsert uses signal key 'lineup_strength'."""
-        ledger_calls = []
-        monkeypatch.setattr(
-            "src.state.ledger_upsert",
-            lambda mid, key, entry: ledger_calls.append((mid, key)),
-        )
-        compute_lineup_signal(
+    def test_signal_key_in_output(self, team_values, sample_groups, monkeypatch):
+        """Each match entry has probability key."""
+        result = compute_lineup_signal(
             groups=sample_groups,
             team_values=team_values,
             bracket=[],
         )
-        assert all(key == "lineup_strength" for _, key in ledger_calls)
+        for mid, entry in result.get("matches", {}).items():
+            assert "probability" in entry

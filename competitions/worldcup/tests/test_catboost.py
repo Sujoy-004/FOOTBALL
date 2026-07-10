@@ -453,20 +453,13 @@ class TestCatboostFetch:
         mock_resp = self._make_mock_response(json_data=json_data)
         monkeypatch.setattr("requests.get", lambda *a, **kw: mock_resp)
 
-        calls = []
-        def fake_ledger_upsert(mid, signal, entry):
-            calls.append((mid, signal, entry.get("probability")))
-        monkeypatch.setattr("src.state.ledger_upsert", fake_ledger_upsert)
-
-        fetch_and_cache_catboost(
+        result = fetch_and_cache_catboost(
             "test_key", alias_lookup, groups, [], cache_ttl_hours=24,
         )
 
-        assert len(calls) == 1
-        mid, signal, prob = calls[0]
-        assert mid == "GS_B_01"
-        assert signal == "catboost"
-        assert abs(prob - 0.64) < 0.001
+        assert "matches" in result
+        assert "GS_B_01" in result["matches"]
+        assert abs(result["matches"]["GS_B_01"].get("probability", 0) - 0.64) < 0.001
 
 
 # ─── Edge Case Tests ─────────────────────────────────────────────────

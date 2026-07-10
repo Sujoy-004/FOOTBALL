@@ -166,7 +166,14 @@ def _build_alias_lookup(aliases: dict[str, list[str]], bracket: list[dict]) -> d
 
 
 def normalize_team(api_name: str, alias_lookup: dict[str, str]) -> str | None:
-    return alias_lookup.get(api_name.strip().lower())
+    key = api_name.strip().lower()
+    result = alias_lookup.get(key)
+    if result is not None:
+        return result
+    if "&" in key:
+        alt = key.replace("&", "and").replace("  ", " ")
+        return alias_lookup.get(alt)
+    return None
 
 
 def find_bracket_match(home_norm: str, away_norm: str, bracket: list[dict]) -> str | None:

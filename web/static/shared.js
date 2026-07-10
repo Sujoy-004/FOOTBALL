@@ -63,29 +63,124 @@ document.addEventListener("click", e => {
 function renderLanding() {
   currentCompetition = null;
   document.getElementById("landingBackdrop").classList.add("show");
+
+  renderNavBar(null);
+
   document.getElementById("contentArea").innerHTML = `
-    <div class="landing-header">
-      <div class="landing-title">FOOTBALL</div>
-      <div class="landing-sub">Multi-Competition Predictor</div>
+    <div class="landing-hero">
+      <div class="lh-badge">PREDICTIVE ANALYTICS</div>
+      <h1 class="lh-title">FOOTBALL</h1>
+      <p class="lh-sub">Multi-Competition Predictor</p>
+      <p class="lh-tagline">Real-time match forecasting powered by Elo ratings, multi-signal blending, and Monte Carlo simulation across football's biggest tournaments.</p>
+      <div class="lh-actions">
+        <a class="lh-btn lh-btn-primary" href="#/worldcup">Enter World Cup 2026</a>
+        <a class="lh-btn lh-btn-secondary" href="#/ucl">Explore UCL 2025/26</a>
+      </div>
     </div>
-    <div class="landing-grid">
-      ${Object.entries(competitions).map(([slug, c]) => `
-        <div class="landing-card ${c.disabled ? "disabled" : ""}" data-route="${c.route}"${c.disabled ? ' data-disabled="1"' : ""}>
-          <div class="lc-badge">${c.short}</div>
-          <div class="lc-name">${c.label}</div>
-          <div class="lc-desc">${c.disabled ? "Coming Soon" : "Click to explore"}</div>
+
+    <div class="landing-section">
+      <h2 class="ls-title">Competitions</h2>
+      <div class="landing-cards">
+        ${Object.entries(competitions).map(([slug, c]) => `
+          <div class="lc-card ${slug} ${c.disabled ? "lc-disabled" : ""}" data-route="${c.route}"${c.disabled ? ' data-disabled="1"' : ""}>
+            <div class="lcc-top">
+              <div class="lcc-badge">${c.short}</div>
+              <div class="lcc-name">${c.label}</div>
+            </div>
+            <div class="lcc-meta" id="lccMeta-${slug}">
+              ${c.disabled
+                ? '<span class="lcc-coming-soon">Coming Soon</span>'
+                : '<span class="lcc-loading">Loading stats &hellip;</span>'}
+            </div>
+            <div class="lcc-chevron">${c.disabled ? 'Unavailable' : 'Launch Predictor &rarr;'}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="landing-section">
+      <h2 class="ls-title">Prediction Engine</h2>
+      <div class="lf-grid">
+        <div class="lf-card">
+          <div class="lfc-icon"><span class="lfc-dot"></span></div>
+          <div class="lfc-name">Elo Ratings</div>
+          <div class="lfc-desc">Dynamic team strength ratings updated with every match result, calibrated across international and club competitions.</div>
         </div>
-      `).join("")}
+        <div class="lf-card">
+          <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
+          <div class="lfc-name">Multi-Signal Blending</div>
+          <div class="lfc-desc">Refined Elo, market odds, manager effect, squad value, defensive quality, availability, and team synergy &mdash; weighted by proven accuracy.</div>
+        </div>
+        <div class="lf-card">
+          <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
+          <div class="lfc-name">Monte Carlo Simulation</div>
+          <div class="lfc-desc">50,000 tournament simulations projecting every knockout path, group outcome, and championship probability with statistical confidence.</div>
+        </div>
+        <div class="lf-card">
+          <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
+          <div class="lfc-name">What-If Analysis</div>
+          <div class="lfc-desc">Ask &ldquo;what if my team&rsquo;s star player is injured?&rdquo; or &ldquo;what if they hit peak form?&rdquo; &mdash; see instant probability shifts.</div>
+        </div>
+      </div>
     </div>
   `;
+
+  document.getElementById("statusBar").innerHTML =
+    '<span id="statusLeft">Select a competition to begin</span><span id="statusRight"></span>';
+
+  loadLandingStats();
+}
+
+async function loadLandingStats() {
+  const results = await Promise.allSettled([
+    fetch("/worldcup/api/data").then(r => r.json()),
+    fetch("/ucl/api/data").then(r => r.json()),
+  ]);
+  if (results[0].status === "fulfilled") {
+    const wc = results[0].value;
+    const el = document.getElementById("lccMeta-worldcup");
+    if (el) el.innerHTML = [
+      '<span class="lcc-stat"><strong>' + (wc.n_teams || '&hellip;') + '</strong> teams</span>',
+      '<span class="lcc-stat"><strong>' + (wc.total_iterations ? (wc.total_iterations / 1000).toFixed(0) + 'K' : '&hellip;') + '</strong> simulations</span>',
+      '<span class="lcc-stat"><strong>' + (wc.n_played || 0) + '</strong> matches played</span>',
+    ].join('');
+  }
+  if (results[1].status === "fulfilled") {
+    const ucl = results[1].value;
+    const el = document.getElementById("lccMeta-ucl");
+    if (el) {
+      const parts = [
+        '<span class="lcc-stat"><strong>' + (ucl.n_teams || '&hellip;') + '</strong> teams</span>',
+      ];
+      if (ucl.n_iterations > 100) {
+        parts.push('<span class="lcc-stat"><strong>' + (ucl.n_iterations / 1000).toFixed(0) + 'K</strong> simulations</span>');
+      } else if (ucl.n_iterations) {
+        parts.push('<span class="lcc-stat"><strong>' + ucl.n_iterations + '</strong> matchdays</span>');
+      }
+      if (ucl.champion) {
+        parts.push('<span class="lcc-stat"><strong>' + ucl.champion + '</strong> champion</span>');
+      }
+      el.innerHTML = parts.join('');
+    }
+  }
+}
+
+function renderNavBar(activeSlug) {
   document.getElementById("navBar").innerHTML = `
-    <div class="nav-logo" data-route="/">FOOTBALL</div>
-    ${Object.entries(competitions).map(([slug, c]) => `
-      <button class="nav-btn ${c.disabled ? "disabled" : ""}" data-route="${c.route}"${c.disabled ? ' data-disabled="1"' : ""}>${c.short}<span class="nav-full"> ${c.label}</span></button>
+    <div class="nav-logo" data-route="/">
+      <span class="nl-indicator"></span>
+      <span class="nl-text">FOOTBALL</span>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Competitions</div>
+    ${Object.entries(competitions).map(([s, c]) => `
+      <button class="nav-btn ${s === activeSlug ? "active" : ""} ${c.disabled ? "disabled" : ""}"
+        data-route="${c.route}"${c.disabled ? ' data-disabled="1"' : ""}>
+        <span class="nb-badge">${c.short}</span>
+        <span class="nb-label">${c.label}</span>
+      </button>
     `).join("")}
   `;
-  document.getElementById("statusBar").innerHTML =
-    '<span id="statusLeft">Select a competition</span><span id="statusRight"></span>';
 }
 
 // ── Load Competition Module ──
@@ -95,14 +190,7 @@ async function loadCompetition(slug) {
   document.getElementById("landingBackdrop").classList.remove("show");
   currentCompetition = comp;
 
-  // Highlight nav
-  document.getElementById("navBar").innerHTML = `
-    <div class="nav-logo" data-route="/" style="cursor:pointer">FOOTBALL</div>
-    ${Object.entries(competitions).map(([s, c]) => `
-      <button class="nav-btn ${s === slug ? "active" : ""} ${c.disabled ? "disabled" : ""}"
-        data-route="${c.route}"${c.disabled ? ' data-disabled="1"' : ""}>${c.short}<span class="nav-full"> ${c.label}</span></button>
-    `).join("")}
-  `;
+  renderNavBar(slug);
 
   // Build shell
   const tabHtml = comp.tabs.map(t =>

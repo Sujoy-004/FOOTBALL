@@ -4,8 +4,11 @@ Mounts competition sub-apps under /worldcup and /ucl.
 Serves the SPA shell from /static and the landing page at /.
 """
 
+import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+mimetypes.add_type('image/webp', '.webp')
 
 import fastapi
 from fastapi.responses import HTMLResponse, JSONResponse

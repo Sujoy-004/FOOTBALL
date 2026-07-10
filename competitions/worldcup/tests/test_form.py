@@ -460,37 +460,25 @@ class TestWindowSize:
 class TestFormLedger:
     """Ledger upsert from compute_form_signal."""
 
-    def test_ledger_upsert_called(self, sample_teams, sample_groups, sample_played_groups, sample_played, monkeypatch):
-        """compute_form_signal calls ledger_upsert for each match result."""
-        ledger_calls = []
-        monkeypatch.setattr(
-            "src.state.ledger_upsert",
-            lambda mid, key, entry: ledger_calls.append((mid, key)),
-        )
-        compute_form_signal(
+    def test_returns_matches(self, sample_teams, sample_groups, sample_played_groups, sample_played, monkeypatch):
+        """compute_form_signal returns matches in cache dict."""
+        result = compute_form_signal(
             teams=sample_teams,
             groups=sample_groups,
             played=sample_played,
             played_groups=sample_played_groups,
             bracket=[],
         )
-        assert len(ledger_calls) >= 1
-        # All calls should have signal_key "form"
-        for mid, key in ledger_calls:
-            assert key == "form"
+        assert "matches" in result
 
-    def test_ledger_key_form(self, sample_teams, sample_groups, sample_played_groups, sample_played, monkeypatch):
-        """Ledger upsert uses signal key 'form'."""
-        ledger_calls = []
-        monkeypatch.setattr(
-            "src.state.ledger_upsert",
-            lambda mid, key, entry: ledger_calls.append((mid, key)),
-        )
-        compute_form_signal(
+    def test_matches_have_probability(self, sample_teams, sample_groups, sample_played_groups, sample_played, monkeypatch):
+        """Each match entry has probability key."""
+        result = compute_form_signal(
             teams=sample_teams,
             groups=sample_groups,
             played=sample_played,
             played_groups=sample_played_groups,
             bracket=[],
         )
-        assert all(key == "form" for _, key in ledger_calls)
+        for mid, entry in result.get("matches", {}).items():
+            assert "probability" in entry

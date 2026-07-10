@@ -481,19 +481,9 @@ class TestFetchAndCacheOdds:
                 "group_name": "Group B",
             }
         ]
-        import src.state
-        original = src.state.ledger_upsert
-        calls = []
-        def fake_ledger_upsert(mid, signal, entry):
-            calls.append((mid, signal, entry.get("probability")))
-        src.state.ledger_upsert = fake_ledger_upsert
-        try:
-            cache = fetch_and_cache_odds("test_key", events, alias_lookup, groups)
-        finally:
-            src.state.ledger_upsert = original
+        cache = fetch_and_cache_odds("test_key", events, alias_lookup, groups)
 
-        assert len(calls) == 1
-        mid, signal, prob = calls[0]
-        assert mid == "GS_B_01"
-        assert signal == "market_odds"
+        assert "matches" in cache
+        assert "GS_B_01" in cache["matches"]
+        prob = cache["matches"]["GS_B_01"].get("probability", 0)
         assert 0 < prob < 1

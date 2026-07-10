@@ -8,7 +8,6 @@ import {
 const API = "/worldcup/api";
 const sigLabels = { elo: "Elo", form: "Form", lineup_strength: "Lineup", defensive_quality: "Defense", manager_effect: "Manager", market_odds: "Odds", catboost: "CatBoost" };
 const appState = { data: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} };
-let initialLoad = true;
 let refreshing = false;
 let autoRefreshOn = false;
 let autoTimer = null;
@@ -54,10 +53,6 @@ async function loadAll() {
   sigNames.forEach(async name => {
     try { appState.signalCache[name] = await (await fetch(API + "/signal/" + name)).json(); } catch {}
   });
-  if (initialLoad) {
-    initialLoad = false;
-    doRefresh();
-  }
 }
 
 let refreshProgressEl = null;
