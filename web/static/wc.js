@@ -2,12 +2,13 @@
 import {
   termAdd, termScroll, termShowPrompt, termRenderBootStep, termBooting,
   wireTerminal, buildTable, destroyModalCharts, modalCharts, drawBracketConnectors,
-  updateStatusBar, competitions,
+  updateStatusBar, competitions, termRunSimulation, termRunCalibration,
+  renderSparkline, termRunWithSpinner,
 } from "./shared.js";
 
 const API = "/worldcup/api";
 const sigLabels = { elo: "Elo", form: "Form", lineup_strength: "Lineup", defensive_quality: "Defense", manager_effect: "Manager", market_odds: "Odds", catboost: "CatBoost" };
-const appState = { data: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} };
+const appState = { data: null, overview: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} };
 let refreshing = false;
 let autoRefreshOn = false;
 let autoTimer = null;
@@ -33,107 +34,48 @@ function renderTerminalShell() {
 }
 
 async function loadAll() {
-  const [d, s, fb, ev, bl] = await Promise.all([
-    fetch(API + "/data").then(r => r.json()),
-    fetch(API + "/standings").then(r => r.json()),
-    fetch(API + "/bracket/full").then(r => r.json()),
-    fetch(API + "/evaluation").then(r => r.json()),
-    fetch(API + "/blend").then(r => r.json()),
-  ]);
-  appState.data = d;
-  appState.standings = s;
-  appState.fullBracket = fb;
-  appState.eval = ev;
-  appState.blend = bl;
-  renderDashboard();
-  renderStandings();
-  renderBracket();
+  const ov = await fetch(API + "/overview").then(r => r.json());
+  appState.overview = ov;
+  appState.data = ov;
+  renderOverview();
   updateStatus();
-  const sigNames = Object.keys(bl.blend_weights || {});
-  sigNames.forEach(async name => {
-    try { appState.signalCache[name] = await (await fetch(API + "/signal/" + name)).json(); } catch {}
-  });
-}
-
-let refreshProgressEl = null;
-
-function refreshProgressHTML() {
-  return '<div id="wcRefreshProgress" class="progress-bar-wrap" style="display:flex;margin:0 0 4px">' +
-    '<div class="progress-bar-fill" id="wcRefreshFill" style="width:0%"></div>' +
-    '</div><div class="progress-lbl" id="wcRefreshLbl" style="font-size:9px;margin-bottom:2px">Starting...</div>';
+  // Standings tab
+  try {
+    const s = await fetch(API + "/standings").then(r => r.json());
+    appState.standings = s;
+    renderStandings();
+  } catch {}
+  // Bracket tab — full bracket data (chronological + knockout tree)
+  try {
+    const br = await fetch(API + "/bracket").then(r => r.json());
+    appState.bracket = br;
+  } catch {}
+  try {
+    const bd = await fetch(API + "/bracket/data").then(r => r.json());
+    appState.bracketData = bd;
+  } catch {}
+  try {
+    const fb = await fetch(API + "/bracket/full").then(r => r.json());
+    appState.fullBracket = fb;
+  } catch {}
+  renderBracket();
 }
 
 function updateStatus() {
   const d = appState.data;
   if (!d) return;
   if (refreshing) return;
-  const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh</button>';
+  const signals = d.signals_meta?.signals || [];
+  const nActive = signals.filter(s => s.available).length;
+  const hasSim = (d.top_teams || []).length > 0;
+  const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> ' + (hasSim ? 'Re-Simulate' : 'Refresh & Simulate') + '</button>';
   updateStatusBar(
-    ">> " + d.n_teams + " teams  |  " + d.n_played + " matches played  |  " + d.total_iterations.toLocaleString() + " sims",
+    ">> " + d.n_teams + " teams  |  " + d.n_played + " matches played  |  " + nActive + " active signals",
     btn + (autoRefreshOn ? '  <span style="color:#168777;font-size:10px">auto</span>' : "")
   );
 }
 
-async function doRefresh() {
-  if (refreshing) return;
-  refreshing = true;
-
-  const statusEl = document.getElementById("statusBar");
-  if (statusEl) {
-    const prog = document.getElementById("wcRefreshProgress");
-    if (!prog) {
-      statusEl.insertAdjacentHTML("beforebegin", refreshProgressHTML());
-    } else {
-      prog.style.display = "flex";
-      document.getElementById("wcRefreshFill").style.width = "0%";
-      document.getElementById("wcRefreshLbl").textContent = "Starting...";
-    }
-  }
-
-  try {
-    const { task_id } = await (await fetch(API + "/refresh", { method: "POST" })).json();
-    if (!task_id) throw new Error("no task_id");
-
-    await new Promise((resolve, reject) => {
-      const poll = setInterval(async () => {
-        try {
-          const p = await (await fetch(API + "/refresh/progress/" + task_id)).json();
-          if (p.error) { clearInterval(poll); reject(new Error(p.error)); return; }
-          const fill = document.getElementById("wcRefreshFill");
-          const lbl = document.getElementById("wcRefreshLbl");
-          if (fill) fill.style.width = p.progress + "%";
-          if (lbl) lbl.textContent = (p.stage || "Working...") + "  " + Math.round(p.progress) + "%";
-          if (p.status === "complete") {
-            clearInterval(poll);
-            resolve(p.result || {});
-          }
-          if (p.status === "error") {
-            clearInterval(poll);
-            reject(new Error(p.error || "refresh failed"));
-          }
-        } catch (e) {
-          clearInterval(poll);
-          reject(e);
-        }
-      }, 300);
-    });
-
-    await loadAll();
-    const prog = document.getElementById("wcRefreshProgress");
-    if (prog) prog.style.display = "none";
-    const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh</button>';
-    updateStatusBar('<span style="color:#168777">Refresh complete</span>', btn);
-    setTimeout(() => updateStatus(), 3000);
-  } catch (e) {
-    const prog = document.getElementById("wcRefreshProgress");
-    if (prog) prog.style.display = "none";
-    const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh</button>';
-    updateStatusBar('<span style="color:#ff6b6b">Refresh failed: ' + (e.message || "") + '</span>', btn);
-    setTimeout(() => updateStatus(), 5000);
-  }
-  refreshing = false;
-}
-window.__refreshWC = doRefresh;
+window.__refreshWC = showSimPopup;
 
 function toggleAuto(on) {
   autoRefreshOn = on;
@@ -142,155 +84,411 @@ function toggleAuto(on) {
   updateStatus();
 }
 
-// ── Dashboard ──
-function renderDashboard() {
-  const tab = document.getElementById("tab-dashboard");
-  if (!tab) return;
-  const d = appState.data;
-  if (!d) return;
-  const sigs = appState.eval ? Object.keys(appState.eval).filter(k => appState.eval[k].n_matches > 0).length : 0;
-  const top4 = d.teams.slice(0, 4);
-  const ringColors = ["#168777", "#156F69", "#15565B", "#153D4C"];
-  const top10 = d.teams.slice(0, 10);
-  const maxC = top10[0].champion;
-  const ev = appState.eval;
+// ── Simulation Popup ──
+function showSimPopup() {
+  if (refreshing) return;
+  let overlay = document.getElementById("simPopupOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "simPopupOverlay";
+    overlay.className = "sim-popup-overlay";
+    overlay.innerHTML = `
+      <div class="sim-popup">
+        <h3>Simulate Tournament</h3>
+        <p>Number of Monte Carlo iterations:</p>
+        <div class="sim-presets" id="simPresets">
+          <button data-iters="10000">10K</button>
+          <button data-iters="50000" class="active">50K</button>
+          <button data-iters="100000">100K</button>
+          <button data-iters="500000">500K</button>
+        </div>
+        <input type="number" id="simCustomIters" value="50000" min="1000" max="500000">
+        <div class="sim-actions">
+          <button id="simCancelBtn">Cancel</button>
+          <button id="simStartBtn">&#9654; Start</button>
+        </div>
+        <div id="simProgressWrap" class="progress-bar-wrap" style="display:none;margin-top:10px">
+          <div class="progress-bar-fill" id="simProgressFill" style="width:0%"></div>
+        </div>
+        <div class="progress-lbl" id="simProgressLbl" style="display:none"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
 
-  tab.innerHTML = `
-    <div class="stats-row" id="statsRow">
-      <div class="stat-card"><div class="val">${d.n_teams}</div><div class="lbl">Teams</div></div>
-      <div class="stat-card"><div class="val">${d.n_played}</div><div class="lbl">Played</div><div class="sub">${d.total_iterations.toLocaleString()} simulations</div></div>
-      <div class="stat-card"><div class="val">${sigs}</div><div class="lbl">Active Signals</div></div>
-      <div class="stat-card"><div class="val">${d.teams[0].name.split(" ").pop()}</div><div class="lbl">Leader</div><div class="sub">${d.teams[0].champion}% champion</div></div>
-    </div>
-    <div class="team-cards" id="teamCards">
-      ${top4.map(t => `
-        <div class="team-card">
-          <div class="name">${t.name}</div>
-          <div class="elo">Elo ${t.elo}</div>
-          <div class="ring-row">
-            ${["qf","sf","final","champion"].map((k,i) => `
-              <div><div class="ring"><div class="ring-fill" style="width:${t[k]}%;background:${ringColors[i]}"></div></div>
-              <div class="ring-lbl">${k==="champion"?"Champ":k.toUpperCase()}</div></div>
-            `).join("")}
-          </div>
-        </div>
-      `).join("")}
-    </div>
-    <div class="chart-section" id="chartSection">
-      <div class="title">Champion Probability</div>
-      ${top10.map(t => `
-        <div class="chart-row">
-          <div class="cname">${t.name}</div>
-          <div class="cbar-wrap"><div class="cbar" style="width:${(t.champion/maxC*100)}%"></div></div>
-          <div class="cpct">${t.champion}%</div>
-        </div>
-      `).join("")}
-    </div>
-    <div class="chart-section" id="evalSection">
-      <div class="title">Signal Accuracy</div>
-      ${ev ? (() => {
-        const keys = Object.keys(ev).filter(k => ev[k].n_matches > 0);
-        let h = '<table class="eval-table"><tr><th>Signal</th><th>Brier</th><th>Accuracy</th><th>N</th><th></th></tr>';
-        keys.forEach(k => {
-          const s = ev[k];
-          const dot = s.brier < 0.15 ? "dot-green" : s.brier < 0.25 ? "dot-orange" : "dot-red";
-          const status = s.brier < 0.15 ? "Calibrated" : s.brier < 0.25 ? "Adequate" : "Uncalibrated";
-          h += `<tr><td>${k}</td><td class="num">${s.brier.toFixed(4)}</td><td class="num">${(s.accuracy*100).toFixed(1)}%</td><td class="num">${s.n_matches}</td><td class="num"><span class="${dot}">&#9679;</span> ${status}</td></tr>`;
-        });
-        return h + "</table>";
-      })() : ""}
-    </div>
-  `;
+    // Wire presets
+    overlay.querySelectorAll(".sim-presets button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        overlay.querySelectorAll(".sim-presets button").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("simCustomIters").value = btn.dataset.iters;
+      });
+    });
+
+    // Cancel
+    document.getElementById("simCancelBtn").addEventListener("click", () => {
+      overlay.classList.remove("show");
+    });
+
+    // Start
+    document.getElementById("simStartBtn").addEventListener("click", startSimulation);
+
+    // Overlay click to close
+    overlay.addEventListener("click", e => {
+      if (e.target === overlay) overlay.classList.remove("show");
+    });
+  }
+  overlay.classList.add("show");
 }
 
-// ── Bracket ──
+async function startSimulation() {
+  refreshing = true;
+  const iters = parseInt(document.getElementById("simCustomIters").value) || 50000;
+  const startBtn = document.getElementById("simStartBtn");
+  const cancelBtn = document.getElementById("simCancelBtn");
+  const progressWrap = document.getElementById("simProgressWrap");
+  const progressFill = document.getElementById("simProgressFill");
+  const progressLbl = document.getElementById("simProgressLbl");
+
+  startBtn.disabled = true;
+  cancelBtn.style.display = "none";
+  progressWrap.style.display = "block";
+  progressLbl.style.display = "block";
+  progressFill.style.width = "0%";
+  progressLbl.textContent = "Starting simulation...";
+
+  try {
+    const resp = await (await fetch(API + "/simulate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ iterations: iters })
+    })).json();
+
+    if (resp.error) {
+      progressLbl.textContent = "Error: " + resp.error;
+      startBtn.disabled = false;
+      cancelBtn.style.display = "";
+      refreshing = false;
+      return;
+    }
+
+    const taskId = resp.task_id;
+    const totalIters = resp.iterations;
+    let t0 = Date.now();
+
+    await new Promise((resolve, reject) => {
+      const poll = setInterval(async () => {
+        try {
+          const p = await (await fetch(API + "/simulation/progress/" + taskId)).json();
+          if (p.error) { clearInterval(poll); reject(new Error(p.error)); return; }
+
+          progressFill.style.width = p.progress + "%";
+          const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
+          let label = p.stage || "Simulating...";
+          if (p.total_iterations > 0) {
+            label += "  " + (p.iteration || 0).toLocaleString() + "/" + p.total_iterations.toLocaleString();
+          }
+          label += "  (" + p.progress.toFixed(0) + "%)  " + elapsed + "s";
+          if (p.elapsed) label += "  ETA: " + Math.max(0, Math.round(p.elapsed * ((100 - p.progress) / Math.max(p.progress, 1)))) + "s";
+          progressLbl.textContent = label;
+
+          if (p.status === "complete") {
+            clearInterval(poll);
+            resolve();
+          }
+          if (p.status === "error") {
+            clearInterval(poll);
+            reject(new Error(p.error || "simulation failed"));
+          }
+        } catch (e) {
+          clearInterval(poll);
+          reject(e);
+        }
+      }, 200);
+    });
+
+    // Complete — close popup, reload data
+    document.getElementById("simPopupOverlay").classList.remove("show");
+    progressWrap.style.display = "none";
+    progressLbl.style.display = "none";
+    await loadAll();
+    const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh & Simulate</button>';
+    updateStatusBar('<span style="color:#168777">Simulation complete (' + iters.toLocaleString() + ' iters)</span>', btn);
+  } catch (e) {
+    progressLbl.textContent = "Error: " + (e.message || "unknown");
+    startBtn.disabled = false;
+    cancelBtn.style.display = "";
+  }
+  refreshing = false;
+}
+window.__refreshWC = showSimPopup;
+
+// ── Overview (pre- and post-simulation) ──
+function renderOverview() {
+  const tab = document.getElementById("tab-overview");
+  if (!tab) return;
+  const ov = appState.overview || appState.data;
+  if (!ov) return;
+
+  const signals = ov.signals_meta?.signals || [];
+  const nActive = signals.filter(s => s.available).length;
+  const topTeams = ov.top_teams || [];
+  const hasSim = topTeams.length > 0;
+  const signalEval = ov.signal_eval || {};
+
+  let html = '';
+
+  // Stat cards (always)
+  html += '<div class="stats-row" id="statsRow">';
+  if (hasSim) {
+    const simMeta = ov.simulation_meta || {};
+    html += '<div class="stat-card"><div class="val">' + ov.n_teams + '</div><div class="lbl">Teams</div></div>';
+    html += '<div class="stat-card"><div class="val">' + ov.n_played + '</div><div class="lbl">Matches Played</div></div>';
+    html += '<div class="stat-card"><div class="val">' + nActive + '/' + signals.length + '</div><div class="lbl">Signals</div></div>';
+    html += '<div class="stat-card"><div class="val">' + (simMeta.iterations || 0).toLocaleString() + '</div><div class="lbl">Simulations Run</div></div>';
+  } else {
+    html += '<div class="stat-card"><div class="val">' + ov.n_teams + '</div><div class="lbl">Teams</div></div>';
+    html += '<div class="stat-card"><div class="val">' + ov.n_played + '</div><div class="lbl">Matches Played</div></div>';
+    html += '<div class="stat-card"><div class="val">' + nActive + ' / ' + signals.length + '</div><div class="lbl">Signals Available</div></div>';
+  }
+  html += '</div>';
+
+  // Post-sim: champion probability bar chart
+  if (hasSim) {
+    html += '<div class="chart-section">';
+    html += '<div class="title">Champion Probability (Top 10)</div>';
+    html += '<div class="champ-chart" id="champChart">';
+    topTeams.slice(0, 10).forEach(t => {
+      const pct = (t.champion * 100).toFixed(1);
+      const barW = Math.max(2, pct * 3);
+      html += '<div class="champ-bar-row"><div class="cname">' + t.name + '</div><div class="cbar-wrap"><div class="cbar" style="width:' + barW + 'px"></div></div><div class="cpct">' + pct + '%</div></div>';
+    });
+    html += '</div></div>';
+
+    // Post-sim: top 4 team cards with ring charts
+    html += '<div class="chart-section">';
+    html += '<div class="title">Top 4 Teams</div>';
+    html += '<div class="team-cards" id="topTeamCards">';
+    topTeams.slice(0, 4).forEach(t => {
+      const champ = (t.champion * 100).toFixed(1);
+      const final = (t.final * 100).toFixed(1);
+      const sf = (t.sf * 100).toFixed(1);
+      const qf = (t.qf * 100).toFixed(1);
+      html += '<div class="team-card"><div class="name">' + t.name + '</div>';
+      html += '<div class="team-ring-row">';
+      html += '<div class="team-ring-item"><div class="trl">CH</div><div class="trv">' + champ + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, champ * 2) + '%"></div></div></div>';
+      html += '<div class="team-ring-item"><div class="trl">F</div><div class="trv">' + final + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, final) + '%"></div></div></div>';
+      html += '<div class="team-ring-item"><div class="trl">SF</div><div class="trv">' + sf + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, sf) + '%"></div></div></div>';
+      html += '<div class="team-ring-item"><div class="trl">QF</div><div class="trv">' + qf + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, qf) + '%"></div></div></div>';
+      html += '</div></div>';
+    });
+    html += '</div></div>';
+  }
+
+  // Group standings (always)
+  html += '<div class="chart-section">';
+  html += '<div class="title">Group Standings</div>';
+  html += '<div class="overview-standings" id="ovStandings">';
+  html += renderOverviewStandings(ov.standings || []);
+  html += '</div></div>';
+
+  // Post-sim: signal evaluation table
+  if (hasSim && Object.keys(signalEval).length > 0) {
+    html += '<div class="chart-section">';
+    html += '<div class="title">Signal Accuracy</div>';
+    html += renderSignalEval(signalEval);
+    html += '</div>';
+  }
+
+  // Signals metadata (always — or only when no sim data)
+  if (!hasSim || signals.length > 0) {
+    html += '<div class="chart-section">';
+    html += '<div class="title">' + (hasSim ? 'Signal Cache Status' : 'Signals Data') + '</div>';
+    html += '<div class="overview-signals" id="ovSignals">';
+    html += renderOverviewSignals(signals);
+    html += '</div></div>';
+  }
+
+  tab.innerHTML = html;
+}
+
+function renderSignalEval(signalEval) {
+  const sigOrder = ["elo", "all_signals", "form", "lineup_strength", "defensive_quality", "manager_effect", "market_odds", "catboost"];
+  const labels = { elo: "Elo", all_signals: "Blended", form: "Form", lineup_strength: "Lineup", defensive_quality: "Defense", manager_effect: "Manager", market_odds: "Odds", catboost: "CatBoost" };
+  let html = '<table class="eval-table"><tr><th>Signal</th><th>Brier</th><th>Accuracy</th><th>Matches</th></tr>';
+  sigOrder.forEach(sk => {
+    const e = signalEval[sk];
+    if (!e) return;
+    const nMatches = e.n_matches || e.n || 0;
+    if (!nMatches) return;
+    const metrics = e.metrics || e;
+    const brier = metrics.brier != null ? metrics.brier : null;
+    const accuracy = metrics.accuracy != null ? metrics.accuracy : null;
+    if (brier == null) return;
+    const dot = brier < 0.15 ? "dot-green" : brier < 0.25 ? "dot-orange" : "dot-red";
+    html += '<tr><td>' + (labels[sk] || sk) + '</td><td class="num">' + brier.toFixed(4) + '</td><td class="num">' + (accuracy !== null ? (accuracy * 100).toFixed(1) + '%' : '—') + '</td><td class="num">' + nMatches + ' <span class="' + dot + '">&#9679;</span></td></tr>';
+  });
+  return html + '</table>';
+}
+
+function renderOverviewStandings(standings) {
+  if (!standings.length) return '<div class="dim">No matches played yet.</div>';
+  const groups = {};
+  standings.forEach(r => {
+    if (!groups[r.group]) groups[r.group] = [];
+    groups[r.group].push(r);
+  });
+  let html = '';
+  Object.keys(groups).sort().forEach(letter => {
+    const rows = groups[letter];
+    html += '<details class="group-detail" open>' +
+      '<summary class="gd-summary">Group ' + letter + ' &middot; ' + rows.filter(r => r.played > 0).length + ' teams</summary>' +
+      '<table class="group-table"><tr><th>#</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th></tr>';
+    rows.forEach(r => {
+      const gd = r.gd > 0 ? '+' + r.gd : String(r.gd);
+      html += '<tr><td class="num">' + r.position + '</td><td>' + r.team + '</td><td class="num">' + r.pts + '</td><td class="num">' + gd + '</td><td class="num">' + r.gs + '</td></tr>';
+    });
+    html += '</table></details>';
+  });
+  return html;
+}
+
+function renderOverviewSignals(signals) {
+  if (!signals.length) return '<div class="dim">No signal data available.</div>';
+  let html = '<table class="eval-table"><tr><th>Signal</th><th>Available</th><th>Last Updated</th></tr>';
+  signals.forEach(s => {
+    const dot = s.available ? 'dot-green' : 'dot-red';
+    const status = s.available ? 'Yes' : 'No';
+    const updated = s.last_updated ? new Date(s.last_updated).toLocaleString() : '—';
+    html += '<tr><td>' + s.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) + '</td><td class="num"><span class="' + dot + '">&#9679;</span> ' + status + '</td><td class="num" style="font-size:10px">' + updated + '</td></tr>';
+  });
+  return html + '</table>';
+}
+
+// ── Bracket (Phase 3: group accordion + knockout tree) ──
 function renderBracket() {
   const tab = document.getElementById("tab-bracket");
   if (!tab) return;
-  const fb = appState.fullBracket;
-  if (!fb || !fb.rounds) return;
-  const rounds = ["R32", "R16", "QF", "SF", "TPP", "FINAL"];
-  const roundLabel = { R32: "Round of 32", R16: "Round of 16", QF: "Quarter-Finals", SF: "Semi-Finals", TPP: "3rd Place", FINAL: "Final" };
+  const bd = appState.bracketData;
+  if (!bd) {
+    tab.innerHTML = '<div class="dim" style="padding:20px">Bracket data not available yet.</div>';
+    return;
+  }
 
-  // Store for shared connector drawing
-  window.__bracketData = fb.rounds;
+  const rounds = bd.chronological_rounds || [];
+  const koTree = bd.knockout_tree || {};
+  window.__bracketData = koTree;
 
-  tab.innerHTML = `
-    <div class="bracket-wrap">
-      <div class="bracket-grid" id="bracketGrid"></div>
-      <svg class="bracket-svg" id="bracketSvg"></svg>
-    </div>
-  `;
+  // Split into group rounds and KO rounds
+  const groupRounds = rounds.filter(r => r.round_type === 'group');
+  const koRounds = rounds.filter(r => r.round_type !== 'group');
 
-  const grid = document.getElementById("bracketGrid");
+  const koTreeRounds = ['R32', 'R16', 'QF', 'SF', 'TPP', 'FINAL'];
+  const koRoundLabels = { R32: 'Round of 32', R16: 'Round of 16', QF: 'Quarter-Finals', SF: 'Semi-Finals', TPP: 'Third Place', FINAL: 'Final' };
+
+  let html = '';
+
+  // Simulate All Remaining button
+  const hasUnplayed = [...groupRounds, ...koRounds].some(r => r.matches.some(m => !m.played));
+  if (hasUnplayed) {
+    html += '<div style="text-align:right;margin-bottom:8px"><button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining</button></div>';
+  }
+
+  // Section 1: Group Stage Accordion
+  html += '<div class="chart-section"><div class="title">Group Stage</div><div class="md-accordion">';
+  groupRounds.forEach((r, ri) => {
+    const isFirst = ri === 0;
+    const nPlayed = r.matches.filter(m => m.played).length;
+    const nTotal = r.matches.length;
+    html += '<div class="md-card"><div class="md-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">' +
+      '<span class="md-label">' + r.round_name + '</span><span class="md-count">' + nPlayed + '/' + nTotal + ' played</span>' +
+      '<span class="md-arrow">' + (isFirst ? '\u25BC' : '\u25B6') + '</span></div>' +
+      '<div class="md-body ' + (isFirst ? 'open' : '') + '">' +
+      r.matches.map(m => renderMatchRow(m)).join('') +
+      '</div></div>';
+  });
+  html += '</div></div>';
+
+  // Section 2: Knockout Tree (UCL-style)
+  html += '<div class="chart-section"><div class="title">Knockout Stage</div>';
+  html += '<div class="bracket-wrap"><div class="bracket-grid" id="bracketGrid"></div><svg class="bracket-svg" id="bracketSvg"></svg></div></div>';
+
+  tab.innerHTML = html;
+
+  // Build the knockout tree from koTree data
+  const grid = document.getElementById('bracketGrid');
+  if (!grid) return;
+
+  // Flatten all KO matches into byId
   const byId = {};
-  for (const [, ms] of Object.entries(fb.rounds)) for (const m of ms) byId[m.match_id] = m;
+  for (const [, ms] of Object.entries(koTree)) for (const m of ms) byId[m.match_id] = m;
 
   function getLeafOrder(mid) {
     const m = byId[mid];
     if (!m || !m.source_matches) return [mid];
     return [...getLeafOrder(m.source_matches[0]), ...getLeafOrder(m.source_matches[1])];
   }
-  const leafOrder = getLeafOrder("FINAL");
+
+  const leafOrder = [];
+  const leafMatches = koTree.R32 || [];
+  for (const m of leafMatches) leafOrder.push(m.match_id);
   const leafIdx = {};
   leafOrder.forEach((id, i) => leafIdx[id] = i);
 
   function getRowRange(mid) {
     const m = byId[mid];
-    if (!m) return { start: 0, end: 2 };
-    if (m.round === "FINAL" || m.round === "TPP") return { start: 0, end: leafOrder.length };
+    if (!m) return { start: 0, end: leafOrder.length };
+    if (['FINAL', 'TPP'].includes(m.round)) return { start: 0, end: leafOrder.length };
+    if (!m.source_matches) return { start: leafIdx[mid] || 0, end: (leafIdx[mid] || 0) + 1 };
     const leaves = getLeafOrder(mid);
-    if (leaves.length === 0) return { start: 0, end: 2 };
-    return { start: leafIdx[leaves[0]], end: leafIdx[leaves[leaves.length - 1]] + 1 };
+    if (!leaves.length) return { start: 0, end: 2 };
+    return { start: leafIdx[leaves[0]] || 0, end: (leafIdx[leaves[leaves.length - 1]] || 0) + 1 };
   }
 
   const ROW_UNIT = 28;
-  rounds.forEach((r, ri) => {
-    const col = document.createElement("div");
-    col.className = "bracket-col";
-    col.style.flex = String(1 + (ri === rounds.length - 1 ? 0.5 : 0));
-    col.innerHTML = '<div class="col-head">' + (roundLabel[r] || r) + "</div>";
+  const roundOrder = ['R32', 'R16', 'QF', 'SF', 'TPP', 'FINAL'];
+  roundOrder.forEach((r, ri) => {
+    const col = document.createElement('div');
+    col.className = 'bracket-col';
+    col.style.flex = String(1 + (ri === roundOrder.length - 1 ? 0.5 : 0));
+    col.innerHTML = '<div class="col-head">' + (koRoundLabels[r] || r) + '</div>';
 
-    const ms = (fb.rounds[r] || []).slice().sort((a, b) => {
-      return getRowRange(a.match_id).start - getRowRange(b.match_id).start;
-    });
-
+    const ms = (koTree[r] || []).slice().sort((a, b) => getRowRange(a.match_id).start - getRowRange(b.match_id).start);
     let lastEnd = 0;
     ms.forEach(m => {
       const rr = getRowRange(m.match_id);
       const gap = rr.start - lastEnd;
       if (gap > 0) {
-        const sp = document.createElement("div");
-        sp.className = "match-slot";
-        sp.style.minHeight = (gap * ROW_UNIT) + "px";
+        const sp = document.createElement('div');
+        sp.className = 'match-slot';
+        sp.style.minHeight = (gap * ROW_UNIT) + 'px';
         col.appendChild(sp);
       }
       lastEnd = rr.end;
 
-      const slot = document.createElement("div");
-      slot.className = "match-slot";
-      slot.style.minHeight = Math.max((rr.end - rr.start) * ROW_UNIT, 40) + "px";
+      const slot = document.createElement('div');
+      slot.className = 'match-slot';
+      slot.style.minHeight = Math.max((rr.end - rr.start) * ROW_UNIT, 40) + 'px';
 
-      const ta = m.team_a || "TBD";
-      const tb = m.team_b || "TBD";
-      const scoreStr = m.score ? m.score.home + "-" + m.score.away : "?-?";
-      const isPlayed = m.played;
-      const isTbd = !m.team_a && !m.team_b;
-      const cardClass = isTbd ? "tbd" : isPlayed ? "played" : "upcoming";
-      const probStr = m.prob_a != null ? (m.prob_a * 100).toFixed(1) + "%" : "";
-      const wStr = m.winner ? m.winner + " won" : "";
+      const ta = m.team_a || 'TBD';
+      const tb = m.team_b || 'TBD';
+      const scoreStr = m.score ? m.score.home + '-' + m.score.away : (m.winner ? '1-0' : '?-?');
+      const isPlayed = m.played || !!m.winner;
+      const isTbd = (!m.team_a && !m.team_b) || (!m.played && !m.winner);
+      const cardClass = isTbd ? 'tbd' : isPlayed ? 'played' : 'upcoming';
 
-      slot.innerHTML = `
-        <div class="match-card ${cardClass}" data-mid="${m.match_id}">
-          <div class="m-teams">
-            <span class="m-team ${m.winner === ta ? "winner" : ""}">${ta}</span>
-            <span class="m-score">${scoreStr}</span>
-            <span class="m-team ${m.winner === tb ? "winner" : ""}">${tb}</span>
-          </div>
-          ${wStr ? '<div class="m-winner-label">' + wStr + "</div>" : ""}
-          ${probStr ? '<div class="m-prob">' + ta + " win " + probStr + "</div>" : ""}
-        </div>`;
-      slot.querySelector(".match-card").onclick = () => openMatchModal(m.match_id);
+      let cardHtml = '<div class="match-card ' + cardClass + '" data-mid="' + m.match_id + '">' +
+        '<div class="m-teams"><span class="m-team ' + (m.winner === ta ? 'winner' : '') + '">' + ta + '</span>' +
+        '<span class="m-score">' + scoreStr + '</span>' +
+        '<span class="m-team ' + (m.winner === tb ? 'winner' : '') + '">' + tb + '</span></div>' +
+        (m.winner ? '<div class="m-winner-label">' + m.winner + ' advances</div>' : '');
+
+      // Show Simulate button for unplayed matches
+      if (!m.played && m.team_a) {
+        cardHtml += '<div class="m-sim-btn" onclick="event.stopPropagation();window.__simulateMatch(\'' + m.match_id + '\')">&#9654; Simulate</div>';
+      }
+      cardHtml += '</div>';
+
+      slot.innerHTML = cardHtml;
+      slot.querySelector('.match-card').onclick = () => openMatchModal(m.match_id);
       col.appendChild(slot);
     });
     grid.appendChild(col);
@@ -299,13 +497,170 @@ function renderBracket() {
   setTimeout(drawBracketConnectors, 50);
 }
 
+function renderMatchRow(m) {
+  const scoreStr = m.winner ? (m.home_score + '-' + m.away_score) : (m.played ? '?' : '—');
+  const status = m.played
+    ? '<span class="dot-green">&#9679;</span> <span class="dim">Played</span>'
+    : '<span class="dot-orange">&#9679;</span> TBD';
+  return '<div class="md-row"><span class="md-team">' + m.team_a + '</span><span class="md-score">' + scoreStr + '</span><span class="md-team">' + m.team_b + '</span><span class="md-date">' + status + '</span></div>';
+}
+
+// ── Match Simulation from bracket ──
+let simMatchId = null;
+
+window.__simulateAllRemaining = function() {
+  simMatchId = '__all__';
+  showMatchSimPopup('Simulate All Remaining Matches');
+};
+
+window.__simulateMatch = function(matchId) {
+  simMatchId = matchId;
+  showMatchSimPopup('Simulate Match ' + matchId);
+};
+
+function showMatchSimPopup(title) {
+  let overlay = document.getElementById('matchSimOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'matchSimOverlay';
+    overlay.className = 'sim-popup-overlay';
+    overlay.innerHTML = `
+      <div class="sim-popup" style="max-width:400px">
+        <h3 id="matchSimTitle">Simulate Match</h3>
+        <p>Number of Monte Carlo iterations:</p>
+        <div class="sim-presets">
+          <button data-iters="5000">5K</button>
+          <button data-iters="10000" class="active">10K</button>
+          <button data-iters="50000">50K</button>
+        </div>
+        <input type="number" id="matchSimIters" value="10000" min="1000" max="100000">
+        <div class="sim-actions">
+          <button id="matchSimCancelBtn">Cancel</button>
+          <button id="matchSimStartBtn">&#9654; Start</button>
+        </div>
+        <div id="matchSimProgress" class="progress-bar-wrap" style="display:none;margin-top:10px">
+          <div class="progress-bar-fill" id="matchSimProgressFill" style="width:0%"></div>
+        </div>
+        <div id="matchSimResult" style="display:none;margin-top:10px;font-size:11px"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll('.sim-presets button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        overlay.querySelectorAll('.sim-presets button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('matchSimIters').value = btn.dataset.iters;
+      });
+    });
+    document.getElementById('matchSimCancelBtn').addEventListener('click', () => overlay.classList.remove('show'));
+    document.getElementById('matchSimStartBtn').addEventListener('click', startMatchSim);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('show'); });
+  }
+  document.getElementById('matchSimTitle').textContent = title;
+  document.getElementById('matchSimResult').style.display = 'none';
+  overlay.classList.add('show');
+}
+
+async function startMatchSim() {
+  const iters = parseInt(document.getElementById('matchSimIters').value) || 10000;
+  const startBtn = document.getElementById('matchSimStartBtn');
+  const cancelBtn = document.getElementById('matchSimCancelBtn');
+  const progressWrap = document.getElementById('matchSimProgress');
+  const progressFill = document.getElementById('matchSimProgressFill');
+  const resultDiv = document.getElementById('matchSimResult');
+
+  startBtn.disabled = true;
+  cancelBtn.style.display = 'none';
+  progressWrap.style.display = 'block';
+  progressFill.style.width = '0%';
+  resultDiv.style.display = 'none';
+
+  try {
+    if (simMatchId === '__all__') {
+      // Full tournament simulation
+      const startBtn2 = document.getElementById('simStartBtn');
+      if (startBtn2) {
+        document.getElementById('matchSimOverlay').classList.remove('show');
+        document.getElementById('simCustomIters').value = iters;
+        startSimulation();
+      } else {
+        // Fallback: call POST /api/simulate
+        const resp = await (await fetch(API + '/simulate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ iterations: iters })
+        })).json();
+        const taskId = resp.task_id;
+        await new Promise((resolve, reject) => {
+          const poll = setInterval(async () => {
+            const p = await (await fetch(API + '/simulation/progress/' + taskId)).json();
+            if (p.status === 'complete') { clearInterval(poll); resolve(); }
+            if (p.status === 'error') { clearInterval(poll); reject(new Error(p.error)); }
+            progressFill.style.width = p.progress + '%';
+          }, 200);
+        });
+        await loadAll();
+        document.getElementById('matchSimOverlay').classList.remove('show');
+      }
+      return;
+    }
+
+    // Single match simulation
+    const resp = await (await fetch(API + '/simulate-from-match', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ match_id: simMatchId, iterations: iters })
+    })).json();
+
+    if (resp.error) {
+      resultDiv.textContent = 'Error: ' + resp.error;
+      resultDiv.style.display = 'block';
+      startBtn.disabled = false;
+      cancelBtn.style.display = '';
+      return;
+    }
+
+    // Show predictions
+    let resultHtml = '<div style="color:#168777;font-weight:bold;margin-bottom:6px">Simulation Complete</div>';
+    if (resp.predictions && resp.predictions.length) {
+      resultHtml += '<div style="margin-bottom:4px">Top contenders:</div>';
+      resp.predictions.forEach(p => {
+        const cp = (p.champion * 100).toFixed(1);
+        const fn = (p.final * 100).toFixed(1);
+        resultHtml += '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.05)">' +
+          '<span>' + p.name + '</span><span style="color:#16A085">' + cp + '% champ, ' + fn + '% final</span></div>';
+      });
+    }
+    if (resp.downstream && resp.downstream.length) {
+      resultHtml += '<div style="margin-top:6px;font-size:10px;color:#15565B">' + resp.downstream.length + ' downstream matches simulated</div>';
+    }
+    resultDiv.innerHTML = resultHtml;
+    resultDiv.style.display = 'block';
+    progressFill.style.width = '100%';
+    progressWrap.style.display = 'none';
+  } catch (e) {
+    resultDiv.textContent = 'Error: ' + (e.message || 'unknown');
+    resultDiv.style.display = 'block';
+  }
+  startBtn.disabled = false;
+  cancelBtn.style.display = '';
+}
+
 // ── Match Insight Modal ──
 async function openMatchModal(mid) {
-  const fb = appState.fullBracket;
   let match = null;
-  for (const [, ms] of Object.entries(fb.rounds)) {
-    const found = ms.find(m => m.match_id === mid);
-    if (found) { match = found; break; }
+  const fb = appState.fullBracket;
+  const bd = appState.bracketData;
+  if (fb && fb.rounds) {
+    for (const [, ms] of Object.entries(fb.rounds)) {
+      const found = ms.find(m => m.match_id === mid);
+      if (found) { match = found; break; }
+    }
+  }
+  if (!match && bd && bd.knockout_tree) {
+    for (const [, ms] of Object.entries(bd.knockout_tree)) {
+      const found = ms.find(m => m.match_id === mid);
+      if (found) { match = found; break; }
+    }
   }
   if (!match) return;
 
@@ -545,13 +900,28 @@ function renderStandings() {
   const tab = document.getElementById("tab-standings");
   if (!tab) return;
   const s = appState.standings;
-  if (!s || !s.standings) return;
-  const letters = Object.keys(s.standings).sort();
+  if (!s) return;
+  // Handle both old format {standings: {A: [...]}} and new flat list [{}]
+  let groups = {};
+  if (s.standings && !Array.isArray(s.standings)) {
+    // Legacy format
+    groups = s.standings;
+  } else {
+    // New flat format — group by letter
+    const list = Array.isArray(s) ? s : (s.standings || []);
+    list.forEach(r => {
+      const g = r.group || '?';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(r);
+    });
+  }
+  const letters = Object.keys(groups).sort();
+  if (!letters.length) { tab.innerHTML = '<div class="dim" style="padding:20px">No standings data.</div>'; return; }
 
   tab.innerHTML = `
     <div class="standings-grid" id="standingsGrid">
       ${letters.map(letter => {
-        const rows = s.standings[letter];
+        const rows = groups[letter];
         const positions = rows.map(r => r.position);
         const maxPos = Math.max(...positions);
         return '<div class="group-card"><div class="g-title">Group ' + letter + '</div>' +
@@ -563,40 +933,24 @@ function renderStandings() {
           }).join("") + "</table></div>";
       }).join("")}
     </div>
-    <div class="bubble-section" id="bubbleSection"></div>
   `;
-
-  const tp = s.third_place;
-  if (tp && tp.length >= 9) {
-    let html = '<div class="g-title">Third-Place Bubble</div><table class="bubble-table"><tr><th>#</th><th>Group</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th></tr>';
-    tp.forEach((r, i) => {
-      const cls = i < 8 ? "advancing" : i === 8 ? "cutoff-line" : "eliminated";
-      const gd = r.gd > 0 ? "+" + r.gd : String(r.gd);
-      html += '<tr class="' + cls + '"><td class="num">' + (i + 1) + '</td><td>' + r.group + '</td><td>' + r.team + '</td><td class="num">' + r.pts + '</td><td class="num">' + gd + '</td><td class="num">' + r.gs + '</td></tr>';
-    });
-    html += "</table>";
-    if (tp[7] && tp[8]) {
-      const m = tp[7], n = tp[8];
-      const margin = m.pts !== n.pts ? (m.pts - n.pts) + " pts" : (m.gd !== n.gd ? "GD " + (m.gd - n.gd) : "GS " + (m.gs - n.gs));
-      html += '<div style="font-size:10px;color:#F6DBC088;margin-top:4px">>> 8th advances, 9th out. Cutoff margin = ' + margin + ".</div>";
-    }
-    document.getElementById("bubbleSection").innerHTML = html;
-  }
 }
 
 // ── Terminal ──
 function buildWCTable(teams, cols) {
   const show = cols || ["champion", "final", "sf", "qf"];
   const labels = { champion: "Champion", final: "Final", sf: "SF", qf: "QF" };
-  let h = '<tr><th>#</th><th>Team</th><th>ELO</th>';
+  let h = '<tr><th>#</th><th>Team</th><th>Elo</th>';
   show.forEach(c => h += "<th>" + (labels[c] || c) + "</th>");
-  h += "<th></th></tr>";
+  h += '<th></th></tr><tr class="sep"><td class="num">──</td><td>────</td><td>───</td>';
+  show.forEach(c => h += '<td class="num">' + (labels[c] || c).replace(/./g, '─') + '</td>');
+  h += '<td></td></tr>';
   let html = "<table>" + h;
   teams.forEach((t, i) => {
     const pct = t[show[0]] || 0;
     const barW = Math.max(2, pct * 2);
-    html += '<tr><td class="num">' + (i + 1) + "</td><td>" + t.name + '</td><td class="num">' + t.elo + "</td>";
-    show.forEach(c => html += '<td class="num">' + (t[c] || 0).toFixed(1) + "%</td>");
+    html += '<tr><td class="num">' + (i + 1) + '</td><td class="team">' + t.name + "</td>";
+    show.forEach(c => html += '<td class="num prob">' + (t[c] || 0).toFixed(1) + '%</td>');
     html += '<td><div class="bar-wrap"><div class="bar" style="width:' + barW + 'px"></div></div></td></tr>';
   });
   return html + "</table>";
@@ -684,7 +1038,11 @@ async function termExec(cmd) {
     termAdd('<span class="prompt">blend</span>       - signal blending weights and calibration.');
     termAdd('<span class="prompt">coverage</span>    - feature coverage audit report.');
     termAdd('<span class="prompt">gov</span>         - system health check.');
-    termAdd('<span class="prompt">refresh</span>     - fetch latest matches from BSD API (if .env configured).');
+    termAdd('<span class="prompt">simulate [N]</span> - run Monte Carlo simulation (N iterations, default 50000).');
+    termAdd('<span class="prompt">what-if TEAM[.PARAM=VALUE]</span> - team stats or scenario impact analysis.');
+    termAdd('<span class="prompt">validate</span>   - run validation suite (Brier, LogLoss, accuracy).');
+    termAdd('<span class="prompt">calibrate</span>  - trigger temperature scaling.');
+    termAdd('<span class="prompt">export</span>      - print report snapshot.');
     termAdd('<span class="prompt">auto</span>        - toggle auto-refresh every 60s.');
     termAdd('<span class="prompt">clear</span>       - reset screen.');
     termAdd("");
@@ -764,17 +1122,8 @@ async function termExec(cmd) {
       termAdd(JSON.stringify(cov, null, 2).replace(/\n/g, "<br>").replace(/  /g, "&nbsp;&nbsp;"));
       termAdd("");
     } catch { termAdd("Failed to load coverage.", "danger"); }
-  } else if (main === "refresh") {
-    try {
-      const resp = await (await fetch(API + "/refresh", { method: "POST" })).json();
-      termAdd("");
-      termAdd('<span class="highlight">== Refresh Result ==</span>');
-      termAdd(JSON.stringify(resp, null, 2).replace(/\n/g, "<br>").replace(/  /g, "&nbsp;&nbsp;"));
-      // Reload
-      await loadAll();
-      termAdd('<span class="ok">Data reloaded.</span>');
-      termAdd("");
-    } catch { termAdd("Failed to refresh.", "danger"); }
+  } else if (main === "simulate") {
+    termAdd('<span class="dim">Open the Overview tab and click "Refresh & Simulate" to run a simulation.</span>');
   } else if (main === "auto") {
     toggleAuto(!autoRefreshOn);
     termAdd("");
@@ -827,6 +1176,140 @@ async function termExec(cmd) {
       termAdd(tbl + "</table>");
       termAdd("");
     } catch { termAdd("Failed to load blend info.", "danger"); }
+  } else if (main === "simulate") {
+    const n = parseInt(parts[1]) || 50000;
+    await termRunSimulation(API, n, async () => {
+      const ov = await fetch(API + "/overview").then(r => r.json());
+      appState.overview = ov;
+      appState.data = ov;
+      const teams = ov.teams || [];
+      termAdd("");
+      termAdd('<span class="highlight">== Champion Probability Table ==</span>');
+      termAdd(buildWCTable(teams));
+      termAdd("");
+      updateStatus();
+    });
+    return;
+  } else if (main === "what-if") {
+    const arg = parts.slice(1).join(" ").trim();
+    if (!arg) { termAdd("Usage: what-if <TEAM[.PARAM=VALUE]>", "dim"); termShowPrompt(); return; }
+    const dotIdx = arg.indexOf(".");
+    const eqIdx = arg.indexOf("=");
+    let teamName, param, value;
+    if (dotIdx > 0 && eqIdx > dotIdx) { teamName = arg.slice(0, dotIdx); param = arg.slice(dotIdx + 1, eqIdx); value = parseFloat(arg.slice(eqIdx + 1)); }
+    else { teamName = arg; param = null; }
+    const teams = (d && d.teams) || [];
+    const team = teams.find(t => t.name.toLowerCase() === teamName.toLowerCase());
+    if (!team) { termAdd("Team not found: " + teamName, "danger"); termShowPrompt(); return; }
+    termAdd("");
+    termAdd('<span class="highlight">== ' + team.name + ' ==</span>');
+    termAdd('  Elo: <span class="num">' + team.elo + '</span>');
+    termAdd('  Champion: <span class="num">' + (team.champion || 0).toFixed(1) + '%</span>');
+    termAdd('  Final: <span class="num">' + (team.final || 0).toFixed(1) + '%</span>  SF: <span class="num">' + (team.sf || 0).toFixed(1) + '%</span>  QF: <span class="num">' + (team.qf || 0).toFixed(1) + '%</span>');
+    termAdd('  Group: <span class="num">' + (team.group_win || 0).toFixed(1) + '%</span>  R32: <span class="num">' + (team.r32 || 0).toFixed(1) + '%</span>');
+    if (team.form_avg !== undefined) termAdd('  Form: <span class="num">' + team.form_avg.toFixed(3) + '</span>');
+    if (team.odds_avg !== undefined) termAdd('  Market Odds: <span class="num">' + team.odds_avg.toFixed(3) + '</span>');
+    try {
+      const sig = await (await fetch(API + "/signals")).json();
+      const teamSigs = (sig.team_signals || {})[team.name] || {};
+      if (Object.keys(teamSigs).length) {
+        termAdd('<span class="dim">--- Signal Breakdown ---</span>');
+        Object.entries(teamSigs).forEach(([k, v]) => {
+          termAdd('  ' + k + ': <span class="num">' + (typeof v === "number" ? v.toFixed(4) : v) + '</span>');
+        });
+      }
+    } catch {}
+    if (param && !isNaN(value)) {
+      let matchId = null;
+      try {
+        const br = appState.bracketData;
+        if (br && br.knockout_tree) {
+          for (const [, ms] of Object.entries(br.knockout_tree)) {
+            const found = ms.find(m => (m.team_a || "").toLowerCase() === team.name.toLowerCase() || (m.team_b || "").toLowerCase() === team.name.toLowerCase());
+            if (found) { matchId = found.match_id; break; }
+          }
+        }
+      } catch {}
+      if (matchId) {
+        const scenario = param === "form" && value > 1 ? team.name + " in form" : param === "form" && value < 1 ? team.name + " poor form" : param === "defense" && value > 1 ? team.name + " strong defense" : param === "defense" && value < 1 ? team.name + " weak defense" : param === "lineup" && value < 1 ? team.name + " lineup injury" : param === "manager" && value < 0.5 ? team.name + " manager sacked" : team.name + " " + param + " " + value;
+        await termRunWithSpinner('<span class="highlight">What-If</span>',
+          () => fetch(API + "/what-if", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ match_id: matchId, scenario, mode: "instant" }) }).then(r => r.json()),
+          result => {
+            if (result.error) { termAdd('<span class="dim">' + result.error + '</span>'); return; }
+            if (result.insight) termAdd('<span class="title">Impact:</span> ' + result.insight.replace(/<br>/g, ' '));
+            if (result.adjusted_signals) {
+              const adj = Object.entries(result.adjusted_signals).filter(([, sv]) => sv.was_adjusted);
+              if (adj.length) {
+                let tbl = '<table><tr><th>Signal</th><th>Before</th><th>After</th><th>Δ</th></tr>';
+                adj.forEach(([sk, sv]) => {
+                  const base = sv.original_probability != null ? (sv.original_probability * 100) : ((sv.probability - sv.delta) * 100);
+                  const aft = sv.probability * 100;
+                  const d = sv.delta * 100;
+                  const cls = d >= 0 ? "ok" : "danger";
+                  tbl += '<tr><td>' + (sigLabels[sk] || sk) + '</td><td class="num prob">' + base.toFixed(1) + '%</td><td class="num prob">' + aft.toFixed(1) + '%</td><td class="num ' + cls + '">' + (d >= 0 ? "+" : "") + d.toFixed(1) + '%</td></tr>';
+                });
+                termAdd(tbl + '</table>');
+              }
+            }
+          }
+        );
+      } else {
+        termAdd('<span class="dim">No match found for scenario analysis.</span>');
+      }
+    }
+    termAdd("");
+  } else if (main === "validate") {
+    await termRunWithSpinner('<span class="highlight">Validate</span>',
+      () => fetch(API + "/validation").then(r => r.json()),
+      v => {
+        if (v.error) { termAdd('<span class="danger">' + v.error + '</span>'); return; }
+        termAdd('<span class="highlight">== Validation ==</span>');
+        termAdd('  Matches evaluated: ' + (v.n_matches || "?"));
+        if (v.before) {
+          termAdd('<span class="title">Before Calibration:</span>');
+          termAdd('  Brier: ' + v.before.brier.toFixed(4) + '  LogLoss: ' + (v.before.log_loss || 0).toFixed(4) + '  Accuracy: ' + ((v.before.accuracy || 0) * 100).toFixed(1) + '%');
+        }
+        if (v.after) {
+          termAdd('<span class="title">After Calibration:</span>');
+          termAdd('  Brier: ' + v.after.brier.toFixed(4) + '  LogLoss: ' + (v.after.log_loss || 0).toFixed(4) + '  Accuracy: ' + ((v.after.accuracy || 0) * 100).toFixed(1) + '%');
+        }
+        if (v.calibrated) {
+          termAdd('  Calibrated: <span class="ok">' + v.calibrated + '</span>');
+        }
+      }
+    );
+    termAdd("");
+  } else if (main === "calibrate") {
+    await termRunCalibration(API);
+    return;
+  } else if (main === "export") {
+    await termRunWithSpinner('<span class="highlight">Export</span>',
+      () => fetch(API + "/report").then(r => r.json()),
+      r => {
+        if (r.error) { termAdd('<span class="danger">' + r.error + '</span>'); return; }
+        termAdd('<span class="highlight">== Report Snapshot ==</span>');
+        if (r.timestamp) termAdd('  Timestamp: <span class="dim">' + r.timestamp + '</span>');
+        if (r.iterations) termAdd('  Iterations: ' + r.iterations.toLocaleString());
+        if (r.seed !== undefined) termAdd('  Seed: ' + r.seed);
+        if (r.top_teams && r.top_teams.length) {
+          termAdd('<span class="title">Top Teams:</span>');
+          r.top_teams.slice(0, 10).forEach((t, i) => {
+            termAdd('  ' + (i + 1) + '. ' + t.name + ' — ' + (t.champion_prob || 0).toFixed(1) + '% champion');
+          });
+        }
+        if (r.evaluation) {
+          const ev = r.evaluation;
+          termAdd('<span class="title">Evaluation:</span>');
+          Object.entries(ev).forEach(([k, v]) => {
+            if (v.n_matches > 0) termAdd('  ' + k + ' — Brier: ' + v.brier.toFixed(4) + '  Accuracy: ' + ((v.accuracy || 0) * 100).toFixed(1) + '%');
+          });
+        }
+        if (r.calibration) {
+          termAdd('  Calibration status: <span class="dim">' + (r.calibration.status || "N/A") + '</span>');
+        }
+      }
+    );
+    termAdd("");
   } else {
     termAdd("command not found: " + trimmed, "danger");
     termAdd('Type <span class="prompt">help</span> for available commands.', "dim");

@@ -1,6 +1,5 @@
 import json, os, sys, time, random, copy, uuid
 from pathlib import Path
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
@@ -15,17 +14,24 @@ import requests
 
 import competitions.worldcup
 from competitions.worldcup.src import constants, elo
+from football_core.signal import PredictionContext
 from competitions.worldcup.src.knockout import run_full_simulation, resolve_knockout_slot_teams
-from competitions.worldcup.src.state import load_groups, load_annex_c
+from competitions.worldcup.src.state import load_groups, load_annex_c, save_signal_cache, save_calibration_params, load_calibration_params
+from competitions.worldcup.src.engine import run_calibrate_and_blend
+from competitions.worldcup.src.analysis import run_calibrated_validation
 from competitions.worldcup.src.evaluation import evaluate_all_matches
-from competitions.worldcup.src.output import coverage_audit
+from competitions.worldcup.src.constants import (
+    CATBOOST_CACHE_FILE, FORM_CACHE_FILE, LINEUP_CACHE_FILE,
+    ODDS_CACHE_FILE, DEFENSIVE_CACHE_FILE, MANAGER_EFFECT_CACHE_FILE,
+    AVAILABILITY_CACHE_FILE,
+)
 from football_core.groups import precompute_matchup_lambdas, simulate_group_matches
 from competitions.worldcup.src.groups import (
     compute_standings, rank_third_placed, select_advancers, resolve_r32_matchups,
 )
 
 from web.insight import compute_team_signal_strengths, compute_ko_signal_probs, compute_match_insight, compute_form_trend, compute_head_to_head, compute_match_outcome
-from web.engine_helpers import compute_predictions, compute_team_strengths_from_predictions
+from web.engine_helpers import compute_team_strengths_from_predictions, _build_engine_from_caches
 from web.whatif_engine import parse_scenario, handle_instant_scenario, generate_simulate_insight
 from web.common import ts, boot_step, load_json, load_json_list
 
@@ -33,7 +39,6 @@ load_dotenv()
 BSD_API_KEY = os.getenv("BSD_API_KEY", "")
 
 DATA_DIR = constants.DATA_DIR
-CACHE_FILE = Path(__file__).parent / "cache.json"
 
 cache: dict = {}
 boot_log: list[dict] = []
@@ -174,6 +179,85 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
     return {"rounds": rounds_data, "n_matchups": len(resolved)}
 
 
+def build_chronological_matches() -> dict:
+    """Build chronological match listing grouped by round.
+
+    Returns: {rounds: [{round_name, round_type, matches}]}
+    """
+    teams_raw = load_json(DATA_DIR, "teams.json")
+    groups = load_groups(DATA_DIR, teams=teams_raw)
+    groups_data = groups.get("groups", groups) if isinstance(groups, dict) else groups
+    groups_data = groups_data if isinstance(groups_data, dict) else {}
+    bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
+    played_groups_raw = load_json(DATA_DIR, "played_groups.json") or {}
+    played_raw = load_json(DATA_DIR, "played.json") or {}
+
+    rounds = []
+
+    for gk in sorted(groups_data.keys()):
+        g = groups_data[gk]
+        matches = []
+        for m in g.get("matches", []):
+            mid = m["match_id"]
+            r = played_groups_raw.get(mid, {})
+            matches.append({
+                "match_id": mid,
+                "date": r.get("completed_at"),
+                "team_a": m["team_a"],
+                "team_b": m["team_b"],
+                "home_score": r.get("home_score"),
+                "away_score": r.get("away_score"),
+                "winner": r.get("winner"),
+                "played": mid in played_groups_raw,
+                "status": "played" if mid in played_groups_raw else "tbd",
+                "matchday": m.get("matchday"),
+            })
+        if matches:
+            rounds.append({"round_name": "Group " + gk, "round_type": "group", "matches": matches})
+
+    KO_ROUND_TYPES = {"R32": "r32", "R16": "r16", "QF": "qf", "SF": "sf", "TPP": "tpp", "FINAL": "final"}
+    ko_rounds_order = ["R32", "R16", "QF", "SF", "TPP", "FINAL"]
+    for round_name in ko_rounds_order:
+        matches = []
+        for be in bracket_raw:
+            if be.get("round") != round_name:
+                continue
+            mid = be["match_id"]
+            r = played_raw.get(mid, {})
+            matches.append({
+                "match_id": mid,
+                "date": r.get("completed_at"),
+                "team_a": r.get("team_a"),
+                "team_b": r.get("team_b"),
+                "home_score": r.get("home_score"),
+                "away_score": r.get("away_score"),
+                "winner": r.get("winner"),
+                "played": mid in played_raw,
+                "status": "played" if mid in played_raw else "tbd",
+                "source_matches": be.get("source_matches"),
+            })
+        if matches:
+            rounds.append({"round_name": round_name, "round_type": KO_ROUND_TYPES.get(round_name, "ko"), "matches": matches})
+
+    return {"rounds": rounds}
+
+
+def build_knockout_tree() -> dict:
+    """Build knockout tree structure with resolved teams for all rounds.
+
+    Returns: {round_name: [{match_id, team_a, team_b, score, winner, played, source_matches}]}
+    """
+    teams_raw = load_json(DATA_DIR, "teams.json")
+    groups = load_groups(DATA_DIR, teams=teams_raw)
+    bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
+    annex_c = load_annex_c(DATA_DIR)
+    played_raw = load_json(DATA_DIR, "played.json") or {}
+    played_groups_raw = load_json(DATA_DIR, "played_groups.json") or {}
+
+    fb = compute_full_bracket(groups, teams_raw, bracket_raw, annex_c, played_raw, played_groups_raw)
+    return fb.get("rounds", {})
+
+
 def compute_group_standings(groups, teams, played_groups):
     groups_data = groups.get("groups", groups)
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
@@ -288,7 +372,73 @@ def _build_eval_history_from_predictions(predictions, all_matches, played, playe
     return history
 
 
-def compute_all(skip_simulation: bool = False):
+def compute_real_standings(groups_data: dict, played_groups: dict) -> list[dict]:
+    """Compute deterministic real standings from played group matches.
+
+    Returns a flat list sorted by group, then position:
+    [{group, position, team, pts, gd, gs, ga, played}, ...]
+    """
+    standings = []
+    for group_letter in sorted(groups_data.keys()):
+        group = groups_data[group_letter]
+        team_stats: dict[str, dict] = {}
+        for match in group.get("matches", []):
+            mid = match["match_id"]
+            if mid not in played_groups:
+                continue
+            m = played_groups[mid]
+            ta, tb = m["team_a"], m["team_b"]
+            hs = m.get("home_score", 0)
+            aw = m.get("away_score", 0)
+            for team, gs, ga in [(ta, hs, aw), (tb, aw, hs)]:
+                if team not in team_stats:
+                    team_stats[team] = {"team": team, "group": group_letter, "pts": 0, "gd": 0, "gs": 0, "ga": 0, "played": 0}
+                team_stats[team]["gs"] += gs
+                team_stats[team]["ga"] += ga
+                team_stats[team]["gd"] += (gs - ga)
+                team_stats[team]["played"] += 1
+            if hs > aw:
+                team_stats[ta]["pts"] += 3
+            elif aw > hs:
+                team_stats[tb]["pts"] += 3
+            else:
+                team_stats[ta]["pts"] += 1
+                team_stats[tb]["pts"] += 1
+        sorted_teams = sorted(team_stats.values(), key=lambda t: (-t["pts"], -t["gd"], -t["gs"]))
+        for i, t in enumerate(sorted_teams, 1):
+            t["position"] = i
+            standings.append(t)
+    return standings
+
+
+def compute_signals_meta() -> dict:
+    """Check on-disk signal cache files and return metadata."""
+    cache_files: list[tuple[str, str]] = [
+        ("odds_cache.json", "market_odds"),
+        ("catboost_cache.json", "catboost"),
+        ("form_cache.json", "form"),
+        ("lineup_cache.json", "lineup_strength"),
+        ("defensive_cache.json", "defensive_quality"),
+        ("manager_effect_cache.json", "manager_effect"),
+        ("availability_cache.json", "availability"),
+    ]
+    signals = []
+    for fname, sname in cache_files:
+        path = DATA_DIR / fname
+        exists = path.exists()
+        mtime = None
+        if exists:
+            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
+        signals.append({"name": sname, "available": exists, "last_updated": mtime})
+    return {"signals": signals, "n_total": len(signals)}
+
+
+def compute_overview() -> dict:
+    """Real-data-first overview — no simulation, no engine predictions.
+
+    Loads teams, groups, bracket, played results from disk and computes
+    deterministic standings and bracket display only.
+    """
     global boot_log
     boot_log = []
     data = {"boot": []}
@@ -301,153 +451,45 @@ def compute_all(skip_simulation: bool = False):
         "played": json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {},
         "played_groups": json.loads((DATA_DIR / "played_groups.json").read_text(encoding="utf-8")) if (DATA_DIR / "played_groups.json").exists() else {},
         "versions": json.loads((DATA_DIR / "versions.json").read_text(encoding="utf-8")) if (DATA_DIR / "versions.json").exists() else {},
-        "backtest": json.loads((DATA_DIR / "eval_backtest_report.json").read_text(encoding="utf-8")) if (DATA_DIR / "eval_backtest_report.json").exists() else {},
     }, boot_log)
     if not ld:
         return {"boot": boot_log, "error": "data load failed"}
     teams, groups_data = ld["teams"], ld["groups"]["groups"]
     bracket, annex_c = ld["bracket"], ld["annex_c"]
     played, played_groups = ld["played"], ld["played_groups"]
-    versions, backtest = ld["versions"], ld["backtest"]
+    versions = ld["versions"]
 
-    n_played_ko = sum(1 for m in played.values() if m.get("winner"))
-    n_played_grp = sum(1 for m in played_groups.values() if m.get("winner"))
-    total_played = n_played_ko + n_played_grp
-
-    # Build full match list (needed for engine prediction alignment)
-    all_matches: list[dict] = []
-    for g in groups_data.values():
-        for m in g.get("matches", []):
-            all_matches.append(m)
-    for m in bracket:
-        all_matches.append(m)
-
-    # Compute engine predictions from on-disk signal caches
-    engine_predictions, match_probs, blend_weights = boot_step("Engine Predictions", lambda:
-        compute_predictions(teams, ld["groups"], bracket, played, played_groups)
-    , boot_log) or ([], {}, {})
-
-    if skip_simulation:
-        sim = None
-    else:
-        sim = boot_step("Monte Carlo Simulation", lambda:
-            run_full_simulation(teams, ld["groups"], bracket, annex_c, played, played_groups=played_groups)
-        , boot_log)
+    total_played = sum(1 for m in played.values() if m.get("winner"))
+    total_played += sum(1 for m in played_groups.values() if m.get("winner"))
 
     gs = boot_step("Group Standings", lambda:
-        compute_group_standings(ld["groups"], teams, played_groups)
-    , boot_log)
-    standings, third = gs or ({}, [])
+        compute_real_standings(groups_data, played_groups)
+    , boot_log) or []
 
     bracket_display = boot_step("Bracket Resolution", lambda:
         compute_bracket_display(ld["groups"], teams, bracket, annex_c, played, played_groups)
     , boot_log)
 
-    eval_result = boot_step("Signal Evaluation", lambda:
-        compute_signal_eval(teams, played, played_groups, engine_predictions, all_matches)
-    , boot_log)
+    signals_meta = compute_signals_meta()
 
     gov = boot_step("Governance", lambda: {
         "versions": versions,
-        "n_matches": len(played) + len(played_groups),
-        "n_signals": len(blend_weights) if blend_weights else 0,
-        "status": "COLD_START" if (len(played) + len(played_groups)) < 30 else "HEALTHY",
-        "backtest_summary": backtest.get("governance_recommendation", ""),
+        "n_matches": total_played,
+        "n_signals": signals_meta.get("n_total", 0),
+        "status": "COLD_START" if total_played < 30 else "HEALTHY",
     }, boot_log)
 
-    cov = boot_step("Coverage Audit", lambda: coverage_audit(), boot_log)
-
-    sorted_teams = sorted(teams.items(), key=lambda t: (sim or {}).get(t[0], {}).get("champion", 0), reverse=True)
-    team_list = [
-        {"name": name, "elo": round(d["elo"], 1),
-         "champion": round((sim or {}).get(name, {}).get("champion", 0) * 100, 1),
-         "final": round((sim or {}).get(name, {}).get("final", 0) * 100, 1),
-         "sf": round((sim or {}).get(name, {}).get("sf", 0) * 100, 1),
-         "qf": round((sim or {}).get(name, {}).get("qf", 0) * 100, 1)}
-        for name, d in sorted_teams
-    ]
-
-    standings_display = {}
-    for letter in sorted(standings.keys()):
-        standings_display[letter] = []
-        for row in standings[letter]:
-            standings_display[letter].append({
-                "team": row["team"], "position": row["position"],
-                "pts": row["pts"], "gd": row["gd"], "gs": row["gs"],
-            })
-
-    third_display = []
-    for r in (third or []):
-        third_display.append({"group": r["group"], "team": r["team"],
-                              "pts": r["pts"], "gd": r["gd"], "gs": r["gs"]})
-
-    eval_display = {}
-    if eval_result:
-        elo_r = eval_result["elo"]
-        eval_display["elo"] = {
-            "brier": elo_r.get("metrics", {}).get("brier", 0),
-            "log_loss": elo_r.get("metrics", {}).get("log_loss", 0),
-            "accuracy": elo_r.get("metrics", {}).get("accuracy", 0),
-            "n_matches": elo_r.get("n_matches", 0),
-        }
-        all_sig = eval_result["all_signals"].get("signals", {})
-        for sk, sr in all_sig.items():
-            m = sr.get("metrics", {})
-            if m.get("n", 0) > 0:
-                eval_display[sk] = {
-                    "brier": m["brier"], "log_loss": m["log_loss"],
-                    "accuracy": m["accuracy"], "n_matches": m["n"],
-                }
-
-    gov_display = {}
-    if gov:
-        gov_display = {
-            "data_version": versions.get("data_version", "D?"),
-            "model_version": versions.get("model_version", "M?"),
-            "run_version": versions.get("run_version", "R?"),
-            "n_matches": len(played) + len(played_groups),
-            "status": gov.get("status", "UNKNOWN"),
-            "backtest": backtest.get("governance_recommendation", ""),
-        }
-
-    total_iters = 50000
+    team_list = [{"name": name, "elo": round(d["elo"], 1)} for name, d in sorted(teams.items(), key=lambda t: t[1].get("elo", 1500), reverse=True)]
 
     data["boot"] = boot_log
     data["teams"] = team_list
     data["n_teams"] = len(team_list)
-    data["total_iterations"] = total_iters
     data["n_played"] = total_played
-
-    data["full_bracket"] = boot_step("Full Bracket Resolution", lambda:
-        compute_full_bracket(ld["groups"], teams, bracket, annex_c, played, played_groups,
-                             engine_predictions=engine_predictions)
-    , boot_log)
-
-    data["standings"] = standings_display
-    data["third_place"] = third_display
+    data["standings"] = gs
     data["bracket"] = bracket_display
-    data["evaluation"] = eval_display
-    data["governance"] = gov_display
-    data["backtest"] = backtest
-    data["coverage"] = cov
-
-    if sim:
-        data["simulation_raw"] = {
-            team: {"champion": probs.get("champion", 0), "final": probs.get("final", 0)}
-            for team, probs in sim.items()
-        }
-
+    data["governance"] = gov if gov else {}
+    data["signals_meta"] = signals_meta
     return data
-
-
-def compute_or_load():
-    if CACHE_FILE.exists():
-        loaded = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
-        if loaded.get("boot") and len(loaded["boot"]) > 5:
-            return loaded
-    result = compute_all(skip_simulation=True)
-    CACHE_FILE.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
-    return result
 
 
 def compute_signal_stats():
@@ -527,12 +569,7 @@ def compute_signal_detail(name: str):
             brier_sum += (prob - actual) ** 2
             if (actual == 1.0 and prob > 0.5) or (actual == 0.0 and prob < 0.5) or (actual == 0.5):
                 correct += 1
-    cache_file = Path(__file__).parent / "cache.json"
-    if cache_file.exists():
-        cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
-    else:
-        cache_data = {}
-    ev = cache_data.get("evaluation", {})
+    ev = cache.get("evaluation", {})
     sig_eval = ev.get(name, {})
     return {
         "name": name,
@@ -549,16 +586,11 @@ def compute_signal_detail(name: str):
 
 
 def compute_blend_info():
-    """Blend info from cache.json engine weights + backtest — no ledger dependency."""
+    """Blend info from in-memory cache evaluation + backtest — no cached file."""
     data_dir = constants.DATA_DIR
     backtest_path = data_dir / "eval_backtest_report.json"
     backtest = json.loads(backtest_path.read_text(encoding="utf-8")) if backtest_path.exists() else {}
-    cache_file = Path(__file__).parent / "cache.json"
-    if cache_file.exists():
-        cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
-    else:
-        cache_data = {}
-    eval_data = cache_data.get("evaluation", {})
+    eval_data = cache.get("evaluation", {})
     available_signals = sorted(k for k in eval_data if k != "elo" and eval_data[k].get("n_matches", 0) > 0)
     n_available = len(available_signals)
     per_signal = backtest.get("per_signal", {})
@@ -572,7 +604,7 @@ def compute_blend_info():
             briers[sk] = 0.25
     total_inv = sum(1.0 / max(b, 0.01) for b in briers.values()) if briers else 1
     weights = {sk: round((1.0 / max(b, 0.01)) / total_inv, 4) for sk, b in briers.items()} if total_inv else {}
-    gov = cache_data.get("governance", {})
+    gov = cache.get("governance", {})
     n_matches = gov.get("n_matches", 0)
     return {
         "n_signals_available": n_available,
@@ -585,28 +617,31 @@ def compute_blend_info():
     }
 
 
-def refresh_from_api(progress_cb=None):
-    global cache
+def _fetch_live_data() -> None:
+    """Fetch all live data from BSD API at startup.
+
+    Fetches match results + all 7 signal predictors, saves signal caches
+    to DATA_DIR so _build_engine_from_caches() finds them. No ledger writes.
+    Called once at server startup if BSD_API_KEY is set.
+    """
     if not BSD_API_KEY:
-        return {"status": "error", "message": "No BSD_API_KEY configured. Add to .env file."}
-    data_dir = constants.DATA_DIR
-    t0 = time.time()
-    updated = {}
-    errors = []
+        return
+    data_dir = DATA_DIR
     try:
         teams = json.loads((data_dir / "teams.json").read_text(encoding="utf-8"))
         groups = json.loads((data_dir / "groups.json").read_text(encoding="utf-8"))
         bracket_raw = json.loads((data_dir / "bracket.json").read_text(encoding="utf-8"))
         aliases = json.loads((data_dir / "team_aliases.json").read_text(encoding="utf-8"))
-    except Exception as e:
-        return {"status": "error", "message": f"Failed to load data files: {e}"}
-    raw_matches = []
+    except Exception:
+        return
+
+    # 1. Fetch and process match results
     try:
         from competitions.worldcup.src.fetcher import build_historic_url, process_matches, process_group_matches
         from football_core.fetcher import fetch_raw_matches
         url = build_historic_url()
         raw_matches = fetch_raw_matches(BSD_API_KEY, url, constants.DEFAULT_LEAGUE_ID)
-        updated["matches_fetched"] = len(raw_matches)
+
         played_groups_path = data_dir / "played_groups.json"
         played_groups = json.loads(played_groups_path.read_text(encoding="utf-8")) if played_groups_path.exists() else {}
         played_group_ids = set(played_groups.keys())
@@ -614,157 +649,65 @@ def refresh_from_api(progress_cb=None):
         for m in new_grp:
             played_groups[m["match_id"]] = m
         played_groups_path.write_text(json.dumps(played_groups, indent=2, ensure_ascii=False), encoding="utf-8")
-        updated["new_group_matches"] = len(new_grp)
+
         annex_c = load_annex_c(DATA_DIR)
         played_path = data_dir / "played.json"
         played = json.loads(played_path.read_text(encoding="utf-8")) if played_path.exists() else {}
         known_winners = {mid: d["winner"] for mid, d in played.items() if d.get("winner")}
-        slot_teams = resolve_knockout_slot_teams(
-            groups, teams, played_groups, bracket_raw, annex_c, known_winners
-        )
+        slot_teams = resolve_knockout_slot_teams(groups, teams, played_groups, bracket_raw, annex_c, known_winners)
         resolved_bracket = [
             {"match_id": mid, "team_a": st["team_a"], "team_b": st["team_b"]}
             for mid, st in slot_teams.items()
             if st.get("team_a") and st.get("team_b")
         ]
-        updated["bracket_resolved"] = len(resolved_bracket)
         played_ids = set(played.keys())
         new_ko = process_matches(raw_matches, teams, resolved_bracket, aliases, played_ids)
         for m in new_ko:
             played[m["match_id"]] = m
         played_path.write_text(json.dumps(played, indent=2, ensure_ascii=False), encoding="utf-8")
-        updated["new_ko_matches"] = len(new_ko)
-        updated["match_results"] = True
-    except Exception as e:
-        errors.append(f"match_fetch: {str(e)}")
-        updated["match_results"] = False
-    if progress_cb:
-        progress_cb(10, "Matches fetched and processed")
+    except Exception:
+        pass
 
-    cb_result = {}
+    # 2. Fetch and cache all 7 signal predictors
     try:
-        from competitions.worldcup.src.predictors.catboost import fetch_and_cache_catboost as fetch_cb
-        cb_result = fetch_cb(BSD_API_KEY, aliases, groups, bracket_raw)
-        updated["catboost"] = True
-    except Exception as e:
-        errors.append(f"catboost: {str(e)}")
-        updated["catboost"] = False
-    if progress_cb:
-        progress_cb(20, "Catboost model predictions done")
-
-    lineup_cache = {}
-    try:
+        from competitions.worldcup.src.predictors.catboost import fetch_and_cache_catboost
         from competitions.worldcup.src.predictors.lineup import compute_lineup_signal
-        lineup_cache = compute_lineup_signal(groups, bracket=bracket_raw)
-        updated["lineup_signal"] = True
-    except Exception as e:
-        errors.append(f"lineup_signal: {str(e)}")
-        updated["lineup_signal"] = False
-    if progress_cb:
-        progress_cb(30, "Lineup strength signal computed")
-
-    form_cache = {}
-    try:
         from competitions.worldcup.src.predictors.form import compute_form_signal
-        form_cache = compute_form_signal(teams, groups, played=played, played_groups=played_groups, bracket=bracket_raw)
-        updated["form_signal"] = True
-    except Exception as e:
-        errors.append(f"form_signal: {str(e)}")
-        updated["form_signal"] = False
-    if progress_cb:
-        progress_cb(40, "Team form signal computed")
+        from competitions.worldcup.src.predictors.odds import fetch_and_cache_odds
+        from competitions.worldcup.src.predictors.manager_signals import fetch_and_cache_manager_signals
+        from competitions.worldcup.src.predictors.availability import fetch_and_cache_availability_signal
 
-    odds_cache = {}
-    try:
-        from competitions.worldcup.src.predictors.odds import fetch_and_cache_odds as fetch_odds
-        odds_cache = fetch_odds(BSD_API_KEY, raw_matches, aliases, groups, bracket=bracket_raw)
-        updated["odds_signal"] = True
-    except Exception as e:
-        errors.append(f"odds_signal: {str(e)}")
-        updated["odds_signal"] = False
-    if progress_cb:
-        progress_cb(50, "Market odds signal computed")
+        cb_cache = fetch_and_cache_catboost(BSD_API_KEY, aliases, groups, bracket_raw)
+        save_signal_cache(cb_cache, CATBOOST_CACHE_FILE, DATA_DIR)
 
-    defensive_cache = {}
-    manager_cache = {}
-    try:
-        from competitions.worldcup.src.predictors.manager_signals import fetch_and_cache_manager_signals as fetch_mgr
-        defensive_cache, manager_cache = fetch_mgr(BSD_API_KEY, groups, bracket=bracket_raw)
-        updated["manager_signals"] = True
-    except Exception as e:
-        errors.append(f"manager_signals: {str(e)}")
-        updated["manager_signals"] = False
-    if progress_cb:
-        progress_cb(60, "Manager & defensive quality signals computed")
+        lineup_cache = compute_lineup_signal(groups, bracket=bracket_raw)
+        save_signal_cache(lineup_cache, LINEUP_CACHE_FILE, DATA_DIR)
 
-    availability_cache = {}
-    try:
-        from competitions.worldcup.src.predictors.availability import fetch_and_cache_availability_signal as fetch_avail
+        form_cache = compute_form_signal(teams, groups, bracket=bracket_raw)
+        save_signal_cache(form_cache, FORM_CACHE_FILE, DATA_DIR)
+
+        odds_cache = fetch_and_cache_odds(BSD_API_KEY, raw_matches, aliases, groups, bracket=bracket_raw)
+        save_signal_cache(odds_cache, ODDS_CACHE_FILE, DATA_DIR)
+
+        defensive_cache, manager_cache = fetch_and_cache_manager_signals(BSD_API_KEY, groups, bracket=bracket_raw)
+        save_signal_cache(defensive_cache, DEFENSIVE_CACHE_FILE, DATA_DIR)
+        save_signal_cache(manager_cache, MANAGER_EFFECT_CACHE_FILE, DATA_DIR)
+
         ex = ThreadPoolExecutor(max_workers=1)
         try:
-            f = ex.submit(fetch_avail, BSD_API_KEY, groups, bracket=bracket_raw)
-            availability_cache = f.result(timeout=30)
-            updated["availability_signal"] = True
+            f = ex.submit(fetch_and_cache_availability_signal, BSD_API_KEY, groups, bracket=bracket_raw)
+            avail_cache = f.result(timeout=30)
+            save_signal_cache(avail_cache, AVAILABILITY_CACHE_FILE, DATA_DIR)
         except FuturesTimeout:
-            errors.append("availability_signal: timeout after 30s")
-            updated["availability_signal"] = False
-        except Exception as e:
-            errors.append(f"availability_signal: {str(e)}")
-            updated["availability_signal"] = False
+            pass
         finally:
             ex.shutdown(wait=False)
     except Exception:
         pass
-    if progress_cb:
-        progress_cb(70, "Player availability signal computed")
-
-    # Batch-write all signal results into prediction ledger (single atomic write)
-    try:
-        from competitions.worldcup.src.state import ledger_batch_upsert
-        _ledger_pairs = []
-        for cache, name in [(odds_cache, "market_odds"), (cb_result, "catboost"),
-                             (form_cache, "form"), (lineup_cache, "lineup_strength"),
-                             (defensive_cache, "defensive_quality"),
-                             (manager_cache, "manager_effect"),
-                             (availability_cache, "availability")]:
-            if cache and cache.get("matches"):
-                for mid, entry in cache["matches"].items():
-                    _ledger_pairs.append((mid, name, entry))
-        if _ledger_pairs:
-            ledger_batch_upsert(_ledger_pairs)
-    except Exception:
-        errors.append("ledger_batch_upsert: failed to write prediction ledger")
-
-    elapsed = time.time() - t0
-    status = "ok" if not errors else ("partial" if updated.get("match_results") else "error")
-    refresh_record = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "status": status,
-        "elapsed": round(elapsed, 2),
-        "updated": updated,
-        "errors": errors if errors else None,
-    }
-    (Path(__file__).parent / "last_refresh.json").write_text(json.dumps(refresh_record, indent=2), encoding="utf-8")
-    cache_file = Path(__file__).parent / "cache.json"
-    if cache_file.exists():
-        cache_file.unlink()
-        updated["cache_invalidated"] = True
-    return {
-        "status": status,
-        "elapsed": round(elapsed, 2),
-        "updated": updated,
-        "errors": errors if errors else None,
-    }
 
 
-@asynccontextmanager
-async def lifespan(app: fastapi.FastAPI):
-    global cache
-    cache = compute_or_load()
-    yield
 
-
-wc_app = fastapi.FastAPI(lifespan=lifespan)
+wc_app = fastapi.FastAPI()
 
 
 @wc_app.get("/api/data")
@@ -774,6 +717,21 @@ def api_data():
         "n_teams": cache.get("n_teams", 0),
         "total_iterations": cache.get("total_iterations", 0),
         "n_played": cache.get("n_played", 0),
+    })
+
+
+@wc_app.get("/api/overview")
+def api_overview():
+    return JSONResponse({
+        "standings": cache.get("standings", []),
+        "teams": cache.get("teams", []),
+        "n_teams": cache.get("n_teams", 0),
+        "n_played": cache.get("n_played", 0),
+        "signals_meta": cache.get("signals_meta", {"signals": [], "n_total": 0}),
+        "governance": cache.get("governance", {}),
+        "top_teams": cache.get("top_teams", []),
+        "signal_eval": cache.get("signal_eval", {}),
+        "simulation_meta": cache.get("simulation_meta", None),
     })
 
 
@@ -795,6 +753,14 @@ def api_bracket():
 @wc_app.get("/api/bracket/full")
 def api_bracket_full():
     return JSONResponse(cache.get("full_bracket", {}))
+
+
+@wc_app.get("/api/bracket/data")
+def api_bracket_data():
+    return JSONResponse({
+        "chronological_rounds": build_chronological_matches().get("rounds", []),
+        "knockout_tree": build_knockout_tree(),
+    })
 
 
 @wc_app.get("/api/evaluation")
@@ -832,68 +798,334 @@ def api_blend():
     return JSONResponse(compute_blend_info())
 
 
-def _run_refresh_task(task_id: str):
-    """Background refresh with progress reporting."""
+
+def _run_simulation_task(
+    task_id: str,
+    iterations: int = 50000,
+    seed: int | None = None,
+    weights: dict[str, float] | None = None,
+    show_ci: str = "auto",
+):
+    """Background simulation with progress reporting.
+
+    Loads data from disk, builds engine from signal caches, computes
+    predictions, runs Monte Carlo simulation, and updates global cache
+    with top_teams and signal_eval.
+    """
     try:
+        t0 = time.time()
         with sim_lock:
-            active_simulations[task_id] = {"status": "running", "progress": 0, "stage": "Loading data files..."}
+            active_simulations[task_id] = {
+                "status": "running", "progress": 0, "iteration": 0,
+                "total_iterations": iterations, "stage": "Loading data...",
+                "t0": t0, "elapsed": 0,
+            }
 
         def _progress(pct, stage):
             with sim_lock:
-                active_simulations[task_id]["progress"] = pct
-                active_simulations[task_id]["stage"] = stage
+                s = active_simulations[task_id]
+                s["progress"] = pct
+                s["stage"] = stage
+                s["elapsed"] = time.time() - s.get("t0", time.time())
 
-        result = refresh_from_api(progress_cb=_progress)
-        if result["status"] == "error":
-            with sim_lock:
-                active_simulations[task_id]["status"] = "error"
-                active_simulations[task_id]["error"] = result.get("message", "refresh failed")
-            return
+        _progress(0, "Loading data files...")
+        teams_raw = load_json(DATA_DIR, "teams.json")
+        groups_raw = load_groups(DATA_DIR, teams=teams_raw)
+        bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
+        annex_c = load_annex_c(DATA_DIR)
+        played_raw = json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {}
+        played_groups_raw = (DATA_DIR / "played_groups.json").read_text(encoding="utf-8")
+        played_groups = json.loads(played_groups_raw) if played_groups_raw.strip() else {}
+        elapsed = 0.0
 
-        _progress(75, "Recomputing predictions...")
+        _progress(5, "Building prediction engine...")
+        engine = _build_engine_from_caches(weights=weights)
+
+        _progress(10, "Computing engine predictions...")
+        elo_ratings = {n: d["elo"] for n, d in teams_raw.items()}
+        groups_data = groups_raw.get("groups", groups_raw) if isinstance(groups_raw, dict) else groups_raw
+        all_matches = []
+        for g in groups_data.values():
+            for m in g.get("matches", []):
+                all_matches.append(m)
+        for m in bracket_raw:
+            all_matches.append(m)
+
+        engine_predictions = []
+        if engine:
+            context = PredictionContext(
+                fixtures=all_matches,
+                elo_ratings=elo_ratings,
+                played_results=list(played_raw.values()) + list(played_groups.values()),
+            )
+            for m in all_matches:
+                bp = engine.evaluate(m, context)
+                engine_predictions.append(bp)
+
+        _progress(15, "Running Monte Carlo simulation...")
+        def _sim_progress(current, total):
+            pct = 15 + (current / max(total, 1) * 75)
+            _progress(pct, f"Simulating match {current} of {total}")
+
+        sim_result = run_full_simulation(
+            teams_raw, groups_raw, bracket_raw, annex_c,
+            played_raw, iterations=iterations,
+            seed=seed if seed is not None else int(time.time()),
+            played_groups=played_groups,
+            progress_cb=_sim_progress,
+        )
+
+        _progress(92, "Computing top team rankings...")
+        top_teams = sorted(
+            [{"name": name, **probs} for name, probs in sim_result.items()],
+            key=lambda t: t.get("champion", 0), reverse=True
+        )
+
+        _progress(95, "Evaluating prediction accuracy...")
+        eval_metrics = compute_signal_eval(teams_raw, played_raw, played_groups, engine_predictions, all_matches)
 
         global cache
-        cache = compute_all(skip_simulation=True)
-        CACHE_FILE.write_text(json.dumps(cache, indent=2, default=str), encoding="utf-8")
+        overview = compute_overview()
+        overview["top_teams"] = top_teams[:20]
+        overview["signal_eval"] = eval_metrics
+        overview["simulation_meta"] = {
+            "iterations": iterations,
+            "seed": seed,
+            "weights": weights,
+            "show_ci": show_ci,
+            "n_top_teams": len(top_teams),
+            "n_signals_evaluated": len(eval_metrics),
+        }
+
+        _progress(97, "Building full bracket tree...")
+        full_bracket = compute_full_bracket(
+            groups_raw, teams_raw, bracket_raw, annex_c,
+            played_raw, played_groups, engine_predictions,
+        )
+        overview["full_bracket"] = full_bracket
+        cache = overview
 
         _progress(100, "Complete")
+
+        snapshot = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "iterations": iterations,
+            "seed": seed,
+            "weights": weights,
+            "show_ci": show_ci,
+            "n_teams": overview.get("n_teams", 0),
+            "n_played": overview.get("n_played", 0),
+            "top_teams": top_teams[:20],
+            "standings": overview.get("standings", []),
+            "bracket": overview.get("bracket", {}),
+            "signal_eval": eval_metrics,
+            "signals_meta": overview.get("signals_meta", {"signals": [], "n_total": 0}),
+            "governance": overview.get("governance", {}),
+            "calibration": load_calibration_params(DATA_DIR),
+        }
+        (DATA_DIR / "snapshot.json").write_text(
+            json.dumps(snapshot, indent=2, default=str, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
         with sim_lock:
-            active_simulations[task_id]["status"] = "complete"
-            active_simulations[task_id]["result"] = result
+            s = active_simulations[task_id]
+            s["status"] = "complete"
+            s["progress"] = 100
+            s["elapsed"] = time.time() - t0
     except Exception as e:
         with sim_lock:
             active_simulations[task_id]["status"] = "error"
             active_simulations[task_id]["error"] = str(e)
+            active_simulations[task_id]["elapsed"] = time.time() - t0
 
 
-@wc_app.post("/api/refresh")
-def api_refresh():
+@wc_app.post("/api/simulate")
+def api_simulate(req: dict = None):
+    if not req:
+        return JSONResponse({"error": "request body required"})
+    iterations = int(req.get("iterations", 50000))
+    iterations = max(1000, min(500000, iterations))
+    seed = req.get("seed")
+    if seed is not None:
+        seed = int(seed)
+    weights = req.get("weights")
+    show_ci = str(req.get("show_ci", "auto"))
     task_id = str(uuid.uuid4())
-    t = threading.Thread(target=_run_refresh_task, args=(task_id,), daemon=True)
+    t = threading.Thread(
+        target=_run_simulation_task,
+        args=(task_id, iterations),
+        kwargs={"seed": seed, "weights": weights, "show_ci": show_ci},
+        daemon=True,
+    )
     t.start()
-    return JSONResponse({"task_id": task_id, "status": "started"})
+    return JSONResponse({
+        "task_id": task_id,
+        "status": "started",
+        "iterations": iterations,
+        "seed": seed,
+        "weights": weights,
+        "show_ci": show_ci,
+    })
 
 
-@wc_app.get("/api/refresh/progress/{task_id}")
-def api_refresh_progress(task_id: str):
-    with sim_lock:
-        task = active_simulations.get(task_id)
-    if not task:
-        return JSONResponse({"error": "task not found"})
-    resp = {
-        "status": task["status"],
-        "progress": task.get("progress", 0),
-        "stage": task.get("stage", ""),
+@wc_app.get("/api/validation")
+def api_validation():
+    try:
+        teams_raw = load_json(DATA_DIR, "teams.json")
+        groups_raw = load_groups(DATA_DIR, teams=teams_raw)
+        bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
+        annex_c = load_annex_c(DATA_DIR)
+        played_raw = json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {}
+        played_groups_raw = (DATA_DIR / "played_groups.json").read_text(encoding="utf-8")
+        played_groups = json.loads(played_groups_raw) if played_groups_raw.strip() else {}
+
+        result = run_calibrated_validation(
+            teams_raw, groups_raw, bracket_raw, annex_c,
+            played_raw, played_groups, str(DATA_DIR),
+        )
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@wc_app.get("/api/report")
+def api_report():
+    snapshot_path = DATA_DIR / "snapshot.json"
+    if not snapshot_path.exists():
+        return JSONResponse({"error": "no snapshot available — run a simulation first"})
+    try:
+        data = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+def _simulate_from_match_sync(match_id: str, iterations: int = 10000) -> dict:
+    """Run a full simulation and extract probabilities for target + downstream matches."""
+    teams_raw = load_json(DATA_DIR, "teams.json")
+    groups_raw = load_groups(DATA_DIR, teams=teams_raw)
+    bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
+    annex_c = load_annex_c(DATA_DIR)
+    played_raw = load_json(DATA_DIR, "played.json") or {}
+    played_groups_raw = load_json(DATA_DIR, "played_groups.json") or {}
+
+    engine = _build_engine_from_caches()
+    elo_ratings = {n: d["elo"] for n, d in teams_raw.items()}
+    groups_data = groups_raw.get("groups", groups_raw) if isinstance(groups_raw, dict) else groups_raw
+    all_matches = []
+    for g in groups_data.values():
+        for m in g.get("matches", []):
+            all_matches.append(m)
+    for m in bracket_raw:
+        all_matches.append(m)
+
+    engine_predictions = []
+    if engine:
+        from football_core.signal import PredictionContext
+        context = PredictionContext(
+            fixtures=all_matches,
+            elo_ratings=elo_ratings,
+            played_results=list(played_raw.values()) + list(played_groups_raw.values()),
+        )
+        for m in all_matches:
+            bp = engine.evaluate(m, context)
+            engine_predictions.append(bp)
+
+    def _noop_progress(current, total):
+        pass
+
+    sim_result = run_full_simulation(
+        teams_raw, groups_raw, bracket_raw, annex_c,
+        played_raw, iterations=iterations,
+        played_groups=played_groups_raw,
+        progress_cb=_noop_progress,
+    )
+
+    bracket_entry = None
+    for be in bracket_raw:
+        if be["match_id"] == match_id:
+            bracket_entry = be
+            break
+
+    downstream_ids = _collect_downstream_matches(match_id, bracket_raw)
+    simulated = []
+    for mid in downstream_ids:
+        probs = {}
+        for team_name, pdata in sim_result.items():
+            champion = pdata.get("champion", 0)
+            final = pdata.get("final", 0)
+            sf = pdata.get("sf", 0)
+            qf = pdata.get("qf", 0)
+            r16 = pdata.get("r16", 0)
+            r32 = pdata.get("r32", 0)
+            for stage in ("champion", "final", "sf", "qf", "r16", "r32"):
+                prob = pdata.get(stage, 0)
+                if prob > 0.001:
+                    probs.setdefault(stage, []).append({"name": team_name, "probability": prob})
+        sorted_probs = {k: sorted(v, key=lambda x: x["probability"], reverse=True)[:3] for k, v in probs.items()}
+        simulated.append({
+            "match_id": mid,
+            "top_teams": sorted(
+                [{"name": name, **pdata} for name, pdata in sim_result.items()],
+                key=lambda t: t.get("champion", 0), reverse=True
+            )[:5],
+        })
+
+    target_probs = {}
+    target_round = bracket_entry.get("round", "?") if bracket_entry else "?"
+    for team_name, pdata in sim_result.items():
+        target_probs[team_name] = {
+            stage: pdata.get(stage, 0)
+            for stage in ("champion", "final", "sf", "qf", "r16", "r32")
+        }
+    top_target = sorted(target_probs.items(), key=lambda x: x[1].get("champion", 0), reverse=True)[:4]
+
+    return {
+        "match_id": match_id,
+        "round": target_round,
+        "predictions": [
+            {"name": name, **probs} for name, probs in top_target if probs.get("champion", 0) > 0
+        ],
+        "downstream": simulated,
     }
-    if task["status"] == "complete" and task.get("result"):
-        resp["result"] = task["result"]
-        with sim_lock:
-            del active_simulations[task_id]
-    if task["status"] == "error":
-        resp["error"] = task.get("error")
-        with sim_lock:
-            del active_simulations[task_id]
-    return JSONResponse(resp)
+
+
+def _collect_downstream_matches(target_id: str, bracket_raw: list) -> list[str]:
+    """Collect all downstream matches reachable from target_id via source_matches."""
+    children_of: dict[str, list[str]] = {}
+    for be in bracket_raw:
+        for sm in (be.get("source_matches") or []):
+            children_of.setdefault(sm, []).append(be["match_id"])
+
+    downstream = []
+    queue = [target_id]
+    visited = set()
+    while queue:
+        mid = queue.pop(0)
+        for child in children_of.get(mid, []):
+            if child not in visited:
+                visited.add(child)
+                downstream.append(child)
+                queue.append(child)
+    return downstream
+
+
+@wc_app.post("/api/simulate-from-match")
+def api_simulate_from_match(req: dict = None):
+    if not req:
+        return JSONResponse({"error": "request body required"})
+    match_id = req.get("match_id", "")
+    iterations = int(req.get("iterations", 10000))
+    iterations = max(1000, min(100000, iterations))
+    if not match_id:
+        return JSONResponse({"error": "match_id required"})
+
+    try:
+        result = _simulate_from_match_sync(match_id, iterations)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
 
 
 @wc_app.get("/api/match/insight")
@@ -1039,6 +1271,91 @@ def api_what_if(req: dict = None):
     return JSONResponse({"error": "invalid mode"})
 
 
+def _run_calibration_task(task_id: str):
+    """Background calibration: Brier-weighted blend optimization + temperature scaling."""
+    try:
+        t0 = time.time()
+        with sim_lock:
+            active_simulations[task_id] = {
+                "status": "running", "progress": 0, "stage": "Loading data...",
+                "t0": t0, "elapsed": 0, "total_iterations": 100,
+            }
+
+        def _progress(pct, stage):
+            with sim_lock:
+                s = active_simulations.get(task_id)
+                if s:
+                    s["progress"] = pct
+                    s["stage"] = stage
+                    s["elapsed"] = time.time() - t0
+
+        _progress(5, "Loading teams and groups...")
+        teams_raw = load_json(DATA_DIR, "teams.json")
+        groups_raw = load_groups(DATA_DIR, teams=teams_raw)
+        bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
+
+        _progress(15, "Loading signal caches...")
+        from competitions.worldcup.src.state import load_signal_cache
+        odds_cache = load_signal_cache("odds_cache.json", DATA_DIR)
+        cb_cache = load_signal_cache("catboost_cache.json", DATA_DIR)
+        form_cache = load_signal_cache("form_cache.json", DATA_DIR)
+        lineup_cache = load_signal_cache("lineup_cache.json", DATA_DIR)
+        defensive_cache = load_signal_cache("defensive_cache.json", DATA_DIR)
+        manager_cache = load_signal_cache("manager_effect_cache.json", DATA_DIR)
+        availability_cache = load_signal_cache("availability_cache.json", DATA_DIR)
+
+        _progress(30, "Running calibration...")
+
+        def _cal_progress(pct):
+            _progress(30 + int(pct * 0.6), f"Calibrating... {pct:.0f}%")
+
+        blend_params = run_calibrate_and_blend(
+            teams=teams_raw,
+            groups=groups_raw,
+            bracket=bracket_raw,
+            odds_cache=odds_cache,
+            cb_cache=cb_cache,
+            form_cache=form_cache,
+            lineup_cache=lineup_cache,
+            defensive_cache=defensive_cache,
+            manager_cache=manager_cache,
+            availability_cache=availability_cache,
+            data_dir=str(DATA_DIR),
+        )
+
+        _progress(95, "Saving calibration params...")
+        calib_params = load_calibration_params(DATA_DIR)
+
+        _progress(100, "Complete")
+        with sim_lock:
+            s = active_simulations.get(task_id)
+            if s:
+                s["status"] = "complete"
+                s["progress"] = 100
+                s["elapsed"] = time.time() - t0
+                s["result"] = {
+                    "status": "calibrated" if blend_params else "failed",
+                    "weights": (blend_params or {}).get("weights"),
+                    "calibration_params": calib_params,
+                    "n_signals_calibrated": len((blend_params or {}).get("weights", {})),
+                }
+    except Exception as e:
+        with sim_lock:
+            s = active_simulations.get(task_id)
+            if s:
+                s["status"] = "error"
+                s["error"] = str(e)
+                s["elapsed"] = time.time() - t0
+
+
+@wc_app.post("/api/calibrate")
+def api_calibrate(req: dict = None):
+    task_id = str(uuid.uuid4())
+    t = threading.Thread(target=_run_calibration_task, args=(task_id,), daemon=True)
+    t.start()
+    return JSONResponse({"task_id": task_id, "status": "started"})
+
+
 @wc_app.get("/api/simulation/progress/{task_id}")
 def api_simulation_progress(task_id: str):
     with sim_lock:
@@ -1050,11 +1367,13 @@ def api_simulation_progress(task_id: str):
         "progress": sim.get("progress", 0),
         "iteration": sim.get("iteration", 0),
         "total_iterations": sim.get("total_iterations", 0),
+        "stage": sim.get("stage", ""),
+        "elapsed": round(sim.get("elapsed", 0), 1),
     }
-    if sim["status"] == "complete" and sim.get("result"):
-        response["result"] = sim["result"]
-        if sim.get("insight"):
-            response["insight"] = sim["insight"]
+    if sim["status"] == "complete":
+        result = sim.get("result")
+        if result:
+            response["result"] = result
         with sim_lock:
             del active_simulations[task_id]
     if sim["status"] == "error":

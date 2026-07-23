@@ -21,7 +21,9 @@ import uvicorn
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from competitions.ucl.main import build_simulation_result, _build_signal_engine
+from competitions.ucl.src.orchestrator import build_simulation_result, build_signal_engine, load_calibration, run_validation
+from competitions.ucl.src.analysis import run_validation_suite, run_calibrated_validation
+from competitions.ucl.src.calibrate import run_calibration
 from competitions.ucl.result import SimulationResult
 from competitions.ucl.src.elo_fetcher import fetch_team_elos, get_clubelo_snapshot_date
 from competitions.ucl.src.provider import RepoFixtureProvider
@@ -401,7 +403,7 @@ def deterministic_compute() -> dict:
         data["error"] = "standings computation failed"
         return data
     bracket_data = boot_step("Build bracket", lambda: _build_deterministic_bracket(knockout, standings), boot_log_local)
-    engine = boot_step("Build signal engine", lambda: _build_signal_engine(elo_ratings), boot_log_local)
+    engine = boot_step("Build signal engine", lambda: build_signal_engine(elo_ratings), boot_log_local)
     data["_signal_engine"] = engine
     signal_stats = boot_step("Evaluate signals", lambda: _compute_signal_eval(results, engine, elo_ratings, bsd_manager_data), boot_log_local)
     odds_display = []
@@ -508,7 +510,7 @@ def compute_all() -> dict:
         data["error"] = "simulation failed"
         return data
     sim_result = result
-    engine = boot_step("Build signal engine", lambda: _build_signal_engine(elo_ratings), boot_log_local)
+    engine = boot_step("Build signal engine", lambda: build_signal_engine(elo_ratings), boot_log_local)
     data["_signal_engine"] = engine
     bracket_rules_path = DATA_DIR / "bracket_rules.json"
     bracket_rules = {}
@@ -676,7 +678,13 @@ def api_simulate(req: dict = None):
     global _mode
     _mode = "simulation"
     task_id = str(uuid.uuid4())
-    n_iterations = max(10, min(1000000, int((req or {}).get("n_iterations", 10000))))
+    body = req or {}
+    n_iterations = max(10, min(1000000, int(body.get("iterations") or body.get("n_iterations") or 10000)))
+    seed = body.get("seed")
+    if seed is not None:
+        seed = int(seed)
+    weights = body.get("weights")
+    show_ci = str(body.get("show_ci", "auto"))
     with sim_lock:
         active_simulations[task_id] = {
             "status": "starting", "progress": 0, "iteration": 0,
@@ -693,7 +701,7 @@ def api_simulate(req: dict = None):
                         s["progress"] = pct
                         if iteration:
                             s["iteration"] = iteration
-            _run_mc_simulation(progress_cb=on_progress, n_iterations=n_iterations)
+            _run_mc_simulation(progress_cb=on_progress, n_iterations=n_iterations, seed=seed, weights=weights, show_ci=show_ci)
             with sim_lock:
                 s = active_simulations.get(tid)
                 if s:
@@ -709,11 +717,20 @@ def api_simulate(req: dict = None):
 
     t = threading.Thread(target=_task, args=(task_id,), daemon=True)
     t.start()
-    return JSONResponse({"status": "ok", "task_id": task_id, "mode": _mode})
+    return JSONResponse({
+        "status": "ok", "task_id": task_id, "mode": _mode,
+        "seed": seed, "weights": weights, "show_ci": show_ci,
+    })
 
 
 
-def _run_mc_simulation(progress_cb=None, n_iterations=10000):
+def _run_mc_simulation(
+    progress_cb=None,
+    n_iterations=10000,
+    seed: int | None = None,
+    weights: dict[str, float] | None = None,
+    show_ci: str = "auto",
+):
     global boot_log_local, sim_result, _mode, cache
     _mode = "simulation"
     boot_log_local = []
@@ -743,17 +760,17 @@ def _run_mc_simulation(progress_cb=None, n_iterations=10000):
                 if win_pct > 0:
                     mgr_elo = 1400.0 + (win_pct - 0.5) * 400.0
                     elo_ratings[t] = round(base * 0.7 + mgr_elo * 0.3, 1)
-    seed = 42
+    resolved_seed = seed if seed is not None else 42
     if progress_cb:
         def _mc_progress(current, total):
             pct = 10 + (current / total) * 75
             progress_cb(pct, current)
     else:
         _mc_progress = None
-    result = build_simulation_result(provider, elo_ratings, seed, n_iterations, progress_cb=_mc_progress)
+    result = build_simulation_result(provider, elo_ratings, resolved_seed, n_iterations, progress_cb=_mc_progress)
     if progress_cb: progress_cb(85, n_iterations)
     sim_result = result
-    engine = _build_signal_engine(elo_ratings)
+    engine = build_signal_engine(elo_ratings, weights_override=weights)
     bracket_rules_path = DATA_DIR / "bracket_rules.json"
     bracket_rules = {}
     try:
@@ -818,6 +835,9 @@ def _run_mc_simulation(progress_cb=None, n_iterations=10000):
     except Exception:
         signal_stats = {}
     if progress_cb: progress_cb(95, n_iterations)
+
+    calib = load_calibration()
+
     cache = {
         "mode": "simulation", "teams": top4, "all_teams": odds_display,
         "n_teams": len(result.teams), "n_iterations": result.n_iterations,
@@ -825,9 +845,55 @@ def _run_mc_simulation(progress_cb=None, n_iterations=10000):
         "champion": result.bracket_champion, "standings": standings_display,
         "playoff": playoff_display, "bracket_rounds": enriched_bracket,
         "odds": odds_display, "signals": signal_stats, "elo_ratings": elo_ratings,
+        "calibration": calib, "show_ci": show_ci,
         "boot": [],
     }
     if progress_cb: progress_cb(100, n_iterations)
+
+    snapshot = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "mode": "simulation",
+        "iterations": n_iterations,
+        "seed": resolved_seed,
+        "weights": weights,
+        "show_ci": show_ci,
+        "n_teams": len(result.teams),
+        "champion": result.bracket_champion,
+        "snapshot_date": result.snapshot_date,
+        "odds": odds_display,
+        "standings": standings_display,
+        "signals": signal_stats,
+        "elo_ratings": elo_ratings,
+        "calibration": calib,
+    }
+    (DATA_DIR / "snapshot.json").write_text(
+        json.dumps(snapshot, indent=2, default=str, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+@ucl_app.post("/api/mode")
+def api_set_mode(req: dict = None):
+    global _mode
+    body = req or {}
+    mode = str(body.get("mode", "simulate")).lower()
+    if mode not in ("simulate", "replay", "live"):
+        return JSONResponse({"error": f"invalid mode: {mode}. Must be simulate, replay, or live"})
+    _mode = mode
+    if mode == "replay":
+        replay_data = body.get("replay_data")
+        if replay_data:
+            cache["_replay_data"] = replay_data
+    if mode == "live":
+        api_key = body.get("api_key")
+        if api_key:
+            cache["_bsd_api_key"] = api_key
+    return JSONResponse({"status": "ok", "mode": _mode})
+
+
+@ucl_app.get("/api/mode")
+def api_get_mode():
+    return JSONResponse({"mode": _mode})
 
 
 @ucl_app.post("/api/reset")
@@ -838,6 +904,134 @@ def api_reset():
         return JSONResponse({"status": "ok", "mode": _mode})
     except Exception as e:
         return JSONResponse({"status": "error", "error": str(e)})
+
+
+def _run_calibration_task(task_id: str, replay_data: str | None = None):
+    """Background calibration: run run_calibration and save weights."""
+    try:
+        t0 = time.time()
+        with sim_lock:
+            active_simulations[task_id] = {
+                "status": "running", "progress": 0, "stage": "Loading replay data...",
+                "t0": t0, "elapsed": 0, "total_iterations": 100,
+            }
+
+        def _progress(pct, stage):
+            with sim_lock:
+                s = active_simulations.get(task_id)
+                if s:
+                    s["progress"] = pct
+                    s["stage"] = stage
+                    s["elapsed"] = time.time() - t0
+
+        replay_path = replay_data or str(DATA_DIR / "results.json")
+        _progress(10, f"Loading replay data from {os.path.basename(replay_path)}...")
+
+        config = run_calibration(replay_data_path=replay_path)
+
+        _progress(90, "Saving calibration weights...")
+
+        calib = load_calibration()
+
+        _progress(100, "Complete")
+        with sim_lock:
+            s = active_simulations.get(task_id)
+            if s:
+                s["status"] = "complete"
+                s["progress"] = 100
+                s["elapsed"] = time.time() - t0
+                s["result"] = {
+                    "status": "ok",
+                    "n_matches": config.get("n_matches", 0),
+                    "weights": config.get("weights", {}),
+                    "per_signal": config.get("per_signal", {}),
+                    "calibration": calib,
+                }
+    except Exception as e:
+        with sim_lock:
+            s = active_simulations.get(task_id)
+            if s:
+                s["status"] = "error"
+                s["error"] = str(e)
+                s["elapsed"] = time.time() - t0
+
+
+@ucl_app.post("/api/calibrate")
+def api_calibrate(req: dict = None):
+    body = req or {}
+    replay_data = body.get("replay_data")
+    task_id = str(uuid.uuid4())
+    t = threading.Thread(target=_run_calibration_task, args=(task_id, replay_data), daemon=True)
+    t.start()
+    return JSONResponse({"task_id": task_id, "status": "started"})
+
+
+@ucl_app.get("/api/validation")
+def api_validation():
+    try:
+        results = _load_results()
+        if not results:
+            return JSONResponse({"error": "no results data available", "validation": None})
+
+        elo_ratings = cache.get("elo_ratings", {})
+        if not elo_ratings:
+            team_names = list({m["team_a"] for m in results} | {m["team_b"] for m in results})
+            elo_ratings = fetch_team_elos(team_names) or {}
+
+        sim_result_obj = sim_result
+        if sim_result_obj:
+            validation = run_validation(sim_result_obj, results, elo_ratings)
+        else:
+            from football_core.evaluation import compute_metrics
+            from football_core.elo import expected_score
+            predictions: list[float] = []
+            actuals: list[float] = []
+            for m in results:
+                ta, tb = m["team_a"], m["team_b"]
+                elo_a = elo_ratings.get(ta, 1500)
+                elo_b = elo_ratings.get(tb, 1500)
+                pred = expected_score(elo_a, elo_b)
+                if m.get("winner") == ta:
+                    actual = 1.0
+                elif m.get("winner") == tb:
+                    actual = 0.0
+                else:
+                    actual = 0.5
+                predictions.append(pred)
+                actuals.append(actual)
+            metrics = compute_metrics(predictions, actuals)
+            validation = {
+                "validated_at": datetime.now(timezone.utc).isoformat(),
+                "n_matches_fetched": len(results),
+                "n_matches_matched": len(predictions),
+                "prediction_metrics": {
+                    "brier": round(metrics["brier"], 6),
+                    "log_loss": round(metrics["log_loss"], 6),
+                    "accuracy": round(metrics["accuracy"], 6),
+                    "n": metrics["n"],
+                },
+            }
+
+        calib = load_calibration()
+        return JSONResponse({
+            "validation": validation,
+            "calibration_available": calib is not None,
+            "calibration": calib,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@ucl_app.get("/api/report")
+def api_report():
+    snapshot_path = DATA_DIR / "snapshot.json"
+    if not snapshot_path.exists():
+        return JSONResponse({"error": "no snapshot available — run a simulation first"})
+    try:
+        data = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @ucl_app.get("/api/simulation/progress/{task_id}")

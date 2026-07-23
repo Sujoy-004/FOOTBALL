@@ -11,8 +11,12 @@ from football_core.signal import BlendedPrediction, PredictionContext, Signal, S
 DATA_DIR = constants.DATA_DIR
 
 
-def _build_engine_from_caches() -> EnsembleEngine | None:
+def _build_engine_from_caches(weights: dict[str, float] | None = None) -> EnsembleEngine | None:
     """Load all signal caches from disk and build an EnsembleEngine.
+
+    Args:
+        weights: Optional dict of signal weights (e.g. {"elo": 0.4, "market_odds": 0.3}).
+            Passed to EnsembleEngine for weighted blend. None = uniform fallback.
 
     Returns None if no caches are available (cold start).
     """
@@ -65,52 +69,8 @@ def _build_engine_from_caches() -> EnsembleEngine | None:
         sig = _CacheSignal(name, cache)
         signals.append(sig)
 
-    return EnsembleEngine(signals)
+    return EnsembleEngine(signals, weights=weights)
 
-
-def compute_predictions(
-    teams: dict,
-    groups: dict,
-    bracket: list[dict],
-    played: dict,
-    played_groups: dict,
-) -> tuple[list[BlendedPrediction], dict[str, float], dict[str, float]]:
-    """Build engine, evaluate all matches, return predictions.
-
-    Returns:
-        (predictions_list, match_probs_dict, blend_weights_dict)
-    """
-    engine = _build_engine_from_caches()
-    if engine is None:
-        return [], {}, {}
-
-    elo_ratings = {name: data["elo"] for name, data in teams.items()}
-    groups_data = groups.get("groups", groups) if isinstance(groups, dict) else groups
-
-    all_matches: list[dict] = []
-    for g in groups_data.values():
-        for m in g.get("matches", []):
-            all_matches.append(m)
-    for m in bracket:
-        all_matches.append(m)
-
-    context = PredictionContext(
-        fixtures=all_matches,
-        elo_ratings=elo_ratings,
-        played_results=list(played.values()) + list((played_groups or {}).values()),
-    )
-
-    predictions: list[BlendedPrediction] = []
-    match_probs: dict[str, float] = {}
-    for m in all_matches:
-        mid = m.get("match_id", "")
-        if not mid:
-            continue
-        bp = engine.evaluate(m, context)
-        predictions.append(bp)
-        match_probs[mid] = bp.home_prob
-
-    return predictions, match_probs, dict(engine.weights)
 
 
 def compute_team_strengths_from_predictions(

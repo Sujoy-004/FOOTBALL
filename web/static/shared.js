@@ -6,7 +6,7 @@ const competitions = {
     module: "wc",
     route: "/worldcup",
     apiPrefix: "/worldcup/api",
-    tabs: ["Dashboard", "Bracket", "Standings", "Terminal"],
+    tabs: ["Terminal", "Overview", "Bracket", "Standings"],
   },
   ucl: {
     label: "UCL 2025/26",
@@ -14,7 +14,7 @@ const competitions = {
     module: "ucl",
     route: "/ucl",
     apiPrefix: "/ucl/api",
-    tabs: ["Overview", "League Table", "Bracket", "Odds", "Signals", "Terminal"],
+    tabs: ["Terminal", "Overview", "League Table", "Bracket", "Odds", "Signals"],
   },
   euro: {
     label: "Euro 2028",
@@ -62,6 +62,7 @@ document.addEventListener("click", e => {
 // ── Landing Page ──
 function renderLanding() {
   currentCompetition = null;
+  document.body.className = "";
   document.getElementById("landingBackdrop").classList.add("show");
 
   renderNavBar(null);
@@ -188,6 +189,7 @@ async function loadCompetition(slug) {
   const comp = competitions[slug];
   if (!comp) { renderLanding(); return; }
   document.getElementById("landingBackdrop").classList.remove("show");
+  document.body.className = "competition-" + slug;
   currentCompetition = comp;
 
   renderNavBar(slug);
@@ -214,7 +216,9 @@ async function loadCompetition(slug) {
   `;
 
   document.getElementById("statusBar").innerHTML =
-    '<span id="statusLeft"></span><span id="statusRight"></span>';
+    '<span id="statusLeft"></span><span id="statusRight"><button class="drawer-btn" id="drawerToggle">>_</button></span>';
+
+  document.getElementById("drawerToggle").onclick = toggleDrawer;
 
   // Activate first tab
   const firstTab = document.querySelector(".tab-btn");
@@ -222,6 +226,7 @@ async function loadCompetition(slug) {
     firstTab.classList.add("active");
     const firstContent = document.getElementById("tab-" + firstTab.dataset.tab);
     if (firstContent) firstContent.classList.add("active");
+    if (firstTab.dataset.tab === "terminal") focusTermInput();
   }
 
   // Wire tab switching
@@ -269,16 +274,30 @@ let termBooting = false;
 
 function termAdd(text, cls) {
   const termOutput = document.getElementById("termOutput");
-  if (!termOutput) return;
-  const div = document.createElement("div");
-  div.className = "line";
-  if (text) {
-    const span = document.createElement("span");
-    if (cls) span.className = cls;
-    span.innerHTML = text;
-    div.appendChild(span);
+  const drawerOutput = document.getElementById("drawerOutput");
+  if (termOutput) {
+    const div = document.createElement("div");
+    div.className = "line";
+    if (text) {
+      const span = document.createElement("span");
+      if (cls) span.className = cls;
+      span.innerHTML = text;
+      div.appendChild(span);
+    }
+    termOutput.appendChild(div);
   }
-  termOutput.appendChild(div);
+  if (drawerOutput) {
+    const div = document.createElement("div");
+    div.className = "line";
+    if (text) {
+      const span = document.createElement("span");
+      if (cls) span.className = cls;
+      span.innerHTML = text;
+      div.appendChild(span);
+    }
+    drawerOutput.appendChild(div);
+    drawerOutput.scrollTop = drawerOutput.scrollHeight;
+  }
 }
 
 function termScroll() {
@@ -290,6 +309,37 @@ function focusTermInput() {
   const inp = document.getElementById("terminal-input");
   if (inp) inp.focus();
 }
+
+function toggleDrawer() {
+  const drawer = document.getElementById("terminalDrawer");
+  if (!drawer) return;
+  drawer.classList.toggle("open");
+  const btn = document.querySelector(".drawer-btn");
+  if (drawer.classList.contains("open")) {
+    if (btn) btn.classList.add("active");
+    focusTermInput();
+    const drawerOutput = document.getElementById("drawerOutput");
+    if (drawerOutput) drawerOutput.scrollTop = drawerOutput.scrollHeight;
+  } else {
+    if (btn) btn.classList.remove("active");
+  }
+}
+
+function closeDrawer() {
+  const drawer = document.getElementById("terminalDrawer");
+  if (drawer) drawer.classList.remove("open");
+}
+
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey && e.key === "`") {
+    e.preventDefault();
+    toggleDrawer();
+  }
+});
+
+document.addEventListener("click", e => {
+  if (e.target.id === "drawerClose") closeDrawer();
+});
 
 function termShowPrompt() {
   const line = document.getElementById("termInputLine");
@@ -350,7 +400,12 @@ function wireTerminal(onExec) {
   inp.addEventListener("keydown", e => {
     if (termBooting) { e.preventDefault(); return; }
     const display = document.getElementById("termInputDisplay");
+    const drawerDisplay = document.getElementById("drawerInputDisplay");
     const cursor = document.querySelector(".term-cursor");
+    function syncDisplay() {
+      if (display) display.textContent = termBuffer;
+      if (drawerDisplay) drawerDisplay.textContent = termBuffer;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       const cmd = termBuffer;
@@ -358,23 +413,24 @@ function wireTerminal(onExec) {
       termHistory.push(cmd);
       termHistoryIdx = termHistory.length;
       if (display) display.textContent = "";
+      if (drawerDisplay) drawerDisplay.textContent = "";
       if (cursor) cursor.style.display = "none";
       if (termInputHandler) termInputHandler(cmd);
     } else if (e.key === "Backspace") {
       termBuffer = termBuffer.slice(0, -1);
-      if (display) display.textContent = termBuffer;
+      syncDisplay();
     } else if (e.key === "ArrowUp") {
       if (!termHistory.length) return;
       termHistoryIdx = Math.max(0, termHistoryIdx - 1);
       termBuffer = termHistory[termHistoryIdx] || "";
-      if (display) display.textContent = termBuffer;
+      syncDisplay();
     } else if (e.key === "ArrowDown") {
       termHistoryIdx = Math.min(termHistory.length, termHistoryIdx + 1);
       termBuffer = termHistoryIdx >= termHistory.length ? "" : termHistory[termHistoryIdx] || "";
-      if (display) display.textContent = termBuffer;
+      syncDisplay();
     } else if (e.key.length === 1) {
       termBuffer += e.key;
-      if (display) display.textContent = termBuffer;
+      syncDisplay();
     }
   });
 }
@@ -432,7 +488,250 @@ function updateStatusBar(left, right) {
   const leftEl = document.getElementById("statusLeft");
   const rightEl = document.getElementById("statusRight");
   if (leftEl) leftEl.innerHTML = left;
-  if (rightEl) rightEl.innerHTML = right;
+  if (rightEl) {
+    if (right) rightEl.innerHTML = right;
+    const btn = document.createElement("button");
+    btn.className = "drawer-btn";
+    btn.textContent = ">_";
+    btn.onclick = toggleDrawer;
+    rightEl.appendChild(btn);
+  }
+}
+
+// ── Shared Simulation Popup ──
+let _simOverlay = null;
+let _simPolling = false;
+
+function createSimPopup() {
+  if (_simOverlay) return _simOverlay;
+  const overlay = document.createElement("div");
+  overlay.id = "simPopupOverlay";
+  overlay.className = "sim-popup-overlay";
+  overlay.innerHTML = `
+    <div class="sim-popup">
+      <h3>Simulate Tournament</h3>
+      <p>Number of Monte Carlo iterations:</p>
+      <div class="sim-presets" id="simPresets">
+        <button data-iters="10000">10K</button>
+        <button data-iters="50000" class="active">50K</button>
+        <button data-iters="100000">100K</button>
+        <button data-iters="500000">500K</button>
+      </div>
+      <input type="number" id="simCustomIters" value="50000" min="1000" max="500000">
+      <div class="sim-actions">
+        <button id="simCancelBtn">Cancel</button>
+        <button id="simStartBtn">&#9654; Start</button>
+      </div>
+      <div id="simProgressWrap" class="progress-bar-wrap" style="display:none;margin-top:10px">
+        <div class="progress-bar-fill" id="simProgressFill" style="width:0%"></div>
+      </div>
+      <div class="progress-lbl" id="simProgressLbl" style="display:none"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelectorAll(".sim-presets button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      overlay.querySelectorAll(".sim-presets button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("simCustomIters").value = btn.dataset.iters;
+    });
+  });
+  document.getElementById("simCancelBtn").addEventListener("click", () => overlay.classList.remove("show"));
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.classList.remove("show"); });
+  _simOverlay = overlay;
+  return overlay;
+}
+
+function showSimPopup(apiPrefix, opts = {}) {
+  const overlay = createSimPopup();
+  overlay.classList.add("show");
+  document.getElementById("simStartBtn").onclick = () =>
+    _startSim(apiPrefix, opts.onComplete, opts.bodyBuilder || (iters => ({ iterations: iters })));
+}
+
+async function _startSim(apiPrefix, onComplete, bodyBuilder) {
+  if (_simPolling) return;
+  _simPolling = true;
+  const iters = parseInt(document.getElementById("simCustomIters").value) || 50000;
+  const startBtn = document.getElementById("simStartBtn");
+  const cancelBtn = document.getElementById("simCancelBtn");
+  const progressWrap = document.getElementById("simProgressWrap");
+  const progressFill = document.getElementById("simProgressFill");
+  const progressLbl = document.getElementById("simProgressLbl");
+  startBtn.disabled = true;
+  cancelBtn.style.display = "none";
+  progressWrap.style.display = "block";
+  progressLbl.style.display = "block";
+  progressFill.style.width = "0%";
+  progressLbl.textContent = "Starting simulation...";
+  try {
+    const resp = await (await fetch(apiPrefix + "/simulate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bodyBuilder(iters)),
+    })).json();
+    if (resp.error) throw new Error(resp.error);
+    const taskId = resp.task_id;
+    const t0 = Date.now();
+    await new Promise((resolve, reject) => {
+      const poll = setInterval(async () => {
+        try {
+          const p = await (await fetch(apiPrefix + "/simulation/progress/" + taskId)).json();
+          if (p.error) { clearInterval(poll); reject(new Error(p.error)); return; }
+          progressFill.style.width = p.progress + "%";
+          const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
+          let label = p.stage || "Simulating...";
+          if (p.total_iterations > 0) label += "  " + (p.iteration || 0).toLocaleString() + "/" + p.total_iterations.toLocaleString();
+          label += "  (" + p.progress.toFixed(0) + "%)  " + elapsed + "s";
+          if (p.elapsed) label += "  ETA: " + Math.max(0, Math.round(p.elapsed * ((100 - p.progress) / Math.max(p.progress, 1)))) + "s";
+          progressLbl.textContent = label;
+          if (p.status === "complete") { clearInterval(poll); resolve(); }
+          if (p.status === "error") { clearInterval(poll); reject(new Error(p.error || "simulation failed")); }
+        } catch (e) { clearInterval(poll); reject(e); }
+      }, 200);
+    });
+    document.getElementById("simPopupOverlay").classList.remove("show");
+    progressWrap.style.display = "none";
+    progressLbl.style.display = "none";
+    _simPolling = false;
+    if (onComplete) onComplete(iters);
+  } catch (e) {
+    progressLbl.textContent = "Error: " + (e.message || "unknown");
+    startBtn.disabled = false;
+    cancelBtn.style.display = "";
+    _simPolling = false;
+  }
+}
+
+// ── Terminal Simulation Runner ──
+async function termRunSimulation(apiPrefix, iterations, onComplete) {
+  const displayPfx = '<span class="highlight">Simulate</span> ';
+  termAdd(displayPfx + 'Starting simulation with ' + iterations.toLocaleString() + ' iterations...');
+  termScroll();
+  try {
+    const resp = await (await fetch(apiPrefix + "/simulate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ iterations }),
+    })).json();
+    if (resp.error) { termAdd(displayPfx + '<span class="danger">Error: ' + resp.error + '</span>'); termShowPrompt(); return; }
+    const taskId = resp.task_id;
+    const t0 = Date.now();
+    const progressLineId = "prog-" + taskId;
+    termAdd('<span id="' + progressLineId + '">' + displayPfx + PROGRESS_SPINNER_FRAMES[0] + ' queued...</span>');
+    termScroll();
+    await termProgressLoop(apiPrefix, taskId, progressLineId, displayPfx, t0,
+      p => (p.iteration || 0).toLocaleString() + '/' + (p.total_iterations || iterations).toLocaleString());
+    const line = document.getElementById(progressLineId);
+    if (line) line.innerHTML = displayPfx + '<span class="ok">' + renderProgressBar(100) + ' 100%</span> <span class="dim">(' + ((Date.now() - t0) / 1000).toFixed(1) + 's)</span>';
+    termScroll();
+    if (onComplete) await onComplete();
+  } catch (e) {
+    termAdd(displayPfx + '<span class="danger">Error: ' + (e.message || "unknown") + '</span>');
+  }
+  termShowPrompt();
+}
+
+async function termRunCalibration(apiPrefix) {
+  const displayPfx = '<span class="highlight">Calibrate</span> ';
+  termAdd(displayPfx + 'Starting calibration...');
+  termScroll();
+  try {
+    const resp = await (await fetch(apiPrefix + "/calibrate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+    })).json();
+    if (resp.error) { termAdd(displayPfx + '<span class="danger">Error: ' + resp.error + '</span>'); termShowPrompt(); return; }
+    const taskId = resp.task_id;
+    const t0 = Date.now();
+    const progressLineId = "prog-" + taskId;
+    termAdd('<span id="' + progressLineId + '">' + displayPfx + PROGRESS_SPINNER_FRAMES[0] + ' queued...</span>');
+    termScroll();
+    await termProgressLoop(apiPrefix, taskId, progressLineId, displayPfx, t0, "");
+    const line = document.getElementById(progressLineId);
+    if (line) line.innerHTML = displayPfx + '<span class="ok">' + renderProgressBar(100) + ' 100%</span> <span class="dim">(' + ((Date.now() - t0) / 1000).toFixed(1) + 's)</span>';
+    termAdd(displayPfx + '<span class="ok">Calibration complete.</span>');
+    termScroll();
+  } catch (e) {
+    termAdd(displayPfx + '<span class="danger">Error: ' + (e.message || "unknown") + '</span>');
+  }
+  termShowPrompt();
+}
+
+// ── Inline Progress Bar Utilities (C5) ──
+
+const PROGRESS_SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+function renderProgressBar(pct, width = 20) {
+  pct = Math.max(0, Math.min(100, pct || 0));
+  const filled = Math.round((pct / 100) * width);
+  const head = filled < width ? 1 : 0;
+  const eq = Math.max(0, filled - head);
+  const sp = Math.max(0, width - eq - head);
+  return '[' + '='.repeat(eq) + '>'.repeat(head) + ' '.repeat(sp) + ']';
+}
+
+async function termRenderProgress(lineId, pct, elapsed, extra = "") {
+  const el = document.getElementById(lineId);
+  if (!el) return;
+  const bar = renderProgressBar(pct);
+  const label = bar + ' ' + pct.toFixed(0) + '%' + (extra ? '  ' + extra : '');
+  el.innerHTML = label + '  <span class="dim">' + elapsed + 's</span>';
+}
+
+async function termProgressLoop(apiPrefix, taskId, progressLineId, displayPfx, t0, extras) {
+  return new Promise((resolve, reject) => {
+    const spinner = { i: 0 };
+    const spinInt = setInterval(() => {
+      const el = document.getElementById(progressLineId);
+      if (el) el.innerHTML = displayPfx + PROGRESS_SPINNER_FRAMES[spinner.i % PROGRESS_SPINNER_FRAMES.length] + ' working...';
+      spinner.i++;
+    }, 120);
+    const poll = setInterval(async () => {
+      try {
+        const p = await (await fetch(apiPrefix + "/simulation/progress/" + taskId)).json();
+        if (p.error) { clearInterval(poll); clearInterval(spinInt); reject(new Error(p.error)); return; }
+        const pct = p.progress || 0;
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        const extra = typeof extras === "function" ? extras(p) : extras;
+        clearInterval(spinInt);
+        await termRenderProgress(progressLineId, pct, elapsed, extra);
+        if (p.status === "complete") { clearInterval(poll); resolve(); }
+        if (p.status === "error") { clearInterval(poll); reject(new Error(p.error || "task failed")); }
+      } catch (e) { clearInterval(poll); clearInterval(spinInt); reject(e); }
+    }, 300);
+  });
+}
+
+// ── Sparkline Renderer (C6) ──
+const SPARKLINE_CHARS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+
+function renderSparkline(val) {
+  val = Math.max(0, Math.min(1, val || 0));
+  const idx = Math.min(SPARKLINE_CHARS.length - 1, Math.floor(val * SPARKLINE_CHARS.length));
+  return '<span class="spark">' + SPARKLINE_CHARS[idx] + '</span>';
+}
+
+// ── Terminal Spinner for One-Shot API Calls (C6) ──
+async function termRunWithSpinner(displayPfx, apiCall, onSuccess) {
+  const lineId = "spin-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+  const idx = { i: 0 };
+  termAdd('<span id="' + lineId + '">' + displayPfx + ' ' + PROGRESS_SPINNER_FRAMES[0] + '</span>');
+  termScroll();
+  const int = setInterval(() => {
+    const el = document.getElementById(lineId);
+    if (el) el.innerHTML = displayPfx + ' ' + PROGRESS_SPINNER_FRAMES[idx.i % PROGRESS_SPINNER_FRAMES.length];
+    idx.i++;
+  }, 100);
+  try {
+    const result = await apiCall();
+    clearInterval(int);
+    const el = document.getElementById(lineId);
+    if (el) el.innerHTML = displayPfx + ' <span class="ok">\u2713</span>';
+    if (onSuccess) await onSuccess(result);
+    return result;
+  } catch (e) {
+    clearInterval(int);
+    const el = document.getElementById(lineId);
+    if (el) el.innerHTML = displayPfx + ' <span class="danger">\u2717</span> <span class="dim">' + e.message + '</span>';
+  }
 }
 
 // ── Exports ──
@@ -451,4 +750,15 @@ export {
   drawBracketConnectors,
   updateStatusBar,
   focusTermInput,
+  toggleDrawer,
+  closeDrawer,
+  termRunSimulation,
+  termRunCalibration,
+  renderProgressBar,
+  termRenderProgress,
+  termProgressLoop,
+  renderSparkline,
+  termRunWithSpinner,
+  createSimPopup,
+  showSimPopup,
 };
