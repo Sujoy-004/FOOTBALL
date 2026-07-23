@@ -8,11 +8,14 @@ Phase 16 — three-version approach (D-01):
 All functions are pure (no I/O). State persistence is handled in state.py.
 """
 
+import logging
 import math
 from datetime import datetime, timezone
 from pathlib import Path
 
 from src.evaluation import brier_score
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_version_number(version_str: str, prefix: str) -> int:
@@ -362,7 +365,7 @@ def _run_governance(
                     f"Best: {best_sig} Brier={best_brier:.4f}"
                 )
         except Exception as e:
-            print(f"Backtest failed: {e}", file=sys.stderr)
+            logger.error("Backtest failed: %s", e)
             backtest_summary = None
 
     # 1. Deduplicate entries
@@ -480,19 +483,13 @@ def _run_backtest(
     for tournament in GOV_BACKTEST_TOURNAMENTS:
         file_path = historical_dir / f"{tournament}.json"
         if not file_path.exists():
-            print(
-                f"Backtest: {tournament} data not found at {file_path}",
-                file=sys.stderr,
-            )
+            logger.warning("Backtest: %s data not found at %s", tournament, file_path)
             continue
         try:
             with open(file_path, encoding="utf-8") as f:
                 matches: list[dict] = json.load(f)
         except (json.JSONDecodeError, OSError) as e:
-            print(
-                f"Backtest: failed to load {tournament} data: {e}",
-                file=sys.stderr,
-            )
+            logger.warning("Backtest: failed to load %s data: %s", tournament, e)
             continue
 
         report = backtest_tournament(matches, teams, tournament_name=tournament)
@@ -561,13 +558,12 @@ def _run_backtest(
 
     # Print backtest summary line
     if best_signal:
-        print(
-            f"Backtest: {', '.join(tournaments)} — "
-            f"{n_total_matches} matches, "
-            f"best signal: {best_signal} "
-            f"(Brier={aggregate_per_signal[best_signal]['brier']:.4f})"
+        logger.info(
+            "Backtest: %s — %s matches, best signal: %s (Brier=%.4f)",
+            ', '.join(tournaments), n_total_matches, best_signal,
+            aggregate_per_signal[best_signal]['brier'],
         )
     else:
-        print(f"Backtest: {', '.join(tournaments)} — {n_total_matches} matches")
+        logger.info("Backtest: %s — %s matches", ', '.join(tournaments), n_total_matches)
 
     return aggregate_report

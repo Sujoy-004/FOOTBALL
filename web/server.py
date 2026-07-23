@@ -4,9 +4,12 @@ Mounts competition sub-apps under /worldcup and /ucl.
 Serves the SPA shell from /static and the landing page at /.
 """
 
+import logging
 import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 mimetypes.add_type('image/webp', '.webp')
 
@@ -49,11 +52,12 @@ STATIC_DIR = HERE / "static"
 async def lifespan(app: fastapi.FastAPI):
     import web.wc_app as _wc
     import web.ucl_app as _ucl
-    _wc.cache = _wc.compute_or_load()
+    _wc._fetch_live_data()
+    _wc.cache = _wc.compute_overview()
     try:
-        _ucl.cache = _ucl.compute_all()
+        _ucl.cache = _ucl.deterministic_compute()
     except Exception as e:
-        print(f"[UCL] compute_all failed: {e}")
+        logger.error("[UCL] deterministic_compute failed: %s", e)
         _ucl.cache = {}
     yield
 
