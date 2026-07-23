@@ -156,7 +156,7 @@ PREDICTION_HISTORY_SCHEMA_VERSION: int = 2
 
 PROBABILITY_LOG_FILE: str = "probability_log.json"
 """Filename for rolling probability log in data/ directory (Phase 20).
-Array of snapshot dicts appended after every _run_iteration(). Never pruned."""
+Array of snapshot dicts appended after every run_poll_cycle(). Never pruned."""
 
 # ─── Blender Constants (Phase 14) ──────────────────────────────────────────
 

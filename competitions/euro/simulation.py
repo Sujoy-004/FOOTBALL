@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from football_core import constants
 from football_core.elo import expected_score
-from src.groups import (
+from competitions.worldcup.src.groups import (
     compute_standings,
     precompute_matchup_lambdas,
     rank_third_placed,

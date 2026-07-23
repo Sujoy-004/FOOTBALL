@@ -3,7 +3,7 @@
 Tests run_validation() with synthetic match data and Elo-based predictions.
 """
 
-from competitions.ucl.main import run_validation
+from competitions.ucl.src.orchestrator import run_validation
 from competitions.ucl.result import SimulationResult
 from football_core.elo import expected_score
 

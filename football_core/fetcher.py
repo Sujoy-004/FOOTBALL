@@ -24,7 +24,7 @@ def fetch_raw_matches(api_key: str, api_url: str, league_id: int, timeout: int =
             resp = requests.get(api_url, headers=headers, timeout=timeout)
 
             if resp.status_code == 401:
-                logger.warning("HTTP 401 (invalid API key), returning []")
+                logger.debug("HTTP 401 (invalid API key), returning []")
                 return []
 
             resp.raise_for_status()
@@ -47,28 +47,28 @@ def fetch_raw_matches(api_key: str, api_url: str, league_id: int, timeout: int =
             return all_events
 
         except requests.exceptions.Timeout:
-            logger.warning("Request timed out (attempt %d/3)", attempt + 1)
+            logger.debug("Request timed out (attempt %d/3)", attempt + 1)
             if attempt < 2:
                 time.sleep(backoff_seconds[attempt])
                 continue
             return []
 
         except requests.exceptions.ConnectionError:
-            logger.warning("Connection error (attempt %d/3)", attempt + 1)
+            logger.debug("Connection error (attempt %d/3)", attempt + 1)
             if attempt < 2:
                 time.sleep(backoff_seconds[attempt])
                 continue
             return []
 
         except requests.exceptions.HTTPError:
-            logger.warning("HTTP error (attempt %d/3)", attempt + 1)
+            logger.debug("HTTP error (attempt %d/3)", attempt + 1)
             if attempt < 2:
                 time.sleep(backoff_seconds[attempt])
                 continue
             return []
 
         except (json.JSONDecodeError, requests.exceptions.JSONDecodeError):
-            logger.warning("Malformed JSON response, returning []")
+            logger.debug("Malformed JSON response, returning []")
             return []
 
     return []
@@ -99,12 +99,12 @@ def process_matches(
         away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
-            logger.warning("Unmatchable team names: home=%r, away=%r", home_name, away_name)
+            logger.debug("Unmatchable team names: home=%r, away=%r", home_name, away_name)
             continue
 
         bracket_id = find_bracket_match(home_norm, away_norm, bracket)
         if bracket_id is None:
-            logger.warning("No bracket match found for %s vs %s", home_norm, away_norm)
+            logger.debug("No bracket match found for %s vs %s", home_norm, away_norm)
             continue
 
         home_score = match.get("home_score", 0)
@@ -243,7 +243,7 @@ def process_group_matches(
 
         group_letter = _extract_group_letter(group_name)
         if group_letter is None:
-            logger.warning("Invalid group_name: %r", group_name)
+            logger.debug("Invalid group_name: %r", group_name)
             continue
 
         home_name = match.get("home_team", "")
@@ -252,7 +252,7 @@ def process_group_matches(
         away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
-            logger.warning(
+            logger.debug(
                 "Unmatchable team names: home=%r, away=%r", home_name, away_name
             )
             continue
@@ -262,7 +262,7 @@ def process_group_matches(
             home_norm, away_norm, group_letter, round_number, groups
         )
         if match_id is None:
-            logger.warning(
+            logger.debug(
                 "No group match found for %s vs %s in group %s (round %d)",
                 home_norm, away_norm, group_letter, round_number,
             )

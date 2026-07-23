@@ -14,8 +14,8 @@ from football_core.groups import (
     _tiebreak_group,
 )
 
-from src import constants
-from src.constants import MAX_EXPECTED_GOALS, HOME_ADVANTAGE_MULTIPLIER
+from competitions.worldcup.src import constants
+from competitions.worldcup.src.constants import MAX_EXPECTED_GOALS, HOME_ADVANTAGE_MULTIPLIER
 
 
 def compute_standings(

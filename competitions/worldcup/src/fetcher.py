@@ -58,12 +58,12 @@ def process_matches(
         away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
-            logger.warning("Unmatchable team names: home=%r, away=%r", home_name, away_name)
+            logger.debug("Unmatchable team names: home=%r, away=%r", home_name, away_name)
             continue
 
         bracket_id = find_bracket_match(home_norm, away_norm, bracket)
         if bracket_id is None:
-            logger.warning("No bracket match found for %s vs %s", home_norm, away_norm)
+            logger.debug("No bracket match found for %s vs %s", home_norm, away_norm)
             continue
         if bracket_id in played_ids:
             continue
@@ -173,7 +173,7 @@ def process_group_matches(
 
         group_letter = _extract_group_letter(group_name)
         if group_letter is None:
-            logger.warning("Invalid group_name: %r", group_name)
+            logger.debug("Invalid group_name: %r", group_name)
             continue
 
         home_name = match.get("home_team", "")
@@ -182,7 +182,7 @@ def process_group_matches(
         away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
-            logger.warning(
+            logger.debug(
                 "Unmatchable team names: home=%r, away=%r", home_name, away_name
             )
             continue
@@ -192,7 +192,7 @@ def process_group_matches(
             home_norm, away_norm, group_letter, round_number, groups
         )
         if match_id is None:
-            logger.warning(
+            logger.debug(
                 "No group match found for %s vs %s in group %s (round %d)",
                 home_norm, away_norm, group_letter, round_number,
             )

@@ -9,3 +9,7 @@ if _repo_root not in sys.path:
 _pkg_dir = str(Path(__file__).resolve().parent)
 if _pkg_dir not in sys.path:
     sys.path.insert(0, _pkg_dir)
+
+_src_dir = str(Path(__file__).resolve().parent / "src")
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)

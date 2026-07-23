@@ -191,7 +191,7 @@ class TestComputeKFactor:
 
 
 class TestDrawBackfill:
-    """Tests for historical draw backfill logic in main._run_draw_backfill.
+    """Tests for historical draw backfill logic in engine.draw_backfill.
 
     All tests monkeypatch state.save_teams/save_elo_applied/save_elo_update_log
     to prevent modification of production data files in data/.
@@ -199,66 +199,66 @@ class TestDrawBackfill:
 
     @pytest.fixture(autouse=True)
     def _mock_saves(self, monkeypatch):
-        """Prevent all _run_draw_backfill tests from writing to production data/."""
-        monkeypatch.setattr("main.state.save_teams", lambda *a, **kw: None)
-        monkeypatch.setattr("main.state.save_elo_applied", lambda *a, **kw: None)
-        monkeypatch.setattr("main.state.save_elo_update_log", lambda *a, **kw: None)
+        """Prevent all draw_backfill tests from writing to production data/."""
+        monkeypatch.setattr("competitions.worldcup.src.state.save_teams", lambda *a, **kw: None)
+        monkeypatch.setattr("competitions.worldcup.src.state.save_elo_applied", lambda *a, **kw: None)
+        monkeypatch.setattr("competitions.worldcup.src.state.save_elo_update_log", lambda *a, **kw: None)
 
     def test_backfill_detects_draw_candidates(self):
         """Scans played for h==a matches not in elo_applied."""
-        from main import _run_draw_backfill
+        from competitions.worldcup.src.engine import draw_backfill
         teams = {"A": {"elo": 2000}, "B": {"elo": 1900}}
         played = {"M01": {"match_id": "M01", "team_a": "A", "team_b": "B",
                           "winner": None, "home_score": 1, "away_score": 1,
                           "completed_at": "2026-06-15T20:00:00Z"}}
         elo_applied = set()
-        result = _run_draw_backfill(teams, played, {}, elo_applied)
+        result, _n = draw_backfill(teams, played, {}, elo_applied)
         assert "M01" in result
 
     def test_backfill_skips_already_applied(self):
         """Match already in elo_applied is not re-processed."""
-        from main import _run_draw_backfill
+        from competitions.worldcup.src.engine import draw_backfill
         teams = {"A": {"elo": 2000}, "B": {"elo": 1900}}
         played = {"M01": {"match_id": "M01", "team_a": "A", "team_b": "B",
                           "winner": None, "home_score": 1, "away_score": 1,
                           "completed_at": "2026-06-15T20:00:00Z"}}
         elo_applied = {"M01"}
         before = teams["A"]["elo"]
-        _run_draw_backfill(teams, played, {}, elo_applied)
+        draw_backfill(teams, played, {}, elo_applied)
         assert teams["A"]["elo"] == before
 
     def test_backfill_skips_non_draws(self):
         """Non-draw matches (h != a) are skipped."""
-        from main import _run_draw_backfill
+        from competitions.worldcup.src.engine import draw_backfill
         teams = {"A": {"elo": 2000}, "B": {"elo": 1900}}
         played = {"M01": {"match_id": "M01", "team_a": "A", "team_b": "B",
                           "winner": "A", "home_score": 3, "away_score": 1,
                           "completed_at": "2026-06-15T20:00:00Z"}}
         elo_applied = set()
-        result = _run_draw_backfill(teams, played, {}, elo_applied)
+        result, _n = draw_backfill(teams, played, {}, elo_applied)
         assert "M01" not in result
 
     def test_backfill_draws_from_played_groups(self):
         """Draws in played_groups are also backfilled."""
-        from main import _run_draw_backfill
+        from competitions.worldcup.src.engine import draw_backfill
         teams = {"A": {"elo": 2000}, "B": {"elo": 1900}}
         played_groups = {"GS_A_01": {"match_id": "GS_A_01", "team_a": "A",
                           "team_b": "B", "winner": None, "home_score": 2,
                           "away_score": 2, "completed_at": "2026-06-14T20:00:00Z"}}
         elo_applied = set()
-        result = _run_draw_backfill(teams, {}, played_groups, elo_applied)
+        result, _n = draw_backfill(teams, {}, played_groups, elo_applied)
         assert "GS_A_01" in result
         assert teams["A"]["elo"] != 2000
 
     def test_backfill_applies_elo_change(self):
         """Backfilled draw changes Elo for both teams."""
-        from main import _run_draw_backfill
+        from competitions.worldcup.src.engine import draw_backfill
         teams = {"A": {"elo": 2000}, "B": {"elo": 1900}}
         played = {"M01": {"match_id": "M01", "team_a": "A", "team_b": "B",
                           "winner": None, "home_score": 1, "away_score": 1,
                           "completed_at": "2026-06-15T20:00:00Z"}}
         elo_applied = set()
-        _run_draw_backfill(teams, played, {}, elo_applied)
+        draw_backfill(teams, played, {}, elo_applied)
         # Draw when A is favored: A should lose Elo, B should gain
         assert teams["A"]["elo"] < 2000
         assert teams["B"]["elo"] > 1900
@@ -267,7 +267,7 @@ class TestDrawBackfill:
         """Backfilled draw logs change to elo_update_log.json."""
         import json
         from pathlib import Path
-        from main import _run_draw_backfill
+        from competitions.worldcup.src.engine import draw_backfill
         from src import constants, state
 
         # Save original log
@@ -293,7 +293,7 @@ class TestDrawBackfill:
         monkeypatch.setattr(state, "save_teams", lambda *a, **kw: None)
         monkeypatch.setattr(state, "save_elo_applied", lambda *a, **kw: None)
 
-        _run_draw_backfill(teams, played, {}, elo_applied)
+        draw_backfill(teams, played, {}, elo_applied)
 
         assert saved_log is not None
         assert len(saved_log) >= 2  # 2 teams updated

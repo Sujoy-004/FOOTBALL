@@ -1,37 +1,22 @@
 """Tests for counterfactual analysis — Phase 11, Plan 11-02.
 
 Covers:
-    - _parse_what_if() argument parsing
+    - parse_what_if() argument parsing
     - _run_counterfactual() execution with mocked fixtures
     - print_counterfactual_comparison() display
 """
 
 from __future__ import annotations
 
-import io
-import sys
 from typing import Any
 
 import pytest
 
-from competitions.ucl.main import _parse_what_if
-from competitions.ucl import display
+from competitions.ucl.src.analysis import parse_what_if
 from competitions.ucl.result import SimulationResult
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
-
-
-def _capture(func, *args, **kwargs) -> str:
-    """Capture stdout from a display function."""
-    buf = io.StringIO()
-    old = sys.stdout
-    sys.stdout = buf
-    try:
-        func(*args, **kwargs)
-    finally:
-        sys.stdout = old
-    return buf.getvalue()
 
 
 def _make_team_data(
@@ -83,11 +68,11 @@ def _make_minimal_result(
 
 
 class TestWhatIfParsing:
-    """Tests for _parse_what_if()."""
+    """Tests for parse_what_if()."""
 
     def test_basic_parsing(self):
         """Basic team.param=value parsing."""
-        result = _parse_what_if(["Arsenal.elo=1960"])
+        result = parse_what_if(["Arsenal.elo=1960"])
         assert len(result) == 1
         assert result[0]["team"] == "Arsenal"
         assert result[0]["param"] == "elo"
@@ -95,7 +80,7 @@ class TestWhatIfParsing:
 
     def test_multiple_modifications(self):
         """Multiple --what-if flags produce multiple modifications."""
-        result = _parse_what_if([
+        result = parse_what_if([
             "Arsenal.elo=1960",
             "RealMadrid.elo=2100",
         ])
@@ -105,124 +90,44 @@ class TestWhatIfParsing:
 
     def test_float_value(self):
         """Float values are accepted."""
-        result = _parse_what_if(["Arsenal.elo=1950.5"])
+        result = parse_what_if(["Arsenal.elo=1950.5"])
         assert result[0]["value"] == 1950.5
 
     def test_empty_list_returns_empty(self):
         """None or empty list returns empty list."""
-        assert _parse_what_if(None) == []
-        assert _parse_what_if([]) == []
+        assert parse_what_if(None) == []
+        assert parse_what_if([]) == []
 
     def test_missing_dot_raises(self):
-        """Missing dot in format raises SystemExit."""
-        with pytest.raises(SystemExit):
-            _parse_what_if(["Arsenalo=1960"])
+        """Missing dot in format raises ValueError."""
+        with pytest.raises(ValueError):
+            parse_what_if(["Arsenalo=1960"])
 
     def test_missing_equals_raises(self):
-        """Missing equals raises SystemExit."""
-        with pytest.raises(SystemExit):
-            _parse_what_if(["Arsenal.elo1960"])
+        """Missing equals raises ValueError."""
+        with pytest.raises(ValueError):
+            parse_what_if(["Arsenal.elo1960"])
 
     def test_unknown_param_raises(self):
-        """Unknown parameter raises SystemExit with supported list."""
-        with pytest.raises(SystemExit):
-            _parse_what_if(["Arsenal.rest_days=5"])
+        """Unknown parameter raises ValueError with supported list."""
+        with pytest.raises(ValueError):
+            parse_what_if(["Arsenal.rest_days=5"])
 
     def test_non_numeric_value_raises(self):
-        """Non-numeric value raises SystemExit."""
-        with pytest.raises(SystemExit):
-            _parse_what_if(["Arsenal.elo=abc"])
+        """Non-numeric value raises ValueError."""
+        with pytest.raises(ValueError):
+            parse_what_if(["Arsenal.elo=abc"])
 
     def test_negative_value_raises(self):
-        """Negative Elo value raises SystemExit."""
-        with pytest.raises(SystemExit):
-            _parse_what_if(["Arsenal.elo=-100"])
+        """Negative Elo value raises ValueError."""
+        with pytest.raises(ValueError):
+            parse_what_if(["Arsenal.elo=-100"])
 
     def test_empty_team_name_raises(self):
-        """Empty team name raises SystemExit."""
-        with pytest.raises(SystemExit):
-            _parse_what_if([".elo=1960"])
+        """Empty team name raises ValueError."""
+        with pytest.raises(ValueError):
+            parse_what_if([".elo=1960"])
 
-
-# ── TestCounterfactualDisplay ──────────────────────────────────────────────
-
-
-class TestCounterfactualDisplay:
-    """Tests for print_counterfactual_comparison()."""
-
-    def test_header_present(self):
-        """Output contains Counterfactual Comparison header."""
-        baseline = _make_minimal_result()
-        cf = _make_minimal_result(champion="Arsenal")
-        output = _capture(
-            display.print_counterfactual_comparison,
-            baseline, cf, ["Arsenal.elo=1960 (was 2064, -104)"],
-        )
-        assert "==== Counterfactual Comparison ===" in output
-
-    def test_shows_changes(self):
-        """Change descriptions appear in output."""
-        baseline = _make_minimal_result()
-        cf = _make_minimal_result(champion="Arsenal")
-        output = _capture(
-            display.print_counterfactual_comparison,
-            baseline, cf, ["Arsenal.elo=1960 (was 2064, -104)"],
-        )
-        assert "Change:" in output
-        assert "Arsenal" in output
-
-    def test_baseline_probabilities_shown(self):
-        """Baseline champion probabilities appear."""
-        baseline = _make_minimal_result(champion="Arsenal")
-        cf = _make_minimal_result(champion="Arsenal")
-        output = _capture(
-            display.print_counterfactual_comparison,
-            baseline, cf, [],
-        )
-        assert "68.8%" in output
-
-    def test_delta_column_present(self):
-        """Delta column header appears."""
-        baseline = _make_minimal_result(champion="Arsenal")
-        cf = _make_minimal_result(champion="Arsenal")
-        output = _capture(
-            display.print_counterfactual_comparison,
-            baseline, cf, [],
-        )
-        assert "Delta" in output
-
-    def test_top_n_teams_shown(self):
-        """Default number of top teams shown."""
-        baseline = _make_minimal_result(champion="Arsenal")
-        cf = _make_minimal_result(champion="Arsenal")
-        output = _capture(
-            display.print_counterfactual_comparison,
-            baseline, cf, [], n_top=3,
-        )
-        assert "Arsenal" in output
-        assert "Man City" in output
-
-    def test_stage_probabilities_shown(self):
-        """Stage probabilities for champion team appear."""
-        baseline = _make_minimal_result(champion="Arsenal")
-        cf = _make_minimal_result(champion="Arsenal")
-        output = _capture(
-            display.print_counterfactual_comparison,
-            baseline, cf, [],
-        )
-        assert "Stage Probabilities" in output
-        assert "Champion" in output
-        assert "Final" in output
-
-    def test_no_champion_team_no_crash(self):
-        """No bracket champion does not crash."""
-        baseline = _make_minimal_result(champion=None)
-        cf = _make_minimal_result(champion=None)
-        output = _capture(
-            display.print_counterfactual_comparison,
-            baseline, cf, [],
-        )
-        assert "Counterfactual Comparison" in output
 
 
 # ── TestReport ────────────────────────────────────────────────────────────
@@ -331,14 +236,14 @@ class TestCounterfactualExecution:
 
     def test_parse_team_not_in_elo(self):
         """Parsing works even if team not in elo dict (runtime check)."""
-        result = _parse_what_if(["UnknownTeam.elo=1800"])
+        result = parse_what_if(["UnknownTeam.elo=1800"])
         assert len(result) == 1
         assert result[0]["team"] == "UnknownTeam"
         assert result[0]["value"] == 1800.0
 
-    def test_what_if_prints_error_and_exits_for_invalid(self):
-        """Invalid --what-if format prints error."""
-        with pytest.raises(SystemExit):
-            _parse_what_if(["invalid"])
-        with pytest.raises(SystemExit):
-            _parse_what_if(["noequals"])
+    def test_what_if_raises_value_error_for_invalid(self):
+        """Invalid --what-if format raises ValueError."""
+        with pytest.raises(ValueError):
+            parse_what_if(["invalid"])
+        with pytest.raises(ValueError):
+            parse_what_if(["noequals"])

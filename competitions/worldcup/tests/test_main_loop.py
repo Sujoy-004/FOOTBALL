@@ -11,7 +11,7 @@ DATA_DIR = MAIN_DIR / "data"
 
 
 class TestHistoricalCatchUp:
-    """Tests for _run_historical_catch_up in main.py."""
+    """Tests for historical_catch_up in engine.py."""
 
     @pytest.fixture
     def full_data(self):
@@ -451,7 +451,7 @@ class TestDrawBackfillIntegration:
 
 
 class TestGatherSignalData:
-    """Tests for _gather_signal_data (display blend logic)."""
+    """Tests for gather_signal_data (blend logic)."""
 
     def _make_cache(self, mid: str, prob: float | None) -> dict:
         return {"matches": {mid: {"probability": prob}}}

@@ -1,7 +1,7 @@
 """Form (Elo-based residual) signal computation.
 
 DEPRECATED — Use football_core.signals.form.RollingFormSignal or the
-EnsembleEngine in main.py:_build_signal_engine() instead.
+EnsembleEngine instead.
 Kept for backward compatibility with legacy refresh_from_api().
 
 Computes a form signal for each match based on the difference in average

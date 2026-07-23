@@ -11,9 +11,7 @@ if _pkg_dir not in sys.path:
     sys.path.insert(0, _pkg_dir)
 
 from competitions.ucl.result import SimulationResult
-from competitions.ucl.main import main
 
 __all__ = [
     "SimulationResult",
-    "main",
 ]

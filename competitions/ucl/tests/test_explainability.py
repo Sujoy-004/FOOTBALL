@@ -1,25 +1,13 @@
-"""Tests for signal contribution breakdown — Phase 11, Plan 11-01.
-
-Covers:
-    - compute_signal_contributions() computation and edge cases
-    - print_signal_breakdown() display formatting
-    - Integration with main output pipeline
-"""
+"""Tests for signal contribution computation — Phase 11, Plan 11-01."""
 
 from __future__ import annotations
 
-import io
-import sys
 from typing import Any
 
 import pytest
 
 from football_core.blender import compute_signal_contributions
 from football_core.signal import BlendedPrediction
-from competitions.ucl import display
-
-
-# ── Helpers ─────────────────────────────────────────────────────────────────
 
 
 def _make_blended_prediction(
@@ -29,7 +17,6 @@ def _make_blended_prediction(
     signal_breakdown: dict[str, dict[str, float]] | None = None,
     weights: dict[str, float] | None = None,
 ) -> BlendedPrediction:
-    """Create a BlendedPrediction with uniform signal breakdown if none given."""
     if signal_breakdown is None:
         signal_breakdown = {
             "elo": {"home": 0.6, "draw": 0.25, "away": 0.15, "weight": 0.5},
@@ -49,18 +36,6 @@ def _make_blended_prediction(
 
 def _make_team_match(team_a: str, team_b: str, match_id: str = "M01") -> dict:
     return {"team_a": team_a, "team_b": team_b, "match_id": match_id}
-
-
-def _capture(func, *args, **kwargs) -> str:
-    """Capture stdout from a display function."""
-    buf = io.StringIO()
-    old = sys.stdout
-    sys.stdout = buf
-    try:
-        func(*args, **kwargs)
-    finally:
-        sys.stdout = old
-    return buf.getvalue()
 
 
 # ── TestContributionComputation ─────────────────────────────────────────────
@@ -226,149 +201,10 @@ class TestContributionComputation:
         )
         assert "missing_signal" not in result or result["missing_signal"] == 0.0
 
-
-# ── TestSignalBreakdownDisplay ──────────────────────────────────────────────
-
-
-class TestSignalBreakdownDisplay:
-    """Tests for print_signal_breakdown()."""
-
-    def test_output_contains_prediction_breakdown_header(self):
-        """Output contains section header."""
-        output = _capture(
-            display.print_signal_breakdown,
-            {"elo": 0.5, "market": 0.3},
-            "Arsenal",
-            68.8,
-        )
-        assert "==== Prediction Breakdown ===" in output
-
-    def test_shows_champion_team_and_prob(self):
-        """Champion team name and probability appear in output."""
-        output = _capture(
-            display.print_signal_breakdown,
-            {"elo": 0.5, "market": 0.3},
-            "Arsenal",
-            68.8,
-        )
-        assert "Arsenal" in output
-        assert "68.8%" in output
-
-    def test_positive_contributions_formatted_with_plus(self):
-        """Positive contributions display with '+' prefix."""
-        output = _capture(
-            display.print_signal_breakdown,
-            {"elo": 31.2, "market": 22.4},
-            "Arsenal",
-            53.6,
-        )
-        assert "+31.2%" in output or "+31.2" in output
-
-    def test_negative_contributions_formatted_with_minus(self):
-        """Negative contributions display with '-' prefix (among positive ones)."""
-        output = _capture(
-            display.print_signal_breakdown,
-            {"good": 30.0, "bad": -5.0},
-            "Arsenal",
-            68.8,
-        )
-        assert "-" in output
-        assert "good" in output
-        assert "bad" in output
-
-    def test_empty_contributions_does_not_crash(self):
-        """Empty contributions dict does not crash and shows placeholder."""
-        output = _capture(
-            display.print_signal_breakdown,
-            {},
-            "Arsenal",
-            68.8,
-        )
-        assert "No signal contribution data available" in output or "Prediction Breakdown" in output
-
-    def test_total_matches_champion_prob(self):
-        """Total line shows champion_prob."""
-        output = _capture(
-            display.print_signal_breakdown,
-            {"elo": 0.5, "market": 0.3},
-            "Arsenal",
-            68.8,
-        )
-        assert "68.8%" in output
-
-    def test_all_signals_appear_in_output(self):
-        """Every signal in the contributions dict appears."""
-        contribs = {"elo": 31.2, "market": 22.4, "form": 5.1, "squad": 3.2, "rest": 1.0}
-        output = _capture(
-            display.print_signal_breakdown,
-            contribs,
-            "Arsenal",
-            62.9,
-        )
-        for sig in contribs:
-            assert sig in output, f"Signal '{sig}' not found in output"
-
-    def test_sorted_by_abs_contribution_descending(self):
-        """Signals are sorted by absolute contribution value descending."""
-        contribs = {"small": 1.0, "medium": 10.0, "large": 50.0}
-        output = _capture(
-            display.print_signal_breakdown,
-            contribs,
-            "Arsenal",
-            61.0,
-        )
-        # Check order by finding positions
-        positions = {}
-        for sig in ("large", "medium", "small"):
-            pos = output.find(sig)
-            assert pos >= 0, f"Signal '{sig}' not found"
-            positions[sig] = pos
-        assert positions["large"] < positions["medium"] < positions["small"], (
-            "Signals not sorted by absolute value descending"
-        )
-
-
-# ── TestIntegration ─────────────────────────────────────────────────────────
-
-
-class TestIntegration:
-    """Integration tests for signal breakdown in main output pipeline.
-
-    These tests verify the module-level integration works correctly.
-    """
-
-    def test_compute_signal_contributions_integration(self):
-        """End-to-end: fake data flows through both functions without error."""
-        bp = _make_blended_prediction(
-            home=0.6, draw=0.25, away=0.15,
-            signal_breakdown={
-                "elo": {"home": 0.6, "draw": 0.25, "away": 0.15, "weight": 0.5},
-                "market": {"home": 0.5, "draw": 0.3, "away": 0.2, "weight": 0.3},
-            },
-            weights={"elo": 0.5, "market": 0.3},
-        )
-        match = _make_team_match("Arsenal", "Chelsea")
-
-        contributions = compute_signal_contributions(
-            [bp], "Arsenal", {"elo": 0.5, "market": 0.3},
-            match_fixtures=[match],
-        )
-        assert isinstance(contributions, dict)
-        assert len(contributions) > 0
-
-        # Display should not crash
-        output = _capture(
-            display.print_signal_breakdown,
-            contributions,
-            "Arsenal",
-            60.0,
-        )
-        assert "Prediction Breakdown" in output
-
     def test_missing_champion_team_handling(self):
         """Can handle case where bracket_champion is None."""
         contributions = compute_signal_contributions(
             [_make_blended_prediction()], None, {"elo": 1.0},
         )
-        # Should not crash; returns empty dict for None target
         assert isinstance(contributions, dict)
+

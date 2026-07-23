@@ -29,7 +29,7 @@ from football_core.state import (
     _atomic_write_json,
 )
 
-from src import constants
+from competitions.worldcup.src import constants
 
 
 def _resolve_data_dir(data_dir: Path | str | None) -> Path:

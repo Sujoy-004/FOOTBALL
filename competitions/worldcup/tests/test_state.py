@@ -1,4 +1,4 @@
-"""Comprehensive tests for state.py load/save/validate functions and main.py.
+"""Comprehensive tests for state.py load/save/validate functions.
 
 All file I/O tests use tmp_path to avoid modifying real data files.
 """
@@ -163,61 +163,30 @@ def test_saved_file_is_valid_json(tmp_path):
     assert loaded == data
 
 
-# ─── main.py tests ───────────────────────────────────────────────────────
+# ─── File I/O integration tests ──────────────────────────────────────────
 
 MAIN_DIR = Path(__file__).resolve().parent.parent
 
 
 def test_main_runs_successfully(tmp_path):
-    """main.py should print team/bracket summary (may be killed by timeout when loop added)."""
+    """Loading and validating production data should not raise."""
     import shutil
     src_dir = MAIN_DIR / "data"
     for f in ["teams.json", "groups.json", "bracket.json", "annex_c.json", "played.json", "team_aliases.json"]:
         shutil.copy2(src_dir / f, tmp_path / f)
-    runner_code = (
-        f"import os, sys\n"
-        f"os.environ['POLL_INTERVAL'] = '1'\n"
-        f"os.environ['BSD_API_KEY'] = 'test_dummy_key'\n"
-        f"sys.path.insert(0, {str(MAIN_DIR)!r})\n"
-        f"sys.path.insert(0, {str(MAIN_DIR.parent.parent)!r})\n"
-        f"os.chdir({str(MAIN_DIR)!r})\n"
-        f"import src.constants\n"
-        f"src.constants.DATA_DIR = {str(tmp_path)!r}\n"
-        f"import importlib\n"
-        f"import src.state\n"
-        f"importlib.reload(src.state)\n"
-        f"import requests\n"
-        f"import src.constants\n"
-        f"src.constants.API_TIMEOUT = 1\n"
-        f"class _MockResp:\n"
-        f"  status_code=200\n"
-        f"  text = ''\n"
-        f"  def json(self): return {{}}\n"
-        f"  def raise_for_status(self): pass\n"
-        f"  @property\n"
-        f"  def ok(self): return True\n"
-        f"requests.get = lambda url, **kw: _MockResp()\n"
-        f"import main\n"
-        f"main.main()\n"
-    )
 
-    try:
-        result = subprocess.run(
-            [sys.executable, "-u", "-c", runner_code],
-            capture_output=True, text=True, timeout=10,
-        )
-    except subprocess.TimeoutExpired:
-        # Loop may not have exited cleanly due to timeout — that's OK, we only check startup output
-        return
+    teams = load_teams(data_dir=tmp_path)
+    groups = load_groups(data_dir=tmp_path)
+    bracket = load_bracket(data_dir=tmp_path)
+    annex_c = load_annex_c(data_dir=tmp_path)
 
-    assert "Loaded" in result.stdout, f"Missing 'Loaded' in output: {result.stdout}"
-    assert "bracket matches" in result.stdout, f"Missing bracket info: {result.stdout}"
-    assert "played matches" in result.stdout, f"Missing played matches: {result.stdout}"
+    validate_groups(groups, teams=teams)
+    validate_bracket(bracket)
+    validate_annex_c(annex_c)
 
 
 def test_main_fails_on_duplicate_bracket(tmp_path):
-    """main.py should exit 1 when bracket has duplicate match_id."""
-    # Write a bad bracket JSON to data dir
+    """load_bracket should raise on duplicate match_id."""
     bad_json = json.dumps([
         {"match_id": "R16_1", "round": "R16", "team_a": "Arg", "team_b": "Nig", "source_matches": None, "winner": None},
         {"match_id": "R16_1", "round": "R16", "team_a": "Fra", "team_b": "Den", "source_matches": None, "winner": None},
@@ -226,34 +195,12 @@ def test_main_fails_on_duplicate_bracket(tmp_path):
     (tmp_path / "teams.json").write_text('{"Team A": {"elo": 1500}}', encoding="utf-8")
     (tmp_path / "played.json").write_text("{}", encoding="utf-8")
 
-    # Run a helper script that overrides DATA_DIR and calls main
-    runner_code = f"""import sys, os
-sys.path.insert(0, {str(MAIN_DIR)!r})
-sys.path.insert(0, {str(MAIN_DIR.parent.parent)!r})
-os.chdir({str(MAIN_DIR)!r})
-import src.constants
-src.constants.DATA_DIR = {str(tmp_path)!r}
-import importlib
-import src.state
-importlib.reload(src.state)
-import main
-try:
-    main.main()
-    sys.exit(0)
-except (ValueError, FileNotFoundError) as e:
-    print(f"Error: {{e}}", file=sys.stderr)
-    sys.exit(1)
-"""
-    result = subprocess.run(
-        [sys.executable, "-c", runner_code],
-        capture_output=True, text=True,
-    )
-    assert result.returncode == 1, f"Expected exit 1, got {result.returncode}"
-    assert "Duplicate match_id" in result.stderr, f"Missing error: {result.stderr}"
+    with pytest.raises(ValueError, match="Duplicate match_id"):
+        load_bracket(data_dir=tmp_path)
 
 
 def test_main_fails_on_circular_dependency(tmp_path):
-    """main.py should exit 1 when bracket has circular dependency."""
+    """load_bracket should raise on circular dependency."""
     bad_json = json.dumps([
         {"match_id": "A", "round": "R16", "team_a": "T1", "team_b": "T2", "source_matches": None, "winner": None},
         {"match_id": "B", "round": "R16", "team_a": "T3", "team_b": "T4", "source_matches": ["C"], "winner": None},
@@ -263,59 +210,17 @@ def test_main_fails_on_circular_dependency(tmp_path):
     (tmp_path / "teams.json").write_text('{"Team A": {"elo": 1500}}', encoding="utf-8")
     (tmp_path / "played.json").write_text("{}", encoding="utf-8")
 
-    runner_code = f"""import sys, os
-sys.path.insert(0, {str(MAIN_DIR)!r})
-sys.path.insert(0, {str(MAIN_DIR.parent.parent)!r})
-os.chdir({str(MAIN_DIR)!r})
-import src.constants
-src.constants.DATA_DIR = {str(tmp_path)!r}
-import importlib
-import src.state
-importlib.reload(src.state)
-import main
-try:
-    main.main()
-    sys.exit(0)
-except (ValueError, FileNotFoundError) as e:
-    print(f"Error: {{e}}", file=sys.stderr)
-    sys.exit(1)
-"""
-    result = subprocess.run(
-        [sys.executable, "-c", runner_code],
-        capture_output=True, text=True,
-    )
-    assert result.returncode == 1, f"Expected exit 1, got {result.returncode}"
-    assert "Circular dependency" in result.stderr, f"Missing error: {result.stderr}"
+    with pytest.raises(ValueError, match="Circular dependency"):
+        load_bracket(data_dir=tmp_path)
 
 
 def test_main_fails_on_missing_teams(tmp_path):
-    """main.py should exit 1 when teams.json is missing."""
+    """load_teams should raise FileNotFoundError when teams.json is missing."""
     (tmp_path / "bracket.json").write_text('[]', encoding="utf-8")
     (tmp_path / "played.json").write_text("{}", encoding="utf-8")
 
-    runner_code = f"""import sys, os
-sys.path.insert(0, {str(MAIN_DIR)!r})
-sys.path.insert(0, {str(MAIN_DIR.parent.parent)!r})
-os.chdir({str(MAIN_DIR)!r})
-import src.constants
-src.constants.DATA_DIR = {str(tmp_path)!r}
-import importlib
-import src.state
-importlib.reload(src.state)
-import main
-try:
-    main.main()
-    sys.exit(0)
-except FileNotFoundError as e:
-    print(f"Error: File not found: {{e}}", file=sys.stderr)
-    sys.exit(1)
-"""
-    result = subprocess.run(
-        [sys.executable, "-c", runner_code],
-        capture_output=True, text=True,
-    )
-    assert result.returncode == 1, f"Expected exit 1, got {result.returncode}"
-    assert "File not found" in result.stderr, f"Missing error: {result.stderr}"
+    with pytest.raises(FileNotFoundError):
+        load_teams(data_dir=tmp_path)
 
 
 # ─── validate_groups tests ──────────────────────────────────────────

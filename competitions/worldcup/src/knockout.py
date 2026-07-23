@@ -14,9 +14,9 @@ __all__ = [
     "run_full_simulation",
 ]
 
-from src import constants
-from src.elo import expected_score
-from src.groups import (
+from competitions.worldcup.src import constants
+from competitions.worldcup.src.elo import expected_score
+from competitions.worldcup.src.groups import (
     compute_standings,
     rank_third_placed,
     select_advancers,
