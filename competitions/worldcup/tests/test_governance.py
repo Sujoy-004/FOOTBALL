@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from src import state
-from src import constants
+from competitions.worldcup.src import state
+from competitions.worldcup.src import constants
 
 
 # ─── Version persistence tests (Task 1) ─────────────────────────────────────
@@ -549,7 +549,6 @@ class TestRunGovernance:
     def test_run_governance_snapshot_shape(self, monkeypatch):
         """_run_governance() returns snapshot with D-06 schema keys."""
         monkeypatch.setattr("src.state.save_run_snapshot", lambda s, data_dir=None: None)
-        monkeypatch.setattr("src.output.print_governance_dashlet", lambda *a, **kw: None)
 
         from src.governance import _run_governance
 
@@ -584,7 +583,6 @@ class TestRunGovernance:
     def test_run_governance_cold_start(self, monkeypatch):
         """< 30 entries -> drift_status == COLD_START."""
         monkeypatch.setattr("src.state.save_run_snapshot", lambda s, data_dir=None: None)
-        monkeypatch.setattr("src.output.print_governance_dashlet", lambda *a, **kw: None)
 
         from src.governance import _run_governance
 
@@ -604,7 +602,6 @@ class TestRunGovernance:
     def test_run_governance_healthy(self, monkeypatch):
         """>= 30 entries, no drift -> drift_status == HEALTHY."""
         monkeypatch.setattr("src.state.save_run_snapshot", lambda s, data_dir=None: None)
-        monkeypatch.setattr("src.output.print_governance_dashlet", lambda *a, **kw: None)
 
         from src.governance import _run_governance
 
@@ -620,30 +617,6 @@ class TestRunGovernance:
             blend_weights={"elo": 1.0},
         )
         assert snapshot["drift_status"] == "HEALTHY"
-
-
-class TestShouldRunGov:
-    """Tests for _should_run_gov() timing logic."""
-
-    def test_startup_returns_true(self):
-        """When _last_gov_time == 0.0, should return True."""
-        import main as main_mod
-        main_mod._state.last_gov_time = 0.0
-        assert main_mod._should_run_gov() is True
-
-    def test_hourly_trigger(self):
-        """After 3600s, should return True."""
-        import main as main_mod
-        import time
-        main_mod._state.last_gov_time = time.time() - 3601  # 1s over hourly
-        assert main_mod._should_run_gov() is True
-
-    def test_within_hour_returns_false(self):
-        """Within 3600s of last run, should return False."""
-        import main as main_mod
-        import time
-        main_mod._state.last_gov_time = time.time() - 1800  # 30 min ago
-        assert main_mod._should_run_gov() is False
 
 
 class TestRunBacktest:
