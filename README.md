@@ -1,14 +1,14 @@
 <!-- generated-by: gsd-doc-writer -->
 # FOOTBALL Monte Carlo Prediction Engine
 
-A Python Monte Carlo simulation engine that predicts football tournament outcomes — knockout probabilities, group standings, and championship odds — across three major competitions. Each competition is a standalone CLI tool sharing a common library (`football_core/`) for Elo ratings, Poisson-based match simulation, and prediction evaluation.
+A Python Monte Carlo simulation engine that predicts football tournament outcomes — knockout probabilities, group standings, and championship odds — across three major competitions. The sole interface is a **FastAPI web dashboard** (`python -m web.server`) with a retro terminal-emulator aesthetic.
 
-| Competition | Status | CLI Tool | Run Command | Tests |
-|---|---|---|---|---|
-| **World Cup 2026** | Active — continuous polling (60s) | `wc-predict` | `python -m competitions.worldcup.main` | 614 |
-| **UCL 2025/26** | Active — single-run Monte Carlo | `ucl-predict` | `python -m competitions.ucl.main` | 438 |
-| **Euro 2024** | Dormant — continuous polling | `euro-predict` | `python -m competitions.euro.main` | — |
-| **football_core** | Shared library | — | — | 109 |
+| Competition | Route | Status | Tests |
+|---|---|---|---|
+| **World Cup 2026** | `/worldcup` | Active — live polling via BSD API | 614 |
+| **UCL 2025/26** | `/ucl` | Active — single-run Monte Carlo | 438 |
+| **Euro 2024** | `/euro` | Dormant — stub | — |
+| **football_core** | Shared library | — | 109 |
 
 ## Quick Start
 
@@ -26,115 +26,69 @@ cp competitions/worldcup/.env.example competitions/worldcup/.env
 # Edit .env and set BSD_API_KEY=your_key_here
 # Get a free key at https://sports.bzzoiro.com/register/
 
-# 4. Run a single World Cup prediction cycle
-python -m competitions.worldcup.main --once
-```
-
-## Usage
-
-### World Cup 2026 (continuous polling)
-
-Fetches live match data from the BSD API every 60 seconds, updates Elo ratings, refreshes signal caches (market odds, CatBoost ML predictions, and 9 additional signals), runs 50,000 Monte Carlo iterations, and prints championship probability tables with deltas.
-
-```bash
-# Single fetch → simulate → print cycle, then exit
-python -m competitions.worldcup.main --once
-
-# Continuous polling mode (Ctrl+C for graceful shutdown)
-python -m competitions.worldcup.main
-
-# Reproducible simulation with a fixed seed
-python -m competitions.worldcup.main --once --seed 42
-
-# List all available BSD league IDs and names
-python -m competitions.worldcup.main --list-leagues
-
-# Simulate a different league by ID
-python -m competitions.worldcup.main --once --league 27
-
-# Offline simulation mode (no API key needed, uses cached data files)
-python -m competitions.worldcup.main --simulate -n 50000 --seed 42
-
-# Export structured JSON report
-python -m competitions.worldcup.main --simulate -n 50000 --seed 42 --report results.json
-
-# Available flags: --once, --simulate, -n N (iterations), --seed N, --no-color, --ai-preview,
-#   --match-detail [TABLE|MATCH_ID], --league ID, --list-leagues, --what-if FILE,
-#   --report FILE, --show-breakdown [summary|match], --show-ci [auto|on|off],
-#   --validate-calibrated, --weights K=V,K=V
-```
-
-The World Cup competition supports 48 teams across 12 groups (A–L), 104 total matches (72 group + 32 knockout), and annex C routing for third-placed teams.
-
-### UCL 2025/26 (single-run)
-
-Runs a Monte Carlo simulation of the Champions League league phase and knockout tree, then prints a full result summary including the league table, playoff rounds, knockout bracket, and championship odds.
-
-```bash
-# Run with 10,000 iterations and a fixed seed
-python -m competitions.ucl.main -n 10000 -s 42
-
-# Run and export results to JSON
-python -m competitions.ucl.main -n 10000 -s 42 -o results.json
-
-# Cross-check predictions against real BSD match results
-python -m competitions.ucl.main --validate --api-key KEY
-
-# Run in replay mode with historical match data
-python -m competitions.ucl.main --mode replay --replay-data matches.json
-
-# Live polling mode (continuous, requires BSD API key)
-python -m competitions.ucl.main --mode live --watch
-
-# Counterfactual analysis: modify team Elo ratings
-python -m competitions.ucl.main --what-if 'Arsenal.elo=1960' --what-if 'RealMadrid.elo=2100'
-
-# Available flags: -n N (iterations), -s N (seed), --use-glicko (Bayesian uncertainty),
-#   -o FILE (output), --validate, --api-key KEY, --tier {cross-tournament,walk-forward,replay,all},
-#   --fixture-source {auto,repo,bsd}, --mode {simulate,replay,live}, --once, --watch,
-#   --poll-interval N, --replay-data FILE, --what-if TEAM.PARAM=VALUE (repeatable),
-#   --report FILE, --calibrate, --calibrate-temp FILE, --validate-calibrated,
-#   --weights K=V,K=V, --show-breakdown [summary|match], --calibrated [auto|on|off],
-#   --show-ci [auto|on|off], --verbose
-```
-
-The UCL competition uses a Swiss-system league phase (36 teams, 8 matchdays) followed by a playoff round and a 16-team knockout bracket.
-
-## Web Dashboard (Unified)
-
-The project ships with a unified FastAPI web dashboard on port 8080 that serves an SPA for all competitions.
-
-```bash
-# Start the unified web server
+# 4. Start the web dashboard
 python -m web.server
 
-# Open in browser: http://127.0.0.1:8080
+# 5. Open in browser: http://127.0.0.1:8080
 ```
 
-| Path | Competition | Status |
+## Web Dashboard
+
+The dashboard is a **vanilla JS SPA** served from `web/static/` over a unified FastAPI server on port 8080. No bundler, no build step — edit and reload.
+
+| Path | Competition | Description |
 |---|---|---|
-| `/` | Landing page (competition selector) | Active |
-| `/worldcup` | World Cup 2026 dashboard | Active |
-| `/worldcup/api/*` | WC backend endpoints | Active |
-| `/ucl` | UCL 2025/26 dashboard | Active |
-| `/ucl/api/*` | UCL backend endpoints | Active |
-| `/euro` | Euro 2028 placeholder | Stub (`{"status": "coming_soon"}`) |
+| `/` | Landing page | Competition selector |
+| `/worldcup` | World Cup 2026 | Dashboard, bracket, standings, what-if, terminal |
+| `/worldcup/api/*` | WC backend | REST API |
+| `/ucl` | UCL 2025/26 | Overview, league table, bracket, odds, terminal |
+| `/ucl/api/*` | UCL backend | REST API |
+| `/euro` | Euro 2028 | Stub (`{"status": "coming_soon"}`) |
 
-The dashboard is a vanilla JS SPA (no bundler). Each competition has a separate JS module (`static/wc.js`, `static/ucl.js`) loaded dynamically. Development requires only editing `static/*.js` and reloading the browser.
+### CLI-Vibe Terminal UX
 
-*The old dual-server architecture (`web/server.py` + `web/ucl_server.py` on ports 8080/8081) has been replaced by a single unified server.*
+The dashboard greets you with a **retro terminal** as the default tab. Type `help` to see available commands. The terminal supports:
 
-### Euro 2024 (dormant)
+- **Commands:** `simulate`, `validate`, `calibrate`, `what-if`, `export`, `standings`, `bracket`, `odds`, `elo`, `signals`, `clear`, `help`, and more
+- **Inline progress bars:** `[====>    ] 60%` during long operations
+- **Sparklines:** `▁▂▃▄▅▆▇█` in result cells
+- **Animated spinner:** `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏` during API calls
+- **Collapsible drawer:** Press `` Ctrl+` `` or click the status-bar toggle to open the terminal from any tab (slides up 300px)
+- **Color-coded output:** Warm earth tones for WC, bluish for UCL
 
-Continuous polling predictor for UEFA Euro 2024. Shares architecture with the World Cup predictor but is currently in a dormant state.
+### API Endpoints
+
+**World Cup** (`/worldcup/api`): `data`, `standings`, `bracket`, `bracket/full`, `evaluation`, `governance`, `signals`, `signal/{name}`, `blend`, `refresh` (async), `simulate` (async), `what-if`, `match/insight`, `validation`, `report`, `calibrate` (async)
+
+**UCL** (`/ucl/api`): `data`, `standings`, `bracket`, `odds`, `signals`, `simulate` (async), `reset`, `mode`, `what-if`, `match/insight`, `validation`, `report`, `calibrate` (async)
+
+Long operations (simulate, calibrate, refresh) use an async task + polling pattern — POST returns a `task_id`, then GET `progress/{task_id}` until complete.
+
+### Running the Web Server
 
 ```bash
-# Single cycle with reproducible seed
-python -m competitions.euro.main --once --seed 42
+# Standard start
+python -m web.server
 
-# Continuous polling
-python -m competitions.euro.main
+# Development with hot reload
+uvicorn web.server:asgi_app --reload --host 127.0.0.1 --port 8080
 ```
+
+## World Cup 2026
+
+48 teams, 12 groups (A–L), 104 total matches (72 group + 32 knockout), annex C routing for the 8 best third-placed teams. Fetches live match data from the BSD API, updates Elo ratings, refreshes signal caches, blends 8 prediction signals (Elo, market odds, CatBoost, form, lineup, availability, defensive quality, manager effect), and runs 50,000 Monte Carlo iterations per cycle.
+
+Accessible at `http://127.0.0.1:8080/worldcup`.
+
+## UCL 2025/26
+
+36-team Swiss-system league phase (8 matchdays), playoff round (positions 9–24), seeded R16 bracket with top-4 protection, two-legged knockout ties with extra time and penalties. Uses a 5-signal ensemble (RefinedElo, MarketOdds, RollingForm, SquadValue, RestDays) via `EnsembleEngine`.
+
+Accessible at `http://127.0.0.1:8080/ucl`.
+
+## Euro 2024 (dormant)
+
+Continuous polling predictor for UEFA Euro 2024. Shares architecture with the World Cup predictor but is currently in a dormant state. The `/euro` route returns a "coming soon" stub.
 
 ## Project Structure
 
@@ -165,80 +119,67 @@ FOOTBALL/
 │   │   ├── odds.py             Market odds fetcher
 │   │   └── catboost.py         CatBoost prediction fetcher
 │   ├── signals/                11 prediction signal implementations
-│   │   ├── availability.py     Availability/injury impact signal
-│   │   ├── defensive_quality.py Defensive quality signal
-│   │   ├── manager_effect.py   Manager effect signal
-│   │   ├── market_odds.py      Market odds signal
-│   │   ├── player_form.py      Player-level form signal
-│   │   ├── refined_elo.py      Refined Elo signal
-│   │   ├── rest_days.py        Rest days signal
-│   │   ├── rolling_form.py     Rolling form signal
-│   │   ├── squad_value.py      Squad value signal
-│   │   └── team_synergy.py     Team synergy signal
 │   └── tests/                  6 modules, 109 tests
-│       ├── test_availability_signal.py
-│       ├── test_defensive_quality_signal.py
-│       ├── test_evaluation.py
-│       ├── test_manager_effect_signal.py
-│       ├── test_manager_provider.py
-│       └── test_player_provider.py
 │
 ├── competitions/
 │   ├── worldcup/               ← World Cup 2026 (active)
-│   │   ├── main.py             CLI entry point, polling loop, governance, blending
-│   │   ├── requirements.txt    pytest, pytest-cov, python-dotenv
-│   │   ├── .env.example        BSD_API_KEY template
+│   │   ├── requirements.txt
+│   │   ├── .env.example
 │   │   ├── config.json         League ID (27)
-│   │   ├── src/                WC-specific modules (blender, governance, output, etc.)
-│   │   │   └── predictors/     Signal ingestion (odds, catboost, form, lineup, availability, manager_signals)
+│   │   ├── src/                WC-specific modules
+│   │   │   ├── elo.py, elo_sync.py, fetcher.py, state.py
+│   │   │   ├── groups.py, knockout.py
+│   │   │   ├── evaluation.py, blender.py, governance.py
+│   │   │   ├── engine.py, analysis.py
+│   │   │   └── predictors/     Signal ingestion
 │   │   ├── tests/              26 modules, 614 tests
-│   │   ├── data/               JSON state files (generated at runtime + historical data)
-│   │   ├── docs/               Archive docs
-│   │   └── .github/workflows/  CI pipeline (Python 3.10–3.12, pytest --cov)
+│   │   ├── data/               JSON state files
+│   │   └── .github/workflows/  CI pipeline
 │   │
 │   ├── ucl/                    ← UCL 2025/26 (active)
-│   │   ├── main.py             CLI entry point, single-run Monte Carlo
-│   │   ├── display.py          Formatted terminal output
-│   │   ├── result.py           SimulationResult contract (display-layer boundary)
+│   │   ├── result.py           SimulationResult contract
 │   │   ├── report.py           Structured JSON report builder
 │   │   ├── config/             Signal weights and calibration JSON
-│   │   ├── src/                UCL-specific simulation + knockout modules
+│   │   ├── src/                UCL-specific modules
+│   │   │   ├── simulation.py, knockout.py, groups.py
+│   │   │   ├── orchestrator.py, analysis.py
+│   │   │   ├── fetcher.py, elo_fetcher.py, provider.py
+│   │   │   ├── validation.py, validation_suite.py
+│   │   │   └── calibrate.py
 │   │   ├── tests/              23 modules, 438 tests
-│   │   └── data/               Fixture files, bracket rules, team aliases, replay data
+│   │   ├── benchmarks/         Performance benchmarks
+│   │   └── data/               Fixture data, bracket rules
 │   │
 │   └── euro/                   ← Euro 2024 (dormant)
-│       ├── main.py             CLI entry point, continuous polling
 │       ├── config.py           Competition configuration
-│       ├── display.py          Formatted terminal output
 │       ├── simulation.py       Euro-specific simulation logic
-│       ├── __init__.py        Package init + sys.path bootstrap
 │       └── data/               Teams, groups, bracket data
 │
-├── web/                        ← Unified FastAPI web dashboard (port 8080)
-│   ├── __init__.py              Package marker
-│   ├── server.py                Parent FastAPI — mounts sub-apps, serves static
-│   ├── common.py                Shared backend utilities (boot_step, ts, load_json)
-│   ├── wc_app.py                WC sub-app (mounted at /worldcup)
-│   ├── ucl_app.py               UCL sub-app (mounted at /ucl)
-│   ├── insight.py               WC match insight engine
-│   ├── whatif_engine.py         Shared what-if scenario engine
-│   ├── cache.json               Web data cache (auto-generated)
+├── web/                        ← FastAPI web dashboard (port 8080)
+│   ├── server.py               Parent FastAPI — mounts sub-apps, serves static
+│   ├── common.py               Shared backend utilities
+│   ├── wc_app.py               WC sub-app (mounted at /worldcup)
+│   ├── ucl_app.py              UCL sub-app (mounted at /ucl)
+│   ├── insight.py              WC match insight engine
+│   ├── whatif_engine.py        Shared what-if scenario engine
+│   ├── cache.json              Web data cache (auto-generated)
 │   └── static/
-│       ├── index.html            SPA shell (landing + dynamic competition loading)
-│       ├── shared.css            Unified design system CSS
-│       ├── shared.js             Shared components (terminal, modal, tabs, router)
-│       ├── wc.js                 WC module (dashboard, bracket, standings, what-if)
-│       └── ucl.js                UCL module (overview, league table, bracket, odds, what-if)
+│       ├── index.html           SPA shell
+│       ├── shared.css           Design system CSS
+│       ├── shared.js            Router, terminal, modal, tabs
+│       ├── wc.js                WC dashboard views
+│       └── ucl.js               UCL dashboard views
 │
 └── docs/
-    ├── ARCHITECTURE.md            System architecture, data flow, design decisions
-    ├── ARCHITECTURE_RESEARCH.md  Architecture research notes
-    ├── CONFIGURATION.md          Environment variables and CLI reference
-    ├── DEVELOPMENT.md           Development setup and contribution guide
-    ├── GETTING-STARTED.md        Installation and quick start
-    ├── TESTING.md                Test framework, layout, and patterns
-    ├── FOOTBALL_ENGINE_ARCHITECTURE.md   Detailed architecture document
-    └── COMMONALITY_REPORT.md     Cross-competition commonality analysis
+    ├── ARCHITECTURE.md
+    ├── CONFIGURATION.md
+    ├── DEVELOPMENT.md
+    ├── GETTING-STARTED.md
+    ├── TESTING.md
+    ├── WEB_LAYER.md
+    ├── FOOTBALL_ENGINE_ARCHITECTURE.md
+    ├── ARCHITECTURE_RESEARCH.md
+    └── COMMONALITY_REPORT.md
 ```
 
 ## Requirements

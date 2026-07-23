@@ -98,9 +98,9 @@ These were extracted into `football_core/state.py`.
 
 **Verdict**: The `_simulate_knockout_round()` primitive is now shared via `football_core/knockout.py`. The wrapping structure (which rounds exist, what advancement logic runs) is competition-specific. The simulation orchestrator remains in each competition.
 
-### `competitions/worldcup/src/output.py`
-- World Cup display: WC header, group standings (12 groups), third-place bubble, Annex C references, probability table with trend arrows, AI previews, signal detail tables.
-- Euro has its own `display.py` with a simpler probability table, no trends, no signal detail.
+### `competitions/worldcup/src/output.py` (deleted in web-only transition)
+- Display logic moved to web layer for both competitions. No longer a CLI module.
+- Euro's `display.py` was also removed in the transition.
 
 **Verdict**: Competition-specific. Display is inherently tied to competition branding, round names, and feature set.
 
@@ -111,12 +111,8 @@ These were extracted into `football_core/state.py`.
 | Module | Reason |
 |---|---|
 | `competitions/euro/simulation.py` | Euro R16 resolution (precomputed third-place from bracket JSON), no R32, no TPP. Different orchestration. |
-| `competitions/euro/main.py` | Different CLI, different data directory, different entry point. |
-| `competitions/euro/display.py` | Different header, no ANSI color, no trend arrows, no signal detail tables |
 | `competitions/euro/config.py` | Competition constants (6 groups, 4 third-placed, Euro league ID) |
 | `competitions/worldcup/src/knockout.py` | R32 via Annex C, TPP, 12-group iteration. WC-specific orchestration. |
-| `competitions/worldcup/src/output.py` | WC-specific display (12-group standings, Annex C, trend arrows, signal detail). |
-| `competitions/worldcup/main.py` | WC-specific CLI, live loop, governance, blending, signal fusion. |
 | Data files (`data/*.json`) | Teams, groups, bracket per competition. |
 | `competitions/euro/data/*.json` | Euro teams, groups, bracket. |
 
@@ -145,14 +141,12 @@ FOOTBALL/
 │
 ├── competitions/
 │   ├── worldcup/          ← WC-specific code
-│   │   ├── main.py        ← WC orchestrator
 │   │   ├── __init__.py    ← sys.path bootstrap
 │   │   └── src/
 │   │       ├── constants.py      ← extends football_core.constants with WC-specific values
 │   │       ├── groups.py         ← extends football_core.groups with compute_standings/rank/select/resolve
 │   │       ├── state.py          ← extends football_core.state with WC validate/load + governance persistence
 │   │       ├── knockout.py       ← WC-only (R32, TPP, full simulation orchestrator)
-│   │       ├── output.py         ← WC-only display
 │   │       ├── blender.py        ← WC-only (calibrate_and_blend)
 │   │       ├── evaluation.py     ← WC-only (evaluate_all_matches)
 │   │       ├── governance.py     ← WC-only (_run_governance)
@@ -162,10 +156,8 @@ FOOTBALL/
 │   │           └── lineup.py     ← WC-only
 │   │
 │   ├── euro/              ← Euro-specific code
-│   │   ├── main.py        ← thin Euro orchestrator
 │   │   ├── __init__.py    ← sys.path bootstrap (repo root + worldcup/ for src.groups)
 │   │   ├── simulation.py  ← Euro simulation engine
-│   │   ├── display.py     ← Euro display
 │   │   ├── config.py      ← Euro constants
 │   │   └── data/
 │   │

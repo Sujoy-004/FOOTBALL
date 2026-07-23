@@ -146,7 +146,6 @@ FOOTBALL/
 ├── competitions/
 │   ├── worldcup/                    ← World Cup 2026 predictor (active — continuous polling)
 │   │   ├── __init__.py              sys.path setup
-│   │   ├── main.py                  CLI entry point, 60s polling loop, orchestration (1694 lines)
 │   │   ├── config.json              League ID: 27
 │   │   ├── .env.example             BSD_API_KEY template
 │   │   ├── requirements.txt         pytest, pytest-cov, python-dotenv
@@ -156,15 +155,14 @@ FOOTBALL/
 │   │   │   ├── elo.py, elo_sync.py  Extends football_core Elo for WC
 │   │   │   ├── groups.py            WC group stage (48 teams, 12 groups, annex C)
 │   │   │   ├── knockout.py          WC knockout bracket resolution
+│   │   │   ├── engine.py            Orchestration: signal build, poll cycle, calibration
+│   │   │   ├── analysis.py          Counterfactual + calibrated validation
 │   │   │   ├── fetcher.py           WC-specific BSD API fetching
 │   │   │   ├── state.py             WC-specific state persistence + versioning
 │   │   │   ├── evaluation.py        WC-specific evaluation/calibration
-│   │   │   ├── output.py            ANSI terminal display (891 lines)
 │   │   │   ├── blender.py           Platt scaling, Brier-weighted blending
-│   │   │   ├── governance.py        Version tracking, drift detection (573 lines)
-│   │   │   ├── math_utils.py        Sigmoid helper
+│   │   │   ├── governance.py        Version tracking, drift detection
 │   │   │   └── predictors/          Competition-specific predictor wrappers
-│   │   │       ├── __init__.py
 │   │   │       ├── odds.py          Market odds fetcher
 │   │   │       ├── catboost.py      CatBoost ML prediction fetcher
 │   │   │       ├── form.py          Form signal computation
@@ -172,42 +170,39 @@ FOOTBALL/
 │   │   │       ├── availability.py  Availability/injury impact signal
 │   │   │       └── manager_signals.py Manager effect signal computation
 │   │   ├── tests/                   24 test files, 614 tests
-│   │   │   ├── conftest.py          Shared fixtures (sample_teams, sample_bracket, etc.)
+│   │   │   ├── conftest.py          Shared fixtures
 │   │   │   └── test_*.py            Unit + integration tests
 │   │   ├── data/                    Runtime state (gitignored) + team/group config
 │   │   └── .github/workflows/       CI pipeline
 │   │
 │   ├── ucl/                         ← UEFA Champions League 2025/26 predictor (active — single-run)
-│   │   ├── __init__.py              sys.path setup, exports SimulationResult + main
-│   │   ├── main.py                  CLI entry point, Monte Carlo orchestration (1701 lines)
-│   │   ├── result.py                SimulationResult dataclass (display contract)
-│   │   ├── display.py               Formatted terminal output (814 lines)
+│   │   ├── __init__.py              sys.path setup, exports SimulationResult
+│   │   ├── result.py                SimulationResult dataclass
 │   │   ├── report.py                Structured JSON report generation
 │   │   ├── src/                     UCL-specific simulation modules
-│   │   │   ├── __init__.py          Public API: simulation, knockout, groups, elo_fetcher
-│   │   │   ├── calibrate.py             Offline weight calibration for prediction signals
+│   │   │   ├── __init__.py
+│   │   │   ├── calibrate.py         Offline weight calibration
 │   │   │   ├── constants.py         UCL-specific constants
 │   │   │   ├── simulation.py        Monte Carlo engine, league phase simulation
 │   │   │   ├── knockout.py          Swiss playoff + knockout bracket simulation
 │   │   │   ├── groups.py            Swiss-system standings, matchup lambdas
+│   │   │   ├── orchestrator.py      Replay/live simulation orchestrator
+│   │   │   ├── analysis.py          Counterfactual + validation suite
 │   │   │   ├── fetcher.py           Match fetching for UCL
 │   │   │   ├── elo_fetcher.py       ClubElo data fetching
-│   │   │   ├── orchestrator.py      Replay/live simulation orchestrator
 │   │   │   ├── provider.py          BSD data provider for UCL
 │   │   │   ├── result_provider.py   Match result fetching for UCL
 │   │   │   ├── validation.py        Cross-check predictions vs real results
-│   │   │   └── validation_suite.py     Validation suite for prediction accuracy
+│   │   │   └── validation_suite.py  Validation suite for prediction accuracy
 │   │   ├── tests/                   20 test files, 438 tests
-│   │   │   ├── conftest.py          Team pots, Elo ratings, fixture data (1076 lines)
-│   │   │   └── test_*.py            Unit + integration tests
+│   │   │   ├── conftest.py
+│   │   │   └── test_*.py
 │   │   ├── benchmarks/              Performance benchmarks + results
 │   │   └── data/                    Fixture data, bracket rules, team aliases, coefficients
 │   │
-│   └── euro/                        ← Euro 2024 predictor (dormant — continuous polling)
-│       ├── __init__.py              sys.path setup (also adds worldcup/src to path)
-│       ├── main.py                  CLI entry point, polling loop (255 lines)
+│   └── euro/                        ← Euro 2024 predictor (dormant)
+│       ├── __init__.py
 │       ├── config.py                Euro-specific configuration
-│       ├── display.py               Terminal display
 │       ├── simulation.py            Match + knockout simulation
 │       └── data/                    Teams, groups, bracket data
 │
@@ -240,19 +235,10 @@ FOOTBALL/
 
 ### Key Architectural Patterns
 
-- **Continuous polling (World Cup, Euro):** CLI enters a 60-second loop that
-  fetches live matches → updates Elo → refreshes signal caches → runs Monte Carlo
-  simulation → prints probability tables. Supports `--once` for single-cycle mode.
-- **Single-run Monte Carlo (UCL):** Fetches all data upfront, runs N iterations of
-  league-phase + knockout simulation, prints a full result summary, optionally
-  exports to JSON. Uses `-n` for iteration count and `-s` for seed.
-- **Simpson's paradox avoidance:** The `result.py` / `display.py` separation in UCL
-  ensures the display layer never imports simulation internals — only the result
-  contract dataclass.
-- **Web dashboard as unified layer:** The `web/` package provides a FastAPI-based
-  SPA that wraps both World Cup and UCL engines behind a REST API, adding
-  caching, signal evaluation, and what-if scenario features on top of the CLI
-  logic.
+- **Continuous polling (World Cup):** The web server fetches live matches → updates Elo → refreshes signal caches → runs Monte Carlo simulation → caches probability tables. Accessible via `/worldcup` dashboard.
+- **Single-run Monte Carlo (UCL):** The web server fetches all data upfront, runs N iterations of league-phase + knockout simulation, caches results. Accessible via `/ucl` dashboard.
+- **Simpson's paradox avoidance:** The `result.py` contract in UCL provides a clean boundary between simulation computation and web serialization.
+- **Web dashboard as unified layer:** The `web/` package provides a FastAPI-based SPA that wraps both World Cup and UCL engines behind a REST API, adding caching, terminal UI, signal evaluation, and what-if scenario features.
 
 ---
 
@@ -503,7 +489,6 @@ Each competition follows a consistent structural pattern. To add a new one:
 ```
 competitions/<name>/
 ├── __init__.py          # sys.path setup (see template below)
-├── main.py              # CLI entry point
 ├── src/                 # Competition-specific modules
 │   └── __init__.py
 ├── tests/               # Test suite
@@ -530,70 +515,35 @@ if _pkg_dir not in sys.path:
     sys.path.insert(0, _pkg_dir)
 ```
 
-If the new competition reuses World Cup modules (like Euro does), also add
-the worldcup `src/` path:
+If the new competition reuses World Cup modules, use absolute imports instead of
+sys.path manipulation (see Euro's `simulation.py` for the pattern).
+
+### 3. Web Sub-App
+
+Create a FastAPI sub-app (e.g., `euro_app.py`) following the pattern in
+`web/wc_app.py` and mount it in `web/server.py`:
 
 ```python
-_wc_pkg = str(Path(__file__).resolve().parent.parent / "worldcup")
-if _wc_pkg not in sys.path:
-    sys.path.insert(0, _wc_pkg)
+from fastapi import APIRouter
+
+app = APIRouter()
+
+@app.get("/api/data")
+def get_data():
+    return {"status": "ok"}
 ```
 
-### 3. `main.py` Entry Point
-
-The entry point should use `argparse` for CLI argument parsing and follow one
-of two patterns:
-
-**Continuous polling pattern** (like World Cup / Euro):
+Register it in `server.py`:
 
 ```python
-import argparse
-from <package> import <package>  # noqa: F401 — sys.path setup
-
-def _parse_args(argv=None):
-    parser = argparse.ArgumentParser(...)
-    parser.add_argument("--once", action="store_true")
-    parser.add_argument("--seed", type=int, default=None)
-    return parser.parse_args(argv)
-
-def main():
-    args = _parse_args()
-    # Load state → polling loop → simulate → print
-
-if __name__ == "__main__":
-    main()
-```
-
-**Single-run Monte Carlo pattern** (like UCL):
-
-```python
-import argparse
-from <package> import <package>  # noqa: F401 — sys.path setup
-
-def _parse_args(argv=None):
-    parser = argparse.ArgumentParser(...)
-    parser.add_argument("-n", type=int, default=10000, help="Iterations")
-    parser.add_argument("-s", type=int, default=None, help="Seed")
-    parser.add_argument("-o", type=str, default=None, help="JSON output path")
-    return parser.parse_args(argv)
-
-def main():
-    args = _parse_args()
-    # Fetch data → run Monte Carlo → print results
-
-if __name__ == "__main__":
-    main()
+from web.euro_app import app as euro_app
+app.mount("/euro", euro_app)
 ```
 
 ### 4. Testing Setup
 
 Create a `tests/conftest.py` with shared fixtures, then add `test_*.py` files
-following the naming convention. The Euro competition currently has no tests —
-a new competition should include at minimum:
-
-- Smoke test (`test_main_loop.py` or `test_cli.py`) — verifies the CLI parses
-  arguments without error.
-- Core logic tests — test group simulation, knockout resolution, etc.
+following the naming convention.
 
 ### 5. Data Files
 
@@ -622,7 +572,7 @@ conventions have emerged organically:
   `param: str`). Early modules (`football_core/elo.py`,
   `football_core/groups.py`, `football_core/knockout.py`) use inline type hints
   without the `from __future__ import annotations` import. Newer modules (UCL's
-  `result.py`, `display.py`) use `from __future__ import annotations` and full
+   `result.py`) use `from __future__ import annotations` and full
   modern type annotations. Follow the convention of the module you are editing.
 - **Docstrings.** Top-level modules have a module-level docstring. Public
   functions and classes have docstrings describing purpose, arguments, and

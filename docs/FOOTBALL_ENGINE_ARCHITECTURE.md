@@ -21,7 +21,7 @@ FOOTBALL/
 │
 ├── competitions/
 │   ├── worldcup/                 ← World Cup 2026
-│   │   ├── main.py               ← WC orchestrator (live loop, governance, blending)
+│   │   ├── web/                  ← web layer (replaced CLI)
 │   │   ├── __init__.py           ← sys.path bootstrap
 │   │   ├── src/
 │   │   │   ├── constants.py      ← extends football_core.constants
@@ -32,7 +32,6 @@ FOOTBALL/
 │   │   │   ├── fetcher.py        ← re-exports football_core.fetcher
 │   │   │   ├── math_utils.py     ← re-exports football_core.math_utils
 │   │   │   ├── knockout.py       ← WC-only (R32, TPP, full simulation orchestrator)
-│   │   │   ├── output.py         ← WC-only display
 │   │   │   ├── blender.py        ← WC-only (calibrate_and_blend)
 │   │   │   ├── evaluation.py     ← WC-only (evaluate_all_matches)
 │   │   │   ├── governance.py     ← WC-only (_run_governance)
@@ -44,10 +43,8 @@ FOOTBALL/
 │   │   └── data/                 ← WC teams, groups, bracket, historical
 │   │
 │   ├── euro/                     ← Euro 2024
-│   │   ├── main.py               ← thin orchestrator
 │   │   ├── __init__.py           ← sys.path bootstrap (repo root + worldcup/)
 │   │   ├── simulation.py         ← Euro simulation engine
-│   │   ├── display.py            ← Euro display
 │   │   ├── config.py             ← Euro constants
 │   │   └── data/                 ← Euro teams, groups, bracket
 │   │
@@ -104,8 +101,8 @@ from football_core.groups import expected_goals, _tiebreak_group, ...
 | `competitions/worldcup/src/groups.py` (WC extras) | `compute_standings` — hardcodes `"ABCDEFGHIJKL"`, `rank_third_placed` — picks top 8 of 12, `select_advancers` — top8_groups, `resolve_r32_matchups` — Annex C R32 logic | Deep |
 | `competitions/worldcup/src/state.py` (WC extras) | `validate_groups` — 12 groups A–L, `validate_annex_c` — 495-entry table, `migrate_prediction_history`, `ledger_upsert`, governance I/O | Medium |
 | `competitions/worldcup/src/knockout.py` | `ROUND_ORDER = ["R16", "QF", "SF", "FINAL"]`, `ROUND_KEYS = {"QF": "qf", "SF": "sf", "FINAL": "final"}`, 3rd-place playoff (`TPP`), R32 Annex C resolution | Deep |
-| `competitions/worldcup/src/output.py` | Header prints "WORLD CUP DYNAMIC PREDICTOR — v1.1", 12-group standings, Annex C refs | Shallow |
-| `competitions/worldcup/main.py` | WC-specific pipeline; `_parse_args` sets `prog="wc-predict"`; signal key list `["elo", "market_odds", "catboost", "form", "lineup_strength"]` | Deep |
+| `competitions/worldcup/src/output.py` | Removed in web-only transition | N/A (deleted) |
+| `competitions/worldcup/main.py` | Removed in web-only transition | N/A (deleted) |
 | `competitions/worldcup/src/blender.py` | Signal key list, calibration params file names | Medium |
 | `competitions/worldcup/src/evaluation.py` | I/O leak via `load_prediction_history` from state | Medium |
 | `competitions/worldcup/src/governance.py` | Display leak via `print_governance_dashlet` from output | Medium |
@@ -118,9 +115,7 @@ from football_core.groups import expected_goals, _tiebreak_group, ...
 
 | Module | Purpose |
 |---|---|
-| `competitions/euro/main.py` | Thin orchestrator, different CLI |
 | `competitions/euro/simulation.py` | 6-group → R16 (top 2 + 4 best 3rd) → QF → SF → FINAL |
-| `competitions/euro/display.py` | Simpler probability table, no trend arrows, no signal detail |
 | `competitions/euro/config.py` | 6 groups, 4 third-placed advancers, Euro league ID |
 | `competitions/euro/data/` | Euro 2024 teams, groups, bracket |
 
@@ -168,24 +163,19 @@ football-engine/
 │
 ├── competitions/
 │   ├── worldcup/
-│   │   ├── main.py              ← thin CLI (was ~1500 LOC)
+│   │   ├── web/                 ← web layer (was CLI)
 │   │   ├── config.py            ← WC-specific constants
 │   │   ├── simulation.py        ← groups.py + knockout.py (WC-specific)
-│   │   ├── display.py           ← WC-specific output
 │   │   └── data/
 │   │
 │   ├── euro/
-│   │   ├── main.py
 │   │   ├── config.py
 │   │   ├── simulation.py
-│   │   ├── display.py
 │   │   └── data/
 │   │
 │   ├── ucl/
-│   │   ├── main.py
 │   │   ├── config.py
 │   │   ├── simulation.py        ← UCL 2024+ Swiss-system + knockout
-│   │   ├── display.py
 │   │   └── data/
 │   │
 │   ├── laliga/                  ← future
@@ -231,7 +221,7 @@ football-engine/
             │                                       │
             ▼                                       ▼
   competitions/worldcup/                    competitions/laliga/
-  display.py                                display.py
+  web/                                      web/
   (champion probabilities)                   (final table)
 ```
 
@@ -470,10 +460,7 @@ def run_simulation(...) -> dict[str, dict[str, float]]:
     """Return {team_name: {stage: probability}}."""
     ...
 
-# competitions/<name>/display.py
-def print_probability_table(probs, prev_probs=None, prob_log=None) -> None: ...
-def print_header(teams, bracket, played, aliases, groups, annex_c) -> None: ...
-def print_shutdown_banner(probs) -> None: ...
+# Web layer handles display (CLI display.py was removed)
 ```
 
 ### 6.2 What `football_core` provides to competitions
@@ -495,7 +482,7 @@ from football_core.predictors.catboost import fetch_and_cache_catboost
 
 ```
 football_core/state.py           # functions use data_dir from caller
-competitions/worldcup/main.py    # passes data/<league_id> to every persistence call
+competitions/worldcup/web/    # web layer passes data/<league_id> to every persistence call
 ```
 
 All state persists in `competitions/<name>/data/`. Every `state.py` function accepts `data_dir`.
@@ -505,9 +492,9 @@ All state persists in `competitions/<name>/data/`. Every `state.py` function acc
 1. Create `competitions/<name>/` directory
 2. Provide `config.py` with competition constants
 3. Provide `simulation.py` with the competition's simulation engine
-4. Provide `display.py` with competition-specific output
+4. Provide web display via the web layer
 5. Provide competition data files in `data/`
-6. Write a thin `main.py` that wires `football_core` → competition logic
+6. Wire `football_core` → competition logic in the web layer
 7. Zero changes to `football_core/`
 
 ---

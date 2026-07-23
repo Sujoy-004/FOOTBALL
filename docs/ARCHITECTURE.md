@@ -3,9 +3,9 @@
 
 ## 1. Overview
 
-This project is a **Monte Carlo football tournament prediction engine** — a collection of CLI tools that simulate football competitions (World Cup, UEFA Euro, UEFA Champions League) using Poisson-distributed match outcomes driven by Elo ratings. Each competition is a standalone CLI program (`wc-predict`, `euro-predict`, `ucl-predict`) that shares a common engine library (`football_core/`). The architecture follows a **hub-and-spoke** pattern: a flat shared library at the project root provides core math, data-fetching, and state-management primitives, while competition modules in `competitions/` add competition-specific simulation orchestration, display logic, and tournament format details.
+This project is a **Monte Carlo football tournament prediction engine** that simulates football competitions (World Cup, UEFA Champions League) using Poisson-distributed match outcomes driven by Elo ratings. The sole interface is a **FastAPI web dashboard** on port 8080 with a retro terminal-emulator aesthetic. All competitions share a common engine library (`football_core/`). The architecture follows a **hub-and-spoke** pattern: a flat shared library at the project root provides core math, data-fetching, and state-management primitives, while competition modules in `competitions/` add competition-specific simulation orchestration and tournament format details.
 
-The system also includes a **FastAPI web dashboard** (`web/`) that exposes the prediction engine as a real-time web application. The dashboard serves a **SPA frontend** from `web/static/` via two competition sub-apps — `wc_app` for World Cup and `ucl_app` for UCL — mounted under a unified FastAPI server at `web/server.py` (port 8080, served by uvicorn). In addition to read-only dashboards (standings, bracket, odds tables, signal evaluation), the dashboard provides a **what-if engine** (`web/whatif_engine.py`) for instant natural-language scenario analysis and a **insight engine** (`web/insight.py`) for per-match signal breakdowns, form trends, head-to-head statistics, and natural-language summaries. All state is persisted as JSON files on disk. User interaction is available via both `argparse` CLI and the web UI.
+The web dashboard serves a **SPA frontend** from `web/static/` via two competition sub-apps — `wc_app` for World Cup and `ucl_app` for UCL — mounted under a unified FastAPI server at `web/server.py` (port 8080, served by uvicorn). The dashboard provides dashboards (standings, bracket, odds tables, signal evaluation), a **what-if engine** (`web/whatif_engine.py`) for instant natural-language scenario analysis, an **insight engine** (`web/insight.py`) for per-match signal breakdowns, and a **retro terminal** (`static/shared.js`) as the default UI. All state is persisted as JSON files on disk.
 
 ---
 
@@ -64,17 +64,14 @@ The system also includes a **FastAPI web dashboard** (`web/`) that exposes the p
 │  ┌──────────┐  ┌────────┐  ┌─────┐ │
 │  │ worldcup │  │  euro  │  │ ucl │ │
 │  │          │  │        │  │     │ │
-│  │ main.py  │  │main.py │  │main.│ │
-│  │ src/     │  │simul.. │  │py   │ │
-│  │  knockout│  │display │  │src/  │ │
-│  │  output  │  │config  │  │ sim. │ │
-│  │  eval.   │  └────────┘  │ kno. │ │
-│  │  gov.    │              │ grps │ │
-│  │  const.  │              │ val. │ │
-│  │  form    │              │ live │ │
-│  │  lineup  │              │provid.│ │
-│  │  avail.  │              │replay│ │
-│  │  mgr_sig │              │sig_reg│ │
+ │  │ src/     │  │simul.. │  │src/  │ │
+ │  │  engine  │  │config  │  │ sim. │ │
+ │  │  analysis│  └────────┘  │ kno. │ │
+ │  │  knockout│              │ grps │ │
+ │  │  groups  │              │ orch.│ │
+ │  │  eval.   │              │ val. │ │
+ │  │  gov.    │              │provid│ │
+ │  │  blender │              │replay│ │
 │  └────┬─────┘              └─────┘ │
 └───────┼───────────────────────────┘
         │ imports all via football_core.*
@@ -147,7 +144,7 @@ World Cup uses re-export wrappers because its internal modules were written befo
 
 ## 3. Data Flow
 
-The data flow differs between **live-polling** competitions (worldcup, euro) and the **single-run** competition (ucl).
+The data flow differs between **live-polling** competitions (worldcup) and the **single-run** competition (ucl).
 
 ### 3.1 Live-Polling Flow (World Cup, Euro)
 
@@ -377,14 +374,14 @@ All three competitions follow the same logical pipeline:
 Load data → Fetch live info (or skip) → Simulate Monte Carlo → Display results
 ```
 
-The simulation kernel is always Poisson-distributed match outcomes computed from Elo ratings via `football_core.elo.expected_score()`. All competitions use `football_core.state` for JSON file persistence. All use `argparse` for CLI argument parsing.
+The simulation kernel is always Poisson-distributed match outcomes computed from Elo ratings via `football_core.elo.expected_score()`. All competitions use `football_core.state` for JSON file persistence. Data is served through the web dashboard's REST API.
 
 ### 5.2 Differences
 
 | Aspect | World Cup | Euro | UCL |
 |---|---|---|---|
 | **Maturity** | Most mature (614 tests, 24 test files) | Mature (dormant) | Mature (438 tests, 20 test files) |
-| **CLI name** | `wc-predict` | `euro-predict` | `ucl-predict` |
+| **Web route** | `/worldcup` | `/euro` (stub) | `/ucl` |
 | **Poll mode** | Continuous (60s interval) | Continuous (60s interval) | Single-run |
 | **Group format** | 12 groups (A-L), 4 teams each | 6 groups (A-F), 4 teams each | Swiss-system, 36 teams, 8 matchdays |
 | **Third-place advancers** | Top 8 of 12 | Top 4 of 6 | N/A (positions 9-24 → playoff) |
@@ -394,7 +391,7 @@ The simulation kernel is always Poisson-distributed match outcomes computed from
 | **Signals used** | Elo, odds, CatBoost, form, lineup, availability, defensive quality, manager effect | Elo, odds, CatBoost | 5-signal ensemble (RefinedElo, MarketOdds, RollingForm, SquadValue, RestDays) |
 | **Blending** | Brier-weighted 8-signal fusion | None | Log-loss-weighted uniform blend via EnsembleEngine |
 | **Governance** | Drift detection, version tracking, backtest | None | None |
-| **Display** | Rich: standings table, trend arrows, delta, signal detail, AI previews | Simple: probability table only | Structured: standings, playoff, bracket, odds table |
+| **Display** | Web dashboard: standings, bracket, terminal, what-if, signal detail | Stub | Web dashboard: standings, bracket, odds, terminal, what-if |
 | **Validation** | History-based evaluation | None | `--validate` flag cross-checks vs BSD results |
 | **BSD integration** | Full: group + knockout fetch, alias resolution | Full: group + knockout fetch | Partial: validation-only fetch |
 
@@ -409,18 +406,17 @@ These remain in `competitions/worldcup/src/` because no other competition needs 
 - `predictors/lineup.py` — lineup strength signal
 - `predictors/manager_signals.py` — manager-based signal orchestration (uses `football_core.providers.manager`, `football_core.signals.defensive_quality`, `football_core.signals.manager_effect`)
 - `predictors/availability.py` — availability signal orchestration (uses `football_core.providers.player`, `football_core.signals.availability`)
-- `output.py` — WC-specific display with 12-group standings, trend arrows, signal detail
 - `knockout.py` — full simulation orchestrator with R32 Annex C routing
 
 ### 5.4 Sys.Path Bootstrap
 
-Each competition module manipulates `sys.path` at import time:
+Each competition module manipulates `sys.path` at import time for `football_core` resolution:
 
-- **`competitions/worldcup/__init__.py`**: Adds repo root (for `football_core`) and `competitions/worldcup/` (for `src`).
-- **`competitions/euro/__init__.py`**: Adds repo root and `competitions/worldcup/` (needed because Euro imports `compute_standings` from `src.groups` for historical catch-up).
-- **`competitions/ucl/__init__.py`**: Minimal bootstrap for `competitions.ucl.*` package imports.
+- **`competitions/worldcup/__init__.py`**: Adds repo root (for `football_core`) and `competitions/worldcup/src/` directory.
+- **`competitions/ucl/__init__.py`**: Adds repo root and `competitions/ucl/` directory.
+- **`competitions/euro/__init__.py`**: Minimal bootstrap — imports `football_core` and `competitions.worldcup.src.groups` via absolute paths.
 
-This is a deliberate trade-off: it avoids rewriting all module-level import paths but creates implicit cross-competition dependencies (notably Euro → World Cup `src.groups`). See [FOOTBALL_ENGINE_ARCHITECTURE.md](./FOOTBALL_ENGINE_ARCHITECTURE.md) §7 for the eventual migration plan.
+This is a deliberate trade-off: it avoids a `pyproject.toml` / pip-installable package while keeping import resolution working from source. Euro's previous sys.path manipulation for `worldcup/` was removed in Phase D when its import was migrated to an absolute path.
 
 ---
 
@@ -432,7 +428,7 @@ This is a deliberate trade-off: it avoids rewriting all module-level import path
 
 ### 6.2 Sys.Path over pip Install
 
-The project runs from source without a build step. This avoids tooling overhead (no `pyproject.toml`, no `setup.py`, no virtualenv requirement) and keeps the development loop fast: edit → run. The downside is that other projects cannot `pip install football_core`.
+The project runs from source without a build step. This avoids tooling overhead (no `pyproject.toml`, no `setup.py`) and keeps the development loop fast: edit → run (with hot reload via `uvicorn --reload`). The downside is that other projects cannot `pip install football_core`.
 
 ### 6.3 Rule-of-Two Extraction
 

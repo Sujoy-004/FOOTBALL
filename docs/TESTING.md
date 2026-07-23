@@ -62,7 +62,6 @@ FOOTBALL/
 │   ├── test_main_loop.py
 │   ├── test_migration.py
 │   ├── test_odds.py
-│   ├── test_output.py
 │   ├── test_scaffold.py
 │   ├── test_state.py
 │   └── test_state_load.py
@@ -73,7 +72,6 @@ FOOTBALL/
 │   ├── test_calibrate.py                  Calibration pipeline (fit, transform, save/load)
 │   ├── test_cli.py
 │   ├── test_counterfactual.py             Counterfactual analysis (what-if scenarios)
-│   ├── test_display.py
 │   ├── test_elo_updater.py
 │   ├── test_ensemble.py                   Ensemble signal blending
 │   ├── test_explainability.py             Explainability metrics (SHAP, feature importance)

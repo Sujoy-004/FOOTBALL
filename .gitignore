@@ -21,6 +21,7 @@ Thumbs.db
 
 # World Cup — generated runtime data
 # These are regeneratable by running the prediction pipeline.
+competitions/worldcup/teams.json
 competitions/worldcup/data/predictions_ledger.json
 competitions/worldcup/data/versions.json
 competitions/worldcup/data/elo_applied.json
@@ -48,6 +49,10 @@ probability_log.json
 availability_cache.json
 defensive_cache.json
 manager_effect_cache.json
+
+# Root-level test artifacts (regeneratable by running tests)
+teams.json
+elo_update_log.json
 
 # AI-generated responses, agent context files, and one-time reports
 /RESPONSE.md
