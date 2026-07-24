@@ -21,10 +21,11 @@ cd FOOTBALL
 pip install -r competitions/worldcup/requirements.txt
 pip install requests numpy fastapi uvicorn
 
-# 3. Set your BSD API key (required for live match data and market odds)
-cp competitions/worldcup/.env.example competitions/worldcup/.env
-# Edit .env and set BSD_API_KEY=your_key_here
-# Get a free key at https://sports.bzzoiro.com/register/
+# 3. Configure data provider
+cp .env.example .env  # or edit .env directly
+# Edit .env and set FOOTBALL_DATA_ORG_KEY (free key from https://www.football-data.org/client/register)
+# The default DATA_PROVIDER=football-data uses this key for match results.
+# BSD API key is optional — set DATA_PROVIDER=bsd and BSD_API_KEY if available.
 
 # 4. Start the web dashboard
 python -m web.server
@@ -109,9 +110,12 @@ FOOTBALL/
 │   ├── math_utils.py           Sigmoid and other math helpers
 │   ├── constants.py            Shared configuration constants
 │   ├── signal.py               Signal computation framework
-│   ├── provider.py             Data provider framework
+│   ├── provider.py             Data provider protocols (DataProvider, FixtureProvider)
 │   ├── result_provider.py      Result data provider
-│   ├── providers/              BSD data providers
+│   ├── data_providers/         Data provider implementations
+│   │   ├── bsd_provider.py     BSD API provider (sports.bzzoiro.com)
+│   │   └── football_data_org_provider.py  football-data.org v4 provider
+│   ├── providers/              BSD data providers (legacy wrappers)
 │   │   ├── manager.py          Manager profile fetcher & parser
 │   │   ├── player.py           Player profile fetcher & parser
 │   │   └── team.py             Team ID-to-name mapping
@@ -182,11 +186,41 @@ FOOTBALL/
     └── COMMONALITY_REPORT.md
 ```
 
+## Data Provider Architecture
+
+The engine uses a pluggable provider system to fetch external data. Two providers are available:
+
+| Provider | Source | Match Results | Predictions | Managers | Players |
+|---|---|---|---|---|---|
+| **FootballDataOrg** | `api.football-data.org/v4` | ✅ (WC, CL, ...) | ❌ | ❌ | ❌ |
+| **BSD** | `sports.bzzoiro.com` | ✅ (requires key) | ✅ | ✅ | ✅ |
+
+Selection is driven by the `DATA_PROVIDER` env var in `.env`:
+- `football-data` (default) — match results from football-data.org; BSD-only signals degrade gracefully
+- `bsd` — all data from BSD API (requires non-blocked network + `BSD_API_KEY`)
+
+When a provider cannot return data (network blocked, missing key, rate-limited), the corresponding signals are marked `available: false` in the UI and weighted at zero by the blender. The Monte Carlo simulation still runs on the remaining active signals (Elo, form, lineup, squad value).
+
+### Protocol
+
+All providers implement `football_core.provider.DataProvider`:
+
+```python
+class DataProvider(Protocol):
+    def fetch_matches(self, competition_id: str, **kwargs) -> list[dict]: ...
+    def fetch_predictions(self, competition_id: str, **kwargs) -> list[dict]: ...
+    def fetch_managers(self, competition_id: str, **kwargs) -> list[dict]: ...
+    def fetch_players(self, competition_id: str, **kwargs) -> list[dict]: ...
+```
+
+New providers can be added by implementing this protocol and registering in the `_get_data_provider()` factory in `web/wc_app.py`.
+
 ## Requirements
 
 - **Python:** 3.10, 3.11, or 3.12
 - **Dependencies:** pytest, pytest-cov, python-dotenv, requests, numpy, fastapi, uvicorn
-- **API key:** A free [BSD API key](https://sports.bzzoiro.com/register/) for live match data, market odds, and CatBoost predictions. The engine can run in Elo-only mode without an API key, but will not fetch live data or signals.
+- **API key (recommended):** A free [football-data.org key](https://www.football-data.org/client/register) for live match results. Set `DATA_PROVIDER=football-data` and `FOOTBALL_DATA_ORG_KEY` in `.env`.
+- **BSD API key (optional):** A free [BSD API key](https://sports.bzzoiro.com/register/) for market odds, CatBoost predictions, manager profiles, and player availability. Set `DATA_PROVIDER=bsd` and `BSD_API_KEY` in `.env`. BSD-dependent signals degrade gracefully when unavailable.
 
 ## License
 

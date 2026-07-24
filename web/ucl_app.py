@@ -37,6 +37,7 @@ from web.common import ts, boot_step
 from web.whatif_engine import handle_instant_scenario, parse_scenario
 
 BSD_API_KEY: str = os.environ.get("BSD_API_KEY", "")
+FOOTBALL_DATA_ORG_KEY: str = os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
 UCL_LEAGUE_ID: int = 7
 
 _BSD_TEAM_ALIASES: dict[str, str] = {
@@ -118,43 +119,57 @@ def _parse_what_if_scenario(scenario: str, match: dict) -> dict | None:
     return deltas if deltas else None
 
 
-def _fetch_ucl_managers(api_key: str) -> dict[str, dict]:
-    try:
-        url = f"https://sports.bzzoiro.com/api/managers/?league={UCL_LEAGUE_ID}"
-        resp = requests.get(url, headers={"Authorization": f"Token {api_key}"}, timeout=15)
-        if resp.status_code != 200:
-            return {}
-        data = resp.json()
-        results = data.get("results", [])
-        mapped: dict[str, dict] = {}
-        for m in results:
-            ct = m.get("current_team")
-            bsd_name = ct.get("name") if isinstance(ct, dict) else (ct if isinstance(ct, str) else "")
-            our_name = _BSD_TEAM_ALIASES.get(bsd_name)
-            if not our_name:
-                continue
-            mapped[our_name] = {
-                "name": m.get("name", ""),
-                "team": our_name,
-                "win_pct": m.get("win_pct") or 0.0,
-                "avg_goals_scored": m.get("avg_goals_scored") or 0.0,
-                "avg_goals_conceded": m.get("avg_goals_conceded") or 0.0,
-                "avg_xg_for": m.get("avg_xg_for") or 0.0,
-                "avg_xg_against": m.get("avg_xg_against") or 0.0,
-                "clean_sheet_pct": m.get("clean_sheet_pct") or 0.0,
-                "btts_pct": m.get("btts_pct") or 0.0,
-                "over_25_pct": m.get("over_25_pct") or 0.0,
-                "avg_possession": m.get("avg_possession") or 0.0,
-                "preferred_formation": m.get("preferred_formation", ""),
-                "formations_used": m.get("formations_used", []),
-                "team_style": m.get("team_style", "balanced"),
-                "pressing_intensity": m.get("pressing_intensity", ""),
-                "defensive_line": m.get("defensive_line", ""),
-                "profile": m.get("profile", ""),
-            }
-        return mapped
-    except Exception:
+def _get_ucl_data_provider():
+    """Select UCL data provider — only BSD has manager data."""
+    from football_core.data_providers.bsd_provider import BSDDataProvider
+
+    mode = os.environ.get("DATA_PROVIDER", "").lower()
+    if mode == "football-data":
+        return None
+    if BSD_API_KEY:
+        return BSDDataProvider(BSD_API_KEY, league_id=UCL_LEAGUE_ID)
+    return None
+
+
+def _fetch_ucl_managers() -> dict[str, dict]:
+    """Fetch UCL manager data via the active provider.
+
+    Returns an empty dict when BSD is unavailable (football-data provider
+    or no BSD_API_KEY) — the caller skips manager-dependent features.
+    """
+    provider = _get_ucl_data_provider()
+    if provider is None:
         return {}
+    raw = provider.fetch_managers(league_id=UCL_LEAGUE_ID)
+    if not raw:
+        return {}
+    mapped: dict[str, dict] = {}
+    for m in raw:
+        ct = m.get("current_team")
+        bsd_name = ct.get("name") if isinstance(ct, dict) else (ct if isinstance(ct, str) else "")
+        our_name = _BSD_TEAM_ALIASES.get(bsd_name)
+        if not our_name:
+            continue
+        mapped[our_name] = {
+            "name": m.get("name", ""),
+            "team": our_name,
+            "win_pct": m.get("win_pct") or 0.0,
+            "avg_goals_scored": m.get("avg_goals_scored") or 0.0,
+            "avg_goals_conceded": m.get("avg_goals_conceded") or 0.0,
+            "avg_xg_for": m.get("avg_xg_for") or 0.0,
+            "avg_xg_against": m.get("avg_xg_against") or 0.0,
+            "clean_sheet_pct": m.get("clean_sheet_pct") or 0.0,
+            "btts_pct": m.get("btts_pct") or 0.0,
+            "over_25_pct": m.get("over_25_pct") or 0.0,
+            "avg_possession": m.get("avg_possession") or 0.0,
+            "preferred_formation": m.get("preferred_formation", ""),
+            "formations_used": m.get("formations_used", []),
+            "team_style": m.get("team_style", "balanced"),
+            "pressing_intensity": m.get("pressing_intensity", ""),
+            "defensive_line": m.get("defensive_line", ""),
+            "profile": m.get("profile", ""),
+        }
+    return mapped
 
 
 def _load_results() -> list[dict]:
@@ -396,7 +411,7 @@ def deterministic_compute() -> dict:
         boot_log_local.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback — using UEFA coefficients for {len(elo_ratings)} teams"})
     bsd_manager_data: dict[str, dict] = {}
     if BSD_API_KEY:
-        bsd_manager_data = boot_step("Fetch BSD managers", lambda: _fetch_ucl_managers(BSD_API_KEY), boot_log_local)
+        bsd_manager_data = boot_step("Fetch BSD managers", lambda: _fetch_ucl_managers(), boot_log_local)
     cache["bsd_manager_data"] = bsd_manager_data
     standings = boot_step("Compute standings", lambda: _compute_deterministic_standings(results), boot_log_local)
     if not standings:
@@ -486,7 +501,7 @@ def compute_all() -> dict:
         boot_log_local.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback — using UEFA coefficients for {len(elo_ratings)} teams"})
     bsd_manager_data: dict[str, dict] = {}
     if BSD_API_KEY:
-        bsd_manager_data = boot_step("Fetch BSD managers", lambda: _fetch_ucl_managers(BSD_API_KEY), boot_log_local)
+        bsd_manager_data = boot_step("Fetch BSD managers", lambda: _fetch_ucl_managers(), boot_log_local)
     else:
         boot_log_local.append({"step": "BSD managers", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] BSD_API_KEY not set — skipping manager data"})
     cache["bsd_manager_data"] = bsd_manager_data
@@ -750,7 +765,7 @@ def _run_mc_simulation(
     if progress_cb: progress_cb(10, 0)
     bsd_manager_data = cache.get("bsd_manager_data", {})
     if not bsd_manager_data and BSD_API_KEY:
-        bsd_manager_data = _fetch_ucl_managers(BSD_API_KEY)
+        bsd_manager_data = _fetch_ucl_managers()
     if bsd_manager_data and elo_ratings:
         for t in team_names:
             base = elo_ratings.get(t, 1400.0)

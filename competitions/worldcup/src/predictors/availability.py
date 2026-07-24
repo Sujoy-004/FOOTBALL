@@ -12,6 +12,31 @@ from football_core.signals.availability import compute_availability_signal_for_m
 logger = logging.getLogger(__name__)
 
 
+def _all_match_ids(
+    groups: dict,
+    bracket: list[dict] | None,
+) -> set[str]:
+    """Collect all match IDs from groups and optional bracket."""
+    mids: set[str] = set()
+    groups_data = groups.get("groups", groups) if isinstance(groups, dict) else groups
+    for gd in groups_data.values():
+        for match in gd.get("matches") or []:
+            mid = match.get("match_id")
+            if mid:
+                mids.add(mid)
+    if bracket:
+        for match in bracket:
+            mid = match.get("match_id")
+            if mid:
+                mids.add(mid)
+    return mids
+
+
+def _unavailable_matches(match_ids: set[str]) -> dict[str, dict]:
+    """Build a match dict with all entries marked unavailable."""
+    return {mid: {"probability": None, "available": False} for mid in match_ids}
+
+
 def fetch_and_cache_availability_signal(
     api_key: str,
     groups: dict,
@@ -20,6 +45,9 @@ def fetch_and_cache_availability_signal(
     cache_ttl_hours: int = 6,
 ) -> dict:
     """Fetch player data and compute availability signal.
+
+    When player data is empty (BSD blocked / unavailable), returns a cache
+    with ``available: False`` for every match — the blender ignores it.
 
     Args:
         api_key: BSD API token.
@@ -38,6 +66,12 @@ def fetch_and_cache_availability_signal(
 
     now = datetime.now(timezone.utc)
     expires_at = (now + timedelta(hours=cache_ttl_hours)).isoformat()
+
+    # Graceful degradation: no player data → mark all matches unavailable
+    if not player_data:
+        logger.warning("No player data — returning unavailable availability signal")
+        mid_set = _all_match_ids(groups, bracket)
+        return {"fetched_at": now.isoformat(), "expires_at": expires_at, "matches": _unavailable_matches(mid_set)}
 
     matches = {}
 

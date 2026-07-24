@@ -11,7 +11,6 @@ from football_core.predictors.catboost import (
     _extract_xg,
     _find_match_id,
     parse_catboost_response,
-    predictions_url_for_league,
     fetch_and_cache_catboost as _core_fetch_and_cache_catboost,
 )
 

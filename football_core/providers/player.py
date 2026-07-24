@@ -6,18 +6,14 @@ injury impact signal. Fetched once per TTL, cached by the orchestrator.
 
 import json
 import logging
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-import requests
-
 from football_core import constants
+from football_core.data_providers.bsd_provider import BSDDataProvider
 from football_core.providers.team import fetch_teams
 
 logger = logging.getLogger(__name__)
-
-PLAYERS_API_URL: str = "https://sports.bzzoiro.com/api/v2/players/"
 
 
 @dataclass
@@ -36,62 +32,9 @@ def fetch_players(
     league_id: int = 27,
     timeout: int | None = None,
 ) -> list[dict]:
-    """Fetch raw player data from BSD `/api/v2/players/`.
-
-    Args:
-        api_key: BSD API token.
-        league_id: BSD league ID (default 27 = World Cup 2026).
-        timeout: Request timeout in seconds.
-
-    Returns:
-        Raw list of player dicts from the API (paginated).
-
-    Raises:
-        requests.RequestException: On HTTP or connection failure after retries.
-    """
-    if timeout is None:
-        timeout = constants.API_TIMEOUT
-
-    url = f"{PLAYERS_API_URL}?league_id={league_id}&limit=200"
-    headers = {"Authorization": f"Token {api_key}"}
-    backoff_seconds = [1, 2, 4]
-
-    for attempt in range(3):
-        try:
-            resp = requests.get(url, headers=headers, timeout=timeout)
-            if resp.status_code == 401:
-                logger.warning("HTTP 401 fetching players, returning []")
-                return []
-            resp.raise_for_status()
-            data = resp.json()
-            all_players: list[dict] = list(data.get("results", []))
-
-            next_url = data.get("next")
-            while next_url:
-                resp = requests.get(next_url, headers=headers, timeout=timeout)
-                resp.raise_for_status()
-                data = resp.json()
-                all_players.extend(data.get("results", []))
-                next_url = data.get("next")
-
-            return all_players
-        except requests.exceptions.Timeout:
-            logger.warning("Players request timed out (attempt %d/3)", attempt + 1)
-            if attempt < 2:
-                time.sleep(backoff_seconds[attempt])
-                continue
-            raise
-        except requests.exceptions.ConnectionError:
-            logger.warning("Players connection error (attempt %d/3)", attempt + 1)
-            if attempt < 2:
-                time.sleep(backoff_seconds[attempt])
-                continue
-            raise
-        except (json.JSONDecodeError, requests.exceptions.JSONDecodeError):
-            logger.warning("Players malformed JSON, returning []")
-            return []
-
-    return []
+    """Thin wrapper — delegates to :class:`BSDDataProvider.fetch_players`."""
+    provider = BSDDataProvider(api_key, league_id=league_id)
+    return provider.fetch_players(league_id=league_id, timeout=timeout or constants.API_TIMEOUT)
 
 
 def parse_players(

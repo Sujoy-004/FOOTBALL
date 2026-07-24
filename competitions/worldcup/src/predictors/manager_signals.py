@@ -14,6 +14,31 @@ from football_core.signals.manager_effect import compute_manager_signal, compute
 logger = logging.getLogger(__name__)
 
 
+def _all_match_ids(
+    groups: dict,
+    bracket: list[dict] | None,
+) -> set[str]:
+    """Collect all match IDs from groups and optional bracket."""
+    mids: set[str] = set()
+    groups_data = groups.get("groups", groups) if isinstance(groups, dict) else groups
+    for gd in groups_data.values():
+        for match in gd.get("matches") or []:
+            mid = match.get("match_id")
+            if mid:
+                mids.add(mid)
+    if bracket:
+        for match in bracket:
+            mid = match.get("match_id")
+            if mid:
+                mids.add(mid)
+    return mids
+
+
+def _unavailable_matches(match_ids: set[str]) -> dict[str, dict]:
+    """Build a match dict with all entries marked unavailable."""
+    return {mid: {"probability": None, "available": False} for mid in match_ids}
+
+
 def fetch_and_cache_manager_signals(
     api_key: str,
     groups: dict,
@@ -25,6 +50,9 @@ def fetch_and_cache_manager_signals(
 
     One API call serves both signals. Each signal gets its own cache dict
     matching the standard ``{fetched_at, expires_at, matches}`` schema.
+
+    When manager data is empty (BSD blocked / unavailable), both caches
+    return ``available: False`` for every match — the blender ignores them.
 
     Args:
         api_key: BSD API token.
@@ -45,6 +73,13 @@ def fetch_and_cache_manager_signals(
 
     now = datetime.now(timezone.utc)
     expires_at = (now + timedelta(hours=cache_ttl_hours)).isoformat()
+
+    # Graceful degradation: no manager data → mark all matches unavailable
+    if not manager_data:
+        logger.warning("No manager data — returning unavailable defensive/manager signals")
+        mid_set = _all_match_ids(groups, bracket)
+        empty = {"fetched_at": now.isoformat(), "expires_at": expires_at, "matches": _unavailable_matches(mid_set)}
+        return empty, empty
 
     defensive_matches = {}
     manager_matches = {}

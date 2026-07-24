@@ -1,77 +1,16 @@
 """Fetch and process live match results from BSD API — generic pipeline."""
 
-import json
 import logging
-import time
-from datetime import datetime
 
-import requests
-
-from football_core import constants
+from football_core.data_providers.bsd_provider import BSDDataProvider
 
 logger = logging.getLogger(__name__)
 
 
 def fetch_raw_matches(api_key: str, api_url: str, league_id: int, timeout: int = 10) -> list[dict]:
-    if timeout == 10:
-        timeout = constants.API_TIMEOUT
-
-    headers = {"Authorization": f"Token {api_key}"}
-    backoff_seconds = [1, 2, 4]
-
-    for attempt in range(3):
-        try:
-            resp = requests.get(api_url, headers=headers, timeout=timeout)
-
-            if resp.status_code == 401:
-                logger.debug("HTTP 401 (invalid API key), returning []")
-                return []
-
-            resp.raise_for_status()
-            data = resp.json()
-            all_events = list(data.get("results", []))
-
-            next_url = data.get("next")
-            while next_url:
-                resp = requests.get(next_url, headers=headers, timeout=timeout)
-                resp.raise_for_status()
-                data = resp.json()
-                all_events.extend(data.get("results", []))
-                next_url = data.get("next")
-
-            all_events = [
-                e for e in all_events
-                if isinstance(e.get("league"), dict)
-                and e["league"].get("id") == league_id
-            ]
-            return all_events
-
-        except requests.exceptions.Timeout:
-            logger.debug("Request timed out (attempt %d/3)", attempt + 1)
-            if attempt < 2:
-                time.sleep(backoff_seconds[attempt])
-                continue
-            return []
-
-        except requests.exceptions.ConnectionError:
-            logger.debug("Connection error (attempt %d/3)", attempt + 1)
-            if attempt < 2:
-                time.sleep(backoff_seconds[attempt])
-                continue
-            return []
-
-        except requests.exceptions.HTTPError:
-            logger.debug("HTTP error (attempt %d/3)", attempt + 1)
-            if attempt < 2:
-                time.sleep(backoff_seconds[attempt])
-                continue
-            return []
-
-        except (json.JSONDecodeError, requests.exceptions.JSONDecodeError):
-            logger.debug("Malformed JSON response, returning []")
-            return []
-
-    return []
+    """Thin wrapper — delegates to :class:`BSDDataProvider.fetch_matches`."""
+    provider = BSDDataProvider(api_key, league_id=league_id)
+    return provider.fetch_matches(url=api_url, league_id=league_id, timeout=timeout)
 
 
 def process_matches(

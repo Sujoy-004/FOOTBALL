@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 BSD_API_KEY = os.getenv("BSD_API_KEY", "")
+FOOTBALL_DATA_ORG_KEY = os.getenv("FOOTBALL_DATA_ORG_KEY", "")
 
 DATA_DIR = constants.DATA_DIR
 
@@ -47,6 +48,33 @@ cache: dict = {}
 boot_log: list[dict] = []
 active_simulations: dict[str, dict] = {}
 sim_lock = threading.Lock()
+
+
+def _get_data_provider():
+    """Select and return the active data provider based on env vars.
+
+    Order of precedence:
+      1. ``DATA_PROVIDER=bsd`` + ``BSD_API_KEY`` set  → BSDDataProvider
+      2. ``DATA_PROVIDER=football-data`` + ``FOOTBALL_DATA_ORG_KEY`` → FootballDataOrgProvider
+      3. No env set → auto-detect from whichever key is available
+      4. No key at all → ``None`` (caller must skip live fetch)
+    """
+    from football_core.data_providers.bsd_provider import BSDDataProvider
+    from football_core.data_providers.football_data_org_provider import FootballDataOrgProvider
+
+    mode = os.getenv("DATA_PROVIDER", "").lower()
+
+    if mode == "bsd" and BSD_API_KEY:
+        return BSDDataProvider(BSD_API_KEY, league_id=constants.DEFAULT_LEAGUE_ID)
+    if mode == "football-data" and FOOTBALL_DATA_ORG_KEY:
+        return FootballDataOrgProvider(FOOTBALL_DATA_ORG_KEY)
+
+    # Auto-detect: try BSD first, then football-data
+    if BSD_API_KEY:
+        return BSDDataProvider(BSD_API_KEY, league_id=constants.DEFAULT_LEAGUE_ID)
+    if FOOTBALL_DATA_ORG_KEY:
+        return FootballDataOrgProvider(FOOTBALL_DATA_ORG_KEY)
+    return None
 
 
 def _build_match_score(played_m):
@@ -621,14 +649,18 @@ def compute_blend_info():
 
 
 def _fetch_live_data() -> None:
-    """Fetch all live data from BSD API at startup.
+    """Fetch live match data + signal caches from the configured provider.
 
-    Fetches match results + all 7 signal predictors, saves signal caches
-    to DATA_DIR so _build_engine_from_caches() finds them. No ledger writes.
-    Called once at server startup if BSD_API_KEY is set.
+    Match results flow through the provider selected by ``DATA_PROVIDER`` env var
+    (or auto-detected from available API keys). BSD-dependent signals are still
+    fetched via BSD API when the key is present; they degrade gracefully when
+    unavailable (see Phase 4 of the provider-swap plan).
     """
-    if not BSD_API_KEY:
+    provider = _get_data_provider()
+    if provider is None:
+        logger.warning("_fetch_live_data: no data provider configured, skipping")
         return
+
     data_dir = DATA_DIR
     try:
         teams = json.loads((data_dir / "teams.json").read_text(encoding="utf-8"))
@@ -639,12 +671,14 @@ def _fetch_live_data() -> None:
         logger.warning("_fetch_live_data: failed to load data files: %s", e)
         return
 
-    # 1. Fetch and process match results
+    # 1. Fetch and process match results via provider
     try:
-        from competitions.worldcup.src.fetcher import build_historic_url, process_matches, process_group_matches
-        from football_core.fetcher import fetch_raw_matches
-        url = build_historic_url()
-        raw_matches = fetch_raw_matches(BSD_API_KEY, url, constants.DEFAULT_LEAGUE_ID)
+        from competitions.worldcup.src.fetcher import process_matches, process_group_matches
+
+        raw_matches = provider.fetch_matches(competition_id="WC")
+        if not raw_matches:
+            logger.warning("_fetch_live_data: provider returned no matches")
+            return
 
         played_groups_path = data_dir / "played_groups.json"
         played_groups = json.loads(played_groups_path.read_text(encoding="utf-8")) if played_groups_path.exists() else {}
@@ -672,7 +706,9 @@ def _fetch_live_data() -> None:
     except Exception as e:
         logger.warning("_fetch_live_data: match fetch failed: %s", e)
 
-    # 2. Fetch and cache all 7 signal predictors
+    # 2. Fetch and cache signal predictors
+    #    BSD-dependent signals degrade gracefully (Phase 4) when BSD_API_KEY
+    #    is missing or the network blocks sports.bzzoiro.com.
     try:
         from competitions.worldcup.src.predictors.catboost import fetch_and_cache_catboost
         from competitions.worldcup.src.predictors.lineup import compute_lineup_signal
@@ -681,8 +717,9 @@ def _fetch_live_data() -> None:
         from competitions.worldcup.src.predictors.manager_signals import fetch_and_cache_manager_signals
         from competitions.worldcup.src.predictors.availability import fetch_and_cache_availability_signal
 
-        cb_cache = fetch_and_cache_catboost(BSD_API_KEY, aliases, groups, bracket_raw)
-        save_signal_cache(cb_cache, CATBOOST_CACHE_FILE, DATA_DIR)
+        if BSD_API_KEY:
+            cb_cache = fetch_and_cache_catboost(BSD_API_KEY, aliases, groups, bracket_raw)
+            save_signal_cache(cb_cache, CATBOOST_CACHE_FILE, DATA_DIR)
 
         lineup_cache = compute_lineup_signal(groups, bracket=bracket_raw)
         save_signal_cache(lineup_cache, LINEUP_CACHE_FILE, DATA_DIR)
@@ -693,19 +730,20 @@ def _fetch_live_data() -> None:
         odds_cache = fetch_and_cache_odds(BSD_API_KEY, raw_matches, aliases, groups, bracket=bracket_raw)
         save_signal_cache(odds_cache, ODDS_CACHE_FILE, DATA_DIR)
 
-        defensive_cache, manager_cache = fetch_and_cache_manager_signals(BSD_API_KEY, groups, bracket=bracket_raw)
-        save_signal_cache(defensive_cache, DEFENSIVE_CACHE_FILE, DATA_DIR)
-        save_signal_cache(manager_cache, MANAGER_EFFECT_CACHE_FILE, DATA_DIR)
+        if BSD_API_KEY:
+            defensive_cache, manager_cache = fetch_and_cache_manager_signals(BSD_API_KEY, groups, bracket=bracket_raw)
+            save_signal_cache(defensive_cache, DEFENSIVE_CACHE_FILE, DATA_DIR)
+            save_signal_cache(manager_cache, MANAGER_EFFECT_CACHE_FILE, DATA_DIR)
 
-        ex = ThreadPoolExecutor(max_workers=1)
-        try:
-            f = ex.submit(fetch_and_cache_availability_signal, BSD_API_KEY, groups, bracket=bracket_raw)
-            avail_cache = f.result(timeout=30)
-            save_signal_cache(avail_cache, AVAILABILITY_CACHE_FILE, DATA_DIR)
-        except FuturesTimeout:
-            logger.warning("_fetch_live_data: availability signal timed out (30s)")
-        finally:
-            ex.shutdown(wait=False)
+            ex = ThreadPoolExecutor(max_workers=1)
+            try:
+                f = ex.submit(fetch_and_cache_availability_signal, BSD_API_KEY, groups, bracket=bracket_raw)
+                avail_cache = f.result(timeout=30)
+                save_signal_cache(avail_cache, AVAILABILITY_CACHE_FILE, DATA_DIR)
+            except FuturesTimeout:
+                logger.warning("_fetch_live_data: availability signal timed out (30s)")
+            finally:
+                ex.shutdown(wait=False)
     except Exception as e:
         logger.warning("_fetch_live_data: signal fetch failed: %s", e)
 

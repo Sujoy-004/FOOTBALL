@@ -6,17 +6,13 @@ and manager effect signals. Fetched once per TTL, cached by the orchestrator.
 
 import json
 import logging
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-import requests
-
 from football_core import constants
+from football_core.data_providers.bsd_provider import BSDDataProvider
 
 logger = logging.getLogger(__name__)
-
-MANAGERS_API_URL: str = "https://sports.bzzoiro.com/api/managers/"
 
 
 @dataclass
@@ -45,56 +41,9 @@ def fetch_managers(
     league_id: int = 27,
     timeout: int | None = None,
 ) -> list[dict]:
-    """Fetch raw manager data from BSD `/api/managers/`.
-
-    Args:
-        api_key: BSD API token.
-        league_id: BSD league ID (default 27 = World Cup 2026).
-        timeout: Request timeout in seconds.
-
-    Returns:
-        Raw list of manager dicts from the API.
-
-    Raises:
-        requests.RequestException: On HTTP or connection failure after retries.
-    """
-    if timeout is None:
-        timeout = constants.API_TIMEOUT
-
-    url = f"{MANAGERS_API_URL}?league={league_id}"
-    headers = {"Authorization": f"Token {api_key}"}
-    backoff_seconds = [1, 2, 4]
-
-    for attempt in range(3):
-        try:
-            resp = requests.get(url, headers=headers, timeout=timeout)
-            if resp.status_code == 401:
-                logger.warning("HTTP 401 fetching managers, returning []")
-                return []
-            resp.raise_for_status()
-            data = resp.json()
-            results = data.get("results", [])
-            if not isinstance(results, list):
-                logger.warning("Unexpected managers response format: %s", type(results))
-                return []
-            return results
-        except requests.exceptions.Timeout:
-            logger.warning("Managers request timed out (attempt %d/3)", attempt + 1)
-            if attempt < 2:
-                time.sleep(backoff_seconds[attempt])
-                continue
-            raise
-        except requests.exceptions.ConnectionError:
-            logger.warning("Managers connection error (attempt %d/3)", attempt + 1)
-            if attempt < 2:
-                time.sleep(backoff_seconds[attempt])
-                continue
-            raise
-        except (json.JSONDecodeError, requests.exceptions.JSONDecodeError):
-            logger.warning("Managers malformed JSON, returning []")
-            return []
-
-    return []
+    """Thin wrapper — delegates to :class:`BSDDataProvider.fetch_managers`."""
+    provider = BSDDataProvider(api_key, league_id=league_id)
+    return provider.fetch_managers(league_id=league_id, timeout=timeout or constants.API_TIMEOUT)
 
 
 def parse_managers(raw_managers: list[dict]) -> dict[str, ManagerProfile]:

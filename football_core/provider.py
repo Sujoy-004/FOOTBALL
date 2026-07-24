@@ -1,4 +1,4 @@
-"""Fixture provider interface and shared types — competition-agnostic."""
+"""Fixture provider interface, DataProvider protocol, and shared types — competition-agnostic."""
 
 from __future__ import annotations
 
@@ -103,4 +103,31 @@ class FixtureProvider(Protocol):
 
         Raises FixtureProviderError if no valid schedule can be produced.
         """
+        ...
+
+
+@runtime_checkable
+class DataProvider(Protocol):
+    """Protocol for external data sources (matches, predictions, managers, players).
+
+    Each method returns raw list-of-dict data from the provider.
+    Processing, caching, and persistence are handled by the caller.
+    Competition identifiers are provider-specific (e.g. ``"WC"``, ``"CL"``
+    for football-data.org; ``"27"``, ``"7"`` for BSD league IDs).
+    """
+
+    def fetch_matches(self, competition_id: str, **kwargs) -> list[dict]:
+        """Fetch match results / events for *competition_id*."""
+        ...
+
+    def fetch_predictions(self, competition_id: str, **kwargs) -> list[dict]:
+        """Fetch ML predictions for *competition_id*."""
+        ...
+
+    def fetch_managers(self, competition_id: str, **kwargs) -> list[dict]:
+        """Fetch manager profiles for *competition_id*."""
+        ...
+
+    def fetch_players(self, competition_id: str, **kwargs) -> list[dict]:
+        """Fetch player profiles for *competition_id*."""
         ...
