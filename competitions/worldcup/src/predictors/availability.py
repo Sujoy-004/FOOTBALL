@@ -3,11 +3,6 @@
 Use football_core.signals.availability.AvailabilitySignal instead.
 Kept for backward compatibility with legacy refresh_from_api()."""
 
-WC-specific orchestration layer. Fetches player data via
-football_core.providers.player, computes availability signal,
-persists to prediction ledger, and returns cache dict.
-"""
-
 import logging
 from datetime import datetime, timedelta, timezone
 

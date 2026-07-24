@@ -4,11 +4,6 @@ Use football_core.signals.defensive_quality.DefensiveQualitySignal and
 football_core.signals.manager_effect.ManagerEffectSignal instead.
 Kept for backward compatibility with legacy refresh_from_api()."""
 
-WC-specific orchestration layer. Fetches manager data once via
-football_core.providers.manager, then computes both signals,
-persists to prediction ledger, and returns cache dicts.
-"""
-
 import logging
 from datetime import datetime, timedelta, timezone
 
