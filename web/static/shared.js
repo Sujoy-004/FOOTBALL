@@ -6,7 +6,7 @@ const competitions = {
     module: "wc",
     route: "/worldcup",
     apiPrefix: "/worldcup/api",
-    tabs: ["Terminal", "Overview", "Bracket", "Standings"],
+    tabs: ["Overview", "Bracket", "Standings"],
   },
   ucl: {
     label: "UCL 2025/26",
@@ -74,8 +74,8 @@ function renderLanding() {
       <p class="lh-sub">Multi-Competition Predictor</p>
       <p class="lh-tagline">Real-time match forecasting powered by Elo ratings, multi-signal blending, and Monte Carlo simulation across football's biggest tournaments.</p>
       <div class="lh-actions">
-        <a class="lh-btn lh-btn-primary" href="#/worldcup">Enter World Cup 2026</a>
-        <a class="lh-btn lh-btn-secondary" href="#/ucl">Explore UCL 2025/26</a>
+        <a class="lh-btn lh-btn-primary" href="#/worldcup">Explore WorldCup 2026</a>
+        <a class="lh-btn lh-btn-primary" href="#/ucl">Explore UCL 2025/26</a>
       </div>
     </div>
 
