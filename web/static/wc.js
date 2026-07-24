@@ -283,13 +283,6 @@ function renderOverview() {
     html += '</div></div>';
   }
 
-  // Group standings (always)
-  html += '<div class="chart-section">';
-  html += '<div class="title">Group Standings</div>';
-  html += '<div class="overview-standings" id="ovStandings">';
-  html += renderOverviewStandings(ov.standings || []);
-  html += '</div></div>';
-
   // Post-sim: signal evaluation table
   if (hasSim && Object.keys(signalEval).length > 0) {
     html += '<div class="chart-section">';
