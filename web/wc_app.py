@@ -1,4 +1,5 @@
 import json, os, sys, time, random, copy, uuid
+import logging
 from pathlib import Path
 from datetime import datetime, timezone
 import threading
@@ -34,6 +35,8 @@ from web.insight import compute_team_signal_strengths, compute_ko_signal_probs, 
 from web.engine_helpers import compute_team_strengths_from_predictions, _build_engine_from_caches
 from web.whatif_engine import parse_scenario, handle_instant_scenario, generate_simulate_insight
 from web.common import ts, boot_step, load_json, load_json_list
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 BSD_API_KEY = os.getenv("BSD_API_KEY", "")
@@ -632,7 +635,8 @@ def _fetch_live_data() -> None:
         groups = json.loads((data_dir / "groups.json").read_text(encoding="utf-8"))
         bracket_raw = json.loads((data_dir / "bracket.json").read_text(encoding="utf-8"))
         aliases = json.loads((data_dir / "team_aliases.json").read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as e:
+        logger.warning("_fetch_live_data: failed to load data files: %s", e)
         return
 
     # 1. Fetch and process match results
@@ -665,8 +669,8 @@ def _fetch_live_data() -> None:
         for m in new_ko:
             played[m["match_id"]] = m
         played_path.write_text(json.dumps(played, indent=2, ensure_ascii=False), encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("_fetch_live_data: match fetch failed: %s", e)
 
     # 2. Fetch and cache all 7 signal predictors
     try:
@@ -699,11 +703,11 @@ def _fetch_live_data() -> None:
             avail_cache = f.result(timeout=30)
             save_signal_cache(avail_cache, AVAILABILITY_CACHE_FILE, DATA_DIR)
         except FuturesTimeout:
-            pass
+            logger.warning("_fetch_live_data: availability signal timed out (30s)")
         finally:
             ex.shutdown(wait=False)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("_fetch_live_data: signal fetch failed: %s", e)
 
 
 
@@ -827,6 +831,9 @@ def _run_simulation_task(
                 s["progress"] = pct
                 s["stage"] = stage
                 s["elapsed"] = time.time() - s.get("t0", time.time())
+
+        _progress(0, "Fetching live signal data...")
+        _fetch_live_data()
 
         _progress(0, "Loading data files...")
         teams_raw = load_json(DATA_DIR, "teams.json")
