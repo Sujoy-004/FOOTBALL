@@ -5,7 +5,9 @@ Phase 1 of the architectural refactoring extracts 7 functions from
 (receives all dependencies as parameters, no module-level globals).
 
 Phase 2 will extract ``compute_signal_eval``, ``compute_full_bracket``, etc.
-Phase 3 will extract ``_build_engine_from_caches`` from ``web.engine_helpers``.
+Phase 3 moved ``_build_engine_from_caches`` (renamed to ``build_engine_from_caches``)
+into ``src.engine`` and ``compute_team_strengths_from_predictions`` into ``src.evaluation``.
+``web.engine_helpers`` was deleted.
 """
 
 from __future__ import annotations
