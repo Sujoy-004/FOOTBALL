@@ -367,3 +367,315 @@ def run_simulation(
         played_matches=played_matches,
         rating_system=rating_system,
     )
+
+
+def run_deterministic_compute(
+    data_dir: str,
+    bsd_api_key: str = "",
+    football_data_org_key: str = "",
+    team_aliases: dict[str, str] | None = None,
+) -> dict:
+    """Deterministic computation from real results — pure logic, no web globals.
+
+    Returns dict with keys: mode, teams, all_teams, standings, playoff,
+    bracket_rounds, league_matchdays, odds, signals, elo_ratings, champion,
+    boot, _results, _signal_engine, n_teams, n_iterations, n_total_matches,
+    seed, snapshot_date.
+    """
+    from competitions.ucl.src.pipeline import (
+        load_results, load_knockout_results, compute_deterministic_standings,
+        build_deterministic_bracket, build_league_matchdays, compute_signal_eval,
+        fetch_ucl_managers,
+    )
+    from web.common import ts, boot_step
+
+    boot: list[dict] = []
+
+    def _step(name, fn):
+        return boot_step(name, fn, boot)
+
+    results = _step("Load real results", lambda: load_results(data_dir))
+    if not results:
+        return {"error": "results.json not found", "boot": boot}
+
+    knockout = _step("Load knockout results", lambda: load_knockout_results(data_dir))
+    if not knockout:
+        return {"error": "knockout_results.json not found", "boot": boot}
+
+    from competitions.ucl.src.provider import RepoFixtureProvider
+
+    fixtures_path = os.path.join(data_dir, "fixtures.json")
+    provider = _step("Load fixtures", lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load())
+    if not provider:
+        return {"error": "fixtures load failed", "boot": boot}
+
+    team_names = [t.name for t in provider.teams]
+    from competitions.ucl.src.elo_fetcher import fetch_team_elos
+
+    elo_ratings = _step("Fetch Elo ratings", lambda: fetch_team_elos(team_names))
+    if not elo_ratings:
+        elo_ratings = {}
+        coefficients = {t.name: t.coefficient for t in provider.teams}
+        max_coeff = max(coefficients.values()) if coefficients else 100
+        for t in team_names:
+            c = coefficients.get(t, 50)
+            elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
+        boot.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback"})
+
+    bsd_manager_data = _step("Fetch BSD managers", lambda: fetch_ucl_managers(bsd_api_key, team_aliases=team_aliases))
+    standings = _step("Compute standings", lambda: compute_deterministic_standings(results))
+    if not standings:
+        return {"error": "standings computation failed", "boot": boot}
+
+    bracket_data = _step("Build bracket", lambda: build_deterministic_bracket(knockout, standings, data_dir))
+
+    import tempfile
+
+    _results_tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    json.dump(results, _results_tmp)
+    _results_tmp.close()
+    engine = _step("Build signal engine", lambda: build_signal_engine(elo_ratings, results_file=_results_tmp.name))
+    os.unlink(_results_tmp.name)
+
+    signal_stats = _step("Evaluate signals", lambda: compute_signal_eval(results, engine, elo_ratings, bsd_manager_data))
+
+    odds_display = []
+    champ = knockout.get("champion", "")
+    for i, entry in enumerate(standings, start=1):
+        is_champ = entry["team"] == champ
+        odds_display.append({
+            "rank": i, "team": entry["team"],
+            "champion_prob": 1.0 if is_champ else 0.0,
+            "final_prob": 1.0 if is_champ else 0.0,
+            "sf_prob": 1.0 if is_champ else 0.0,
+            "qf_prob": 1.0 if is_champ else 0.0,
+            "top_8_prob": 1.0 if entry.get("position", 99) <= 8 else 0.0,
+            "playoff_prob": 1.0 if entry.get("zone") == "playoff" else 0.0,
+            "avg_position": float(entry.get("position", 36)),
+        })
+    odds_display.sort(key=lambda x: (0 if x["team"] == champ else 1, x["rank"]))
+
+    top4 = [odds_display[i] for i in range(min(4, len(odds_display)))]
+    enriched_bracket: dict[str, list[dict]] = {}
+    for round_name, matches in bracket_data.get("bracket_rounds", {}).items():
+        enriched_bracket[round_name] = matches
+
+    n_total_matches = len(results)
+    n_matchdays = len({m.get("match_id", "").split("_")[0] for m in results if "_" in m.get("match_id", "")}) or 1
+
+    return {
+        "mode": "results",
+        "teams": top4,
+        "all_teams": odds_display,
+        "n_teams": len(standings),
+        "n_iterations": n_matchdays,
+        "n_total_matches": n_total_matches,
+        "seed": 0,
+        "snapshot_date": "2025/26 Season — Real Results",
+        "champion": champ,
+        "standings": standings,
+        "playoff": bracket_data.get("playoff", []),
+        "bracket_rounds": enriched_bracket,
+        "league_matchdays": build_league_matchdays(results),
+        "odds": odds_display,
+        "signals": signal_stats,
+        "elo_ratings": elo_ratings,
+        "_results": results,
+        "_signal_engine": engine,
+        "boot": boot,
+        "bsd_manager_data": bsd_manager_data,
+    }
+
+
+def run_compute_all(
+    data_dir: str,
+    bsd_api_key: str = "",
+    seed: int = 42,
+    n_iterations: int = 10000,
+    team_aliases: dict[str, str] | None = None,
+) -> dict:
+    """Compute all results or run simulation — pure logic, no web globals.
+
+    Returns dict with keys: mode, teams, all_teams, standings, playoff,
+    bracket_rounds, league_matchdays, odds, signals, elo_ratings, champion,
+    boot, _results, _signal_engine, n_teams, n_iterations, n_total_matches,
+    seed, snapshot_date, bsd_manager_data, calibration, show_ci.
+    """
+    from web.common import ts, boot_step
+
+    boot: list[dict] = []
+
+    def _step(name, fn):
+        return boot_step(name, fn, boot)
+
+    results_path = os.path.join(data_dir, "results.json")
+    ko_path = os.path.join(data_dir, "knockout_results.json")
+
+    use_results_mode = os.path.exists(results_path) and os.path.exists(ko_path)
+
+    if use_results_mode:
+        return run_deterministic_compute(data_dir, bsd_api_key, team_aliases=team_aliases)
+
+    # Simulation mode
+    from competitions.ucl.src.pipeline import (
+        fetch_ucl_managers,
+    )
+    from competitions.ucl.src.provider import RepoFixtureProvider
+    from competitions.ucl.src.elo_fetcher import fetch_team_elos
+
+    fixtures_path = os.path.join(data_dir, "fixtures.json")
+    provider = _step("Load fixtures", lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load())
+    if not provider:
+        return {"error": "fixtures load failed", "boot": boot}
+
+    team_names = [t.name for t in provider.teams]
+    elo_ratings = _step("Fetch Elo ratings", lambda: fetch_team_elos(team_names))
+    if not elo_ratings:
+        elo_ratings = {}
+        coefficients = {t.name: t.coefficient for t in provider.teams}
+        max_coeff = max(coefficients.values()) if coefficients else 100
+        for t in team_names:
+            c = coefficients.get(t, 50)
+            elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
+        boot.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback"})
+
+    bsd_manager_data = _step("Fetch BSD managers", lambda: fetch_ucl_managers(bsd_api_key, team_aliases=team_aliases))
+
+    if bsd_manager_data and elo_ratings:
+        blended_count = 0
+        for t in team_names:
+            base = elo_ratings.get(t, 1400.0)
+            mgr = bsd_manager_data.get(t)
+            if mgr:
+                win_pct = mgr.get("win_pct", 0.0) / 100.0
+                if win_pct > 0:
+                    mgr_elo = 1400.0 + (win_pct - 0.5) * 400.0
+                    elo_ratings[t] = round(base * 0.7 + mgr_elo * 0.3, 1)
+                    blended_count += 1
+        if blended_count > 0:
+            boot.append({"step": "Elo blend (BSD managers)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Blended manager win% into Elo for {blended_count} teams"})
+
+    # Run MC simulation
+    result = _step("Monte Carlo simulation", lambda: build_simulation_result(provider, elo_ratings, seed, n_iterations))
+    if not result:
+        return {"error": "simulation failed", "boot": boot}
+
+    engine = _step("Build signal engine", lambda: build_signal_engine(elo_ratings))
+
+    bracket_rules_path = os.path.join(data_dir, "bracket_rules.json")
+    bracket_rules = {}
+    try:
+        bracket_rules = json.loads(Path(bracket_rules_path).read_text(encoding="utf-8"))
+    except Exception:
+        pass
+
+    source_map = {}
+    for m in bracket_rules.get("matches", []):
+        if m.get("source_matches"):
+            source_map[m["match_id"]] = m["source_matches"]
+
+    enriched_bracket = {}
+    for round_name, matches in result.bracket_rounds.items():
+        enriched_bracket[round_name] = []
+        for m in matches:
+            entry = dict(m)
+            if m["match_id"] in source_map:
+                entry["source_matches"] = source_map[m["match_id"]]
+            enriched_bracket[round_name].append(entry)
+
+    playoff_display = []
+    for tie_num in sorted(result.playoff_ties):
+        tie = result.playoff_ties[tie_num]
+        winner = result.playoff_winners.get(tie_num, "?")
+        loser = tie.get("loser", "?")
+        playoff_display.append({
+            "tie_num": tie_num, "team_a": winner, "team_b": loser,
+            "winner": winner, "aggregate_a": tie.get("aggregate_a", 0),
+            "aggregate_b": tie.get("aggregate_b", 0),
+            "et_played": tie.get("et_played", False),
+            "penalties_played": tie.get("penalties_played", False),
+            "et_a": tie.get("et_a", 0), "et_b": tie.get("et_b", 0),
+            "penalty_a": tie.get("penalty_a", 0), "penalty_b": tie.get("penalty_b", 0),
+        })
+
+    sorted_teams = sorted(result.teams.items(), key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]))
+    odds_display = []
+    for rank, (name, td) in enumerate(sorted_teams, start=1):
+        odds_display.append({
+            "rank": rank, "team": name,
+            "champion_prob": td.get("champion_prob", 0.0),
+            "final_prob": td.get("stage_final_prob", 0.0),
+            "sf_prob": td.get("stage_sf_prob", 0.0),
+            "qf_prob": td.get("stage_qf_prob", 0.0),
+            "top_8_prob": td.get("top_8_prob", 0.0),
+            "playoff_prob": td.get("playoff_prob", 0.0),
+            "avg_position": td.get("avg_position", 0.0),
+        })
+    standings_display = []
+    for entry in result.standings:
+        zone = entry.get("zone", "eliminated")
+        standings_display.append({
+            "position": entry.get("position"), "team": entry.get("team"),
+            "pts": entry.get("pts"), "gd": entry.get("gd"),
+            "gs": entry.get("gs"), "zone": zone,
+        })
+    top4 = [odds_display[i] for i in range(min(4, len(odds_display)))]
+
+    # Build signal stats
+    signal_stats = {}
+    try:
+        signal_matches = []
+        for md in provider.matchdays:
+            for m in md:
+                signal_matches.append({"team_a": m.team_a, "team_b": m.team_b, "match_id": m.match_id})
+        signal_context = PredictionContext(
+            fixtures=signal_matches, elo_ratings=elo_ratings,
+            played_results=[], manager_data=bsd_manager_data,
+        )
+        blended = [engine.evaluate(m, signal_context) for m in signal_matches]
+        sig_data = {}
+        for bp in blended:
+            for sig, sd in bp.signal_breakdown.items():
+                if sig not in sig_data:
+                    sig_data[sig] = {"probs": [], "n": 0, "available": 0}
+                sig_data[sig]["n"] += 1
+                if sd.get("available", True):
+                    sig_data[sig]["available"] += 1
+                if sd.get("weight", 0) > 0:
+                    sig_data[sig]["probs"].extend([sd.get("home", 0.5), sd.get("draw", 0), sd.get("away", 0)])
+        for sig, sd in sorted(sig_data.items()):
+            probs = [p for p in sd["probs"] if p is not None]
+            avg = sum(probs) / len(probs) if probs else 0
+            signal_stats[sig] = {
+                "n_matches": sd["n"], "available": sd["available"],
+                "available_pct": round(sd["available"] / sd["n"] * 100, 1) if sd["n"] else 0,
+                "avg_probability": round(avg, 4),
+                "weight": round(engine.weights.get(sig, 0), 4),
+            }
+    except Exception:
+        signal_stats = {}
+
+    calib = load_calibration()
+
+    return {
+        "mode": "simulation",
+        "teams": top4,
+        "all_teams": odds_display,
+        "n_teams": len(result.teams),
+        "n_iterations": result.n_iterations,
+        "seed": result.seed,
+        "snapshot_date": result.snapshot_date,
+        "champion": result.bracket_champion,
+        "standings": standings_display,
+        "playoff": playoff_display,
+        "bracket_rounds": enriched_bracket,
+        "odds": odds_display,
+        "signals": signal_stats,
+        "elo_ratings": elo_ratings,
+        "calibration": calib,
+        "show_ci": "auto",
+        "league_matchdays": {},
+        "boot": boot,
+        "_signal_engine": engine,
+        "bsd_manager_data": bsd_manager_data,
+    }
