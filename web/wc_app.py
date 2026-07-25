@@ -20,7 +20,7 @@ from competitions.worldcup.src.groups import (
 )
 
 from web.insight import compute_team_signal_strengths, compute_ko_signal_probs, compute_match_insight, compute_form_trend, compute_head_to_head, compute_match_outcome
-from web.engine_helpers import compute_team_strengths_from_predictions
+from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
 from web.whatif_engine import parse_scenario, handle_instant_scenario, generate_simulate_insight
 from web.common import ts, boot_step, load_json
 
@@ -70,7 +70,7 @@ def compute_bracket_display(groups, teams, bracket, annex_c, played, played_grou
 
 
 def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups, engine_predictions=None):
-    from web.engine_helpers import compute_team_strengths_from_predictions
+from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
     known_winners = {mid: data["winner"] for mid, data in played.items() if data.get("winner")}
     slot_teams = resolve_knockout_slot_teams(groups, teams, played_groups, bracket, annex_c, known_winners)
