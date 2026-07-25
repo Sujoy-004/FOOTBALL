@@ -14,7 +14,6 @@ from competitions.worldcup.src import constants, elo
 from competitions.worldcup.src.knockout import run_full_simulation, resolve_knockout_slot_teams
 from competitions.worldcup.src.state import load_groups, load_annex_c
 from competitions.worldcup.src.analysis import run_calibrated_validation
-from competitions.worldcup.src.evaluation import evaluate_all_matches
 from football_core.groups import precompute_matchup_lambdas, simulate_group_matches
 from competitions.worldcup.src.groups import (
     compute_standings, rank_third_placed,
@@ -219,55 +218,14 @@ def compute_signal_briers_from_predictions(
 
     Returns: {signal_name: {"brier": ..., "log_loss": ..., "accuracy": ..., "n": ...}}
     """
-    played_all = dict(played)
-    if played_groups:
-        played_all.update(played_groups)
-
-    accum: dict[str, list[tuple[float, float]]] = {}
-
-    for bp, match in zip(engine_predictions, all_matches):
-        mid = match.get("match_id", "")
-        if not mid or mid not in played_all:
-            continue
-        m = played_all[mid]
-        t_a, t_b = m.get("team_a", ""), m.get("team_b", "")
-        winner = m.get("winner")
-        if winner == t_a:
-            actual = 1.0
-        elif winner == t_b:
-            actual = 0.0
-        elif winner is None:
-            actual = 0.5
-        else:
-            continue
-        for sig_name, sd in (bp.signal_breakdown or {}).items():
-            prob = sd.get("home", 0.33)
-            accum.setdefault(sig_name, []).append((prob, actual))
-
-    from football_core.evaluation import compute_metrics
-    result = {}
-    for sig_name, pairs in sorted(accum.items()):
-        preds = [p for p, _ in pairs]
-        actuals = [a for _, a in pairs]
-        metrics = compute_metrics(preds, actuals)
-        result[sig_name] = {
-            "brier": round(metrics["brier"], 6),
-            "log_loss": round(metrics["log_loss"], 6),
-            "accuracy": round(metrics["accuracy"], 6),
-            "n": metrics["n"],
-        }
-    return result
+    from competitions.worldcup.src.evaluation import compute_signal_briers_from_predictions as _eval
+    return _eval(engine_predictions, all_matches, played, played_groups)
 
 
 def compute_signal_eval(teams, played, played_groups, engine_predictions, all_matches):
     """Evaluate signals from engine predictions — no ledger dependency."""
-    elo_report = evaluate_all_matches(teams, played, played_groups, signal_name="elo")
-    signal_briers = compute_signal_briers_from_predictions(
-        engine_predictions, all_matches, played, played_groups)
-    all_report = evaluate_all_matches(
-        teams, played, played_groups, signal_name=None,
-        history=_build_eval_history_from_predictions(engine_predictions, all_matches, played, played_groups))
-    return {"elo": elo_report, "all_signals": all_report}
+    from competitions.worldcup.src.evaluation import compute_signal_eval as _eval
+    return _eval(teams, played, played_groups, engine_predictions, all_matches)
 
 
 def _build_eval_history_from_predictions(predictions, all_matches, played, played_groups):
@@ -275,33 +233,8 @@ def _build_eval_history_from_predictions(predictions, all_matches, played, playe
 
     Uses zip() since BlendedPrediction has no match_id field.
     """
-    played_all = dict(played)
-    if played_groups:
-        played_all.update(played_groups)
-    played_mids = set(played_all.keys())
-    history = []
-    for bp, match in zip(predictions, all_matches):
-        mid = match.get("match_id", "")
-        if not mid or mid not in played_mids:
-            continue
-        m = played_all[mid]
-        t_a, t_b = m.get("team_a", ""), m.get("team_b", "")
-        winner = m.get("winner")
-        if winner == t_a:
-            actual = 1.0
-        elif winner == t_b:
-            actual = 0.0
-        elif winner is None:
-            actual = 0.5
-        else:
-            continue
-        sigs = {}
-        for sk, sd in (bp.signal_breakdown or {}).items():
-            prob = sd.get("home", 0.33)
-            sigs[sk] = {"probability": prob, "available": True}
-        if sigs:
-            history.append({"match_id": mid, "actual": actual, "signals": sigs})
-    return history
+    from competitions.worldcup.src.evaluation import _build_eval_history_from_predictions as _helper
+    return _helper(predictions, all_matches, played, played_groups)
 
 
 def compute_real_standings(groups_data: dict, played_groups: dict) -> list[dict]:
@@ -436,132 +369,19 @@ def compute_overview() -> dict:
 
 def compute_signal_stats():
     """Signal statistics from on-disk caches — no ledger dependency."""
-    from competitions.worldcup.src.state import load_signal_cache
-    data_dir = constants.DATA_DIR
-    cache_files: list[tuple[str, str]] = [
-        ("odds_cache.json", "market_odds"),
-        ("catboost_cache.json", "catboost"),
-        ("form_cache.json", "form"),
-        ("lineup_cache.json", "lineup_strength"),
-        ("defensive_cache.json", "defensive_quality"),
-        ("manager_effect_cache.json", "manager_effect"),
-        ("availability_cache.json", "availability"),
-        ("elo_odds_cache.json", "elo_odds"),
-        ("team_synergy_cache.json", "team_synergy"),
-        ("rolling_form_cache.json", "rolling_form"),
-        ("squad_value_cache.json", "squad_value"),
-        ("rest_days_cache.json", "rest_days"),
-    ]
-    signal_data: dict[str, dict] = {}
-    n_total = 0
-    for fname, sname in cache_files:
-        cache = load_signal_cache(fname, data_dir)
-        matches = (cache or {}).get("matches", {})
-        if not matches:
-            continue
-        n_total += len(matches)
-        probs = []
-        avail = 0
-        for mid, entry in matches.items():
-            if entry.get("available", False):
-                avail += 1
-            prob = entry.get("probability")
-            if prob is not None:
-                probs.append(prob)
-        signal_data[sname] = {
-            "n_matches": len(matches),
-            "available": avail,
-            "available_pct": round(avail / len(matches) * 100, 1) if matches else 0,
-            "avg_probability": round(sum(probs) / len(probs), 4) if probs else 0,
-            "min_probability": round(min(probs), 4) if probs else 0,
-            "max_probability": round(max(probs), 4) if probs else 0,
-        }
-    return {"signals": signal_data, "n_total": n_total}
+    from competitions.worldcup.src.evaluation import compute_signal_stats as _eval
+    return _eval(constants.DATA_DIR)
 
 
 def compute_signal_detail(name: str):
-    data_dir = constants.DATA_DIR
-    ledger = json.loads((data_dir / "predictions_ledger.json").read_text(encoding="utf-8"))
-    played = json.loads((data_dir / "played.json").read_text(encoding="utf-8"))
-    played_groups_raw = (data_dir / "played_groups.json").read_text(encoding="utf-8")
-    played_groups = json.loads(played_groups_raw) if played_groups_raw.strip() else {}
-    matches = []
-    eval_matches = 0
-    correct = 0
-    brier_sum = 0.0
-    for mid, signals in ledger.items():
-        if name not in signals:
-            continue
-        sv = signals[name]
-        match_data = {"match_id": mid, "probability": sv.get("probability"), "available": sv.get("available", False), "reason": sv.get("reason")}
-        if mid in played:
-            m = played[mid]
-            match_data["team_a"] = m.get("team_a", "")
-            match_data["team_b"] = m.get("team_b", "")
-            match_data["result"] = m.get("winner")
-        elif mid in played_groups:
-            m = played_groups[mid]
-            match_data["team_a"] = m.get("team_a", "")
-            match_data["team_b"] = m.get("team_b", "")
-            match_data["result"] = m.get("winner")
-        else:
-            match_data["team_a"] = sv.get("team_a", "")
-            match_data["team_b"] = sv.get("team_b", "")
-        matches.append(match_data)
-        prob = sv.get("probability")
-        result = match_data.get("result")
-        if prob is not None and result is not None:
-            eval_matches += 1
-            actual = 1.0 if result == match_data.get("team_a") else (0.0 if result == match_data.get("team_b") else 0.5)
-            brier_sum += (prob - actual) ** 2
-            if (actual == 1.0 and prob > 0.5) or (actual == 0.0 and prob < 0.5) or (actual == 0.5):
-                correct += 1
-    ev = cache.get("evaluation", {})
-    sig_eval = ev.get(name, {})
-    return {
-        "name": name,
-        "n_matches": len(matches),
-        "n_with_results": eval_matches,
-        "live_eval": {
-            "brier": round(brier_sum / eval_matches, 4) if eval_matches else None,
-            "accuracy": round(correct / eval_matches, 4) if eval_matches else None,
-            "n": eval_matches,
-        },
-        "cache_eval": sig_eval if sig_eval.get("n_matches", 0) > 0 else None,
-        "matches": matches,
-    }
+    from competitions.worldcup.src.evaluation import compute_signal_detail as _eval
+    return _eval(name, constants.DATA_DIR, cache.get("evaluation", {}))
 
 
 def compute_blend_info():
     """Blend info from in-memory cache evaluation + backtest — no cached file."""
-    data_dir = constants.DATA_DIR
-    backtest_path = data_dir / "eval_backtest_report.json"
-    backtest = json.loads(backtest_path.read_text(encoding="utf-8")) if backtest_path.exists() else {}
-    eval_data = cache.get("evaluation", {})
-    available_signals = sorted(k for k in eval_data if k != "elo" and eval_data[k].get("n_matches", 0) > 0)
-    n_available = len(available_signals)
-    per_signal = backtest.get("per_signal", {})
-    briers = {}
-    for sk, sv in per_signal.items():
-        b = sv.get("brier")
-        if b is not None:
-            briers[sk] = b
-    for sk in available_signals:
-        if sk not in briers:
-            briers[sk] = 0.25
-    total_inv = sum(1.0 / max(b, 0.01) for b in briers.values()) if briers else 1
-    weights = {sk: round((1.0 / max(b, 0.01)) / total_inv, 4) for sk, b in briers.items()} if total_inv else {}
-    gov = cache.get("governance", {})
-    n_matches = gov.get("n_matches", 0)
-    return {
-        "n_signals_available": n_available,
-        "available_signals": available_signals,
-        "blend_weights": weights,
-        "backtest_briers": {sk: round(b, 4) for sk, b in briers.items()},
-        "calibration_status": "cold_start" if n_matches < 30 else "calibrated",
-        "n_matches_for_calibration": n_matches,
-        "threshold": 30,
-    }
+    from competitions.worldcup.src.evaluation import compute_blend_info as _eval
+    return _eval(constants.DATA_DIR, cache.get("evaluation", {}), cache.get("governance", {}))
 
 
 def _fetch_live_data() -> None:
