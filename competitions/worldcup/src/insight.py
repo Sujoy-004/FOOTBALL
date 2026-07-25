@@ -1,7 +1,7 @@
 import json, math
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parent.parent / "competitions" / "worldcup" / "data"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
 def load_ledger():

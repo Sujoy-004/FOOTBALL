@@ -19,7 +19,7 @@ from competitions.worldcup.src.groups import (
     compute_standings, rank_third_placed,
 )
 
-from web.insight import compute_team_signal_strengths, compute_ko_signal_probs, compute_match_insight, compute_form_trend, compute_head_to_head, compute_match_outcome
+from competitions.worldcup.src.insight import compute_team_signal_strengths, compute_ko_signal_probs, compute_match_insight, compute_form_trend, compute_head_to_head, compute_match_outcome
 from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
 from web.whatif_engine import parse_scenario, handle_instant_scenario, generate_simulate_insight
 from web.common import ts, boot_step, load_json
