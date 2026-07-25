@@ -468,10 +468,10 @@ def simulate_from_match(
         else {}
     )
 
-    # Lazy import — web.engine_helpers will be moved to src in Phase 3.
-    from web.engine_helpers import _build_engine_from_caches  # noqa: PLC0415
+    # Lazy import — build_engine_from_caches lives in src.engine (consolidated from web.engine_helpers).
+    from src.engine import build_engine_from_caches  # noqa: PLC0415
 
-    engine = _build_engine_from_caches()
+    engine = build_engine_from_caches()
     elo_ratings = {n: d["elo"] for n, d in teams_raw.items()}
     groups_data = (
         groups_raw.get("groups", groups_raw)
@@ -617,10 +617,9 @@ def run_simulation_compute(
     )
 
     progress_cb(5, "Building prediction engine...")
-    # Phase 3 will move _build_engine_from_caches from web.engine_helpers to src.
-    from web.engine_helpers import _build_engine_from_caches  # noqa: PLC0415
+    from src.engine import build_engine_from_caches  # noqa: PLC0415
 
-    engine = _build_engine_from_caches(weights=weights)
+    engine = build_engine_from_caches(weights=weights)
 
     progress_cb(10, "Computing engine predictions...")
     elo_ratings = {n: d["elo"] for n, d in teams_raw.items()}
