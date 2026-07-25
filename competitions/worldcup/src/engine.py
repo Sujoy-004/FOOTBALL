@@ -1216,3 +1216,47 @@ def run_poll_cycle(
         "last_gov_time": last_gov_time,
         "prev_signal_data": prev_signal_data,
     }
+
+
+def build_engine_from_caches(
+    weights: dict[str, float] | None = None,
+    data_dir: Path | str | None = None,
+) -> Any:
+    """Load all signal caches from disk and build an EnsembleEngine.
+
+    Delegates to build_signal_engine() — this is a convenience wrapper
+    for contexts where caches aren't already loaded in memory.
+    """
+    if data_dir is None:
+        from src import constants as _c
+        data_dir = _c.DATA_DIR
+    from src.state import load_signal_cache
+
+    odds_cache = load_signal_cache("odds_cache.json", data_dir)
+    cb_cache = load_signal_cache("catboost_cache.json", data_dir)
+    form_cache = load_signal_cache("form_cache.json", data_dir)
+    lineup_cache = load_signal_cache("lineup_cache.json", data_dir)
+    defensive_cache = load_signal_cache("defensive_cache.json", data_dir)
+    manager_cache = load_signal_cache("manager_effect_cache.json", data_dir)
+    availability_cache = load_signal_cache("availability_cache.json", data_dir)
+    elo_odds_cache = load_signal_cache("elo_odds_cache.json", data_dir)
+    team_synergy_cache = load_signal_cache("team_synergy_cache.json", data_dir)
+    rolling_form_cache = load_signal_cache("rolling_form_cache.json", data_dir)
+    squad_value_cache = load_signal_cache("squad_value_cache.json", data_dir)
+    rest_days_cache = load_signal_cache("rest_days_cache.json", data_dir)
+
+    return build_signal_engine(
+        odds_cache=odds_cache,
+        cb_cache=cb_cache,
+        form_cache=form_cache,
+        lineup_cache=lineup_cache,
+        defensive_cache=defensive_cache,
+        manager_cache=manager_cache,
+        availability_cache=availability_cache,
+        elo_odds_cache=elo_odds_cache,
+        team_synergy_cache=team_synergy_cache,
+        rolling_form_cache=rolling_form_cache,
+        squad_value_cache=squad_value_cache,
+        rest_days_cache=rest_days_cache,
+        weights=weights,
+    )
