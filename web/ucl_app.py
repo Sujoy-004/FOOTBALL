@@ -7,6 +7,7 @@ import os
 import random
 import re
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -120,14 +121,21 @@ def _parse_what_if_scenario(scenario: str, match: dict) -> dict | None:
 
 
 def _get_ucl_data_provider():
-    """Select UCL data provider — only BSD has manager data."""
+    """Select UCL data provider — BSD or football-data.org."""
     from football_core.data_providers.bsd_provider import BSDDataProvider
+    from football_core.data_providers.football_data_org_provider import FootballDataOrgProvider
 
     mode = os.environ.get("DATA_PROVIDER", "").lower()
-    if mode == "football-data":
-        return None
+
+    if mode == "bsd" and BSD_API_KEY:
+        return BSDDataProvider(BSD_API_KEY, league_id=UCL_LEAGUE_ID)
+    if mode == "football-data" and FOOTBALL_DATA_ORG_KEY:
+        return FootballDataOrgProvider(FOOTBALL_DATA_ORG_KEY)
+
     if BSD_API_KEY:
         return BSDDataProvider(BSD_API_KEY, league_id=UCL_LEAGUE_ID)
+    if FOOTBALL_DATA_ORG_KEY:
+        return FootballDataOrgProvider(FOOTBALL_DATA_ORG_KEY)
     return None
 
 
@@ -170,6 +178,186 @@ def _fetch_ucl_managers() -> dict[str, dict]:
             "profile": m.get("profile", ""),
         }
     return mapped
+
+
+def _fetch_live_data() -> None:
+    import logging
+    logger = logging.getLogger(__name__)
+
+    provider = _get_ucl_data_provider()
+    if provider is None:
+        logger.warning("[UCL] No data provider — skipping live fetch")
+        boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] No data provider configured"})
+        return
+
+    raw = provider.fetch_matches(competition_id="CL")
+    if not raw:
+        logger.warning("[UCL] No matches returned from provider")
+        boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] Provider returned 0 matches"})
+        return
+
+    logger.info("[UCL] Fetched %d raw matches from %s", len(raw), type(provider).__name__)
+
+    # Build alias lookup
+    from football_core.fetcher import _build_alias_lookup, normalize_team
+    aliases_path = DATA_DIR / "team_aliases.json"
+    aliases = json.loads(aliases_path.read_text(encoding="utf-8")) if aliases_path.exists() else {}
+    alias_lookup = _build_alias_lookup(aliases, bracket=[])
+
+    fixtures_path = DATA_DIR / "fixtures.json"
+    if not fixtures_path.exists():
+        logger.warning("[UCL] No fixtures.json — cannot process matches")
+        return
+    fixtures = json.loads(fixtures_path.read_text(encoding="utf-8"))
+    for team in fixtures.get("schedule", {}).get("teams", []):
+        alias_lookup[team["name"].strip().lower()] = team["name"]
+
+    # Build fixture lookup for league phase
+    fixture_lookup: dict[tuple[str, str], str] = {}
+    for md in fixtures.get("schedule", {}).get("matchdays", []):
+        for match in md:
+            pair = (match["team_a"], match["team_b"])
+            fixture_lookup[pair] = match["match_id"]
+            fixture_lookup[(match["team_b"], match["team_a"])] = match["match_id"]
+
+    KO_STAGE_MAP = {
+        "PLAYOFFS": "playoff",
+        "LAST_16": "R16",
+        "QUARTER_FINALS": "QF",
+        "SEMI_FINALS": "SF",
+        "FINAL": "FINAL",
+    }
+
+    results_path = DATA_DIR / "results.json"
+    existing_results = _load_results()
+    existing_by_id = {m["match_id"]: m for m in existing_results}
+
+    ko_path = DATA_DIR / "knockout_results.json"
+    knockout_raw = _load_knockout_results() or {}
+    knockout = {
+        "playoff": knockout_raw.get("playoff", []),
+        "rounds": knockout_raw.get("rounds", {"R16": [], "QF": [], "SF": [], "FINAL": []}),
+    }
+
+    ko_legs: dict[str, dict[frozenset, list[dict]]] = {s: {} for s in KO_STAGE_MAP}
+    n_new = 0
+
+    for event in raw:
+        status = (event.get("status") or "").lower()
+        if status != "finished":
+            continue
+
+        home_name = event.get("home_team", "")
+        away_name = event.get("away_team", "")
+        home_norm = normalize_team(home_name, alias_lookup)
+        away_norm = normalize_team(away_name, alias_lookup)
+
+        if home_norm is None or away_norm is None:
+            logger.debug("[UCL] Unmatchable teams: %r vs %r", home_name, away_name)
+            continue
+
+        home_score = event.get("home_score") or 0
+        away_score = event.get("away_score") or 0
+        stage = event.get("stage", "")
+
+        if stage == "LEAGUE_STAGE":
+            match_id = fixture_lookup.get((home_norm, away_norm))
+            if match_id is None:
+                logger.debug("[UCL] No league fixture for %s vs %s", home_norm, away_norm)
+                continue
+            updated = False
+            if match_id in existing_by_id:
+                entry = existing_by_id[match_id]
+                if entry["home_score"] != home_score or entry["away_score"] != away_score:
+                    entry["home_score"] = home_score
+                    entry["away_score"] = away_score
+                    updated = True
+            else:
+                existing_results.append({
+                    "match_id": match_id, "team_a": home_norm, "team_b": away_norm,
+                    "home_score": home_score, "away_score": away_score,
+                })
+                updated = True
+            if updated:
+                n_new += 1
+                logger.info("[UCL] League %s: %s %d-%d %s", match_id, home_norm, home_score, away_score, away_norm)
+        elif stage in KO_STAGE_MAP:
+            ko_legs[stage].setdefault(frozenset([home_norm, away_norm]), []).append({
+                "home": home_norm, "away": away_norm,
+                "home_score": home_score, "away_score": away_score,
+            })
+
+    # Process knockout legs — aggregate per team pair
+    for api_stage, ties in ko_legs.items():
+        internal_round = KO_STAGE_MAP[api_stage]
+        for pair, legs in ties.items():
+            scores: dict[str, int] = {}
+            for leg in legs:
+                scores[leg["home"]] = scores.get(leg["home"], 0) + leg["home_score"]
+                scores[leg["away"]] = scores.get(leg["away"], 0) + leg["away_score"]
+
+            if internal_round == "playoff":
+                for entry in knockout["playoff"]:
+                    if {entry["team_a"], entry["team_b"]} == pair:
+                        agg_a = scores.get(entry["team_a"], 0)
+                        agg_b = scores.get(entry["team_b"], 0)
+                        w = entry["team_a"] if agg_a > agg_b else (entry["team_b"] if agg_b > agg_a else None)
+                        if entry.get("aggregate_a") != agg_a or entry.get("aggregate_b") != agg_b:
+                            entry["aggregate_a"] = agg_a
+                            entry["aggregate_b"] = agg_b
+                            entry["winner"] = w or entry.get("winner", "")
+                            n_new += 1
+                            logger.info("[UCL] Playoff %s vs %s: %d-%d", entry["team_a"], entry["team_b"], agg_a, agg_b)
+                        break
+            else:
+                for entry in knockout["rounds"].get(internal_round, []):
+                    if {entry["team_a"], entry["team_b"]} == pair:
+                        agg_a = scores.get(entry["team_a"], 0)
+                        agg_b = scores.get(entry["team_b"], 0)
+                        w = entry["team_a"] if agg_a > agg_b else (entry["team_b"] if agg_b > agg_a else None)
+                        if entry.get("score_a") != agg_a or entry.get("score_b") != agg_b:
+                            entry["score_a"] = agg_a
+                            entry["score_b"] = agg_b
+                            entry["winner"] = w or entry.get("winner", "")
+                            n_new += 1
+                            logger.info("[UCL] %s %s vs %s: %d-%d", internal_round, entry["team_a"], entry["team_b"], agg_a, agg_b)
+                        break
+
+    # Write updated files
+    if n_new > 0:
+        results_path.write_text(
+            json.dumps({"matches": existing_results}, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
+        final_entries = knockout["rounds"].get("FINAL", [])
+        if final_entries and final_entries[0].get("winner"):
+            knockout_raw["champion"] = final_entries[0]["winner"]
+        ko_path.write_text(
+            json.dumps({"matches": knockout_raw}, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
+        logger.info("[UCL] Updated %d matches — files saved", n_new)
+
+    # Update last_refresh.json
+    refresh_path = Path(__file__).parent / "last_refresh.json"
+    refresh_data = {}
+    if refresh_path.exists():
+        try:
+            refresh_data = json.loads(refresh_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    refresh_data["ucl"] = {
+        "last_refresh": datetime.now(timezone.utc).isoformat(),
+        "mode": type(provider).__name__,
+        "n_matches": len(raw),
+        "n_updated": n_new,
+    }
+    refresh_path.write_text(
+        json.dumps(refresh_data, indent=2, ensure_ascii=False), encoding="utf-8",
+    )
+
+    boot_log_local.append({
+        "step": "UCL live fetch", "status": "ok", "elapsed": 0.0,
+        "output": f"[{ts()}] {type(provider).__name__}: {len(raw)} raw matches, {n_new} updated",
+    })
 
 
 def _load_results() -> list[dict]:
@@ -330,7 +518,7 @@ def _compute_signal_eval(results: list[dict], engine, elo_ratings: dict[str, flo
     signal_matches = []
     for m in results:
         signal_matches.append({"team_a": m["team_a"], "team_b": m["team_b"], "match_id": m["match_id"]})
-    ctx = PredictionContext(fixtures=signal_matches, elo_ratings=elo_ratings, played_results=[], manager_data=bsd_manager_data)
+    ctx = PredictionContext(fixtures=signal_matches, elo_ratings=elo_ratings, played_results=results, manager_data=bsd_manager_data)
     sig_data: dict[str, dict] = {}
     try:
         blended = [engine.evaluate(m, ctx) for m in signal_matches]
@@ -409,16 +597,18 @@ def deterministic_compute() -> dict:
             c = coefficients.get(t, 50)
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
         boot_log_local.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback — using UEFA coefficients for {len(elo_ratings)} teams"})
-    bsd_manager_data: dict[str, dict] = {}
-    if BSD_API_KEY:
-        bsd_manager_data = boot_step("Fetch BSD managers", lambda: _fetch_ucl_managers(), boot_log_local)
+    bsd_manager_data: dict[str, dict] = boot_step("Fetch BSD managers", lambda: _fetch_ucl_managers(), boot_log_local)
     cache["bsd_manager_data"] = bsd_manager_data
     standings = boot_step("Compute standings", lambda: _compute_deterministic_standings(results), boot_log_local)
     if not standings:
         data["error"] = "standings computation failed"
         return data
     bracket_data = boot_step("Build bracket", lambda: _build_deterministic_bracket(knockout, standings), boot_log_local)
-    engine = boot_step("Build signal engine", lambda: build_signal_engine(elo_ratings), boot_log_local)
+    _results_tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    json.dump(results, _results_tmp)
+    _results_tmp.close()
+    engine = boot_step("Build signal engine", lambda: build_signal_engine(elo_ratings, results_file=_results_tmp.name), boot_log_local)
+    os.unlink(_results_tmp.name)
     data["_signal_engine"] = engine
     signal_stats = boot_step("Evaluate signals", lambda: _compute_signal_eval(results, engine, elo_ratings, bsd_manager_data), boot_log_local)
     odds_display = []
@@ -637,6 +827,7 @@ def compute_all() -> dict:
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     global cache
+    _fetch_live_data()
     cache = compute_all()
     yield
 
@@ -917,6 +1108,17 @@ def api_reset():
     try:
         cache = compute_all()
         return JSONResponse({"status": "ok", "mode": _mode})
+    except Exception as e:
+        return JSONResponse({"status": "error", "error": str(e)})
+
+
+@ucl_app.post("/api/refresh")
+def api_refresh():
+    global cache, _mode
+    try:
+        _fetch_live_data()
+        cache = compute_all()
+        return JSONResponse({"status": "ok", "mode": _mode, "refreshed": True})
     except Exception as e:
         return JSONResponse({"status": "error", "error": str(e)})
 

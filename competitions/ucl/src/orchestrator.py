@@ -82,9 +82,41 @@ def load_cache_ttls(data_dir: str) -> dict[str, int]:
         return {"odds": 12, "catboost": 24}
 
 
+class _ReplayResultProvider:
+    """Reads UCL results.json and provides per-team results for RollingFormSignal.
+
+    Maps the UCL results format (team_a, team_b, home_score, away_score, winner, match_id)
+    to the MatchResultProvider protocol expected by RollingFormSignal.
+    """
+
+    def __init__(self, path: str) -> None:
+        with open(path) as f:
+            data = json.load(f)
+        self._results = data if isinstance(data, list) else data.get("matches", data.get("results", []))
+
+    def get_team_results(self, team: str, before_date: str, limit: int = 10) -> list[dict]:
+        results = []
+        for m in self._results:
+            if m.get("team_a") == team or m.get("team_b") == team:
+                if before_date and m.get("match_id", "") >= before_date:
+                    continue
+                is_team_a = m["team_a"] == team
+                winner = m.get("winner")
+                results.append({
+                    "event_date": m.get("match_id", ""),
+                    "is_draw": winner is None or m.get("is_draw", False),
+                    "winner": winner,
+                    "team_a": m["team_a"],
+                    "team_b": m["team_b"],
+                })
+        results.sort(key=lambda r: r["event_date"], reverse=True)
+        return results[:limit]
+
+
 def build_signal_engine(
     elo_ratings: dict[str, float],
     weights_override: dict[str, float] | None = None,
+    results_file: str | None = None,
 ) -> Any:
     """Build EnsembleEngine with 8 pre-configured signals and calibrated weights."""
     from football_core.blender import EnsembleEngine
@@ -102,7 +134,10 @@ def build_signal_engine(
     signals = [
         RefinedEloSignal(),
         MarketOddsSignal(),
-        RollingFormSignal(result_provider=_EmptyResultProvider()),
+        RollingFormSignal(
+            result_provider=_ReplayResultProvider(results_file) if results_file and os.path.exists(results_file)
+            else _EmptyResultProvider()
+        ),
         SquadValueSignal(),
         RestDaysSignal(),
         AvailabilitySignal(),
