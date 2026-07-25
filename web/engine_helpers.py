@@ -27,6 +27,11 @@ def _build_engine_from_caches(weights: dict[str, float] | None = None) -> Ensemb
     defensive_cache = load_signal_cache("defensive_cache.json", DATA_DIR)
     manager_cache = load_signal_cache("manager_effect_cache.json", DATA_DIR)
     availability_cache = load_signal_cache("availability_cache.json", DATA_DIR)
+    elo_odds_cache = load_signal_cache("elo_odds_cache.json", DATA_DIR)
+    team_synergy_cache = load_signal_cache("team_synergy_cache.json", DATA_DIR)
+    rolling_form_cache = load_signal_cache("rolling_form_cache.json", DATA_DIR)
+    squad_value_cache = load_signal_cache("squad_value_cache.json", DATA_DIR)
+    rest_days_cache = load_signal_cache("rest_days_cache.json", DATA_DIR)
 
     _caches = {
         "market_odds": (odds_cache or {}).get("matches", {}),
@@ -36,6 +41,11 @@ def _build_engine_from_caches(weights: dict[str, float] | None = None) -> Ensemb
         "defensive_quality": (defensive_cache or {}).get("matches", {}),
         "manager_effect": (manager_cache or {}).get("matches", {}),
         "availability": (availability_cache or {}).get("matches", {}),
+        "elo_odds": (elo_odds_cache or {}).get("matches", {}),
+        "team_synergy": (team_synergy_cache or {}).get("matches", {}),
+        "rolling_form": (rolling_form_cache or {}).get("matches", {}),
+        "squad_value": (squad_value_cache or {}).get("matches", {}),
+        "rest_days": (rest_days_cache or {}).get("matches", {}),
     }
 
     class _CacheSignal(Signal):

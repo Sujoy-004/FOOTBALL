@@ -252,6 +252,32 @@ AVAILABILITY_CACHE_FILE: str = "availability_cache.json"
 """Filename for availability signal cache in data/ directory.
 Player data (availability, injury_risk) from BSD /api/v2/players/."""
 
+# ─── World Cup Signal Cache Files (Phase 21) ─────────────────────────────────
+
+ELO_ODDS_CACHE_FILE: str = "elo_odds_cache.json"
+"""Filename for Elo-based odds signal cache in data/ directory."""
+
+TEAM_SYNERGY_CACHE_FILE: str = "team_synergy_cache.json"
+"""Filename for team synergy signal cache in data/ directory."""
+
+ROLLING_FORM_CACHE_FILE: str = "rolling_form_cache.json"
+"""Filename for rolling form signal cache in data/ directory."""
+
+SQUAD_VALUE_CACHE_FILE: str = "squad_value_cache.json"
+"""Filename for squad value signal cache in data/ directory."""
+
+REST_DAYS_CACHE_FILE: str = "rest_days_cache.json"
+"""Filename for rest days signal cache in data/ directory."""
+
+LOCAL_SIGNAL_CACHE_TTL_HOURS: int = 1
+"""Default TTL for locally-computed signals (form, synergy, rolling_form, rest_days)."""
+
+SQUAD_VALUE_CACHE_TTL_HOURS: int = 24
+"""TTL for squad value cache — squad values change slowly (transfer window dependent)."""
+
+ELO_ODDS_CACHE_TTL_HOURS: int = 24
+"""TTL for Elo odds cache — pure computation from Elo ratings, updated daily."""
+
 DEFAULT_DEFENSIVE_K: float = 2.0
 """Default sigmoid steepness for defensive quality signal.
 clean_sheet_pct ∈ [0, 1] and xga_norm ∈ [0, 1], so composite ∈ [0, 1].

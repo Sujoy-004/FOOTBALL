@@ -25,6 +25,8 @@ from competitions.worldcup.src.constants import (
     CATBOOST_CACHE_FILE, FORM_CACHE_FILE, LINEUP_CACHE_FILE,
     ODDS_CACHE_FILE, DEFENSIVE_CACHE_FILE, MANAGER_EFFECT_CACHE_FILE,
     AVAILABILITY_CACHE_FILE,
+    ELO_ODDS_CACHE_FILE, TEAM_SYNERGY_CACHE_FILE, ROLLING_FORM_CACHE_FILE,
+    SQUAD_VALUE_CACHE_FILE, REST_DAYS_CACHE_FILE,
 )
 from football_core.groups import precompute_matchup_lambdas, simulate_group_matches
 from competitions.worldcup.src.groups import (
@@ -452,6 +454,11 @@ def compute_signals_meta() -> dict:
         ("defensive_cache.json", "defensive_quality"),
         ("manager_effect_cache.json", "manager_effect"),
         ("availability_cache.json", "availability"),
+        ("elo_odds_cache.json", "elo_odds"),
+        ("team_synergy_cache.json", "team_synergy"),
+        ("rolling_form_cache.json", "rolling_form"),
+        ("squad_value_cache.json", "squad_value"),
+        ("rest_days_cache.json", "rest_days"),
     ]
     signals = []
     for fname, sname in cache_files:
@@ -512,12 +519,17 @@ def compute_overview() -> dict:
 
     team_list = [{"name": name, "elo": round(d["elo"], 1)} for name, d in sorted(teams.items(), key=lambda t: t[1].get("elo", 1500), reverse=True)]
 
+    full_bracket = compute_full_bracket(
+        ld["groups"], teams, bracket, annex_c, played, played_groups,
+    )
+
     data["boot"] = boot_log
     data["teams"] = team_list
     data["n_teams"] = len(team_list)
     data["n_played"] = total_played
     data["standings"] = gs
     data["bracket"] = bracket_display
+    data["full_bracket"] = full_bracket
     data["governance"] = gov if gov else {}
     data["signals_meta"] = signals_meta
     return data
@@ -535,6 +547,11 @@ def compute_signal_stats():
         ("defensive_cache.json", "defensive_quality"),
         ("manager_effect_cache.json", "manager_effect"),
         ("availability_cache.json", "availability"),
+        ("elo_odds_cache.json", "elo_odds"),
+        ("team_synergy_cache.json", "team_synergy"),
+        ("rolling_form_cache.json", "rolling_form"),
+        ("squad_value_cache.json", "squad_value"),
+        ("rest_days_cache.json", "rest_days"),
     ]
     signal_data: dict[str, dict] = {}
     n_total = 0
@@ -691,18 +708,27 @@ def _fetch_live_data() -> None:
         annex_c = load_annex_c(DATA_DIR)
         played_path = data_dir / "played.json"
         played = json.loads(played_path.read_text(encoding="utf-8")) if played_path.exists() else {}
-        known_winners = {mid: d["winner"] for mid, d in played.items() if d.get("winner")}
-        slot_teams = resolve_knockout_slot_teams(groups, teams, played_groups, bracket_raw, annex_c, known_winners)
-        resolved_bracket = [
-            {"match_id": mid, "team_a": st["team_a"], "team_b": st["team_b"]}
-            for mid, st in slot_teams.items()
-            if st.get("team_a") and st.get("team_b")
-        ]
-        played_ids = set(played.keys())
-        new_ko = process_matches(raw_matches, teams, resolved_bracket, aliases, played_ids)
-        for m in new_ko:
-            played[m["match_id"]] = m
-        played_path.write_text(json.dumps(played, indent=2, ensure_ascii=False), encoding="utf-8")
+
+        # Multi-pass: resolve, match, save — repeat up to 3 times.
+        # Downstream bracket slots (SF, TPP, FINAL) depend on winners
+        # from earlier rounds, which only become known after each pass.
+        for _ in range(3):
+            known_winners = {mid: d["winner"] for mid, d in played.items() if d.get("winner")}
+            slot_teams = resolve_knockout_slot_teams(
+                groups, teams, played_groups, bracket_raw, annex_c, known_winners,
+            )
+            resolved_bracket = [
+                {"match_id": mid, "team_a": st["team_a"], "team_b": st["team_b"]}
+                for mid, st in slot_teams.items()
+                if st.get("team_a") and st.get("team_b")
+            ]
+            played_ids = set(played.keys())
+            new_ko = process_matches(raw_matches, teams, resolved_bracket, aliases, played_ids)
+            if not new_ko:
+                break
+            for m in new_ko:
+                played[m["match_id"]] = m
+            played_path.write_text(json.dumps(played, indent=2, ensure_ascii=False), encoding="utf-8")
     except Exception as e:
         logger.warning("_fetch_live_data: match fetch failed: %s", e)
 
@@ -716,10 +742,14 @@ def _fetch_live_data() -> None:
         from competitions.worldcup.src.predictors.odds import fetch_and_cache_odds
         from competitions.worldcup.src.predictors.manager_signals import fetch_and_cache_manager_signals
         from competitions.worldcup.src.predictors.availability import fetch_and_cache_availability_signal
+        from competitions.worldcup.src.predictors.elo_odds import compute_elo_odds_signal
+        from competitions.worldcup.src.predictors.team_synergy import compute_team_synergy_signal
+        from competitions.worldcup.src.predictors.rolling_form import compute_rolling_form_signal
+        from competitions.worldcup.src.predictors.squad_value import compute_squad_value_signal
+        from competitions.worldcup.src.predictors.rest_days import compute_rest_days_signal
 
-        if BSD_API_KEY:
-            cb_cache = fetch_and_cache_catboost(BSD_API_KEY, aliases, groups, bracket_raw)
-            save_signal_cache(cb_cache, CATBOOST_CACHE_FILE, DATA_DIR)
+        cb_cache = fetch_and_cache_catboost(BSD_API_KEY, aliases, groups, bracket_raw)
+        save_signal_cache(cb_cache, CATBOOST_CACHE_FILE, DATA_DIR)
 
         lineup_cache = compute_lineup_signal(groups, bracket=bracket_raw)
         save_signal_cache(lineup_cache, LINEUP_CACHE_FILE, DATA_DIR)
@@ -730,20 +760,34 @@ def _fetch_live_data() -> None:
         odds_cache = fetch_and_cache_odds(BSD_API_KEY, raw_matches, aliases, groups, bracket=bracket_raw)
         save_signal_cache(odds_cache, ODDS_CACHE_FILE, DATA_DIR)
 
-        if BSD_API_KEY:
-            defensive_cache, manager_cache = fetch_and_cache_manager_signals(BSD_API_KEY, groups, bracket=bracket_raw)
-            save_signal_cache(defensive_cache, DEFENSIVE_CACHE_FILE, DATA_DIR)
-            save_signal_cache(manager_cache, MANAGER_EFFECT_CACHE_FILE, DATA_DIR)
+        defensive_cache, manager_cache = fetch_and_cache_manager_signals(BSD_API_KEY, groups, bracket=bracket_raw)
+        save_signal_cache(defensive_cache, DEFENSIVE_CACHE_FILE, DATA_DIR)
+        save_signal_cache(manager_cache, MANAGER_EFFECT_CACHE_FILE, DATA_DIR)
 
-            ex = ThreadPoolExecutor(max_workers=1)
-            try:
-                f = ex.submit(fetch_and_cache_availability_signal, BSD_API_KEY, groups, bracket=bracket_raw)
-                avail_cache = f.result(timeout=30)
-                save_signal_cache(avail_cache, AVAILABILITY_CACHE_FILE, DATA_DIR)
-            except FuturesTimeout:
-                logger.warning("_fetch_live_data: availability signal timed out (30s)")
-            finally:
-                ex.shutdown(wait=False)
+        elo_odds_cache = compute_elo_odds_signal(teams, groups, bracket=bracket_raw)
+        save_signal_cache(elo_odds_cache, ELO_ODDS_CACHE_FILE, DATA_DIR)
+
+        team_synergy_cache = compute_team_synergy_signal(teams, groups, bracket=bracket_raw)
+        save_signal_cache(team_synergy_cache, TEAM_SYNERGY_CACHE_FILE, DATA_DIR)
+
+        rolling_form_cache = compute_rolling_form_signal(teams, groups, bracket=bracket_raw)
+        save_signal_cache(rolling_form_cache, ROLLING_FORM_CACHE_FILE, DATA_DIR)
+
+        squad_value_cache = compute_squad_value_signal(groups, bracket=bracket_raw)
+        save_signal_cache(squad_value_cache, SQUAD_VALUE_CACHE_FILE, DATA_DIR)
+
+        rest_days_cache = compute_rest_days_signal(groups, bracket=bracket_raw)
+        save_signal_cache(rest_days_cache, REST_DAYS_CACHE_FILE, DATA_DIR)
+
+        ex = ThreadPoolExecutor(max_workers=1)
+        try:
+            f = ex.submit(fetch_and_cache_availability_signal, BSD_API_KEY, groups, bracket=bracket_raw)
+            avail_cache = f.result(timeout=30)
+            save_signal_cache(avail_cache, AVAILABILITY_CACHE_FILE, DATA_DIR)
+        except FuturesTimeout:
+            logger.warning("_fetch_live_data: availability signal timed out (30s)")
+        finally:
+            ex.shutdown(wait=False)
     except Exception as e:
         logger.warning("_fetch_live_data: signal fetch failed: %s", e)
 
@@ -1348,6 +1392,11 @@ def _run_calibration_task(task_id: str):
         defensive_cache = load_signal_cache("defensive_cache.json", DATA_DIR)
         manager_cache = load_signal_cache("manager_effect_cache.json", DATA_DIR)
         availability_cache = load_signal_cache("availability_cache.json", DATA_DIR)
+        elo_odds_cache = load_signal_cache("elo_odds_cache.json", DATA_DIR)
+        team_synergy_cache = load_signal_cache("team_synergy_cache.json", DATA_DIR)
+        rolling_form_cache = load_signal_cache("rolling_form_cache.json", DATA_DIR)
+        squad_value_cache = load_signal_cache("squad_value_cache.json", DATA_DIR)
+        rest_days_cache = load_signal_cache("rest_days_cache.json", DATA_DIR)
 
         _progress(30, "Running calibration...")
 
@@ -1365,6 +1414,11 @@ def _run_calibration_task(task_id: str):
             defensive_cache=defensive_cache,
             manager_cache=manager_cache,
             availability_cache=availability_cache,
+            elo_odds_cache=elo_odds_cache,
+            team_synergy_cache=team_synergy_cache,
+            rolling_form_cache=rolling_form_cache,
+            squad_value_cache=squad_value_cache,
+            rest_days_cache=rest_days_cache,
             data_dir=str(DATA_DIR),
         )
 

@@ -19,6 +19,8 @@ from src.constants import (
     DEFENSIVE_CACHE_FILE, MANAGER_EFFECT_CACHE_FILE, AVAILABILITY_CACHE_FILE,
     MANAGER_CACHE_FILE, MANAGER_CACHE_TTL_HOURS,
     AVAILABILITY_CACHE_TTL_HOURS,
+    ELO_ODDS_CACHE_FILE, TEAM_SYNERGY_CACHE_FILE, ROLLING_FORM_CACHE_FILE,
+    SQUAD_VALUE_CACHE_FILE, REST_DAYS_CACHE_FILE,
 )
 from football_core.signal import PredictionContext, BlendedPrediction
 from src.fetcher import build_historic_url, fetch_raw_matches, process_group_matches, process_matches
@@ -39,10 +41,15 @@ def build_signal_engine(
     defensive_cache: dict | None = None,
     manager_cache: dict | None = None,
     availability_cache: dict | None = None,
+    elo_odds_cache: dict | None = None,
+    team_synergy_cache: dict | None = None,
+    rolling_form_cache: dict | None = None,
+    squad_value_cache: dict | None = None,
+    rest_days_cache: dict | None = None,
     weights: dict[str, float] | None = None,
     weights_path: str | None = None,
 ) -> Any:
-    """Build an EnsembleEngine with all 8 WC signals wrapping their caches."""
+    """Build an EnsembleEngine with all 13 WC signals wrapping their caches."""
     from football_core.blender import EnsembleEngine
     from football_core.signal import Signal, SignalOutput, PredictionContext
 
@@ -54,6 +61,11 @@ def build_signal_engine(
         "defensive_quality": (defensive_cache or {}).get("matches", {}),
         "manager_effect": (manager_cache or {}).get("matches", {}),
         "availability": (availability_cache or {}).get("matches", {}),
+        "elo_odds": (elo_odds_cache or {}).get("matches", {}),
+        "team_synergy": (team_synergy_cache or {}).get("matches", {}),
+        "rolling_form": (rolling_form_cache or {}).get("matches", {}),
+        "squad_value": (squad_value_cache or {}).get("matches", {}),
+        "rest_days": (rest_days_cache or {}).get("matches", {}),
     }
 
     class _CacheSignal(Signal):
@@ -112,6 +124,11 @@ def merge_signals_into_history(data_dir: Path | str | None = None) -> None:
         ("defensive_cache.json", "defensive_quality"),
         ("manager_effect_cache.json", "manager_effect"),
         ("availability_cache.json", "availability"),
+        ("elo_odds_cache.json", "elo_odds"),
+        ("team_synergy_cache.json", "team_synergy"),
+        ("rolling_form_cache.json", "rolling_form"),
+        ("squad_value_cache.json", "squad_value"),
+        ("rest_days_cache.json", "rest_days"),
     ]
 
     caches: dict[str, dict] = {}
@@ -148,6 +165,11 @@ def run_calibrate_and_blend(
     defensive_cache: dict | None = None,
     manager_cache: dict | None = None,
     availability_cache: dict | None = None,
+    elo_odds_cache: dict | None = None,
+    team_synergy_cache: dict | None = None,
+    rolling_form_cache: dict | None = None,
+    squad_value_cache: dict | None = None,
+    rest_days_cache: dict | None = None,
     data_dir: Path | str | None = None,
 ) -> dict | None:
     """Orchestrate calibration + blending via blender.calibrate_and_blend().
@@ -170,6 +192,7 @@ def run_calibrate_and_blend(
             signal_keys.append("manager_effect")
         if availability_cache:
             signal_keys.append("availability")
+        signal_keys.extend(["elo_odds", "team_synergy", "rolling_form", "squad_value", "rest_days"])
 
         blend_params = calibrate_and_blend(
             history=history,
@@ -184,6 +207,11 @@ def run_calibrate_and_blend(
             defensive_cache=defensive_cache or {},
             manager_cache=manager_cache or {},
             availability_cache=availability_cache or {},
+            elo_odds_cache=elo_odds_cache or {},
+            team_synergy_cache=team_synergy_cache or {},
+            rolling_form_cache=rolling_form_cache or {},
+            squad_value_cache=squad_value_cache or {},
+            rest_days_cache=rest_days_cache or {},
         )
         if blend_params and blend_params.get("calibration_params"):
             save_calibration_params(blend_params["calibration_params"], data_dir)
@@ -470,6 +498,11 @@ def gather_signal_data(
     defensive_cache: dict | None = None,
     manager_cache: dict | None = None,
     availability_cache: dict | None = None,
+    elo_odds_cache: dict | None = None,
+    team_synergy_cache: dict | None = None,
+    rolling_form_cache: dict | None = None,
+    squad_value_cache: dict | None = None,
+    rest_days_cache: dict | None = None,
 ) -> list[dict]:
     """Build per-match signal data for the match detail table."""
     odds_m = (odds_cache or {}).get("matches", {})
@@ -479,6 +512,11 @@ def gather_signal_data(
     defensive_m = (defensive_cache or {}).get("matches", {})
     manager_m = (manager_cache or {}).get("matches", {})
     availability_m = (availability_cache or {}).get("matches", {})
+    elo_odds_m = (elo_odds_cache or {}).get("matches", {})
+    team_synergy_m = (team_synergy_cache or {}).get("matches", {})
+    rolling_form_m = (rolling_form_cache or {}).get("matches", {})
+    squad_value_m = (squad_value_cache or {}).get("matches", {})
+    rest_days_m = (rest_days_cache or {}).get("matches", {})
 
     played_mids: set = set()
     for g in (played_groups or {}).values():
@@ -520,6 +558,21 @@ def gather_signal_data(
         availability_prob = None
         if mid in availability_m and isinstance(availability_m[mid], dict):
             availability_prob = availability_m[mid].get("probability")
+        elo_odds_prob = None
+        if mid in elo_odds_m and isinstance(elo_odds_m[mid], dict):
+            elo_odds_prob = elo_odds_m[mid].get("probability")
+        team_synergy_prob = None
+        if mid in team_synergy_m and isinstance(team_synergy_m[mid], dict):
+            team_synergy_prob = team_synergy_m[mid].get("probability")
+        rolling_form_prob = None
+        if mid in rolling_form_m and isinstance(rolling_form_m[mid], dict):
+            rolling_form_prob = rolling_form_m[mid].get("probability")
+        squad_value_prob = None
+        if mid in squad_value_m and isinstance(squad_value_m[mid], dict):
+            squad_value_prob = squad_value_m[mid].get("probability")
+        rest_days_prob = None
+        if mid in rest_days_m and isinstance(rest_days_m[mid], dict):
+            rest_days_prob = rest_days_m[mid].get("probability")
 
         xg_val = None
         if xg_overrides and mid in xg_overrides:
@@ -541,6 +594,11 @@ def gather_signal_data(
                 "defensive_quality": defensive_prob,
                 "manager_effect": manager_prob,
                 "availability": availability_prob,
+                "elo_odds": elo_odds_prob,
+                "team_synergy": team_synergy_prob,
+                "rolling_form": rolling_form_prob,
+                "squad_value": squad_value_prob,
+                "rest_days": rest_days_prob,
                 "xg": xg_val,
             },
             "blended": round(blended, 4),
@@ -787,6 +845,56 @@ def run_poll_cycle(
         if not lineup_cache or not lineup_cache.get("matches"):
             signal_warnings.append("Lineup strength unavailable — no cached data")
 
+    elo_odds_cache = {}
+    try:
+        from src.predictors.elo_odds import compute_elo_odds_signal
+        elo_odds_cache = compute_elo_odds_signal(teams, groups, bracket=bracket)
+        state.save_signal_cache(elo_odds_cache, ELO_ODDS_CACHE_FILE, data_dir)
+    except Exception as e:
+        signal_warnings.append(f"Elo odds signal computation failed: {e}")
+        if not elo_odds_cache or not elo_odds_cache.get("matches"):
+            signal_warnings.append("Elo odds signal unavailable — no cached data")
+
+    team_synergy_cache = {}
+    try:
+        from src.predictors.team_synergy import compute_team_synergy_signal
+        team_synergy_cache = compute_team_synergy_signal(teams, groups, played=played, played_groups=played_groups, bracket=bracket)
+        state.save_signal_cache(team_synergy_cache, TEAM_SYNERGY_CACHE_FILE, data_dir)
+    except Exception as e:
+        signal_warnings.append(f"Team synergy signal computation failed: {e}")
+        if not team_synergy_cache or not team_synergy_cache.get("matches"):
+            signal_warnings.append("Team synergy signal unavailable — no cached data")
+
+    rolling_form_cache = {}
+    try:
+        from src.predictors.rolling_form import compute_rolling_form_signal
+        rolling_form_cache = compute_rolling_form_signal(teams, groups, played=played, played_groups=played_groups, bracket=bracket)
+        state.save_signal_cache(rolling_form_cache, ROLLING_FORM_CACHE_FILE, data_dir)
+    except Exception as e:
+        signal_warnings.append(f"Rolling form signal computation failed: {e}")
+        if not rolling_form_cache or not rolling_form_cache.get("matches"):
+            signal_warnings.append("Rolling form signal unavailable — no cached data")
+
+    squad_value_cache = {}
+    try:
+        from src.predictors.squad_value import compute_squad_value_signal
+        squad_value_cache = compute_squad_value_signal(groups, bracket=bracket)
+        state.save_signal_cache(squad_value_cache, SQUAD_VALUE_CACHE_FILE, data_dir)
+    except Exception as e:
+        signal_warnings.append(f"Squad value signal computation failed: {e}")
+        if not squad_value_cache or not squad_value_cache.get("matches"):
+            signal_warnings.append("Squad value signal unavailable — no cached data")
+
+    rest_days_cache = {}
+    try:
+        from src.predictors.rest_days import compute_rest_days_signal
+        rest_days_cache = compute_rest_days_signal(groups, bracket=bracket)
+        state.save_signal_cache(rest_days_cache, REST_DAYS_CACHE_FILE, data_dir)
+    except Exception as e:
+        signal_warnings.append(f"Rest days signal computation failed: {e}")
+        if not rest_days_cache or not rest_days_cache.get("matches"):
+            signal_warnings.append("Rest days signal unavailable — no cached data")
+
     defensive_cache = {}
     manager_cache = {}
     if api_key:
@@ -831,7 +939,12 @@ def run_poll_cycle(
                          (form_cache, "form"), (lineup_cache, "lineup_strength"),
                          (defensive_cache, "defensive_quality"),
                          (manager_cache, "manager_effect"),
-                         (availability_cache, "availability")]:
+                         (availability_cache, "availability"),
+                         (elo_odds_cache, "elo_odds"),
+                         (team_synergy_cache, "team_synergy"),
+                         (rolling_form_cache, "rolling_form"),
+                         (squad_value_cache, "squad_value"),
+                         (rest_days_cache, "rest_days")]:
         if cache and cache.get("matches"):
             for mid, entry in cache["matches"].items():
                 _ledger_pairs.append((mid, name, entry))
@@ -850,6 +963,9 @@ def run_poll_cycle(
             form_cache=form_cache, lineup_cache=lineup_cache,
             defensive_cache=defensive_cache, manager_cache=manager_cache,
             availability_cache=availability_cache,
+            elo_odds_cache=elo_odds_cache, team_synergy_cache=team_synergy_cache,
+            rolling_form_cache=rolling_form_cache, squad_value_cache=squad_value_cache,
+            rest_days_cache=rest_days_cache,
         )
         elo_ratings = {name: data["elo"] for name, data in teams.items()}
         all_matches = collect_matches_from_groups(groups)
@@ -963,6 +1079,36 @@ def run_poll_cycle(
     )
     if availability_unavailable:
         signal_warnings.append(f"Availability signal unavailable for {availability_unavailable} match(es)")
+    elo_odds_matches = elo_odds_cache.get("matches", {}) if elo_odds_cache else {}
+    elo_odds_unavailable = sum(
+        1 for m in elo_odds_matches.values() if not m.get("available", False)
+    )
+    if elo_odds_unavailable:
+        signal_warnings.append(f"Elo odds signal unavailable for {elo_odds_unavailable} match(es)")
+    team_synergy_matches = team_synergy_cache.get("matches", {}) if team_synergy_cache else {}
+    team_synergy_unavailable = sum(
+        1 for m in team_synergy_matches.values() if not m.get("available", False)
+    )
+    if team_synergy_unavailable:
+        signal_warnings.append(f"Team synergy signal unavailable for {team_synergy_unavailable} match(es)")
+    rolling_form_matches = rolling_form_cache.get("matches", {}) if rolling_form_cache else {}
+    rolling_form_unavailable = sum(
+        1 for m in rolling_form_matches.values() if not m.get("available", False)
+    )
+    if rolling_form_unavailable:
+        signal_warnings.append(f"Rolling form signal unavailable for {rolling_form_unavailable} match(es)")
+    squad_value_matches = squad_value_cache.get("matches", {}) if squad_value_cache else {}
+    squad_value_unavailable = sum(
+        1 for m in squad_value_matches.values() if not m.get("available", False)
+    )
+    if squad_value_unavailable:
+        signal_warnings.append(f"Squad value signal unavailable for {squad_value_unavailable} match(es)")
+    rest_days_matches = rest_days_cache.get("matches", {}) if rest_days_cache else {}
+    rest_days_unavailable = sum(
+        1 for m in rest_days_matches.values() if not m.get("available", False)
+    )
+    if rest_days_unavailable:
+        signal_warnings.append(f"Rest days signal unavailable for {rest_days_unavailable} match(es)")
 
     governance_result = None
     if last_gov_time == 0.0 or (time.time() - last_gov_time >= constants.GOVERNANCE_INTERVAL_SECONDS):
@@ -1021,6 +1167,11 @@ def run_poll_cycle(
                 defensive_cache=defensive_cache,
                 manager_cache=manager_cache,
                 availability_cache=availability_cache,
+                elo_odds_cache=elo_odds_cache,
+                team_synergy_cache=team_synergy_cache,
+                rolling_form_cache=rolling_form_cache,
+                squad_value_cache=squad_value_cache,
+                rest_days_cache=rest_days_cache,
             )
             match_detail_data = {
                 "all_matches": matches_data,
