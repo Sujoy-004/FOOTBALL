@@ -70,7 +70,7 @@ def compute_bracket_display(groups, teams, bracket, annex_c, played, played_grou
 
 
 def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups, engine_predictions=None):
-from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
+    from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
     known_winners = {mid: data["winner"] for mid, data in played.items() if data.get("winner")}
     slot_teams = resolve_knockout_slot_teams(groups, teams, played_groups, bracket, annex_c, known_winners)
