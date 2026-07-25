@@ -439,6 +439,18 @@ def run_deterministic_compute(
 
     signal_stats = _step("Evaluate signals", lambda: compute_signal_eval(results, engine, elo_ratings, bsd_manager_data))
 
+    def _was_in_semis(t: str) -> bool:
+        for m in knockout.get("rounds", {}).get("SF", []):
+            if t in (m.get("team_a"), m.get("team_b")):
+                return True
+        return False
+
+    def _was_in_qf(t: str) -> bool:
+        for m in knockout.get("rounds", {}).get("QF", []):
+            if t in (m.get("team_a"), m.get("team_b")):
+                return True
+        return False
+
     odds_display = []
     champ = knockout.get("champion", "")
     for i, entry in enumerate(standings, start=1):
@@ -447,8 +459,8 @@ def run_deterministic_compute(
             "rank": i, "team": entry["team"],
             "champion_prob": 1.0 if is_champ else 0.0,
             "final_prob": 1.0 if is_champ else 0.0,
-            "sf_prob": 1.0 if is_champ else 0.0,
-            "qf_prob": 1.0 if is_champ else 0.0,
+            "sf_prob": 1.0 if is_champ or _was_in_semis(entry["team"]) else 0.0,
+            "qf_prob": 1.0 if is_champ or _was_in_qf(entry["team"]) else 0.0,
             "top_8_prob": 1.0 if entry.get("position", 99) <= 8 else 0.0,
             "playoff_prob": 1.0 if entry.get("zone") == "playoff" else 0.0,
             "avg_position": float(entry.get("position", 36)),
