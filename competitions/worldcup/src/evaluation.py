@@ -21,6 +21,7 @@ from football_core.evaluation import (
     calibration_curve,
     expected_calibration_error,
 )
+from football_core.signal import BlendedPrediction
 
 
 def evaluate_all_matches(
@@ -670,3 +671,31 @@ def compute_blend_info(
         "n_matches_for_calibration": n_matches,
         "threshold": 30,
     }
+
+
+def compute_team_strengths_from_predictions(
+    predictions: list[BlendedPrediction],
+    all_matches: list[dict],
+) -> dict[str, dict[str, float]]:
+    """Build per-team per-signal strength from BlendedPrediction signal_breakdown.
+
+    Returns: {signal_name: {team_name: avg_strength}}
+    """
+    accum: dict[str, dict[str, list[float]]] = {}
+    for bp, match in zip(predictions, all_matches):
+        ta = match.get("team_a", "")
+        tb = match.get("team_b", "")
+        if not ta or not tb:
+            continue
+        for sig_name, breakdown in bp.signal_breakdown.items():
+            if sig_name not in accum:
+                accum[sig_name] = {}
+            accum[sig_name].setdefault(ta, []).append(breakdown.get("home", 0.5))
+            accum[sig_name].setdefault(tb, []).append(breakdown.get("away", 0.5))
+
+    result: dict[str, dict[str, float]] = {}
+    for sig_name, team_vals in accum.items():
+        result[sig_name] = {
+            team: sum(vals) / len(vals) for team, vals in team_vals.items()
+        }
+    return result
