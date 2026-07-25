@@ -194,3 +194,17 @@ v2.0 deliveries:
 - UCL live monitor: live_state.py, elo_updater.py, polling loop with --watch/--once
 
 630 WC tests pass, 1 skip. 31 UCL failures are pre-existing (outside v2.0 scope).
+
+## Post-Milestone Architectural Refactoring (2026-07-25)
+
+**Phase 5: Pipeline Extraction (architectural)**
+
+Extracted ~680 lines of pure computation from `web/ucl_app.py` into `competitions/ucl/src/pipeline.py` and updated `competitions/ucl/src/orchestrator.py`.
+
+**Changes:**
+
+- **pipeline.py** (706 lines, new): 14 self-contained functions accepting all dependencies as parameters — no module-level globals from web layer.
+- **orchestrator.py**: Added `run_deterministic_compute()` and `run_compute_all()` — dispatch between results/simulation modes with boot_step logging.
+- **ucl_app.py** (1583 → 837 lines): 16 function bodies replaced with thin delegation wrappers to pipeline/orchestrator.
+
+All API routes preserved, all imports verified.
