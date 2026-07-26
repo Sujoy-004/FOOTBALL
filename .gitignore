@@ -40,6 +40,11 @@ competitions/worldcup/data/form_cache.json
 competitions/worldcup/data/lineup_cache.json
 competitions/worldcup/data/eloratings_cache.json
 competitions/worldcup/data/elo_update_log.json
+competitions/worldcup/data/elo_odds_cache.json
+competitions/worldcup/data/rest_days_cache.json
+competitions/worldcup/data/rolling_form_cache.json
+competitions/worldcup/data/squad_value_cache.json
+competitions/worldcup/data/team_synergy_cache.json
 
 # Root-level generated caches (can be produced from any CWD)
 catboost_cache.json
@@ -84,4 +89,7 @@ Desktop.ini
 # Runtime refresh artifacts (auto-generated per-session)
 web/last_refresh.json
 web/cache.json
+
+# UCL data backup files (regeneratable)
+competitions/ucl/data/*.bak
 

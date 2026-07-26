@@ -14,7 +14,7 @@ const competitions = {
     module: "ucl",
     route: "/ucl",
     apiPrefix: "/ucl/api",
-    tabs: ["Terminal", "Overview", "League Table", "Bracket", "Odds", "Signals"],
+    tabs: ["Overview", "Bracket", "Standings"],
   },
   euro: {
     label: "Euro 2028",

@@ -102,6 +102,7 @@ def compute_team_synergy_signal(
     signal = TeamSynergySignal()
     context = PredictionContext(
         fixtures=list(all_matches),
+        elo_ratings={},
         played_results=played_results,
     )
 

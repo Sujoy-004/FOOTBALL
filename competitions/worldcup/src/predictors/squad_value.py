@@ -89,6 +89,7 @@ def compute_squad_value_signal(
     signal = SquadValueSignal()
     context = PredictionContext(
         fixtures=list(all_matches),
+        elo_ratings={},
         squad_values=team_values,
     )
 

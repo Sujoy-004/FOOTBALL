@@ -54,6 +54,7 @@ async def lifespan(app: fastapi.FastAPI):
     import web.ucl_app as _ucl
     _wc._fetch_live_data()
     _wc.cache = _wc.compute_overview()
+    _ucl._fetch_live_data()
     try:
         _ucl.cache = _ucl.deterministic_compute()
     except Exception as e:

@@ -25,84 +25,12 @@ Threat model:
 """
 
 import logging
-import math
 from datetime import datetime, timedelta, timezone
 
-from src import constants
-from src.math_utils import sigmoid as _sigmoid
+from football_core.signal import PredictionContext
+from football_core.signals.lineup import LineupStrengthSignal
 
 logger = logging.getLogger(__name__)
-
-
-# ─── Helpers ────────────────────────────────────────────────────────────────
-
-
-def _compute_match_lineup_signal(
-    team_a: str,
-    team_b: str,
-    team_values: dict[str, int],
-    k: float,
-) -> dict:
-    """Compute lineup strength signal for a single match pairing.
-
-    Args:
-        team_a: Home team name.
-        team_b: Away team name.
-        team_values: Dict mapping team name → squad market value in EUR.
-        k: Sigmoid steepness (DEFAULT_LINEUP_K or overridden).
-
-    Returns:
-        Signal entry dict with keys: probability, available, reason (if unavailable).
-    """
-    now = datetime.now(timezone.utc)
-
-    if team_a not in team_values:
-        return {
-            "probability": None,
-            "timestamp": now.isoformat(),
-            "available": False,
-            "reason": f"team_value_not_found: {team_a}",
-        }
-    if team_b not in team_values:
-        return {
-            "probability": None,
-            "timestamp": now.isoformat(),
-            "available": False,
-            "reason": f"team_value_not_found: {team_b}",
-        }
-
-    value_a = team_values[team_a]
-    value_b = team_values[team_b]
-
-    if not isinstance(value_a, (int, float)) or value_a <= 0:
-        return {
-            "probability": None,
-            "timestamp": now.isoformat(),
-            "available": False,
-            "reason": f"non_positive_value: {team_a}={value_a!r}",
-        }
-    if not isinstance(value_b, (int, float)) or value_b <= 0:
-        return {
-            "probability": None,
-            "timestamp": now.isoformat(),
-            "available": False,
-            "reason": f"non_positive_value: {team_b}={value_b!r}",
-        }
-
-    strength_delta = math.log(value_a / value_b)
-    p = _sigmoid(k * strength_delta)
-
-    # Clamp to [1e-15, 1-1e-15] — T-15-10
-    p = max(1e-15, min(1 - 1e-15, p))
-
-    return {
-        "probability": p,
-        "timestamp": now.isoformat(),
-        "available": True,
-    }
-
-
-# ─── Public API ─────────────────────────────────────────────────────────────
 
 
 def compute_lineup_signal(
@@ -111,9 +39,10 @@ def compute_lineup_signal(
     bracket: list[dict] | None = None,
     k_factor: float | None = None,
 ) -> dict:
-    """Compute lineup strength signal based on squad market value log-ratio.
+    """Compute lineup strength signal — delegates to LineupStrengthSignal.
 
-    For each match with a known team_a/team_b pairing, computes::
+    For each match with a known team_a/team_b pairing, computes via
+    LineupStrengthSignal::
 
         strength_delta = ln(value_a / value_b)
         p = sigmoid(k * strength_delta)
@@ -123,7 +52,7 @@ def compute_lineup_signal(
         team_values: Pre-loaded dict of team → market value (EUR).
                      Auto-loads from state if None.
         bracket: Optional bracket list. Auto-loads if None.
-        k_factor: Sigmoid steepness. Defaults to ``constants.DEFAULT_LINEUP_K``.
+        k_factor: Sigmoid steepness. Defaults to DEFAULT_LINEUP_K (0.35).
 
     Returns:
         Cache dict with keys:
@@ -133,7 +62,6 @@ def compute_lineup_signal(
     """
     now = datetime.now(timezone.utc)
 
-    # Auto-load data if not provided
     if team_values is None:
         from src.state import load_team_values
         team_values = load_team_values()
@@ -146,38 +74,112 @@ def compute_lineup_signal(
             logger.warning("Could not load bracket data for lineup signal", exc_info=True)
             bracket = []
 
-    k = k_factor if k_factor is not None else constants.DEFAULT_LINEUP_K
+    k = k_factor if k_factor is not None else 0.35
+    signal = LineupStrengthSignal(k=k)
 
-    groups_data = groups.get("groups", groups)
+    groups_data = groups.get("groups", groups) if isinstance(groups, dict) else groups
+
+    all_matches: list[dict] = []
+    for g in groups_data.values():
+        for m in g.get("matches", []):
+            all_matches.append(m)
+    for m in bracket:
+        if m.get("team_a") is not None and m.get("team_b") is not None:
+            all_matches.append(m)
+
+    context = PredictionContext(
+        fixtures=list(all_matches),
+        elo_ratings={},
+        squad_values=team_values,
+    )
+
     result: dict[str, dict] = {}
 
-    # Process group matches
-    for group_letter in groups_data:
-        for match in groups_data[group_letter].get("matches", []):
+    for g in groups_data.values():
+        for match in g.get("matches", []):
             mid = match.get("match_id")
             if not mid:
                 continue
-            entry = _compute_match_lineup_signal(
-                match["team_a"], match["team_b"],
-                team_values, k,
-            )
-            result[mid] = entry
+            _process_match(mid, match, signal, context, now, result, team_values)
 
-    # Process bracket matches — skip unresolved slots (team_a or team_b is None)
     for match in bracket:
         if match.get("team_a") is None or match.get("team_b") is None:
             continue
         mid = match.get("match_id")
         if not mid:
             continue
-        entry = _compute_match_lineup_signal(
-            match["team_a"], match["team_b"],
-            team_values, k,
-        )
-        result[mid] = entry
+        _process_match(mid, match, signal, context, now, result, team_values)
 
     return {
         "fetched_at": now.isoformat(),
         "expires_at": (now + timedelta(hours=1)).isoformat(),
         "matches": result,
     }
+
+
+def _process_match(
+    mid: str,
+    match: dict,
+    signal: LineupStrengthSignal,
+    context: PredictionContext,
+    now: datetime,
+    result: dict[str, dict],
+    team_values: dict,
+) -> None:
+    """Process a single match through the signal and populate result dict."""
+    team_a = match.get("team_a", "")
+    team_b = match.get("team_b", "")
+
+    if team_a not in team_values:
+        result[mid] = {
+            "probability": None,
+            "timestamp": now.isoformat(),
+            "available": False,
+            "reason": f"team_value_not_found: {team_a}",
+        }
+        return
+    if team_b not in team_values:
+        result[mid] = {
+            "probability": None,
+            "timestamp": now.isoformat(),
+            "available": False,
+            "reason": f"team_value_not_found: {team_b}",
+        }
+        return
+
+    val_a = team_values[team_a]
+    val_b = team_values[team_b]
+    if not isinstance(val_a, (int, float)) or val_a <= 0:
+        result[mid] = {
+            "probability": None,
+            "timestamp": now.isoformat(),
+            "available": False,
+            "reason": f"non_positive_value: {team_a}={val_a!r}",
+        }
+        return
+    if not isinstance(val_b, (int, float)) or val_b <= 0:
+        result[mid] = {
+            "probability": None,
+            "timestamp": now.isoformat(),
+            "available": False,
+            "reason": f"non_positive_value: {team_b}={val_b!r}",
+        }
+        return
+
+    try:
+        output = signal.predict(match, context)
+        p = max(1e-15, min(1 - 1e-15, output.home_prob))
+        result[mid] = {
+            "probability": p,
+            "draw_probability": output.draw_prob,
+            "timestamp": now.isoformat(),
+            "available": True,
+        }
+    except Exception:
+        logger.exception("LineupStrengthSignal failed for match %s", mid)
+        result[mid] = {
+            "probability": None,
+            "timestamp": now.isoformat(),
+            "available": False,
+            "reason": "error",
+        }

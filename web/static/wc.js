@@ -491,7 +491,7 @@ function renderBracket() {
 }
 
 function renderMatchRow(m) {
-  const scoreStr = m.winner ? (m.home_score + '-' + m.away_score) : (m.played ? '?' : '—');
+  const scoreStr = (m.home_score != null && m.away_score != null) ? (m.home_score + '-' + m.away_score) : (m.played ? '?' : '—');
   const status = m.played
     ? '<span class="dot-green">&#9679;</span> <span class="dim">Played</span>'
     : '<span class="dot-orange">&#9679;</span> TBD';

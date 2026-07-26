@@ -1,1 +1,145 @@
-{"Monaco":["Monaco"],"Qarabag":["Karabakh Agdam"],"Atalanta":["Atalanta"],"Union SG":["St Gillis"],"Napoli":["Napoli"],"Barcelona":["Barcelona"],"Liverpool":["Liverpool"],"PSV":["PSV"],"Slavia Prague":["Slavia Praha"],"PSG":["Paris SG"],"Kairat":["Kairat"],"Benfica":["Benfica"],"Bodo/Glimt":["Bodoe Glimt"],"Tottenham":["Tottenham"],"Dortmund":["Dortmund"],"Inter":["Inter"],"Club Brugge":["Brugge"],"Bayern":["Bayern"],"Ajax":["Ajax"],"Atletico Madrid":["Atletico"],"Galatasaray":["Galatasaray"],"Sporting":["Sporting"],"Bayer Leverkusen":["Leverkusen"],"Arsenal":["Arsenal"],"Newcastle":["Newcastle"],"Athletic Bilbao":["Bilbao"],"Chelsea":["Chelsea"],"Man City":["Man City"],"Marseille":["Marseille"],"Pafos":["Paphos"],"Real Madrid":["Real Madrid"],"Olympiacos":["Olympiakos"],"Villarreal":["Villarreal"],"Juventus":["Juventus"],"Eintracht Frankfurt":["Frankfurt"],"Copenhagen":["FC Kobenhavn"]}
+{
+  "Monaco": [
+    "Monaco",
+    "AS Monaco FC"
+  ],
+  "Qarabag": [
+    "Karabakh Agdam",
+    "Qarabağ Ağdam FK"
+  ],
+  "Atalanta": [
+    "Atalanta",
+    "Atalanta BC"
+  ],
+  "Union SG": [
+    "St Gillis",
+    "Royale Union Saint-Gilloise"
+  ],
+  "Napoli": [
+    "Napoli",
+    "SSC Napoli"
+  ],
+  "Barcelona": [
+    "Barcelona",
+    "FC Barcelona"
+  ],
+  "Liverpool": [
+    "Liverpool",
+    "Liverpool FC"
+  ],
+  "PSV": [
+    "PSV"
+  ],
+  "Slavia Prague": [
+    "Slavia Praha",
+    "SK Slavia Praha"
+  ],
+  "PSG": [
+    "Paris SG",
+    "Paris Saint-Germain FC"
+  ],
+  "Kairat": [
+    "Kairat",
+    "FK Kairat"
+  ],
+  "Benfica": [
+    "Benfica",
+    "Sport Lisboa e Benfica"
+  ],
+  "Bodo/Glimt": [
+    "Bodoe Glimt",
+    "FK Bodø/Glimt"
+  ],
+  "Tottenham": [
+    "Tottenham",
+    "Tottenham Hotspur FC"
+  ],
+  "Dortmund": [
+    "Dortmund",
+    "Borussia Dortmund"
+  ],
+  "Inter": [
+    "Inter",
+    "FC Internazionale Milano"
+  ],
+  "Club Brugge": [
+    "Brugge",
+    "Club Brugge KV"
+  ],
+  "Bayern": [
+    "Bayern",
+    "FC Bayern München"
+  ],
+  "Ajax": [
+    "Ajax",
+    "AFC Ajax"
+  ],
+  "Atletico Madrid": [
+    "Atletico",
+    "Club Atlético de Madrid"
+  ],
+  "Galatasaray": [
+    "Galatasaray",
+    "Galatasaray SK"
+  ],
+  "Sporting": [
+    "Sporting",
+    "Sporting Clube de Portugal"
+  ],
+  "Bayer Leverkusen": [
+    "Leverkusen",
+    "Bayer 04 Leverkusen"
+  ],
+  "Arsenal": [
+    "Arsenal",
+    "Arsenal FC"
+  ],
+  "Newcastle": [
+    "Newcastle",
+    "Newcastle United FC"
+  ],
+  "Athletic Bilbao": [
+    "Bilbao",
+    "Athletic Club"
+  ],
+  "Chelsea": [
+    "Chelsea",
+    "Chelsea FC"
+  ],
+  "Man City": [
+    "Man City",
+    "Manchester City FC"
+  ],
+  "Marseille": [
+    "Marseille",
+    "Olympique de Marseille"
+  ],
+  "Pafos": [
+    "Paphos",
+    "Paphos FC"
+  ],
+  "Real Madrid": [
+    "Real Madrid",
+    "Real Madrid CF"
+  ],
+  "Olympiacos": [
+    "Olympiakos",
+    "PAE Olympiakos SFP"
+  ],
+  "Villarreal": [
+    "Villarreal",
+    "Villarreal CF"
+  ],
+  "Juventus": [
+    "Juventus",
+    "Juventus FC"
+  ],
+  "Eintracht Frankfurt": [
+    "Frankfurt",
+    "Eintracht Frankfurt"
+  ],
+  "Copenhagen": [
+    "FC Kobenhavn",
+    "FC København"
+  ]
+}

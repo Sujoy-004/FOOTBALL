@@ -94,7 +94,7 @@ def compute_rest_days_signal(
             all_matches.append(m)
 
     signal = RestDaysSignal()
-    context = PredictionContext(fixtures=list(all_matches))
+    context = PredictionContext(fixtures=list(all_matches), elo_ratings={})
 
     result: dict[str, dict] = {}
 

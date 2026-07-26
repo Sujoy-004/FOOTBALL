@@ -120,9 +120,17 @@ class FootballDataOrgProvider:
         )
 
         score = raw.get("score") or {}
-        ft = score.get("fullTime") or {}
-        home_score = ft.get("home") if ft.get("home") is not None else 0
-        away_score = ft.get("away") if ft.get("away") is not None else 0
+        duration = score.get("duration", "")
+        # football-data.org's fullTime includes penalty shootout goals.
+        # For penalty shootouts, use regularTime (90-min result) instead.
+        if duration == "PENALTY_SHOOTOUT":
+            rt = score.get("regularTime") or {}
+            home_score = rt.get("home") if rt.get("home") is not None else None
+            away_score = rt.get("away") if rt.get("away") is not None else None
+        else:
+            ft = score.get("fullTime") or {}
+            home_score = ft.get("home") if ft.get("home") is not None else None
+            away_score = ft.get("away") if ft.get("away") is not None else None
 
         status = (raw.get("status") or "").lower()
         group = FootballDataOrgProvider._map_group(raw.get("group"))
@@ -138,6 +146,7 @@ class FootballDataOrgProvider:
             "event_date": raw.get("utcDate", ""),
             "group_name": group,
             "round_number": matchday,
+            "stage": raw.get("stage", ""),
         }
 
         # Derive winner from score.winner or fall back to score comparison

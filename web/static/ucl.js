@@ -1,34 +1,14 @@
 // ── UCL 2025/26 Module ──
 import {
-  termAdd, termScroll, termShowPrompt, termRenderBootStep, termBooting,
-  wireTerminal, buildTable, destroyModalCharts, modalCharts, drawBracketConnectors,
-  updateStatusBar, competitions, showSimPopup, termRunSimulation, termRunCalibration,
-  renderSparkline, termRunWithSpinner,
+  destroyModalCharts, modalCharts, drawBracketConnectors,
+  updateStatusBar, competitions, showSimPopup,
 } from "./shared.js";
 
 const API = "/ucl/api";
 const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, matches: [] };
 
-let pollTimer = null;
-let simTaskId = null;
-
 export function init(comp) {
-  renderTerminalShell();
-  wireTerminal(termExec);
   loadAll();
-  termBoot();
-}
-
-function renderTerminalShell() {
-  const tab = document.getElementById("tab-terminal");
-  if (!tab) return;
-  tab.innerHTML = `
-    <div class="term-output" id="termOutput"></div>
-    <div class="term-input-line" id="termInputLine" style="display:none">
-      <span class="prompt"></span><span class="term-input-display" id="termInputDisplay"></span><span class="term-cursor">&#9608;</span>
-      <input id="terminal-input" type="text" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
-    </div>
-  `;
 }
 
 async function loadAll() {
@@ -62,8 +42,6 @@ async function loadAll() {
   try { renderOverview(); } catch (e) { console.error("renderOverview:", e); }
   try { renderStandings(); } catch (e) { console.error("renderStandings:", e); }
   try { renderBracket(); } catch (e) { console.error("renderBracket:", e); }
-  try { renderOdds(); } catch (e) { console.error("renderOdds:", e); }
-  try { renderSignals(); } catch (e) { console.error("renderSignals:", e); }
   try { updateStatus(); } catch (e) { console.error("updateStatus:", e); }
 }
 
@@ -114,7 +92,7 @@ async function reloadData() {
     }
     appState.matches = matches;
     renderOverview(); renderStandings(); renderBracket();
-    renderOdds(); renderSignals(); updateStatus();
+    updateStatus();
   } catch (e) {
     console.error("reloadData failed:", e);
   }
@@ -148,118 +126,136 @@ window.__resetResults = async function () {
     appState.bracket = br; appState.odds = o.odds || [];
     appState.signals = sig.signals || {};
     renderOverview(); renderStandings(); renderBracket();
-    renderOdds(); renderSignals(); updateStatus();
+    updateStatus();
   } catch (e) {
     console.error("Reset failed:", e);
   }
 };
 
-// ── Overview ──
+// ── Overview (WC-style layout) ──
 function renderOverview() {
   const tab = document.getElementById("tab-overview");
   if (!tab) return;
   const d = appState.data;
   if (!d) return;
-  const mode = d.mode || "simulation";
-  const champ = d.champion || "—";
-  const sigCount = Object.keys(appState.signals).length;
-  const st = appState.standings;
-  const sigs = appState.signals;
-  const sigKeys = Object.keys(sigs);
-
-  if (mode === "results") {
-    // Real standings first (no simulation data)
-    const stTop8 = (st || []).filter(r => r.zone === "top_8");
-    const stPlayoff = (st || []).filter(r => r.zone === "playoff");
-    const stOut = (st || []).filter(r => r.zone === "eliminated");
-
-    tab.innerHTML = `
-      <div class="stats-row">
-        <div class="stat-card"><div class="val">${d.n_teams}</div><div class="lbl">Teams</div></div>
-        <div class="stat-card"><div class="val">${d.n_iterations.toLocaleString()}</div><div class="lbl">Matchdays</div></div>
-        <div class="stat-card"><div class="val">${sigCount}</div><div class="lbl">Active Signals</div></div>
-        <div class="stat-card"><div class="val">${champ ? champ.split(" ").pop() : "—"}</div><div class="lbl">Champion</div><div class="sub">Actual Champion 2025/26</div></div>
-      </div>
-      <div class="chart-section" id="standingsSection">
-        <div class="title">League Standings</div>
-        ${st && st.length ? (() => {
-          const zoneLabel = r => r.zone === "top_8" ? '<span class="zone-badge top8">TOP 8</span>' : r.zone === "playoff" ? '<span class="zone-badge playoff">PLAYOFF</span>' : '<span class="zone-badge eliminated">OUT</span>';
-          const gd = r => r.gd > 0 ? "+" + r.gd : String(r.gd);
-          const pld = r => (r.wins || 0) + (r.draws || 0) + (r.losses || 0);
-          const cls = r => r.zone === "top_8" ? "zone-top8" : r.zone === "playoff" ? "zone-playoff" : "";
-          let html = '<table class="league-table"><tr><th>Pos</th><th>Team</th><th>Pld</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th><th></th></tr>';
-          st.forEach(r => html += '<tr class="' + cls(r) + '"><td class="num">' + r.position + '</td><td>' + r.team + '</td><td class="num">' + pld(r) + '</td><td class="num">' + (r.wins || 0) + '</td><td class="num">' + (r.draws || 0) + '</td><td class="num">' + (r.losses || 0) + '</td><td class="num">' + (r.gs || 0) + '</td><td class="num">' + (r.ga || 0) + '</td><td class="num">' + gd(r) + '</td><td class="num">' + (r.pts !== undefined && r.pts !== null ? r.pts : "?") + '</td><td>' + zoneLabel(r) + '</td></tr>');
-          return html + "</table>";
-        })() : '<div style="color:#15565B;font-size:11px">No standings data.</div>'}
-      </div>
-      <div class="chart-section" id="evalSection">
-        <div class="title">Signal Statistics</div>
-        ${sigKeys.length > 0 ? (() => {
-          let h = '<table class="eval-table"><tr><th>Signal</th><th>Avg Prob</th><th>Matches</th><th>Available</th><th>Weight</th><th>Brier</th><th>Accuracy</th></tr>';
-          sigKeys.forEach(k => {
-            const s = sigs[k];
-            const dot = s.brier !== undefined ? (s.brier < 0.15 ? "dot-green" : s.brier < 0.25 ? "dot-orange" : "dot-red") : "";
-            h += '<tr><td>' + k + '</td><td class="num">' + (s.avg_probability || 0).toFixed(3) + '</td><td class="num">' + s.n_matches + '</td><td class="num">' + (s.available_pct || 0) + '%</td><td class="num">' + ((s.weight || 0) * 100).toFixed(1) + '%</td>' +
-              (s.brier !== undefined ? '<td class="num"><span class="' + dot + '">&#9679;</span> ' + s.brier.toFixed(4) + '</td><td class="num">' + ((s.accuracy || 0) * 100).toFixed(1) + '%</td>' : '<td class="num">—</td><td class="num">—</td>') +
-              '</tr>';
-          });
-          return h + "</table>";
-        })() : '<div style="color:#15565B;font-size:11px">No signal data available.</div>'}
-      </div>
-    `;
-    return;
-  }
-
-  // Simulation mode: full stats with probabilities
-  const champData = d.all_teams && d.all_teams.length ? d.all_teams[0] : null;
-  const top4 = (d.teams || []).slice(0, 4);
-  const ringColors = ["#168777", "#156F69", "#15565B", "#153D4C"];
-  const stageKeys = ["qf_prob", "sf_prob", "final_prob", "champion_prob"];
+  const signals = appState.signals;
+  const sigKeys = Object.keys(signals);
+  const hasSim = d.all_teams && d.all_teams.length > 0 && d.mode !== "results";
   const allTeams = d.all_teams || [];
 
-  tab.innerHTML = `
-    <div class="stats-row">
-      <div class="stat-card"><div class="val">${d.n_teams}</div><div class="lbl">Teams</div></div>
-      <div class="stat-card"><div class="val">${d.n_iterations.toLocaleString()}</div><div class="lbl">Simulations</div></div>
-      <div class="stat-card"><div class="val">${sigCount}</div><div class="lbl">Active Signals</div></div>
-      <div class="stat-card"><div class="val">${champData ? champData.team.split(" ").pop() : champ}</div><div class="lbl">Champion</div><div class="sub">champion probability: ${champData ? (champData.champion_prob * 100).toFixed(1) : "?"}%</div></div>
-    </div>
-    <div class="team-cards">
-      ${top4.map(t => {
-        const full = (d.all_teams || []).find(x => x.team === t.team) || t;
-        return '<div class="team-card"><div class="name">' + full.team + '</div><div class="elo">Avg pos ' + (full.avg_position || "?").toFixed(1) + '</div><div class="ring-row">' +
-          stageKeys.map((k, i) => {
-            const pct = (full[k] || 0) * 100;
-            const label = k === "champion_prob" ? "Champ" : k.replace("_prob", "").toUpperCase();
-            return '<div><div class="ring"><div class="ring-fill" style="width:' + Math.max(2, pct) + '%;background:' + ringColors[i] + '"></div></div><div class="ring-lbl">' + label + '</div></div>';
-          }).join("") + '</div></div>';
-      }).join("")}
-    </div>
-    <div class="chart-section" id="chartSection">
-      <div class="title">Champion Probability</div>
-      ${allTeams.length > 0 ? (() => {
-        const top10 = allTeams.slice(0, 10);
-        const maxC = Math.max(0.01, top10[0].champion_prob);
-        return top10.map(t => '<div class="chart-row"><div class="cname">' + t.team + '</div><div class="cbar-wrap"><div class="cbar" style="width:' + (t.champion_prob / maxC * 100) + '%"></div></div><div class="cpct">' + (t.champion_prob * 100).toFixed(1) + '%</div></div>').join("");
-      })() : ""}
-    </div>
-    <div class="chart-section" id="evalSection">
-      <div class="title">Signal Statistics</div>
-      ${sigKeys.length > 0 ? (() => {
-        let h = '<table class="eval-table"><tr><th>Signal</th><th>Avg Prob</th><th>Matches</th><th>Available</th><th>Weight</th></tr>';
-        sigKeys.forEach(k => {
-          const s = sigs[k];
-          h += '<tr><td>' + k + '</td><td class="num">' + (s.avg_probability || 0).toFixed(3) + '</td><td class="num">' + s.n_matches + '</td><td class="num">' + (s.available_pct || 0) + '%</td><td class="num">' + ((s.weight || 0) * 100).toFixed(1) + '%</td></tr>';
-        });
-        return h + "</table>";
-      })() : '<div style="color:#15565B;font-size:11px">No signal data available.</div>'}
-    </div>
-  `;
+  let html = '';
+
+  // Stat cards
+  html += '<div class="stats-row" id="statsRow">';
+  html += '<div class="stat-card"><div class="val">' + d.n_teams + '</div><div class="lbl">Teams</div></div>';
+  if (hasSim) {
+    html += '<div class="stat-card"><div class="val">' + d.n_iterations.toLocaleString() + '</div><div class="lbl">Simulations Run</div></div>';
+  } else {
+    html += '<div class="stat-card"><div class="val">' + d.n_iterations.toLocaleString() + '</div><div class="lbl">Matchdays</div></div>';
+  }
+  html += '<div class="stat-card"><div class="val">' + sigKeys.length + '</div><div class="lbl">Active Signals</div></div>';
+  html += '</div>';
+
+  // Post-sim: champion probability bar chart (WC-style absolute width)
+  if (hasSim && allTeams.length > 0) {
+    html += '<div class="chart-section">';
+    html += '<div class="title">Champion Probability (Top 10)</div>';
+    html += '<div class="champ-chart" id="champChart">';
+    allTeams.slice(0, 10).forEach(t => {
+      const pct = (t.champion_prob * 100).toFixed(1);
+      const barW = Math.max(2, pct * 3);
+      html += '<div class="champ-bar-row"><div class="cname">' + t.team + '</div><div class="cbar-wrap"><div class="cbar" style="width:' + barW + 'px"></div></div><div class="cpct">' + pct + '%</div></div>';
+    });
+    html += '</div></div>';
+
+    // Post-sim: top 4 team cards (WC-style horizontal bars)
+    html += '<div class="chart-section">';
+    html += '<div class="title">Top 4 Teams</div>';
+    html += '<div class="team-cards" id="topTeamCards">';
+    allTeams.slice(0, 4).forEach(t => {
+      const champ = (t.champion_prob * 100).toFixed(1);
+      const final = (t.final_prob * 100).toFixed(1);
+      const sf = (t.sf_prob * 100).toFixed(1);
+      const qf = (t.qf_prob * 100).toFixed(1);
+      html += '<div class="team-card"><div class="name">' + t.team + '</div>';
+      html += '<div class="team-ring-row">';
+      html += '<div class="team-ring-item"><div class="trl">CH</div><div class="trv">' + champ + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, champ * 2) + '%"></div></div></div>';
+      html += '<div class="team-ring-item"><div class="trl">F</div><div class="trv">' + final + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, final) + '%"></div></div></div>';
+      html += '<div class="team-ring-item"><div class="trl">SF</div><div class="trv">' + sf + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, sf) + '%"></div></div></div>';
+      html += '<div class="team-ring-item"><div class="trl">QF</div><div class="trv">' + qf + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, qf) + '%"></div></div></div>';
+      html += '</div></div>';
+    });
+    html += '</div></div>';
+  }
+
+  // Merged Signals & Odds
+  if (sigKeys.length > 0) {
+    const odds = appState.odds;
+    html += '<div class="chart-section">';
+    html += '<div class="title">Signals &amp; Odds</div>';
+    html += renderSignalEval(signals);
+    if (odds && odds.length) {
+      html += '<div style="height:8px"></div>';
+      html += renderOddsReference(odds);
+    }
+    html += '</div>';
+  }
+
+  tab.innerHTML = html;
+}
+
+function renderSignalEval(signals) {
+  const sigOrder = ["elo", "all_signals", "form", "lineup_strength", "defensive_quality", "manager_effect", "market_odds", "catboost"];
+  const labels = { elo: "Elo", all_signals: "Blended", form: "Form", lineup_strength: "Lineup", defensive_quality: "Defense", manager_effect: "Manager", market_odds: "Odds", catboost: "CatBoost" };
+  const hasEval = sigOrder.some(sk => { const e = signals[sk]; return e && e.n_matches > 0 && e.brier != null; });
+  let html = '<table class="eval-table"><tr><th>Signal</th><th>Avg Prob</th>';
+  if (hasEval) html += '<th>Brier</th><th>Accuracy</th>';
+  html += '<th>Matches</th><th>Avail</th><th>Weight</th></tr>';
+  sigOrder.forEach(sk => {
+    const s = signals[sk];
+    if (!s) return;
+    const nMatches = s.n_matches || 0;
+    if (!nMatches) return;
+    const pct = s.available_pct || 0;
+    const availDot = pct >= 80 ? "dot-green" : pct >= 50 ? "dot-orange" : "dot-red";
+    const availLabel = pct >= 80 ? "High" : pct >= 50 ? "Medium" : "Low";
+    html += '<tr><td>' + (labels[sk] || sk) + '</td>';
+    html += '<td class="num">' + (s.avg_probability || 0).toFixed(3) + '</td>';
+    if (hasEval) {
+      const b = s.brier;
+      if (b != null) {
+        const bDot = b < 0.15 ? "dot-green" : b < 0.25 ? "dot-orange" : "dot-red";
+        html += '<td class="num"><span class="' + bDot + '">&#9679;</span> ' + b.toFixed(4) + '</td>';
+        html += '<td class="num">' + (s.accuracy != null ? (s.accuracy * 100).toFixed(1) + '%' : '—') + '</td>';
+      } else {
+        html += '<td class="num">—</td><td class="num">—</td>';
+      }
+    }
+    html += '<td class="num">' + nMatches + '</td>';
+    html += '<td class="num"><span class="' + availDot + '">&#9679;</span> ' + availLabel + '</td>';
+    html += '<td class="num">' + ((s.weight || 0) * 100).toFixed(1) + '%</td></tr>';
+  });
+  return html + '</table>';
+}
+
+function renderOddsReference(odds) {
+  if (!odds || !odds.length) return '';
+  let html = '<div class="g-title" style="color:#16A085;font-size:11px;margin:0 0 4px">Team Probabilities</div>';
+  html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion</th><th>Final</th><th>SF</th><th>QF</th><th>Top 8</th></tr>';
+  odds.slice(0, 20).forEach(t => {
+    html += '<tr><td class="num">' + t.rank + '</td><td>' + t.team + '</td>';
+    html += '<td class="num">' + (t.champion_prob * 100).toFixed(1) + '%<span class="odds-bar-wrap"><span class="odds-bar" style="width:' + Math.max(2, t.champion_prob * 200) + '%"></span></span></td>';
+    html += '<td class="num">' + (t.final_prob * 100).toFixed(1) + '%</td>';
+    html += '<td class="num">' + (t.sf_prob * 100).toFixed(1) + '%</td>';
+    html += '<td class="num">' + (t.qf_prob * 100).toFixed(1) + '%</td>';
+    html += '<td class="num">' + (t.top_8_prob * 100).toFixed(1) + '%</td></tr>';
+  });
+  return html + '</table>';
 }
 
 // ── League Table ──
 function renderStandings() {
-  const tab = document.getElementById("tab-leaguetable");
+  const tab = document.getElementById("tab-standings");
   if (!tab) return;
   const st = appState.standings;
   if (!st || !st.length) {
@@ -614,526 +610,6 @@ function renderSignals() {
   tab.innerHTML = html;
 }
 
-// ── What-If Page ──
-function populateWhatIfSelectors() {
-  const matches = appState.matches;
-  const roundSel = document.getElementById("whatifRound");
-  const matchSel = document.getElementById("whatifMatch");
-  if (!roundSel || roundSel.options.length > 1) return;
 
-  const rounds = [...new Set(matches.map(m => m.round))];
-  rounds.forEach(r => {
-    const opt = document.createElement("option");
-    opt.value = r; opt.textContent = r;
-    roundSel.appendChild(opt);
-  });
 
-  roundSel.onchange = () => {
-    const r = roundSel.value;
-    matchSel.innerHTML = '<option value="">-- Match --</option>';
-    matches.filter(m => m.round === r).forEach(m => {
-      const opt = document.createElement("option");
-      opt.value = m.match_id;
-      opt.textContent = (m.team_a || "TBD") + " vs " + (m.team_b || "TBD");
-      matchSel.appendChild(opt);
-    });
-    updateMatchInfo();
-  };
-  matchSel.onchange = updateMatchInfo;
-}
 
-function updateMatchInfo() {
-  const matchId = document.getElementById("whatifMatch").value;
-  const info = document.getElementById("whatifMatchInfo");
-  if (!matchId || !info) { if (info) info.textContent = ""; return; }
-  const m = appState.matches.find(x => x.match_id === matchId);
-  if (m) info.textContent = m.round + " — " + (m.team_a || "TBD") + " vs " + (m.team_b || "TBD");
-}
-
-window.__sendUclWhatIf = async function (mode) {
-  const matchId = document.getElementById("whatifMatch").value;
-  const scenario = document.getElementById("whatifInput").value.trim();
-  const resultDiv = document.getElementById("whatifResult");
-  if (!matchId || !scenario) { resultDiv.style.display = "none"; return; }
-
-  resultDiv.style.display = "none";
-  resultDiv.innerHTML = "";
-  const progressWrap = document.getElementById("whatifProgress");
-  const progressBar = document.getElementById("whatifProgressBar");
-  const progressText = document.getElementById("whatifProgressText");
-
-  if (mode === "simulate") {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-    progressWrap.style.display = "block";
-    progressBar.style.width = "0%";
-    progressText.textContent = "Starting...";
-
-    try {
-      const startResp = await (await fetch(API + "/what-if", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ match_id: matchId, scenario, mode: "simulate" }),
-      })).json();
-
-      if (startResp.error) {
-        resultDiv.style.display = "block";
-        resultDiv.innerHTML = '<div style="color:#ff6b6b">' + startResp.error + "</div>";
-        progressWrap.style.display = "none";
-        return;
-      }
-
-      simTaskId = startResp.task_id;
-      pollTimer = setInterval(async () => {
-        try {
-          const pResp = await (await fetch(API + "/simulation/progress/" + simTaskId)).json();
-          if (pResp.error) {
-            clearInterval(pollTimer); pollTimer = null;
-            progressWrap.style.display = "none";
-            resultDiv.style.display = "block";
-            resultDiv.innerHTML = '<div style="color:#ff6b6b">' + pResp.error + "</div>";
-            return;
-          }
-          const pct = pResp.progress || 0;
-          const iter = pResp.iteration || 0;
-          const total = pResp.total_iterations || 0;
-          progressBar.style.width = pct + "%";
-          const elapsed = total > 0 && pct > 0
-            ? Math.round((Date.now() - startTime) / 1000)
-            : 0;
-          const eta = total > 0 && pct > 0 && pct < 100
-            ? Math.round((Date.now() - startTime) / pct * (100 - pct) / 1000)
-            : 0;
-          progressText.textContent = iter.toLocaleString() + " / " + total.toLocaleString() + " (" + pct + "%)"
-            + (elapsed > 0 ? "  elapsed " + elapsed + "s" : "")
-            + (eta > 0 ? "  ETA " + eta + "s" : "");
-
-          if (pResp.status === "complete") {
-            clearInterval(pollTimer); pollTimer = null;
-            progressWrap.style.display = "none";
-            resultDiv.style.display = "block";
-            let html = "";
-            if (pResp.insight) {
-              html += '<div class="wir-insight">>> ' + pResp.insight.replace(/ >> /g, "<br>>></div><div class=\"wir-insight\">>> ") + "</div>";
-            }
-            if (pResp.result) {
-              const r = pResp.result;
-              if (r.baseline && r.adjusted) {
-                Object.keys(r.baseline).forEach(t => {
-                  const base = (r.baseline[t] * 100).toFixed(1);
-                  const adj = (r.adjusted[t] * 100).toFixed(1);
-                  const cls = adj >= base ? "wir-diff-pos" : "wir-diff-neg";
-                  html += '<div class="wir-row"><span class="wir-label">' + t + '</span><span class="wir-val ' + cls + '">' + base + '% &#8594; ' + adj + '%</span></div>';
-                });
-              }
-            }
-            resultDiv.innerHTML = html;
-          }
-          if (pResp.status === "error") {
-            clearInterval(pollTimer); pollTimer = null;
-            progressWrap.style.display = "none";
-            resultDiv.style.display = "block";
-            resultDiv.innerHTML = '<div style="color:#ff6b6b">' + (pResp.error || "Simulation error") + "</div>";
-          }
-        } catch (e) {
-          clearInterval(pollTimer); pollTimer = null;
-          progressWrap.style.display = "none";
-        }
-      }, 200);
-      const startTime = Date.now();
-    } catch (e) {
-      progressWrap.style.display = "none";
-      resultDiv.style.display = "block";
-      resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + "</div>";
-    }
-    return;
-  }
-
-  try {
-    const resp = await (await fetch(API + "/what-if", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ match_id: matchId, scenario }),
-    })).json();
-
-    resultDiv.style.display = "block";
-
-    let html = "";
-    if (resp.insight) {
-      html += '<div class="wir-insight">>> ' + resp.insight.replace(/ >> /g, "<br>>></div><div class=\"wir-insight\">>> ") + "</div>";
-    }
-
-    if (resp.adjusted_signals) {
-      let sigDetail = "";
-      Object.entries(resp.adjusted_signals).forEach(([sk, sv]) => {
-        if (sv.was_adjusted) {
-          const deltaStr = (sv.delta * 100).toFixed(1);
-          const cls = sv.delta >= 0 ? "wir-diff-pos" : "wir-diff-neg";
-          sigDetail += '<div class="wir-sig-row"><span>' + sk + '</span><span class="wir-bar-wrap"><span class="wir-bar" style="width:' + (sv.probability * 100) + '%"></span></span><span class="wir-val">' + (sv.probability * 100).toFixed(1) + '%</span><span class="' + cls + '">' + (sv.delta >= 0 ? "+" : "") + deltaStr + '%</span></div>';
-        }
-      });
-      if (sigDetail) {
-        html += '<div class="wir-toggle" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">[+] Signal detail</div>';
-        html += '<div class="wir-sigs" style="display:none">' + sigDetail + "</div>";
-      }
-    }
-
-    if (resp.parsed && resp.parsed.explanation) {
-      const conf = resp.parsed.confidence || 0;
-      const confColor = conf >= 0.6 ? "#168777" : conf >= 0.3 ? "#15565B" : "#ff6b6b";
-      html += '<div class="wir-meta"><span style="color:' + confColor + '">Detection confidence: ' + (conf * 100).toFixed(0) + "%</span> &middot; " + resp.parsed.explanation + "</div>";
-    }
-
-    if (!resp.insight && resp.original_prob_a !== undefined) {
-      const deltaCls = resp.delta >= 0 ? "wir-diff-pos" : "wir-diff-neg";
-      const deltaSign = resp.delta >= 0 ? "+" : "";
-      html = '<div class="wir-row"><span class="wir-label">Original</span><span class="wir-val">' + (resp.team_a || "A") + " " + (resp.original_prob_a * 100).toFixed(1) + '%</span></div>' +
-        '<div class="wir-row"><span class="wir-label">After scenario</span><span class="wir-val ' + deltaCls + '">' + (resp.team_a || "A") + " " + (resp.adjusted_prob_a * 100).toFixed(1) + '% <span class="' + deltaCls + '">(' + deltaSign + resp.delta_pct + '%)</span></span></div>';
-    }
-
-    resultDiv.innerHTML = html;
-  } catch (e) {
-    resultDiv.style.display = "block";
-    resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + "</div>";
-  }
-};
-
-function renderWhatIf() {
-  const tab = document.getElementById("tab-whatif");
-  if (!tab) return;
-  const matches = appState.matches;
-  if (!matches || !matches.length) {
-    tab.innerHTML = '<div style="color:#15565B;font-size:12px;padding:12px">No match data available. Run a simulation first.</div>';
-    return;
-  }
-  tab.innerHTML = `
-    <div class="whatif-controls">
-      <select id="whatifRound"><option value="">-- Round --</option></select>
-      <select id="whatifMatch"><option value="">-- Match --</option></select>
-      <input type="text" id="whatifInput" placeholder="Scenario (e.g. Man City stronger)">
-      <button onclick="window.__sendUclWhatIf('instant')" title="Instant (signal-only)">&#9654;</button>
-      <button onclick="window.__sendUclWhatIf('simulate')" title="Full MC re-simulation" style="margin-left:4px">&#9654;&#9654;</button>
-    </div>
-    <div id="whatifMatchInfo" style="color:#15565B;font-size:11px;margin-bottom:6px;"></div>
-    <div id="whatifProgress" style="display:none;margin:6px 0">
-      <div style="background:#0D1B2A;border-radius:4px;height:16px;overflow:hidden">
-        <div id="whatifProgressBar" style="background:#16A085;height:100%;width:0%;transition:width 0.2s"></div>
-      </div>
-      <div id="whatifProgressText" style="color:#15565B;font-size:10px;margin-top:2px"></div>
-    </div>
-    <div class="whatif-result" id="whatifResult"></div>
-  `;
-  populateWhatIfSelectors();
-}
-
-// ── Terminal ──
-function buildUCLTable(teams, cols) {
-  const show = cols || ["champion_prob", "final_prob", "sf_prob", "qf_prob"];
-  const labels = { champion_prob: "Champion", final_prob: "Final", sf_prob: "SF", qf_prob: "QF" };
-  let h = "<tr><th>#</th><th>Team</th>";
-  show.forEach(c => h += "<th>" + (labels[c] || c) + "</th>");
-  h += '</tr><tr class="sep"><td class="num">──</td><td>────</td>';
-  show.forEach(c => h += '<td class="num">' + (labels[c] || c).replace(/./g, '─') + '</td>');
-  h += "</tr>";
-  let html = "<table>" + h;
-  teams.forEach((t, i) => {
-    html += '<tr><td class="num">' + (i + 1) + '</td><td class="team">' + t.team + "</td>";
-    show.forEach(c => html += '<td class="num prob">' + ((t[c] || 0) * 100).toFixed(1) + '%</td>');
-    html += "</tr>";
-  });
-  return html + "</table>";
-}
-
-async function termBoot() {
-  termBooting = true;
-  termAdd('<span class="title">>> UCL 2025/26 — Champions League Predictor</span>');
-  termAdd('<span class="banner">+------------------------------------+\n|      MONTE CARLO SIMULATION        |\n|      10 000 iterations             |\n+------------------------------------+</span>');
-  termAdd("");
-
-  let bootSteps;
-  try { bootSteps = await (await fetch(API + "/boot")).json(); }
-  catch { termAdd('<span class="danger">ERROR: Server unreachable.</span>'); termShowPrompt(); termBooting = false; return; }
-
-  for (const step of bootSteps) await termRenderBootStep(step);
-  termAdd("");
-
-  const d = appState.data;
-  if (d && d.all_teams) {
-    termAdd('<span class="highlight">== Champion Probability Table ==</span>');
-    termAdd("");
-    termAdd(buildUCLTable(d.all_teams));
-    termAdd("");
-    termAdd('<span class="dim">>> System ready. ' + d.n_teams + " teams simulated. Type help to explore.</span>");
-  } else {
-    termAdd('<span class="danger">ERROR: Failed to load prediction data.</span>');
-  }
-  termAdd("");
-  termAdd('Type <span class="prompt">help</span> for available commands.', "dim");
-  termShowPrompt();
-  termBooting = false;
-}
-
-async function termExec(cmd) {
-  const trimmed = cmd.trim();
-  if (!trimmed) { termShowPrompt(); return; }
-  const parts = trimmed.toLowerCase().split(/\s+/);
-  const main = parts[0];
-  const d = appState.data;
-
-  if (main === "help") {
-    termAdd("");
-    termAdd('<span class="highlight">Available commands:</span>');
-    termAdd('<span class="prompt">top N</span>       - top N by champion probability.');
-    termAdd('<span class="prompt">table</span>       - full 36-team league table.');
-    termAdd('<span class="prompt">odds</span>        - champion/qualification odds.');
-    termAdd('<span class="prompt">bracket</span>     - knockout bracket rounds.');
-    termAdd('<span class="prompt">playoff</span>     - playoff round results.');
-    termAdd('<span class="prompt">signals</span>     - signal blend statistics.');
-    termAdd('<span class="prompt">champion</span>    - show champion prediction.');
-    termAdd('<span class="prompt">simulate [N]</span> - run MC simulation (N iterations, default 10000).');
-    termAdd('<span class="prompt">what-if TEAM[.PARAM=VALUE]</span> - team stats or scenario impact analysis.');
-    termAdd('<span class="prompt">validate</span>   - run validation suite.');
-    termAdd('<span class="prompt">calibrate</span>  - trigger temperature scaling.');
-    termAdd('<span class="prompt">export</span>      - print report snapshot.');
-    termAdd('<span class="prompt">mode M</span>     - switch mode (simulate/replay/live).');
-    termAdd('<span class="prompt">live</span>       - switch to live polling mode.');
-    termAdd('<span class="prompt">replay [file]</span> - switch to replay mode.');
-    termAdd('<span class="prompt">clear</span>       - reset screen.');
-    termAdd('<span class="prompt">help</span>        - this message.');
-    termAdd("");
-  } else if (main === "clear") {
-    document.getElementById("termOutput").innerHTML = "";
-    termAdd('<span class="banner">+------------------------------------+\n|      MONTE CARLO SIMULATION        |\n|     ' + String((d ? d.n_iterations.toLocaleString() : "—")).padStart(10) + ' iterations           |\n+------------------------------------+</span>');
-    termAdd("");
-  } else if (main === "top") {
-    const n = parseInt(parts[1]) || 5;
-    const teams = (d && d.all_teams) ? d.all_teams.slice(0, Math.min(n, d.all_teams.length)) : [];
-    if (!teams.length) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Top ' + teams.length + " -- Champion Probability ==</span>");
-    termAdd(buildUCLTable(teams));
-    termAdd("");
-  } else if (main === "table") {
-    const st = appState.standings;
-    if (!st || !st.length) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== League Table (36 teams) ==</span>');
-    let tbl = '<table><tr><th>Pos</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th><th>Zone</th></tr>';
-    st.forEach(r => {
-      const gd = r.gd > 0 ? "+" + r.gd : String(r.gd);
-      tbl += '<tr><td class="num">' + r.position + '</td><td>' + r.team + '</td><td class="num">' + (r.pts !== null && r.pts !== undefined ? r.pts : "?") + '</td><td class="num">' + gd + '</td><td class="num">' + (r.gs || 0) + '</td><td>' + (r.zone || "") + "</td></tr>";
-    });
-    termAdd(tbl + "</table>");
-    termAdd("");
-  } else if (main === "odds") {
-    const odds = appState.odds;
-    if (!odds || !odds.length) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Champion / Qualification Odds ==</span>');
-    termAdd(buildUCLTable(odds));
-    termAdd("");
-  } else if (main === "bracket") {
-    const br = appState.bracket;
-    if (!br) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    const rounds = br.bracket_rounds || {};
-    termAdd("");
-    termAdd('<span class="highlight">== Knockout Bracket ==</span>');
-    const roundOrder = ["R16", "QF", "SF", "FINAL"];
-    roundOrder.forEach(r => {
-      const ms = rounds[r] || [];
-      if (!ms.length) return;
-      termAdd('<span class="highlight">--- ' + r + " ---</span>");
-      ms.forEach(m => {
-        const scoreStr = m.score ? m.score.home + "-" + m.score.away : (m.result && m.result.score_a !== undefined ? m.result.score_a + "-" + m.result.score_b + " agg" : "?-?");
-        termAdd("  " + (m.team_a || "TBD") + " " + scoreStr + "  " + (m.team_b || "TBD") + (m.winner ? " -> " + m.winner : ""));
-      });
-    });
-    const po = br.playoff || [];
-    if (po.length) {
-      termAdd("");
-      termAdd('<span class="highlight">--- Playoff Results ---</span>');
-      po.forEach(t => termAdd("  Tie " + t.tie_num + ": " + t.team_a + " " + t.aggregate_a + "-" + t.aggregate_b + " " + t.team_b + (t.et_played ? " (ET)" : "") + (t.penalties_played ? " (pens)" : "") + " -> " + t.winner));
-    }
-    termAdd("");
-  } else if (main === "playoff") {
-    const po = (appState.bracket && appState.bracket.playoff) || [];
-    if (!po.length) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Playoff Round (9-24) ==</span>');
-    po.forEach(t => termAdd("  Tie " + t.tie_num + ": " + t.team_a + " " + t.aggregate_a + "-" + t.aggregate_b + " " + t.team_b + " -> " + t.winner));
-    termAdd("");
-  } else if (main === "signals") {
-    const sigs = appState.signals;
-    const keys = Object.keys(sigs);
-    if (!keys.length) { termAdd("No signal data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Signal Blend Status ==</span>');
-    let tbl = '<table><tr><th>Signal</th><th>Avg Prob</th><th>Matches</th><th>Avail</th><th>Weight</th></tr>';
-    keys.forEach(k => {
-      const s = sigs[k];
-      tbl += '<tr><td>' + k + '</td><td class="num">' + (s.avg_probability || 0).toFixed(3) + '</td><td class="num">' + s.n_matches + '</td><td class="num">' + (s.available_pct || 0) + '%</td><td class="num">' + ((s.weight || 0) * 100).toFixed(1) + "%</td></tr>";
-    });
-    termAdd(tbl + "</table>");
-    termAdd("");
-  } else if (main === "champion") {
-    const ch = d ? d.champion : null;
-    const top = appState.odds && appState.odds.length ? appState.odds[0] : null;
-    termAdd("");
-    if (ch) termAdd('Representative champion: <span class="highlight">' + ch + "</span>");
-    if (top) termAdd('Probability favorite:   <span class="highlight">' + top.team + "</span> (" + (top.champion_prob * 100).toFixed(1) + "%)");
-    else termAdd('<span class="dim">No champion data available.</span>');
-    termAdd("");
-  } else if (main === "simulate") {
-    const n = parseInt(parts[1]) || 10000;
-    await termRunSimulation(API, n, async () => {
-      const [nd, st, br, o, sig] = await Promise.all([
-        fetch(API + "/data").then(r => r.json()),
-        fetch(API + "/standings").then(r => r.json()),
-        fetch(API + "/bracket").then(r => r.json()),
-        fetch(API + "/odds").then(r => r.json()),
-        fetch(API + "/signals").then(r => r.json()),
-      ]);
-      appState.data = nd;
-      appState.standings = st;
-      appState.bracket = br;
-      appState.odds = o;
-      appState.signals = sig;
-      const teams = nd.all_teams || [];
-      termAdd("");
-      termAdd('<span class="highlight">== Champion Probability Table ==</span>');
-      termAdd(buildUCLTable(teams));
-      termAdd("");
-    });
-    return;
-  } else if (main === "what-if") {
-    const arg = parts.slice(1).join(" ").trim();
-    if (!arg) { termAdd("Usage: what-if <TEAM[.PARAM=VALUE]>", "dim"); termShowPrompt(); return; }
-    const dotIdx = arg.indexOf(".");
-    const eqIdx = arg.indexOf("=");
-    let teamName, param, value;
-    if (dotIdx > 0 && eqIdx > dotIdx) { teamName = arg.slice(0, dotIdx); param = arg.slice(dotIdx + 1, eqIdx); value = parseFloat(arg.slice(eqIdx + 1)); }
-    else { teamName = arg; param = null; }
-    const teams = (d && d.all_teams) || [];
-    const team = teams.find(t => t.name.toLowerCase() === teamName.toLowerCase());
-    if (!team) { termAdd("Team not found: " + teamName, "danger"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== ' + team.name + ' ==</span>');
-    termAdd('  Elo: <span class="num">' + (team.elo || "?") + '</span>');
-    termAdd('  Champion: <span class="num">' + (team.champion_prob || 0).toFixed(1) + '%</span>  Final: <span class="num">' + (team.final_prob || 0).toFixed(1) + '%</span>  SF: <span class="num">' + (team.sf_prob || 0).toFixed(1) + '%</span>');
-    termAdd('  QF: <span class="num">' + (team.qf_prob || 0).toFixed(1) + '%</span>  Top8: <span class="num">' + (team.top8_prob || 0).toFixed(1) + '%</span>  Playoff: <span class="num">' + (team.playoff_prob || 0).toFixed(1) + '%</span>');
-    const sigs = appState.signals || {};
-    const teamSigs = Object.entries(sigs)
-      .filter(([k, v]) => v && v.team_values && v.team_values[team.name] !== undefined)
-      .map(([k, v]) => ({ key: k, val: v.team_values[team.name] }));
-    if (teamSigs.length) {
-      termAdd('<span class="dim">--- Signal Values ---</span>');
-      teamSigs.forEach(s => termAdd('  ' + s.key + ': <span class="num">' + (typeof s.val === "number" ? s.val.toFixed(4) : s.val) + '</span>'));
-    }
-    if (param && !isNaN(value)) {
-      let matchId = null;
-      try {
-        matchId = appState.matches.find(m => (m.team_a || "").toLowerCase() === team.name.toLowerCase() || (m.team_b || "").toLowerCase() === team.name.toLowerCase())?.match_id || null;
-      } catch {}
-      if (matchId) {
-        const scenario = param === "form" && value > 1 ? team.name + " in form" : param === "form" && value < 1 ? team.name + " poor form" : param === "defense" && value > 1 ? team.name + " strong defense" : param === "defense" && value < 1 ? team.name + " weak defense" : param === "lineup" && value < 1 ? team.name + " lineup injury" : param === "manager" && value < 0.5 ? team.name + " manager sacked" : team.name + " " + param + " " + value;
-        await termRunWithSpinner('<span class="highlight">What-If</span>',
-          () => fetch(API + "/what-if", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ match_id: matchId, scenario, mode: "instant" }) }).then(r => r.json()),
-          result => {
-            if (result.error) { termAdd('<span class="dim">' + result.error + '</span>'); return; }
-            if (result.insight) termAdd('<span class="title">Impact:</span> ' + result.insight.replace(/<br>/g, ' '));
-            if (result.adjusted_signals) {
-              const adj = Object.entries(result.adjusted_signals).filter(([, sv]) => sv.was_adjusted);
-              if (adj.length) {
-                let tbl = '<table><tr><th>Signal</th><th>Before</th><th>After</th><th>Δ</th></tr>';
-                adj.forEach(([sk, sv]) => {
-                  const base = sv.original_probability != null ? (sv.original_probability * 100) : ((sv.probability - sv.delta) * 100);
-                  const aft = sv.probability * 100;
-                  const d = sv.delta * 100;
-                  const cls = d >= 0 ? "ok" : "danger";
-                  tbl += '<tr><td>' + (sigLabels[sk] || sk) + '</td><td class="num prob">' + base.toFixed(1) + '%</td><td class="num prob">' + aft.toFixed(1) + '%</td><td class="num ' + cls + '">' + (d >= 0 ? "+" : "") + d.toFixed(1) + '%</td></tr>';
-                });
-                termAdd(tbl + '</table>');
-              }
-            }
-          }
-        );
-      } else {
-        termAdd('<span class="dim">No match found for scenario analysis.</span>');
-      }
-    }
-    termAdd("");
-  } else if (main === "validate") {
-    await termRunWithSpinner('<span class="highlight">Validate</span>',
-      () => fetch(API + "/validation").then(r => r.json()),
-      v => {
-        if (v.error) { termAdd('<span class="danger">' + v.error + '</span>'); return; }
-        termAdd('<span class="highlight">== Validation ==</span>');
-        termAdd('  Mode: ' + (v.mode || "N/A"));
-        if (v.n_matches !== undefined) termAdd('  Matches evaluated: ' + v.n_matches);
-        if (v.elo) termAdd('  Elo — Brier: ' + v.elo.brier.toFixed(4) + '  LogLoss: ' + (v.elo.log_loss || 0).toFixed(4) + '  Accuracy: ' + ((v.elo.accuracy || 0) * 100).toFixed(1) + '%');
-        if (v.brier !== undefined) termAdd('  Overall Brier: <span class="num">' + v.brier.toFixed(4) + '</span>');
-        if (v.log_loss !== undefined) termAdd('  Overall LogLoss: <span class="num">' + v.log_loss.toFixed(4) + '</span>');
-        if (v.accuracy !== undefined) termAdd('  Overall Accuracy: <span class="num">' + (v.accuracy * 100).toFixed(1) + '%</span>');
-      }
-    );
-    termAdd("");
-  } else if (main === "calibrate") {
-    await termRunCalibration(API);
-    return;
-  } else if (main === "export") {
-    await termRunWithSpinner('<span class="highlight">Export</span>',
-      () => fetch(API + "/report").then(r => r.json()),
-      r => {
-        if (r.error) { termAdd('<span class="danger">' + r.error + '</span>'); return; }
-        termAdd('<span class="highlight">== Report Snapshot ==</span>');
-        if (r.timestamp) termAdd('  Timestamp: <span class="dim">' + r.timestamp + '</span>');
-        if (r.iterations) termAdd('  Iterations: ' + r.iterations.toLocaleString());
-        if (r.mode) termAdd('  Mode: ' + r.mode);
-        if (r.odds && r.odds.length) {
-          termAdd('<span class="title">Top Odds:</span>');
-          r.odds.slice(0, 10).forEach(t => {
-            termAdd('  ' + t.team + ' — Champion: ' + (t.champion_prob || 0).toFixed(1) + '%  Final: ' + (t.final_prob || 0).toFixed(1) + '%');
-          });
-        }
-      }
-    );
-    termAdd("");
-  } else if (main === "mode") {
-    const mode = parts[1] || "";
-    if (!["simulate", "replay", "live"].includes(mode)) { termAdd("Usage: mode simulate|replay|live", "dim"); termShowPrompt(); return; }
-    try {
-      const resp = await (await fetch(API + "/mode", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode }),
-      })).json();
-      termAdd("");
-      if (resp.error) { termAdd('<span class="danger">' + resp.error + '</span>'); }
-      else { termAdd('<span class="ok">Mode switched to: ' + mode + '</span>'); }
-      termAdd("");
-    } catch { termAdd('<span class="danger">Failed to switch mode.</span>'); }
-  } else if (main === "live") {
-    try {
-      const resp = await (await fetch(API + "/mode", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "live" }),
-      })).json();
-      termAdd("");
-      if (resp.error) { termAdd('<span class="danger">' + resp.error + '</span>'); }
-      else { termAdd('<span class="ok">Switched to live polling mode.</span>'); }
-      termAdd("");
-    } catch { termAdd('<span class="danger">Failed to switch to live mode.</span>'); }
-  } else if (main === "replay") {
-    const file = parts.slice(1).join(" ") || "";
-    try {
-      const resp = await (await fetch(API + "/mode", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "replay", replay_data: file }),
-      })).json();
-      termAdd("");
-      if (resp.error) { termAdd('<span class="danger">' + resp.error + '</span>'); }
-      else { termAdd('<span class="ok">Switched to replay mode' + (file ? ': ' + file : '') + '.</span>'); }
-      termAdd("");
-    } catch { termAdd('<span class="danger">Failed to switch to replay mode.</span>'); }
-  } else {
-    termAdd("command not found: " + trimmed, "danger");
-    termAdd('Type <span class="prompt">help</span> for available commands.', "dim");
-  }
-  termShowPrompt();
-}
