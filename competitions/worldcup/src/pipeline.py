@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from datetime import datetime, timezone
@@ -704,6 +705,18 @@ def run_simulation_compute(
         played_groups,
         engine_predictions,
     )
+
+    # Enrich unplayed bracket matches with predicted scores from simulation
+    from football_core.knockout import simulate_single_match
+    _score_rng = random.Random(42)
+    for _round_name, _matches in full_bracket.get("rounds", {}).items():
+        for _m in _matches:
+            if not _m.get("played") and _m.get("team_a") and _m.get("team_b"):
+                _ta, _tb = _m["team_a"], _m["team_b"]
+                if _ta in elo_ratings and _tb in elo_ratings:
+                    _result = simulate_single_match(_ta, _tb, elo_ratings, _score_rng)
+                    _m["predicted_score"] = {"home": _result["score_a"], "away": _result["score_b"]}
+
     overview = compute_overview()
 
     snapshot = {

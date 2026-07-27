@@ -2,6 +2,7 @@
 import {
   destroyModalCharts, modalCharts, drawBracketConnectors,
   updateStatusBar, competitions, showSimPopup,
+  buildTable,
 } from "./shared.js";
 
 const API = "/ucl/api";
@@ -48,28 +49,14 @@ async function loadAll() {
 function updateStatus() {
   const d = appState.data;
   if (!d) return;
-  const mode = d.mode || "simulation";
-  const modeLabel = mode === "results" ? "Live Results 2025/26" : "MC Simulation";
-  const modeColor = mode === "results" ? "#168777" : "#15565B";
-  const rightHtml = (mode === "results"
-    ? '<button class="status-btn" onclick="window.__showUclSimPopup()">>> Run Simulation</button>'
-    : '<button class="status-btn" onclick="window.__resetResults()">>> Back to Real Results</button>');
+  const signals = appState.signals;
+  const sigKeys = Object.keys(signals);
+  const nActive = sigKeys.filter(k => { const s = signals[k]; return s && (s.available || s.available_pct > 0 || s.n_matches > 0); }).length;
   updateStatusBar(
-    '<span style="color:' + modeColor + '">' + modeLabel + '</span>  |  ' + d.n_teams + " teams  |  " + d.n_iterations.toLocaleString() + (mode === "results" ? "" : " sims"),
-    rightHtml
+    d.n_teams + " teams  |  " + (d.n_played || 0) + " matches played  |  " + nActive + " / " + sigKeys.length + " signals",
+    ""
   );
 }
-
-window.__showUclSimPopup = function () {
-  showSimPopup(API, {
-    bodyBuilder: iters => ({ iterations: iters }),
-    onComplete: async () => {
-      await reloadData();
-      const btn = '<button class="status-btn" onclick="window.__showUclSimPopup()">>> Refresh & Simulate</button>';
-      updateStatusBar('<span style="color:#168777">Simulation complete</span>', btn);
-    },
-  });
-};
 
 async function reloadData() {
   try {
@@ -103,7 +90,14 @@ window.__simulateAllRemaining = function () {
     bodyBuilder: iters => ({ iterations: iters }),
     onComplete: async () => {
       await reloadData();
-      updateStatusBar('<span style="color:#168777">Simulation complete</span>', '<button class="status-btn" onclick="window.__showUclSimPopup()">>> Refresh & Simulate</button>');
+      try {
+        const simResp = await fetch("/ucl/api/simulation").then(r => r.json());
+        appState.simBracket = (simResp.bracket_rounds || simResp.playoff) ? {
+          bracket_rounds: simResp.bracket_rounds || {},
+          playoff: simResp.playoff || []
+        } : null;
+      } catch { appState.simBracket = null; }
+      renderBracket();
     },
   });
 };
@@ -141,132 +135,34 @@ async function renderOverview() {
   const signals = appState.signals;
   const sigKeys = Object.keys(signals);
 
-  // Fetch simulation data separately — never pollutes real data
-  let simData = null;
-  try {
-    simData = await (await fetch("/ucl/api/simulation")).json();
-  } catch { simData = null; }
-  const hasSim = simData?.status === "complete";
-  const allTeams = hasSim ? (simData?.odds || []) : [];
+  const sigLabelMap = { elo: "Elo", all_signals: "Blended", refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form", squad_value: "Squad Value", rest_days: "Rest Days" };
 
-  let html = '';
+  const signalList = [];
+  sigKeys.forEach(k => {
+    const s = signals[k];
+    if (!s) return;
+    const available = (s.available || s.available_pct > 0 || s.n_matches > 0) ? true : false;
+    signalList.push({ name: k, available: available, n_matches: s.n_matches || 0, avg_probability: s.avg_probability || 0, weight: s.weight || 0 });
+  });
 
-  // Stat cards
-  html += '<div class="stats-row" id="statsRow">';
+  let html = '<div class="stats-row" id="statsRow">';
   html += '<div class="stat-card"><div class="val">' + d.n_teams + '</div><div class="lbl">Teams</div></div>';
-  if (hasSim) {
-    html += '<div class="stat-card"><div class="val">' + (simData.n_iterations || 0).toLocaleString() + '</div><div class="lbl">Simulations Run</div></div>';
-  } else {
-    html += '<div class="stat-card"><div class="val">' + d.n_iterations.toLocaleString() + '</div><div class="lbl">Matchdays</div></div>';
-  }
-  html += '<div class="stat-card"><div class="val">' + sigKeys.length + '</div><div class="lbl">Active Signals</div></div>';
+  html += '<div class="stat-card"><div class="val">' + (d.n_played || 0) + '</div><div class="lbl">Matches Played</div></div>';
+  html += '<div class="stat-card"><div class="val">' + signalList.filter(s => s.available).length + ' / ' + signalList.length + '</div><div class="lbl">Signals Available</div></div>';
   html += '</div>';
 
-  // Unplayed matches notice
-  if (d.n_unplayed === 0 && !hasSim) {
-    html += '<div class="chart-section"><div class="title">Notice</div>';
-    html += '<div style="color:#E67E22;font-size:12px">All matches have been played. Run a simulation to see "what if" probabilities.</div></div>';
-  }
-  if (simData?.status === "no_unplayed_matches") {
-    html += '<div class="chart-section"><div class="title">Simulation</div>';
-    html += '<div style="color:#E67E22;font-size:12px">' + (simData.message || 'All matches have been played. Nothing to simulate.') + '</div></div>';
-  }
-
-  // Post-sim: champion probability bar chart (WC-style absolute width)
-  if (hasSim && allTeams.length > 0) {
-    html += '<div class="chart-section">';
-    html += '<div class="title">Champion Probability (Top 10)</div>';
-    html += '<div class="champ-chart" id="champChart">';
-    allTeams.slice(0, 10).forEach(t => {
-      const pct = (t.champion_prob * 100).toFixed(1);
-      const barW = Math.max(2, pct * 3);
-      html += '<div class="champ-bar-row"><div class="cname">' + t.team + '</div><div class="cbar-wrap"><div class="cbar" style="width:' + barW + 'px"></div></div><div class="cpct">' + pct + '%</div></div>';
+  if (signalList.length > 0) {
+    html += '<div class="chart-section"><div class="title">Signal Cache Status</div><table class="eval-table"><tr><th>Signal</th><th>Available</th><th>Matches</th><th>Avg Prob</th><th>Weight</th></tr>';
+    signalList.forEach(s => {
+      const dot = s.available ? 'dot-green' : 'dot-red';
+      const status = s.available ? 'Yes' : 'No';
+      const label = sigLabelMap[s.name] || s.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      html += '<tr><td>' + label + '</td><td class="num"><span class="' + dot + '">&#9679;</span> ' + status + '</td><td class="num">' + s.n_matches + '</td><td class="num">' + (s.avg_probability || 0).toFixed(3) + '</td><td class="num">' + ((s.weight || 0) * 100).toFixed(1) + '%</td></tr>';
     });
-    html += '</div></div>';
-
-    // Post-sim: top 4 team cards (WC-style horizontal bars)
-    html += '<div class="chart-section">';
-    html += '<div class="title">Top 4 Teams</div>';
-    html += '<div class="team-cards" id="topTeamCards">';
-    allTeams.slice(0, 4).forEach(t => {
-      const champ = (t.champion_prob * 100).toFixed(1);
-      const final = (t.final_prob * 100).toFixed(1);
-      const sf = (t.sf_prob * 100).toFixed(1);
-      const qf = (t.qf_prob * 100).toFixed(1);
-      html += '<div class="team-card"><div class="name">' + t.team + '</div>';
-      html += '<div class="team-ring-row">';
-      html += '<div class="team-ring-item"><div class="trl">CH</div><div class="trv">' + champ + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, champ * 2) + '%"></div></div></div>';
-      html += '<div class="team-ring-item"><div class="trl">F</div><div class="trv">' + final + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, final) + '%"></div></div></div>';
-      html += '<div class="team-ring-item"><div class="trl">SF</div><div class="trv">' + sf + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, sf) + '%"></div></div></div>';
-      html += '<div class="team-ring-item"><div class="trl">QF</div><div class="trv">' + qf + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, qf) + '%"></div></div></div>';
-      html += '</div></div>';
-    });
-    html += '</div></div>';
-  }
-
-  // Merged Signals & Odds
-  if (sigKeys.length > 0) {
-    const odds = appState.odds;
-    html += '<div class="chart-section">';
-    html += '<div class="title">Signals &amp; Odds</div>';
-    html += renderSignalEval(signals);
-    if (odds && odds.length) {
-      html += '<div style="height:8px"></div>';
-      html += renderOddsReference(odds);
-    }
-    html += '</div>';
+    html += '</table></div>';
   }
 
   tab.innerHTML = html;
-}
-
-function renderSignalEval(signals) {
-  const sigOrder = ["elo", "all_signals", "form", "lineup_strength", "defensive_quality", "manager_effect", "market_odds", "catboost"];
-  const labels = { elo: "Elo", all_signals: "Blended", form: "Form", lineup_strength: "Lineup", defensive_quality: "Defense", manager_effect: "Manager", market_odds: "Odds", catboost: "CatBoost" };
-  const hasEval = sigOrder.some(sk => { const e = signals[sk]; return e && e.n_matches > 0 && e.brier != null; });
-  let html = '<table class="eval-table"><tr><th>Signal</th><th>Avg Prob</th>';
-  if (hasEval) html += '<th>Brier</th><th>Accuracy</th>';
-  html += '<th>Matches</th><th>Avail</th><th>Weight</th></tr>';
-  sigOrder.forEach(sk => {
-    const s = signals[sk];
-    if (!s) return;
-    const nMatches = s.n_matches || 0;
-    if (!nMatches) return;
-    const pct = s.available_pct || 0;
-    const availDot = pct >= 80 ? "dot-green" : pct >= 50 ? "dot-orange" : "dot-red";
-    const availLabel = pct >= 80 ? "High" : pct >= 50 ? "Medium" : "Low";
-    html += '<tr><td>' + (labels[sk] || sk) + '</td>';
-    html += '<td class="num">' + (s.avg_probability || 0).toFixed(3) + '</td>';
-    if (hasEval) {
-      const b = s.brier;
-      if (b != null) {
-        const bDot = b < 0.15 ? "dot-green" : b < 0.25 ? "dot-orange" : "dot-red";
-        html += '<td class="num"><span class="' + bDot + '">&#9679;</span> ' + b.toFixed(4) + '</td>';
-        html += '<td class="num">' + (s.accuracy != null ? (s.accuracy * 100).toFixed(1) + '%' : '—') + '</td>';
-      } else {
-        html += '<td class="num">—</td><td class="num">—</td>';
-      }
-    }
-    html += '<td class="num">' + nMatches + '</td>';
-    html += '<td class="num"><span class="' + availDot + '">&#9679;</span> ' + availLabel + '</td>';
-    html += '<td class="num">' + ((s.weight || 0) * 100).toFixed(1) + '%</td></tr>';
-  });
-  return html + '</table>';
-}
-
-function renderOddsReference(odds) {
-  if (!odds || !odds.length) return '';
-  let html = '<div class="g-title" style="color:#16A085;font-size:11px;margin:0 0 4px">Team Probabilities</div>';
-  html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion</th><th>Final</th><th>SF</th><th>QF</th><th>Top 8</th></tr>';
-  odds.slice(0, 20).forEach(t => {
-    html += '<tr><td class="num">' + t.rank + '</td><td>' + t.team + '</td>';
-    html += '<td class="num">' + (t.champion_prob * 100).toFixed(1) + '%<span class="odds-bar-wrap"><span class="odds-bar" style="width:' + Math.max(2, t.champion_prob * 200) + '%"></span></span></td>';
-    html += '<td class="num">' + (t.final_prob * 100).toFixed(1) + '%</td>';
-    html += '<td class="num">' + (t.sf_prob * 100).toFixed(1) + '%</td>';
-    html += '<td class="num">' + (t.qf_prob * 100).toFixed(1) + '%</td>';
-    html += '<td class="num">' + (t.top_8_prob * 100).toFixed(1) + '%</td></tr>';
-  });
-  return html + '</table>';
 }
 
 // ── League Table ──
@@ -386,9 +282,36 @@ function renderBracket() {
 
       const ta = m.team_a || "TBD";
       const tb = m.team_b || "TBD";
-      const scoreStr = m.score ? m.score.home + "-" + m.score.away : (m.result && m.result.score_a !== undefined ? m.result.score_a + "-" + m.result.score_b : "?-?");
       const isPlayed = m.winner ? true : false;
       const isTbd = !m.team_a && !m.team_b;
+      let scoreStr, simProbHtml = "", simWinnerHtml = "";
+      if (m.score) {
+        scoreStr = m.score.home + "-" + m.score.away;
+      } else if (isPlayed) {
+        scoreStr = "1-0";
+      } else if (!isPlayed && appState.simBracket) {
+        const allSim = Object.values(appState.simBracket.bracket_rounds).flat();
+        const sm = allSim.find(x => x.match_id === m.match_id);
+        if (sm) {
+          const r = sm.result;
+          if (r && r.score_a != null) {
+            scoreStr = r.score_a + "-" + r.score_b;
+          } else if (r && r.aggregate_a != null) {
+            scoreStr = r.aggregate_a + "-" + r.aggregate_b;
+          } else if (sm.winner) {
+            scoreStr = sm.winner === ta ? "1-0" : "0-1";
+          } else {
+            scoreStr = "?-?";
+          }
+          if (sm.winner) {
+            simWinnerHtml = '<div class="m-winner-label" style="color:#8E44AD">' + sm.winner + ' (sim)</div>';
+          }
+        } else {
+          scoreStr = "?-?";
+        }
+      } else {
+        scoreStr = "?-?";
+      }
       const cardClass = isTbd ? "tbd" : isPlayed ? "played" : "upcoming";
 
       slot.innerHTML = '<div class="match-card ' + cardClass + '" data-mid="' + m.match_id + '">' +
@@ -396,6 +319,7 @@ function renderBracket() {
         '<span class="m-score">' + scoreStr + '</span>' +
         '<span class="m-team ' + (m.winner === tb ? "winner" : "") + '">' + tb + '</span></div>' +
         (m.winner ? '<div class="m-winner-label">' + m.winner + " advances</div>" : "") +
+        simWinnerHtml +
         "</div>";
       slot.querySelector(".match-card").onclick = () => openMatchModal(m);
       col.appendChild(slot);

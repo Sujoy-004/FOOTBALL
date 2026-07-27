@@ -349,9 +349,14 @@ def _load_knockout_results() -> dict | None:
 
 def _unplayed_match_count() -> int:
     """Count UCL matches that haven't been played yet."""
+    return _match_counts()[0]
+
+
+def _match_counts() -> tuple[int, int]:
+    """Return (unplayed, total) match counts from fixtures + results."""
     fixtures_path = DATA_DIR / "fixtures.json"
     if not fixtures_path.exists():
-        return 0
+        return 0, 0
     fixtures = json.loads(fixtures_path.read_text(encoding="utf-8"))
     all_ids = set()
     for md in fixtures.get("schedule", {}).get("matchdays", []):
@@ -360,7 +365,12 @@ def _unplayed_match_count() -> int:
                 all_ids.add(m["match_id"])
     results = _load_results() or []
     knockout = _load_knockout_results() or {}
-    played_ids = {m["match_id"] for m in results if m.get("winner") and m.get("match_id")}
+    played_ids = set()
+    for m in results:
+        if not isinstance(m, dict) or not m.get("match_id"):
+            continue
+        if m.get("winner") or (m.get("home_score") is not None and m.get("away_score") is not None):
+            played_ids.add(m["match_id"])
     for round_matches in knockout.get("rounds", {}).values():
         for m in round_matches:
             mid = m.get("match_id")
@@ -370,7 +380,7 @@ def _unplayed_match_count() -> int:
         mid = m.get("match_id")
         if m.get("winner") and mid:
             played_ids.add(mid)
-    return len(all_ids - played_ids)
+    return len(all_ids - played_ids), len(all_ids)
 
 
 def _compute_deterministic_standings(results: list[dict]) -> list[dict]:
@@ -441,6 +451,7 @@ ucl_app = fastapi.FastAPI(lifespan=lifespan)
 
 @ucl_app.get("/api/data")
 def api_data():
+    n_unplayed, n_total = _match_counts()
     return JSONResponse({
         "teams": cache.get("teams", []),
         "all_teams": cache.get("all_teams", []),
@@ -449,7 +460,8 @@ def api_data():
         "snapshot_date": cache.get("snapshot_date", ""),
         "champion": cache.get("champion"),
         "mode": _mode,
-        "n_unplayed": _unplayed_match_count(),
+        "n_unplayed": n_unplayed,
+        "n_played": n_total - n_unplayed,
     })
 
 
@@ -470,6 +482,8 @@ def api_simulation():
         "n_iterations": sim_cache.get("n_iterations", 0),
         "snapshot_date": sim_cache.get("snapshot_date", ""),
         "status": sim_cache.get("status", "none"),
+        "bracket_rounds": sim_cache.get("bracket_rounds"),
+        "playoff": sim_cache.get("playoff"),
     })
 
 

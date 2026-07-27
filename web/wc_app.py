@@ -450,6 +450,7 @@ def api_simulation():
         "status": sim_cache.get("status", "none"),
         "message": sim_cache.get("message"),
         "n_unplayed": sim_cache.get("n_unplayed", unplayed_match_count()),
+        "full_bracket": sim_cache.get("full_bracket"),
     })
 
 

@@ -342,91 +342,6 @@ body {
 .modal table.insight-table td { padding: 2px 6px; border-bottom: 1px solid #153D4C; }
 .modal table.insight-table .num { text-align: right; }
 
-/* Terminal */
-.term-output { min-height: 200px; }
-.term-output .line { opacity: 0; animation: fadeIn 0.3s forwards; }
-.term-input-line { display: flex; align-items: center; margin-top: 4px; }
-.term-input-line .prompt { color: #F8F4E9; flex-shrink: 0; }
-.term-input-line .prompt::before { content: "$ "; }
-.term-input-display { color: #F8F4E9; white-space: pre; min-height: 1.5em; }
-.term-cursor { animation: blink 1s step-end infinite; color: #F8F4E9; }
-#terminal-input { position: absolute; left: -9999px; opacity: 0; width: 0; height: 0; }
-.term-output .prompt { color: #F8F4E9; }
-.term-output .prompt::before { content: "$ "; color: #F8F4E9; }
-.term-output .dim { color: #F6DBC088; }
-.term-output .highlight { color: #16A085; font-weight: bold; }
-.term-output .danger { color: #ff6b6b; }
-.term-output .ok { color: #F6DBC0; }
-.term-output .title { color: #16A085; font-weight: bold; }
-.term-output .ts { color: #15565B; }
-.term-output .banner { color: #15565B; line-height: 1.3; margin: 8px 0; white-space: pre; }
-.term-output table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-.term-output th { color: #16A085; text-align: left; padding: 4px 8px; border-bottom: 1px solid #153D4C; }
-.term-output td { padding: 4px 8px; border-bottom: 1px solid #153D4C; }
-.term-output tr:hover td { background: rgba(21,61,76,0.4); }
-.term-output .num { text-align: right; font-variant-numeric: tabular-nums; }
-.term-output .bar-wrap { display: inline-block; width: 120px; height: 12px; background: #153D4C; vertical-align: middle; margin-left: 8px; }
-.term-output .bar { height: 100%; background: #16A085; transition: width 0.5s; }
-.term-output .sep td { color: #15565B; border-bottom: none; padding: 1px 8px; font-size: 10px; letter-spacing: 1px; }
-.term-output .team { color: #F6DBC0; font-weight: bold; }
-.term-output .prob { font-weight: bold; }
-.term-output .spark { display: inline-block; width: 8px; text-align: center; color: #16A085; }
-
-/* Terminal drawer (Ctrl+` overlay) */
-.terminal-drawer {
-  position: fixed; bottom: 0; left: 0; right: 0; height: 0; z-index: 500;
-  background: rgba(20,12,48,0.96); border-top: 1px solid #153D4C;
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  display: flex; flex-direction: column; overflow: hidden;
-  transition: height 0.25s ease;
-}
-.terminal-drawer.open { height: 300px; }
-.drawer-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 4px 12px; border-bottom: 1px solid #153D4C; flex-shrink: 0;
-}
-.drawer-label { color: #15565B; font-size: 11px; }
-.drawer-close { background: none; border: none; color: #15565B; font-size: 18px; cursor: pointer; line-height: 1; padding: 0 4px; }
-.drawer-close:hover { color: #F6DBC0; }
-.drawer-output {
-  flex: 1; overflow-y: auto; padding: 4px 12px; min-height: 0;
-  font-size: 12px; line-height: 1.5;
-}
-.drawer-output .line { opacity: 0; animation: fadeIn 0.3s forwards; }
-.drawer-output .dim { color: #F6DBC088; }
-.drawer-output .highlight { color: #16A085; font-weight: bold; }
-.drawer-output .danger { color: #ff6b6b; }
-.drawer-output .ok { color: #F6DBC0; }
-.drawer-output .title { color: #16A085; font-weight: bold; }
-.drawer-output .ts { color: #15565B; }
-.drawer-output .banner { color: #15565B; line-height: 1.3; white-space: pre; font-size: 11px; }
-.drawer-output table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 11px; }
-.drawer-output th { color: #16A085; text-align: left; padding: 2px 6px; border-bottom: 1px solid #153D4C; }
-.drawer-output td { padding: 2px 6px; border-bottom: 1px solid #153D4C; }
-.drawer-output tr:hover td { background: rgba(21,61,76,0.4); }
-.drawer-output .num { text-align: right; font-variant-numeric: tabular-nums; }
-.drawer-output .bar-wrap { display: inline-block; width: 80px; height: 10px; background: #153D4C; vertical-align: middle; margin-left: 6px; }
-.drawer-output .bar { height: 100%; background: #16A085; transition: width 0.5s; }
-.drawer-output .sep td { color: #15565B; border-bottom: none; padding: 1px 8px; font-size: 9px; letter-spacing: 1px; }
-.drawer-output .team { color: #F6DBC0; font-weight: bold; }
-.drawer-output .prob { font-weight: bold; }
-.drawer-output .spark { display: inline-block; width: 7px; text-align: center; color: #16A085; }
-.drawer-input-line {
-  display: flex; align-items: center; padding: 4px 12px;
-  border-top: 1px solid #153D4C; flex-shrink: 0; gap: 0;
-}
-.drawer-input-line .prompt { color: #F8F4E9; flex-shrink: 0; }
-.drawer-input-line .prompt::before { content: "$ "; }
-.drawer-input-display { color: #F8F4E9; white-space: pre; min-height: 1.5em; flex: 1; }
-
-.drawer-btn {
-  background: transparent; border: 1px solid #15565B; color: #15565B;
-  font-family: inherit; font-size: 11px; cursor: pointer; border-radius: 3px;
-  padding: 1px 8px; margin-left: 6px; transition: color 0.15s, border-color 0.15s;
-}
-.drawer-btn:hover { color: #16A085; border-color: #16A085; }
-.drawer-btn.active { color: #16A085; border-color: #16A085; background: rgba(22,160,133,0.1); }
-
 .status-btn { background: transparent; border: 1px solid #16A085; color: #16A085; padding: 2px 10px; font-family: inherit; font-size: 11px; cursor: pointer; border-radius: 3px; }
 .status-btn:hover { background: #16A085; color: #140C30; }
 .status-btn:disabled { opacity: 0.5; cursor: default; }
@@ -553,7 +468,6 @@ body {
 .m-sim-btn:hover { color: #1ABC9C; }
 
 @keyframes fadeIn { to { opacity: 1; } }
-@keyframes blink { 50% { opacity: 0; } }
 
 @media (max-width: 800px) {
   .team-cards { flex-wrap: wrap; }
@@ -721,40 +635,6 @@ body {
 .competition-worldcup .modal .sec-title { color: #D3A376; border-bottom-color: #8C6E63; }
 .competition-worldcup .modal-close { color: #8C6E63; }
 .competition-worldcup .modal-close:hover { color: #FFF2DF; }
-.competition-worldcup .term-output .highlight { color: #D3A376; }
-.competition-worldcup .term-output .title { color: #D3A376; }
-.competition-worldcup .term-output .ok { color: #FFF2DF; }
-.competition-worldcup .term-output .ts { color: #8C6E63; }
-.competition-worldcup .term-output .banner { color: #8C6E63; }
-.competition-worldcup .term-output th { color: #D3A376; border-bottom-color: #8C6E63; }
-.competition-worldcup .term-output td { border-bottom-color: #8C6E6344; }
-.competition-worldcup .term-output tr:hover td { background: rgba(140,110,99,0.4); }
-.competition-worldcup .term-output .bar { background: #D3A376; }
-.competition-worldcup .term-output .sep td { color: #8C6E63; }
-.competition-worldcup .term-output .team { color: #FFF2DF; }
-.competition-worldcup .term-output .spark { color: #D3A376; }
-.competition-worldcup .term-output .prompt { color: #FFF2DF; }
-.competition-worldcup .term-output .prompt::before { color: #FFF2DF; }
-.competition-worldcup .term-input-line .prompt { color: #FFF2DF; }
-.competition-worldcup .term-input-display { color: #FFF2DF; }
-.competition-worldcup .term-cursor { color: #FFF2DF; }
-.competition-worldcup .drawer-output .highlight { color: #D3A376; }
-.competition-worldcup .drawer-output .title { color: #D3A376; }
-.competition-worldcup .drawer-output .ts { color: #8C6E63; }
-.competition-worldcup .drawer-output .banner { color: #8C6E63; }
-.competition-worldcup .drawer-output th { color: #D3A376; border-bottom-color: #8C6E63; }
-.competition-worldcup .drawer-output td { border-bottom-color: #8C6E6344; }
-.competition-worldcup .drawer-output tr:hover td { background: rgba(140,110,99,0.4); }
-.competition-worldcup .drawer-output .bar { background: #D3A376; }
-.competition-worldcup .drawer-output .sep td { color: #8C6E63; }
-.competition-worldcup .drawer-output .team { color: #FFF2DF; }
-.competition-worldcup .drawer-output .spark { color: #D3A376; }
-.competition-worldcup .drawer-label { color: #8C6E63; }
-.competition-worldcup .drawer-close { color: #8C6E63; }
-.competition-worldcup .drawer-close:hover { color: #FFF2DF; }
-.competition-worldcup .drawer-btn { border-color: #8C6E63; color: #8C6E63; }
-.competition-worldcup .drawer-btn:hover { border-color: #D3A376; color: #D3A376; }
-.competition-worldcup .drawer-btn.active { border-color: #D3A376; color: #D3A376; background: rgba(211,163,118,0.1); }
 .competition-worldcup .status-btn { border-color: #D3A376; color: #D3A376; }
 .competition-worldcup .status-btn:hover { background: #D3A376; color: #3E2522; }
 .competition-worldcup .dot-green { color: #C4955A; }

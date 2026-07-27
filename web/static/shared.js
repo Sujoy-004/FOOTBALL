@@ -216,9 +216,7 @@ async function loadCompetition(slug) {
   `;
 
   document.getElementById("statusBar").innerHTML =
-    '<span id="statusLeft"></span><span id="statusRight"><button class="drawer-btn" id="drawerToggle">>_</button></span>';
-
-  document.getElementById("drawerToggle").onclick = toggleDrawer;
+    '<span id="statusLeft"></span><span id="statusRight"></span>';
 
   // Activate first tab
   const firstTab = document.querySelector(".tab-btn");
@@ -226,7 +224,6 @@ async function loadCompetition(slug) {
     firstTab.classList.add("active");
     const firstContent = document.getElementById("tab-" + firstTab.dataset.tab);
     if (firstContent) firstContent.classList.add("active");
-    if (firstTab.dataset.tab === "terminal") focusTermInput();
   }
 
   // Wire tab switching
@@ -240,7 +237,6 @@ async function loadCompetition(slug) {
     const tabEl = document.getElementById(tabId);
     if (tabEl) tabEl.classList.add("active");
     if (btn.dataset.tab === "bracket") setTimeout(drawBracketConnectors, 300);
-    if (btn.dataset.tab === "terminal") focusTermInput();
   });
 
   // Wire modal
@@ -266,92 +262,7 @@ async function loadCompetition(slug) {
   }
 }
 
-// ── Terminal (shared) ──
-let termBuffer = "";
-let termHistory = [];
-let termHistoryIdx = -1;
-let termBooting = false;
 
-function termAdd(text, cls) {
-  const termOutput = document.getElementById("termOutput");
-  const drawerOutput = document.getElementById("drawerOutput");
-  if (termOutput) {
-    const div = document.createElement("div");
-    div.className = "line";
-    if (text) {
-      const span = document.createElement("span");
-      if (cls) span.className = cls;
-      span.innerHTML = text;
-      div.appendChild(span);
-    }
-    termOutput.appendChild(div);
-  }
-  if (drawerOutput) {
-    const div = document.createElement("div");
-    div.className = "line";
-    if (text) {
-      const span = document.createElement("span");
-      if (cls) span.className = cls;
-      span.innerHTML = text;
-      div.appendChild(span);
-    }
-    drawerOutput.appendChild(div);
-    drawerOutput.scrollTop = drawerOutput.scrollHeight;
-  }
-}
-
-function termScroll() {
-  const tt = document.getElementById("tab-terminal");
-  if (tt && tt.classList.contains("active")) tt.scrollIntoView(false);
-}
-
-function focusTermInput() {
-  const inp = document.getElementById("terminal-input");
-  if (inp) inp.focus();
-}
-
-function toggleDrawer() {
-  const drawer = document.getElementById("terminalDrawer");
-  if (!drawer) return;
-  drawer.classList.toggle("open");
-  const btn = document.querySelector(".drawer-btn");
-  if (drawer.classList.contains("open")) {
-    if (btn) btn.classList.add("active");
-    focusTermInput();
-    const drawerOutput = document.getElementById("drawerOutput");
-    if (drawerOutput) drawerOutput.scrollTop = drawerOutput.scrollHeight;
-  } else {
-    if (btn) btn.classList.remove("active");
-  }
-}
-
-function closeDrawer() {
-  const drawer = document.getElementById("terminalDrawer");
-  if (drawer) drawer.classList.remove("open");
-}
-
-document.addEventListener("keydown", e => {
-  if (e.ctrlKey && e.key === "`") {
-    e.preventDefault();
-    toggleDrawer();
-  }
-});
-
-document.addEventListener("click", e => {
-  if (e.target.id === "drawerClose") closeDrawer();
-});
-
-function termShowPrompt() {
-  const line = document.getElementById("termInputLine");
-  const display = document.getElementById("termInputDisplay");
-  const cursor = document.querySelector(".term-cursor");
-  if (line) line.style.display = "flex";
-  termBuffer = "";
-  if (display) display.textContent = "";
-  if (cursor) cursor.style.display = "inline";
-  termScroll();
-  focusTermInput();
-}
 
 function buildTable(teams, cols, keyMap) {
   const show = cols || Object.keys(keyMap || {champion: "Champion"});
@@ -370,69 +281,12 @@ function buildTable(teams, cols, keyMap) {
   return html + "</table>";
 }
 
-async function termRenderBootStep(step) {
-  const timeStr = step.output.split("]")[0].replace("[", "") || "--";
-  const statusChar = step.status === "ok" ? "OK" : "FAIL";
-  const cls = step.status === "ok" ? "ok" : "danger";
-  termAdd('<span class="ts">[' + timeStr + ']</span> <span class="dim">' + step.step + "...</span>");
-  termScroll();
-  await new Promise(r => setTimeout(r, Math.min(300 + step.elapsed * 50, 800)));
-  const termOutput = document.getElementById("termOutput");
-  const last = termOutput ? termOutput.lastElementChild : null;
-  if (last) last.innerHTML = '<span class="ts">[' + timeStr + ']</span> <span class="' + cls + '">' + statusChar + '</span> <span class="dim">' + step.step + '</span> <span class="dim">(' + step.elapsed.toFixed(1) + "s)</span>";
-}
-
 // ── Modal chart cleanup ──
 let modalCharts = {};
 
 function destroyModalCharts() {
   Object.values(modalCharts).forEach(c => { try { c.destroy(); } catch {} });
   modalCharts = {};
-}
-
-// ── Terminal input wiring (called by competition modules) ──
-let termInputHandler = null;
-
-function wireTerminal(onExec) {
-  termInputHandler = onExec;
-  const inp = document.getElementById("terminal-input");
-  if (!inp) return;
-  inp.addEventListener("keydown", e => {
-    if (termBooting) { e.preventDefault(); return; }
-    const display = document.getElementById("termInputDisplay");
-    const drawerDisplay = document.getElementById("drawerInputDisplay");
-    const cursor = document.querySelector(".term-cursor");
-    function syncDisplay() {
-      if (display) display.textContent = termBuffer;
-      if (drawerDisplay) drawerDisplay.textContent = termBuffer;
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const cmd = termBuffer;
-      termAdd('<span class="prompt"></span>' + cmd);
-      termHistory.push(cmd);
-      termHistoryIdx = termHistory.length;
-      if (display) display.textContent = "";
-      if (drawerDisplay) drawerDisplay.textContent = "";
-      if (cursor) cursor.style.display = "none";
-      if (termInputHandler) termInputHandler(cmd);
-    } else if (e.key === "Backspace") {
-      termBuffer = termBuffer.slice(0, -1);
-      syncDisplay();
-    } else if (e.key === "ArrowUp") {
-      if (!termHistory.length) return;
-      termHistoryIdx = Math.max(0, termHistoryIdx - 1);
-      termBuffer = termHistory[termHistoryIdx] || "";
-      syncDisplay();
-    } else if (e.key === "ArrowDown") {
-      termHistoryIdx = Math.min(termHistory.length, termHistoryIdx + 1);
-      termBuffer = termHistoryIdx >= termHistory.length ? "" : termHistory[termHistoryIdx] || "";
-      syncDisplay();
-    } else if (e.key.length === 1) {
-      termBuffer += e.key;
-      syncDisplay();
-    }
-  });
 }
 
 // ── Bracket connector helpers (shared between wc.js and ucl.js) ──
@@ -488,14 +342,7 @@ function updateStatusBar(left, right) {
   const leftEl = document.getElementById("statusLeft");
   const rightEl = document.getElementById("statusRight");
   if (leftEl) leftEl.innerHTML = left;
-  if (rightEl) {
-    if (right) rightEl.innerHTML = right;
-    const btn = document.createElement("button");
-    btn.className = "drawer-btn";
-    btn.textContent = ">_";
-    btn.onclick = toggleDrawer;
-    rightEl.appendChild(btn);
-  }
+  if (rightEl && right) rightEl.innerHTML = right;
 }
 
 // ── Shared Simulation Popup ──
@@ -609,168 +456,15 @@ async function _startSim(apiPrefix, onComplete, bodyBuilder) {
   }
 }
 
-// ── Terminal Simulation Runner ──
-async function termRunSimulation(apiPrefix, iterations, onComplete) {
-  const displayPfx = '<span class="highlight">Simulate</span> ';
-  termAdd(displayPfx + 'Starting simulation with ' + iterations.toLocaleString() + ' iterations...');
-  termScroll();
-  try {
-    const resp = await (await fetch(apiPrefix + "/simulate", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ iterations }),
-    })).json();
-    if (resp.error) { termAdd(displayPfx + '<span class="danger">Error: ' + resp.error + '</span>'); termShowPrompt(); return; }
-    if (resp.status === "no_unplayed_matches") {
-      termAdd(displayPfx + '<span style="color:#E67E22">' + (resp.message || 'All matches played.') + '</span>');
-      termShowPrompt();
-      return;
-    }
-    const taskId = resp.task_id;
-    const t0 = Date.now();
-    const progressLineId = "prog-" + taskId;
-    termAdd('<span id="' + progressLineId + '">' + displayPfx + PROGRESS_SPINNER_FRAMES[0] + ' queued...</span>');
-    termScroll();
-    await termProgressLoop(apiPrefix, taskId, progressLineId, displayPfx, t0,
-      p => (p.iteration || 0).toLocaleString() + '/' + (p.total_iterations || iterations).toLocaleString());
-    const line = document.getElementById(progressLineId);
-    if (line) line.innerHTML = displayPfx + '<span class="ok">' + renderProgressBar(100) + ' 100%</span> <span class="dim">(' + ((Date.now() - t0) / 1000).toFixed(1) + 's)</span>';
-    termScroll();
-    if (onComplete) await onComplete();
-  } catch (e) {
-    termAdd(displayPfx + '<span class="danger">Error: ' + (e.message || "unknown") + '</span>');
-  }
-  termShowPrompt();
-}
-
-async function termRunCalibration(apiPrefix) {
-  const displayPfx = '<span class="highlight">Calibrate</span> ';
-  termAdd(displayPfx + 'Starting calibration...');
-  termScroll();
-  try {
-    const resp = await (await fetch(apiPrefix + "/calibrate", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-    })).json();
-    if (resp.error) { termAdd(displayPfx + '<span class="danger">Error: ' + resp.error + '</span>'); termShowPrompt(); return; }
-    const taskId = resp.task_id;
-    const t0 = Date.now();
-    const progressLineId = "prog-" + taskId;
-    termAdd('<span id="' + progressLineId + '">' + displayPfx + PROGRESS_SPINNER_FRAMES[0] + ' queued...</span>');
-    termScroll();
-    await termProgressLoop(apiPrefix, taskId, progressLineId, displayPfx, t0, "");
-    const line = document.getElementById(progressLineId);
-    if (line) line.innerHTML = displayPfx + '<span class="ok">' + renderProgressBar(100) + ' 100%</span> <span class="dim">(' + ((Date.now() - t0) / 1000).toFixed(1) + 's)</span>';
-    termAdd(displayPfx + '<span class="ok">Calibration complete.</span>');
-    termScroll();
-  } catch (e) {
-    termAdd(displayPfx + '<span class="danger">Error: ' + (e.message || "unknown") + '</span>');
-  }
-  termShowPrompt();
-}
-
-// ── Inline Progress Bar Utilities (C5) ──
-
-const PROGRESS_SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-function renderProgressBar(pct, width = 20) {
-  pct = Math.max(0, Math.min(100, pct || 0));
-  const filled = Math.round((pct / 100) * width);
-  const head = filled < width ? 1 : 0;
-  const eq = Math.max(0, filled - head);
-  const sp = Math.max(0, width - eq - head);
-  return '[' + '='.repeat(eq) + '>'.repeat(head) + ' '.repeat(sp) + ']';
-}
-
-async function termRenderProgress(lineId, pct, elapsed, extra = "") {
-  const el = document.getElementById(lineId);
-  if (!el) return;
-  const bar = renderProgressBar(pct);
-  const label = bar + ' ' + pct.toFixed(0) + '%' + (extra ? '  ' + extra : '');
-  el.innerHTML = label + '  <span class="dim">' + elapsed + 's</span>';
-}
-
-async function termProgressLoop(apiPrefix, taskId, progressLineId, displayPfx, t0, extras) {
-  return new Promise((resolve, reject) => {
-    const spinner = { i: 0 };
-    const spinInt = setInterval(() => {
-      const el = document.getElementById(progressLineId);
-      if (el) el.innerHTML = displayPfx + PROGRESS_SPINNER_FRAMES[spinner.i % PROGRESS_SPINNER_FRAMES.length] + ' working...';
-      spinner.i++;
-    }, 120);
-    const poll = setInterval(async () => {
-      try {
-        const p = await (await fetch(apiPrefix + "/simulation/progress/" + taskId)).json();
-        if (p.error) { clearInterval(poll); clearInterval(spinInt); reject(new Error(p.error)); return; }
-        const pct = p.progress || 0;
-        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-        const extra = typeof extras === "function" ? extras(p) : extras;
-        clearInterval(spinInt);
-        await termRenderProgress(progressLineId, pct, elapsed, extra);
-        if (p.status === "complete") { clearInterval(poll); resolve(); }
-        if (p.status === "error") { clearInterval(poll); reject(new Error(p.error || "task failed")); }
-      } catch (e) { clearInterval(poll); clearInterval(spinInt); reject(e); }
-    }, 300);
-  });
-}
-
-// ── Sparkline Renderer (C6) ──
-const SPARKLINE_CHARS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-
-function renderSparkline(val) {
-  val = Math.max(0, Math.min(1, val || 0));
-  const idx = Math.min(SPARKLINE_CHARS.length - 1, Math.floor(val * SPARKLINE_CHARS.length));
-  return '<span class="spark">' + SPARKLINE_CHARS[idx] + '</span>';
-}
-
-// ── Terminal Spinner for One-Shot API Calls (C6) ──
-async function termRunWithSpinner(displayPfx, apiCall, onSuccess) {
-  const lineId = "spin-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
-  const idx = { i: 0 };
-  termAdd('<span id="' + lineId + '">' + displayPfx + ' ' + PROGRESS_SPINNER_FRAMES[0] + '</span>');
-  termScroll();
-  const int = setInterval(() => {
-    const el = document.getElementById(lineId);
-    if (el) el.innerHTML = displayPfx + ' ' + PROGRESS_SPINNER_FRAMES[idx.i % PROGRESS_SPINNER_FRAMES.length];
-    idx.i++;
-  }, 100);
-  try {
-    const result = await apiCall();
-    clearInterval(int);
-    const el = document.getElementById(lineId);
-    if (el) el.innerHTML = displayPfx + ' <span class="ok">\u2713</span>';
-    if (onSuccess) await onSuccess(result);
-    return result;
-  } catch (e) {
-    clearInterval(int);
-    const el = document.getElementById(lineId);
-    if (el) el.innerHTML = displayPfx + ' <span class="danger">\u2717</span> <span class="dim">' + e.message + '</span>';
-  }
-}
-
 // ── Exports ──
 export {
   competitions,
   currentCompetition,
-  termAdd,
-  termScroll,
-  termShowPrompt,
-  termBooting,
-  termRenderBootStep,
-  wireTerminal,
   buildTable,
   destroyModalCharts,
   modalCharts,
   drawBracketConnectors,
   updateStatusBar,
-  focusTermInput,
-  toggleDrawer,
-  closeDrawer,
-  termRunSimulation,
-  termRunCalibration,
-  renderProgressBar,
-  termRenderProgress,
-  termProgressLoop,
-  renderSparkline,
-  termRunWithSpinner,
   createSimPopup,
   showSimPopup,
 };

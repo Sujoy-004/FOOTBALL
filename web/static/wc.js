@@ -1,9 +1,7 @@
 // ── World Cup 2026 Module ──
 import {
-  termAdd, termScroll, termShowPrompt, termRenderBootStep, termBooting,
-  wireTerminal, buildTable, destroyModalCharts, modalCharts, drawBracketConnectors,
-  updateStatusBar, competitions, termRunSimulation, termRunCalibration,
-  renderSparkline, termRunWithSpinner,
+  buildTable, destroyModalCharts, modalCharts, drawBracketConnectors,
+  updateStatusBar, competitions,
 } from "./shared.js";
 
 const API = "/worldcup/api";
@@ -14,23 +12,7 @@ let autoRefreshOn = false;
 let autoTimer = null;
 
 export function init(comp) {
-  // Terminal input
-  wireTerminal(termExec);
-
-  renderTerminalShell();
   loadAll();
-  termBoot();
-}
-
-function renderTerminalShell() {
-  const tab = document.getElementById("tab-terminal");
-  if (!tab) return;
-  tab.innerHTML = `
-    <div class="term-output" id="termOutput"></div>
-    <div class="term-input-line" id="termInputLine" style="display:none">
-      <span class="prompt"></span><span class="term-input-display" id="termInputDisplay"></span><span class="term-cursor">&#9608;</span>
-    </div>
-  `;
 }
 
 async function loadAll() {
@@ -67,11 +49,9 @@ function updateStatus() {
   if (refreshing) return;
   const signals = d.signals_meta?.signals || [];
   const nActive = signals.filter(s => s.available).length;
-  const hasSim = d.has_simulation === true;
-  const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> ' + (hasSim ? 'Re-Simulate' : 'Refresh & Simulate') + '</button>';
   updateStatusBar(
-    ">> " + d.n_teams + " teams  |  " + d.n_played + " matches played  |  " + nActive + " active signals",
-    btn + (autoRefreshOn ? '  <span style="color:#168777;font-size:10px">auto</span>' : "")
+    d.n_teams + " teams  |  " + d.n_played + " matches played  |  " + nActive + " active signals",
+    ""
   );
 }
 
@@ -170,6 +150,14 @@ async function startSimulation() {
       return;
     }
 
+    if (resp.status === "no_unplayed_matches") {
+      progressLbl.textContent = resp.message || "All matches played.";
+      startBtn.disabled = false;
+      cancelBtn.style.display = "";
+      refreshing = false;
+      return;
+    }
+
     const taskId = resp.task_id;
     const totalIters = resp.iterations;
     let t0 = Date.now();
@@ -210,8 +198,11 @@ async function startSimulation() {
     progressWrap.style.display = "none";
     progressLbl.style.display = "none";
     await loadAll();
-    const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> Refresh & Simulate</button>';
-    updateStatusBar('<span style="color:#168777">Simulation complete (' + iters.toLocaleString() + ' iters)</span>', btn);
+    try {
+      const simResp = await fetch(API + "/simulation").then(r => r.json());
+      appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
+    } catch { appState.simBracket = null; }
+    renderBracket();
   } catch (e) {
     progressLbl.textContent = "Error: " + (e.message || "unknown");
     startBtn.disabled = false;
@@ -221,8 +212,7 @@ async function startSimulation() {
 }
 window.__refreshWC = showSimPopup;
 
-// ── Overview (pre- and post-simulation) ──
-let _simData = null;
+// ── Overview (real data only) ──
 
 async function renderOverview() {
   const tab = document.getElementById("tab-overview");
@@ -232,84 +222,15 @@ async function renderOverview() {
 
   const signals = ov.signals_meta?.signals || [];
   const nActive = signals.filter(s => s.available).length;
-  const hasSim = ov.has_simulation === true;
 
-  // Fetch simulation data separately — never pollutes real data
-  if (hasSim) {
-    try {
-      _simData = await (await fetch(API + "/simulation")).json();
-    } catch { _simData = null; }
-  }
-  const topTeams = (_simData?.top_teams) || [];
-  const signalEval = (_simData?.signal_eval) || {};
-  const simMeta = _simData?.simulation_meta || {};
-
-  let html = '';
-
-  // Stat cards (always)
-  html += '<div class="stats-row" id="statsRow">';
+  let html = '<div class="stats-row" id="statsRow">';
   html += '<div class="stat-card"><div class="val">' + ov.n_teams + '</div><div class="lbl">Teams</div></div>';
   html += '<div class="stat-card"><div class="val">' + ov.n_played + '</div><div class="lbl">Matches Played</div></div>';
   html += '<div class="stat-card"><div class="val">' + nActive + ' / ' + signals.length + '</div><div class="lbl">Signals Available</div></div>';
-  if (hasSim && simMeta.iterations) {
-    html += '<div class="stat-card"><div class="val">' + simMeta.iterations.toLocaleString() + '</div><div class="lbl">Simulations Run</div></div>';
-  }
   html += '</div>';
 
-  // Unplayed matches notice
-  if (ov.n_unplayed === 0 && !hasSim) {
-    html += '<div class="chart-section"><div class="title">Notice</div>';
-    html += '<div style="color:#E67E22;font-size:12px">All matches have been played. Run a simulation to see "what if" probabilities.</div></div>';
-  }
-  if (_simData?.status === "no_unplayed_matches") {
-    html += '<div class="chart-section"><div class="title">Simulation</div>';
-    html += '<div style="color:#E67E22;font-size:12px">' + (_simData.message || 'All matches have been played. Nothing to simulate.') + '</div></div>';
-  }
-
-  // Post-sim: champion probability bar chart
-  if (topTeams.length > 0) {
-    html += '<div class="chart-section">';
-    html += '<div class="title">Champion Probability (Top 10)</div>';
-    html += '<div class="champ-chart" id="champChart">';
-    topTeams.slice(0, 10).forEach(t => {
-      const pct = (t.champion * 100).toFixed(1);
-      const barW = Math.max(2, pct * 3);
-      html += '<div class="champ-bar-row"><div class="cname">' + t.name + '</div><div class="cbar-wrap"><div class="cbar" style="width:' + barW + 'px"></div></div><div class="cpct">' + pct + '%</div></div>';
-    });
-    html += '</div></div>';
-
-    // Post-sim: top 4 team cards with ring charts
-    html += '<div class="chart-section">';
-    html += '<div class="title">Top 4 Teams</div>';
-    html += '<div class="team-cards" id="topTeamCards">';
-    topTeams.slice(0, 4).forEach(t => {
-      const champ = (t.champion * 100).toFixed(1);
-      const final = (t.final * 100).toFixed(1);
-      const sf = (t.sf * 100).toFixed(1);
-      const qf = (t.qf * 100).toFixed(1);
-      html += '<div class="team-card"><div class="name">' + t.name + '</div>';
-      html += '<div class="team-ring-row">';
-      html += '<div class="team-ring-item"><div class="trl">CH</div><div class="trv">' + champ + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, champ * 2) + '%"></div></div></div>';
-      html += '<div class="team-ring-item"><div class="trl">F</div><div class="trv">' + final + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, final) + '%"></div></div></div>';
-      html += '<div class="team-ring-item"><div class="trl">SF</div><div class="trv">' + sf + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, sf) + '%"></div></div></div>';
-      html += '<div class="team-ring-item"><div class="trl">QF</div><div class="trv">' + qf + '%</div><div class="tr-bar"><div class="tr-fill" style="width:' + Math.min(100, qf) + '%"></div></div></div>';
-      html += '</div></div>';
-    });
-    html += '</div></div>';
-  }
-
-  // Post-sim: signal evaluation table
-  if (Object.keys(signalEval).length > 0) {
-    html += '<div class="chart-section">';
-    html += '<div class="title">Signal Accuracy</div>';
-    html += renderSignalEval(signalEval);
-    html += '</div>';
-  }
-
-  // Signals metadata (always)
   if (signals.length > 0) {
-    html += '<div class="chart-section">';
-    html += '<div class="title">Signal Cache Status</div>';
+    html += '<div class="chart-section"><div class="title">Signal Cache Status</div>';
     html += '<div class="overview-signals" id="ovSignals">';
     html += renderOverviewSignals(signals);
     html += '</div></div>';
@@ -394,11 +315,7 @@ function renderBracket() {
 
   let html = '';
 
-  // Simulate All Remaining button
-  const hasUnplayed = [...groupRounds, ...koRounds].some(r => r.matches.some(m => !m.played));
-  if (hasUnplayed) {
-    html += '<div style="text-align:right;margin-bottom:8px"><button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining</button></div>';
-  }
+  html += '<div style="text-align:right;margin-bottom:8px"><button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining</button></div>';
 
   // Section 1: Group Stage Accordion
   html += '<div class="chart-section"><div class="title">Group Stage</div><div class="md-accordion">';
@@ -424,6 +341,14 @@ function renderBracket() {
   // Build the knockout tree from koTree data
   const grid = document.getElementById('bracketGrid');
   if (!grid) return;
+
+  // Build sim match lookup if sim bracket data exists
+  const simById = {};
+  if (appState.simBracket && appState.simBracket.rounds) {
+    for (const [, ms] of Object.entries(appState.simBracket.rounds)) {
+      for (const sm of ms) simById[sm.match_id] = sm;
+    }
+  }
 
   // Flatten all KO matches into byId
   const byId = {};
@@ -478,16 +403,33 @@ function renderBracket() {
 
       const ta = m.team_a || 'TBD';
       const tb = m.team_b || 'TBD';
-      const scoreStr = m.score ? m.score.home + '-' + m.score.away : (m.winner ? '1-0' : '?-?');
       const isPlayed = m.played || !!m.winner;
       const isTbd = (!m.team_a && !m.team_b) || (!m.played && !m.winner);
+
+      // Determine score string: real > sim predicted > placeholder
+      let scoreStr, simWinnerHtml = "", simProbHtml = "";
+      const simM = (!isPlayed && simById[m.match_id]) ? simById[m.match_id] : null;
+      if (m.score) {
+        scoreStr = m.score.home + '-' + m.score.away;
+      } else if (m.winner) {
+        scoreStr = '1-0';
+      } else if (simM && simM.predicted_score) {
+        scoreStr = simM.predicted_score.home + '-' + simM.predicted_score.away;
+      } else {
+        scoreStr = '?-?';
+      }
+      if (simM && simM.predicted_score) {
+        const pct = (simM.prob_a != null) ? Math.round(simM.prob_a * 100) : 50;
+        simProbHtml = '<div class="m-prob" style="font-size:9px;color:#8E44AD;text-align:center;line-height:1.2">' + pct + '% / ' + (100 - pct) + '%</div>';
+      }
+
       const cardClass = isTbd ? 'tbd' : isPlayed ? 'played' : 'upcoming';
 
       let cardHtml = '<div class="match-card ' + cardClass + '" data-mid="' + m.match_id + '">' +
         '<div class="m-teams"><span class="m-team ' + (m.winner === ta ? 'winner' : '') + '">' + ta + '</span>' +
         '<span class="m-score">' + scoreStr + '</span>' +
         '<span class="m-team ' + (m.winner === tb ? 'winner' : '') + '">' + tb + '</span></div>' +
-        (m.winner ? '<div class="m-winner-label">' + m.winner + ' advances</div>' : '');
+        (m.winner ? '<div class="m-winner-label">' + m.winner + ' advances</div>' : simProbHtml);
 
       // Show Simulate button for unplayed matches
       if (!m.played && m.team_a) {
@@ -616,6 +558,11 @@ async function startMatchSim() {
           }, 200);
         });
         await loadAll();
+        try {
+          const simResp = await fetch(API + '/simulation').then(r => r.json());
+          appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
+        } catch { appState.simBracket = null; }
+        renderBracket();
         document.getElementById('matchSimOverlay').classList.remove('show');
       }
       return;
@@ -952,383 +899,6 @@ function renderStandings() {
   `;
 }
 
-// ── Terminal ──
-function buildWCTable(teams, cols) {
-  const show = cols || ["champion", "final", "sf", "qf"];
-  const labels = { champion: "Champion", final: "Final", sf: "SF", qf: "QF" };
-  let h = '<tr><th>#</th><th>Team</th><th>Elo</th>';
-  show.forEach(c => h += "<th>" + (labels[c] || c) + "</th>");
-  h += '<th></th></tr><tr class="sep"><td class="num">──</td><td>────</td><td>───</td>';
-  show.forEach(c => h += '<td class="num">' + (labels[c] || c).replace(/./g, '─') + '</td>');
-  h += '<td></td></tr>';
-  let html = "<table>" + h;
-  teams.forEach((t, i) => {
-    const pct = t[show[0]] || 0;
-    const barW = Math.max(2, pct * 2);
-    html += '<tr><td class="num">' + (i + 1) + '</td><td class="team">' + t.name + "</td>";
-    show.forEach(c => html += '<td class="num prob">' + (t[c] || 0).toFixed(1) + '%</td>');
-    html += '<td><div class="bar-wrap"><div class="bar" style="width:' + barW + 'px"></div></div></td></tr>';
-  });
-  return html + "</table>";
-}
 
-async function termBoot() {
-  termBooting = true;
-  const tab = document.getElementById("tab-terminal");
-  if (!tab) return;
-  termAdd('<span class="title">>> WC26  FIFA World Cup 2026 — Terminal Simulator</span>');
-  termAdd('<span class="banner">+------------------------------------+\n|     MONTE CARLO SIMULATION         |\n|     50 000 iterations              |\n+------------------------------------+</span>');
-  termAdd("");
 
-  let bootSteps;
-  try { bootSteps = await (await fetch(API + "/boot")).json(); }
-  catch { termAdd('<span class="danger">ERROR: Server unreachable.</span>'); termShowPrompt(); termBooting = false; return; }
 
-  for (const step of bootSteps) await termRenderBootStep(step);
-  termAdd("");
-
-  try {
-    const [dr, sr, er, gr, br] = await Promise.all([
-      fetch(API + "/data").then(r => r.json()),
-      fetch(API + "/standings").then(r => r.json()),
-      fetch(API + "/evaluation").then(r => r.json()),
-      fetch(API + "/governance").then(r => r.json()),
-      fetch(API + "/backtest").then(r => r.json()),
-    ]);
-    appState.data = dr;
-    appState.standings = sr;
-    appState.eval = er;
-  } catch { termAdd('<span class="danger">ERROR: Failed to load prediction data.</span>'); termShowPrompt(); termBooting = false; return; }
-
-  termAdd("");
-  termAdd('<span class="highlight">== Champion Probability Table ==</span>');
-  termAdd("");
-  termAdd(buildWCTable(appState.data.teams));
-  termAdd("");
-
-  const ev = appState.eval;
-  if (ev && ev.elo && ev.elo.n_matches > 0) {
-    termAdd('<span class="highlight">== Elo Evaluation (replay)</span> <span class="dim">' + ev.elo.n_matches + " matches</span>");
-    termAdd("  Brier: " + ev.elo.brier.toFixed(4) + "  LogLoss: " + ev.elo.log_loss.toFixed(4) + "  Accuracy: " + (ev.elo.accuracy * 100).toFixed(1) + "%");
-    termAdd("");
-    const others = Object.keys(ev).filter(k => k !== "elo" && ev[k].n_matches > 0);
-    if (others.length) {
-      termAdd('<span class="highlight">== Multi-Signal Evaluation</span>');
-      let tbl = "<table><tr><th>Signal</th><th>Brier</th><th>LogLoss</th><th>Acc</th><th>N</th></tr>";
-      others.forEach(sk => {
-        const s = ev[sk];
-        tbl += '<tr><td>' + sk + '</td><td class="num">' + s.brier.toFixed(4) + '</td><td class="num">' + s.log_loss.toFixed(4) + '</td><td class="num">' + (s.accuracy * 100).toFixed(1) + '%</td><td class="num">' + s.n_matches + "</td></tr>";
-      });
-      termAdd(tbl + "</table>");
-    }
-  }
-  termAdd('<span class="dim">>> System ready. Type help to explore.</span>');
-  termAdd("");
-  termAdd('Type <span class="prompt">help</span> for available commands.', "dim");
-  termShowPrompt();
-  termBooting = false;
-}
-
-async function termExec(cmd) {
-  const trimmed = cmd.trim();
-  if (!trimmed) { termShowPrompt(); return; }
-  const parts = trimmed.toLowerCase().split(/\s+/);
-  const main = parts[0];
-  const d = appState.data;
-
-  if (main === "help") {
-    termAdd("");
-    termAdd('<span class="highlight">Available commands:</span>');
-    termAdd('<span class="prompt">top N</span>       - top N by champion probability.');
-    termAdd('<span class="prompt">elo</span>         - ranking by ELO rating.');
-    termAdd('<span class="prompt">rank</span>        - full 48-team table (QF/SF/Final/Champion).');
-    termAdd('<span class="prompt">standings</span>   - group tables + third-place bubble.');
-    termAdd('<span class="prompt">bracket</span>     - resolved R32 matchups with win odds.');
-    termAdd('<span class="prompt">eval</span>        - prediction accuracy (Brier, LogLoss, Accuracy).');
-    termAdd('<span class="prompt">form</span>        - rolling form signal statistics.');
-    termAdd('<span class="prompt">lineup</span>      - lineup strength / squad value signal.');
-    termAdd('<span class="prompt">defensive</span>   - defensive quality signal.');
-    termAdd('<span class="prompt">manager</span>     - manager effect signal.');
-    termAdd('<span class="prompt">odds</span>        - market odds signal.');
-    termAdd('<span class="prompt">catboost</span>    - CatBoost ML prediction signal.');
-    termAdd('<span class="prompt">blend</span>       - signal blending weights and calibration.');
-    termAdd('<span class="prompt">coverage</span>    - feature coverage audit report.');
-    termAdd('<span class="prompt">gov</span>         - system health check.');
-    termAdd('<span class="prompt">simulate [N]</span> - run Monte Carlo simulation (N iterations, default 50000).');
-    termAdd('<span class="prompt">what-if TEAM[.PARAM=VALUE]</span> - team stats or scenario impact analysis.');
-    termAdd('<span class="prompt">validate</span>   - run validation suite (Brier, LogLoss, accuracy).');
-    termAdd('<span class="prompt">calibrate</span>  - trigger temperature scaling.');
-    termAdd('<span class="prompt">export</span>      - print report snapshot.');
-    termAdd('<span class="prompt">auto</span>        - toggle auto-refresh every 60s.');
-    termAdd('<span class="prompt">clear</span>       - reset screen.');
-    termAdd("");
-  } else if (main === "clear") {
-    document.getElementById("termOutput").innerHTML = "";
-    termAdd('<span class="banner">+------------------------------------+\n|     MONTE CARLO SIMULATION         |\n|     50 000 iterations              |\n+------------------------------------+</span>');
-    termAdd("");
-  } else if (main === "top") {
-    const n = parseInt(parts[1]) || 10;
-    const teams = d ? d.teams.slice(0, Math.min(n, d.teams.length)) : [];
-    if (!teams.length) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Top ' + teams.length + " -- Champion Probability ==</span>");
-    termAdd(buildWCTable(teams));
-    termAdd("");
-  } else if (main === "standings") {
-    const s = appState.standings;
-    if (!s || !s.standings) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Group Standings ==</span>');
-    Object.entries(s.standings).forEach(([letter, rows]) => {
-      termAdd('<span class="title">Group ' + letter + "</span>");
-      let tbl = "<table><tr><th>#</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th></tr>";
-      rows.forEach(r => {
-        const gd = r.gd > 0 ? "+" + r.gd : String(r.gd);
-        tbl += '<tr><td class="num">' + r.position + "</td><td>" + r.team + '</td><td class="num">' + r.pts + '</td><td class="num">' + gd + '</td><td class="num">' + r.gs + "</td></tr>";
-      });
-      termAdd(tbl + "</table>");
-    });
-    const tp = s.third_place;
-    if (tp && tp.length >= 9) {
-      termAdd('<span class="title">Third-Place Bubble</span>');
-      let tbl = "<table><tr><th>#</th><th>G</th><th>Team</th><th>Pts</th><th>GD</th><th>GS</th></tr>";
-      tp.forEach((r, i) => {
-        const cls = i >= 8 ? "dim" : "";
-        termAdd('<span class="' + cls + '">' + (i + 1) + ". " + r.group + " " + r.team + " " + r.pts + "pts " + (r.gd > 0 ? "+" : "") + r.gd + " " + r.gs + "gs</span>");
-      });
-    }
-    termAdd("");
-  } else if (main === "bracket") {
-    const br = appState.bracket;
-    if (!br || !br.rounds) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Resolved R32 Matchups ==</span>');
-    const ms = br.rounds.R32 || [];
-    let tbl = "<table><tr><th>Match</th><th>Team A</th><th>Prob</th><th>Team B</th></tr>";
-    ms.forEach(m => {
-      const probStr = m.prob_a ? (m.prob_a * 100).toFixed(1) + "%" : "?";
-      tbl += '<tr><td>' + m.match_id + "</td><td>" + m.team_a + '</td><td class="num">' + probStr + "</td><td>" + m.team_b + "</td></tr>";
-    });
-    termAdd(tbl + "</table>");
-    termAdd("");
-  } else if (main === "eval") {
-    const ev = appState.eval;
-    if (!ev) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Signal Evaluation ==</span>');
-    let tbl = "<table><tr><th>Signal</th><th>Brier</th><th>LogLoss</th><th>Acc</th><th>N</th></tr>";
-    Object.keys(ev).filter(k => ev[k].n_matches > 0).forEach(k => {
-      const s = ev[k];
-      tbl += '<tr><td>' + k + '</td><td class="num">' + s.brier.toFixed(4) + '</td><td class="num">' + (s.log_loss || 0).toFixed(4) + '</td><td class="num">' + (s.accuracy * 100).toFixed(1) + '%</td><td class="num">' + s.n_matches + "</td></tr>";
-    });
-    termAdd(tbl + "</table>");
-    termAdd("");
-  } else if (main === "gov") {
-    const gr = appState.data ? appState.data.governance : null;
-    if (!gr) { termAdd("No governance data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== System Health ==</span>');
-    termAdd("  Status: " + gr.status + "  Data: " + gr.data_version + "  Model: " + gr.model_version + "  Run: " + gr.run_version);
-    termAdd("");
-  } else if (main === "coverage") {
-    try {
-      const cov = await (await fetch(API + "/coverage")).json();
-      termAdd("");
-      termAdd('<span class="highlight">== Coverage Audit ==</span>');
-      termAdd(JSON.stringify(cov, null, 2).replace(/\n/g, "<br>").replace(/  /g, "&nbsp;&nbsp;"));
-      termAdd("");
-    } catch { termAdd("Failed to load coverage.", "danger"); }
-  } else if (main === "simulate") {
-    termAdd('<span class="dim">Open the Overview tab and click "Refresh & Simulate" to run a simulation.</span>');
-  } else if (main === "auto") {
-    toggleAuto(!autoRefreshOn);
-    termAdd("");
-    termAdd('<span class="highlight">== Auto-Refresh ==</span>');
-    termAdd("  Auto-refresh every 60s: " + (autoRefreshOn ? '<span class="ok">ON</span>' : '<span class="danger">OFF</span>'));
-    termAdd("");
-  } else if (main === "elo") {
-    const teams = d ? [...d.teams].sort((a, b) => b.elo - a.elo) : [];
-    if (!teams.length) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Elo Ranking ==</span>');
-    let tbl = "<table><tr><th>#</th><th>Team</th><th>Elo</th></tr>";
-    teams.forEach((t, i) => {
-      tbl += '<tr><td class="num">' + (i + 1) + "</td><td>" + t.name + '</td><td class="num">' + t.elo + "</td></tr>";
-    });
-    termAdd(tbl + "</table>");
-    termAdd("");
-  } else if (main === "rank") {
-    if (!d) { termAdd("No data.", "dim"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== Full Team Ranking ==</span>');
-    termAdd(buildWCTable(d.teams, ["champion", "final", "sf", "qf"]));
-    termAdd("");
-  } else if (["form", "lineup", "defensive", "manager", "odds", "catboost"].includes(main)) {
-    const sigName = main === "lineup" ? "lineup_strength" : main === "defensive" ? "defensive_quality" : main === "manager" ? "manager_effect" : main === "odds" ? "market_odds" : main;
-    try {
-      const sig = await (await fetch(API + "/signal/" + sigName)).json();
-      termAdd("");
-      termAdd('<span class="highlight">== ' + sigName + " Signal Detail ==</span>");
-      termAdd("  Matches: " + sig.n_matches + "  With results: " + sig.n_with_results);
-      if (sig.live_eval && sig.live_eval.n) {
-        termAdd("  Live Brier: " + sig.live_eval.brier + "  Live Accuracy: " + (sig.live_eval.accuracy * 100).toFixed(1) + "%");
-      }
-      if (sig.cache_eval) {
-        termAdd("  Cache Brier: " + sig.cache_eval.brier + "  Cache Accuracy: " + (sig.cache_eval.accuracy * 100).toFixed(1) + "%");
-      }
-      termAdd("");
-    } catch { termAdd("Signal not found: " + sigName, "danger"); }
-  } else if (main === "blend") {
-    try {
-      const bl = await (await fetch(API + "/blend")).json();
-      termAdd("");
-      termAdd('<span class="highlight">== Signal Blending ==</span>');
-      termAdd("  Status: " + bl.calibration_status + " (" + bl.n_matches_for_calibration + "/" + bl.threshold + " matches)");
-      let tbl = "<table><tr><th>Signal</th><th>Brier</th><th>Weight</th></tr>";
-      Object.entries(bl.blend_weights).forEach(([sk, w]) => {
-        const b = bl.backtest_briers[sk] || "?";
-        tbl += '<tr><td>' + sk + '</td><td class="num">' + b + '</td><td class="num">' + (w * 100).toFixed(1) + "%</td></tr>";
-      });
-      termAdd(tbl + "</table>");
-      termAdd("");
-    } catch { termAdd("Failed to load blend info.", "danger"); }
-  } else if (main === "simulate") {
-    const n = parseInt(parts[1]) || 50000;
-    await termRunSimulation(API, n, async () => {
-      const ov = await fetch(API + "/overview").then(r => r.json());
-      appState.overview = ov;
-      appState.data = ov;
-      const teams = ov.teams || [];
-      termAdd("");
-      termAdd('<span class="highlight">== Champion Probability Table ==</span>');
-      termAdd(buildWCTable(teams));
-      termAdd("");
-      updateStatus();
-    });
-    return;
-  } else if (main === "what-if") {
-    const arg = parts.slice(1).join(" ").trim();
-    if (!arg) { termAdd("Usage: what-if <TEAM[.PARAM=VALUE]>", "dim"); termShowPrompt(); return; }
-    const dotIdx = arg.indexOf(".");
-    const eqIdx = arg.indexOf("=");
-    let teamName, param, value;
-    if (dotIdx > 0 && eqIdx > dotIdx) { teamName = arg.slice(0, dotIdx); param = arg.slice(dotIdx + 1, eqIdx); value = parseFloat(arg.slice(eqIdx + 1)); }
-    else { teamName = arg; param = null; }
-    const teams = (d && d.teams) || [];
-    const team = teams.find(t => t.name.toLowerCase() === teamName.toLowerCase());
-    if (!team) { termAdd("Team not found: " + teamName, "danger"); termShowPrompt(); return; }
-    termAdd("");
-    termAdd('<span class="highlight">== ' + team.name + ' ==</span>');
-    termAdd('  Elo: <span class="num">' + team.elo + '</span>');
-    termAdd('  Champion: <span class="num">' + (team.champion || 0).toFixed(1) + '%</span>');
-    termAdd('  Final: <span class="num">' + (team.final || 0).toFixed(1) + '%</span>  SF: <span class="num">' + (team.sf || 0).toFixed(1) + '%</span>  QF: <span class="num">' + (team.qf || 0).toFixed(1) + '%</span>');
-    termAdd('  Group: <span class="num">' + (team.group_win || 0).toFixed(1) + '%</span>  R32: <span class="num">' + (team.r32 || 0).toFixed(1) + '%</span>');
-    if (team.form_avg !== undefined) termAdd('  Form: <span class="num">' + team.form_avg.toFixed(3) + '</span>');
-    if (team.odds_avg !== undefined) termAdd('  Market Odds: <span class="num">' + team.odds_avg.toFixed(3) + '</span>');
-    try {
-      const sig = await (await fetch(API + "/signals")).json();
-      const teamSigs = (sig.team_signals || {})[team.name] || {};
-      if (Object.keys(teamSigs).length) {
-        termAdd('<span class="dim">--- Signal Breakdown ---</span>');
-        Object.entries(teamSigs).forEach(([k, v]) => {
-          termAdd('  ' + k + ': <span class="num">' + (typeof v === "number" ? v.toFixed(4) : v) + '</span>');
-        });
-      }
-    } catch {}
-    if (param && !isNaN(value)) {
-      let matchId = null;
-      try {
-        const br = appState.bracketData;
-        if (br && br.knockout_tree) {
-          for (const [, ms] of Object.entries(br.knockout_tree)) {
-            const found = ms.find(m => (m.team_a || "").toLowerCase() === team.name.toLowerCase() || (m.team_b || "").toLowerCase() === team.name.toLowerCase());
-            if (found) { matchId = found.match_id; break; }
-          }
-        }
-      } catch {}
-      if (matchId) {
-        const scenario = param === "form" && value > 1 ? team.name + " in form" : param === "form" && value < 1 ? team.name + " poor form" : param === "defense" && value > 1 ? team.name + " strong defense" : param === "defense" && value < 1 ? team.name + " weak defense" : param === "lineup" && value < 1 ? team.name + " lineup injury" : param === "manager" && value < 0.5 ? team.name + " manager sacked" : team.name + " " + param + " " + value;
-        await termRunWithSpinner('<span class="highlight">What-If</span>',
-          () => fetch(API + "/what-if", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ match_id: matchId, scenario, mode: "instant" }) }).then(r => r.json()),
-          result => {
-            if (result.error) { termAdd('<span class="dim">' + result.error + '</span>'); return; }
-            if (result.insight) termAdd('<span class="title">Impact:</span> ' + result.insight.replace(/<br>/g, ' '));
-            if (result.adjusted_signals) {
-              const adj = Object.entries(result.adjusted_signals).filter(([, sv]) => sv.was_adjusted);
-              if (adj.length) {
-                let tbl = '<table><tr><th>Signal</th><th>Before</th><th>After</th><th>Δ</th></tr>';
-                adj.forEach(([sk, sv]) => {
-                  const base = sv.original_probability != null ? (sv.original_probability * 100) : ((sv.probability - sv.delta) * 100);
-                  const aft = sv.probability * 100;
-                  const d = sv.delta * 100;
-                  const cls = d >= 0 ? "ok" : "danger";
-                  tbl += '<tr><td>' + (sigLabels[sk] || sk) + '</td><td class="num prob">' + base.toFixed(1) + '%</td><td class="num prob">' + aft.toFixed(1) + '%</td><td class="num ' + cls + '">' + (d >= 0 ? "+" : "") + d.toFixed(1) + '%</td></tr>';
-                });
-                termAdd(tbl + '</table>');
-              }
-            }
-          }
-        );
-      } else {
-        termAdd('<span class="dim">No match found for scenario analysis.</span>');
-      }
-    }
-    termAdd("");
-  } else if (main === "validate") {
-    await termRunWithSpinner('<span class="highlight">Validate</span>',
-      () => fetch(API + "/validation").then(r => r.json()),
-      v => {
-        if (v.error) { termAdd('<span class="danger">' + v.error + '</span>'); return; }
-        termAdd('<span class="highlight">== Validation ==</span>');
-        termAdd('  Matches evaluated: ' + (v.n_matches || "?"));
-        if (v.before) {
-          termAdd('<span class="title">Before Calibration:</span>');
-          termAdd('  Brier: ' + v.before.brier.toFixed(4) + '  LogLoss: ' + (v.before.log_loss || 0).toFixed(4) + '  Accuracy: ' + ((v.before.accuracy || 0) * 100).toFixed(1) + '%');
-        }
-        if (v.after) {
-          termAdd('<span class="title">After Calibration:</span>');
-          termAdd('  Brier: ' + v.after.brier.toFixed(4) + '  LogLoss: ' + (v.after.log_loss || 0).toFixed(4) + '  Accuracy: ' + ((v.after.accuracy || 0) * 100).toFixed(1) + '%');
-        }
-        if (v.calibrated) {
-          termAdd('  Calibrated: <span class="ok">' + v.calibrated + '</span>');
-        }
-      }
-    );
-    termAdd("");
-  } else if (main === "calibrate") {
-    await termRunCalibration(API);
-    return;
-  } else if (main === "export") {
-    await termRunWithSpinner('<span class="highlight">Export</span>',
-      () => fetch(API + "/report").then(r => r.json()),
-      r => {
-        if (r.error) { termAdd('<span class="danger">' + r.error + '</span>'); return; }
-        termAdd('<span class="highlight">== Report Snapshot ==</span>');
-        if (r.timestamp) termAdd('  Timestamp: <span class="dim">' + r.timestamp + '</span>');
-        if (r.iterations) termAdd('  Iterations: ' + r.iterations.toLocaleString());
-        if (r.seed !== undefined) termAdd('  Seed: ' + r.seed);
-        if (r.top_teams && r.top_teams.length) {
-          termAdd('<span class="title">Top Teams:</span>');
-          r.top_teams.slice(0, 10).forEach((t, i) => {
-            termAdd('  ' + (i + 1) + '. ' + t.name + ' — ' + (t.champion_prob || 0).toFixed(1) + '% champion');
-          });
-        }
-        if (r.evaluation) {
-          const ev = r.evaluation;
-          termAdd('<span class="title">Evaluation:</span>');
-          Object.entries(ev).forEach(([k, v]) => {
-            if (v.n_matches > 0) termAdd('  ' + k + ' — Brier: ' + v.brier.toFixed(4) + '  Accuracy: ' + ((v.accuracy || 0) * 100).toFixed(1) + '%');
-          });
-        }
-        if (r.calibration) {
-          termAdd('  Calibration status: <span class="dim">' + (r.calibration.status || "N/A") + '</span>');
-        }
-      }
-    );
-    termAdd("");
-  } else {
-    termAdd("command not found: " + trimmed, "danger");
-    termAdd('Type <span class="prompt">help</span> for available commands.', "dim");
-  }
-  termShowPrompt();
-}
