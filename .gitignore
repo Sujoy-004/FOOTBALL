@@ -91,6 +91,11 @@ Desktop.ini
 web/last_refresh.json
 web/cache.json
 
-# UCL data backup files (regeneratable)
+# UCL data — runtime simulation state (regeneratable)
 competitions/ucl/data/*.bak
+competitions/ucl/data/snapshot.json
+competitions/ucl/data/results.json
+competitions/ucl/data/knockout_results.json
+competitions/ucl/data/replay_2025_26.json
+competitions/ucl/data/live/
 
