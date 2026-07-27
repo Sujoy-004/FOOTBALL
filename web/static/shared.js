@@ -570,6 +570,13 @@ async function _startSim(apiPrefix, onComplete, bodyBuilder) {
       body: JSON.stringify(bodyBuilder(iters)),
     })).json();
     if (resp.error) throw new Error(resp.error);
+    if (resp.status === "no_unplayed_matches") {
+      progressLbl.textContent = resp.message || "All matches played.";
+      startBtn.disabled = false;
+      cancelBtn.style.display = "";
+      _simPolling = false;
+      return;
+    }
     const taskId = resp.task_id;
     const t0 = Date.now();
     await new Promise((resolve, reject) => {
@@ -613,6 +620,11 @@ async function termRunSimulation(apiPrefix, iterations, onComplete) {
       body: JSON.stringify({ iterations }),
     })).json();
     if (resp.error) { termAdd(displayPfx + '<span class="danger">Error: ' + resp.error + '</span>'); termShowPrompt(); return; }
+    if (resp.status === "no_unplayed_matches") {
+      termAdd(displayPfx + '<span style="color:#E67E22">' + (resp.message || 'All matches played.') + '</span>');
+      termShowPrompt();
+      return;
+    }
     const taskId = resp.task_id;
     const t0 = Date.now();
     const progressLineId = "prog-" + taskId;

@@ -1,0 +1,795 @@
+{
+  "timestamp": "2026-07-26T14:41:29.286138+00:00",
+  "mode": "simulation",
+  "iterations": 10000,
+  "seed": null,
+  "weights": null,
+  "show_ci": "auto",
+  "n_teams": 36,
+  "champion": "Arsenal",
+  "snapshot_date": "2026-07-26",
+  "odds": [
+    {
+      "rank": 1,
+      "team": "Arsenal",
+      "champion_prob": 0.6627,
+      "final_prob": 0.1535,
+      "sf_prob": 0.1,
+      "qf_prob": 0.0828,
+      "top_8_prob": 0.9992,
+      "playoff_prob": 0.0008,
+      "avg_position": 1.8269
+    },
+    {
+      "rank": 2,
+      "team": "Bayern",
+      "champion_prob": 0.1693,
+      "final_prob": 0.2551,
+      "sf_prob": 0.3173,
+      "qf_prob": 0.2378,
+      "top_8_prob": 0.9545,
+      "playoff_prob": 0.0455,
+      "avg_position": 4.6103
+    },
+    {
+      "rank": 3,
+      "team": "PSG",
+      "champion_prob": 0.0754,
+      "final_prob": 0.2237,
+      "sf_prob": 0.2943,
+      "qf_prob": 0.3431,
+      "top_8_prob": 0.8714,
+      "playoff_prob": 0.1286,
+      "avg_position": 5.6686
+    },
+    {
+      "rank": 4,
+      "team": "Man City",
+      "champion_prob": 0.0447,
+      "final_prob": 0.0992,
+      "sf_prob": 0.2895,
+      "qf_prob": 0.5355,
+      "top_8_prob": 0.9852,
+      "playoff_prob": 0.0148,
+      "avg_position": 3.1829
+    },
+    {
+      "rank": 5,
+      "team": "Barcelona",
+      "champion_prob": 0.0258,
+      "final_prob": 0.0954,
+      "sf_prob": 0.2629,
+      "qf_prob": 0.5609,
+      "top_8_prob": 0.9689,
+      "playoff_prob": 0.0311,
+      "avg_position": 3.8865
+    },
+    {
+      "rank": 6,
+      "team": "Real Madrid",
+      "champion_prob": 0.0127,
+      "final_prob": 0.088,
+      "sf_prob": 0.2647,
+      "qf_prob": 0.4695,
+      "top_8_prob": 0.8154,
+      "playoff_prob": 0.1846,
+      "avg_position": 6.2186
+    },
+    {
+      "rank": 7,
+      "team": "Liverpool",
+      "champion_prob": 0.0073,
+      "final_prob": 0.0574,
+      "sf_prob": 0.222,
+      "qf_prob": 0.5178,
+      "top_8_prob": 0.8337,
+      "playoff_prob": 0.1663,
+      "avg_position": 5.9195
+    },
+    {
+      "rank": 8,
+      "team": "Inter",
+      "champion_prob": 0.002,
+      "final_prob": 0.0229,
+      "sf_prob": 0.1479,
+      "qf_prob": 0.3778,
+      "top_8_prob": 0.4721,
+      "playoff_prob": 0.5279,
+      "avg_position": 9.1125
+    },
+    {
+      "rank": 9,
+      "team": "Newcastle",
+      "champion_prob": 0.0001,
+      "final_prob": 0.0007,
+      "sf_prob": 0.0153,
+      "qf_prob": 0.1126,
+      "top_8_prob": 0.0852,
+      "playoff_prob": 0.8983,
+      "avg_position": 14.4199
+    },
+    {
+      "rank": 10,
+      "team": "Ajax",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.0174,
+      "avg_position": 32.2741
+    },
+    {
+      "rank": 11,
+      "team": "Atalanta",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0006,
+      "qf_prob": 0.0226,
+      "top_8_prob": 0.0523,
+      "playoff_prob": 0.8973,
+      "avg_position": 16.0435
+    },
+    {
+      "rank": 12,
+      "team": "Athletic Bilbao",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0004,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.4731,
+      "avg_position": 24.7166
+    },
+    {
+      "rank": 13,
+      "team": "Atletico Madrid",
+      "champion_prob": 0.0,
+      "final_prob": 0.0006,
+      "sf_prob": 0.0125,
+      "qf_prob": 0.0916,
+      "top_8_prob": 0.0712,
+      "playoff_prob": 0.9138,
+      "avg_position": 14.5215
+    },
+    {
+      "rank": 14,
+      "team": "Bayer Leverkusen",
+      "champion_prob": 0.0,
+      "final_prob": 0.0002,
+      "sf_prob": 0.0031,
+      "qf_prob": 0.0352,
+      "top_8_prob": 0.0186,
+      "playoff_prob": 0.9174,
+      "avg_position": 17.6691
+    },
+    {
+      "rank": 15,
+      "team": "Benfica",
+      "champion_prob": 0.0,
+      "final_prob": 0.0003,
+      "sf_prob": 0.015,
+      "qf_prob": 0.1184,
+      "top_8_prob": 0.1419,
+      "playoff_prob": 0.8483,
+      "avg_position": 13.4378
+    },
+    {
+      "rank": 16,
+      "team": "Bodo/Glimt",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.001,
+      "top_8_prob": 0.0004,
+      "playoff_prob": 0.3833,
+      "avg_position": 25.7169
+    },
+    {
+      "rank": 17,
+      "team": "Chelsea",
+      "champion_prob": 0.0,
+      "final_prob": 0.0015,
+      "sf_prob": 0.0206,
+      "qf_prob": 0.139,
+      "top_8_prob": 0.1567,
+      "playoff_prob": 0.8433,
+      "avg_position": 12.2461
+    },
+    {
+      "rank": 18,
+      "team": "Club Brugge",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0001,
+      "qf_prob": 0.0053,
+      "top_8_prob": 0.0005,
+      "playoff_prob": 0.9241,
+      "avg_position": 19.1231
+    },
+    {
+      "rank": 19,
+      "team": "Copenhagen",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.0258,
+      "avg_position": 29.6155
+    },
+    {
+      "rank": 20,
+      "team": "Dortmund",
+      "champion_prob": 0.0,
+      "final_prob": 0.0014,
+      "sf_prob": 0.0271,
+      "qf_prob": 0.1786,
+      "top_8_prob": 0.2274,
+      "playoff_prob": 0.7699,
+      "avg_position": 11.6987
+    },
+    {
+      "rank": 21,
+      "team": "Eintracht Frankfurt",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.1046,
+      "avg_position": 29.0931
+    },
+    {
+      "rank": 22,
+      "team": "Galatasaray",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0004,
+      "top_8_prob": 0.0001,
+      "playoff_prob": 0.4347,
+      "avg_position": 25.1476
+    },
+    {
+      "rank": 23,
+      "team": "Juventus",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0019,
+      "qf_prob": 0.0299,
+      "top_8_prob": 0.0646,
+      "playoff_prob": 0.9136,
+      "avg_position": 15.1363
+    },
+    {
+      "rank": 24,
+      "team": "Kairat",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.0,
+      "avg_position": 35.9562
+    },
+    {
+      "rank": 25,
+      "team": "Marseille",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0017,
+      "top_8_prob": 0.0011,
+      "playoff_prob": 0.7375,
+      "avg_position": 21.8308
+    },
+    {
+      "rank": 26,
+      "team": "Monaco",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0012,
+      "top_8_prob": 0.0007,
+      "playoff_prob": 0.6007,
+      "avg_position": 23.2104
+    },
+    {
+      "rank": 27,
+      "team": "Napoli",
+      "champion_prob": 0.0,
+      "final_prob": 0.0001,
+      "sf_prob": 0.0028,
+      "qf_prob": 0.0606,
+      "top_8_prob": 0.132,
+      "playoff_prob": 0.8671,
+      "avg_position": 12.5703
+    },
+    {
+      "rank": 28,
+      "team": "Olympiacos",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.6098,
+      "avg_position": 23.8438
+    },
+    {
+      "rank": 29,
+      "team": "PSV",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0046,
+      "top_8_prob": 0.0008,
+      "playoff_prob": 0.5014,
+      "avg_position": 24.3155
+    },
+    {
+      "rank": 30,
+      "team": "Pafos",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.0304,
+      "avg_position": 30.4448
+    },
+    {
+      "rank": 31,
+      "team": "Qarabag",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.0179,
+      "avg_position": 32.3232
+    },
+    {
+      "rank": 32,
+      "team": "Slavia Prague",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.113,
+      "avg_position": 29.2664
+    },
+    {
+      "rank": 33,
+      "team": "Sporting",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.0005,
+      "avg_position": 33.3766
+    },
+    {
+      "rank": 34,
+      "team": "Tottenham",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.002,
+      "qf_prob": 0.0527,
+      "top_8_prob": 0.1121,
+      "playoff_prob": 0.8744,
+      "avg_position": 13.6723
+    },
+    {
+      "rank": 35,
+      "team": "Union SG",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0,
+      "qf_prob": 0.0003,
+      "top_8_prob": 0.0,
+      "playoff_prob": 0.2333,
+      "avg_position": 27.6156
+    },
+    {
+      "rank": 36,
+      "team": "Villarreal",
+      "champion_prob": 0.0,
+      "final_prob": 0.0,
+      "sf_prob": 0.0004,
+      "qf_prob": 0.0187,
+      "top_8_prob": 0.034,
+      "playoff_prob": 0.9495,
+      "avg_position": 16.2885
+    }
+  ],
+  "standings": [
+    {
+      "position": 1,
+      "team": "Man City",
+      "pts": 24,
+      "gd": 30,
+      "gs": 33,
+      "zone": "top_8"
+    },
+    {
+      "position": 2,
+      "team": "Arsenal",
+      "pts": 22,
+      "gd": 43,
+      "gs": 44,
+      "zone": "top_8"
+    },
+    {
+      "position": 3,
+      "team": "PSG",
+      "pts": 22,
+      "gd": 36,
+      "gs": 41,
+      "zone": "top_8"
+    },
+    {
+      "position": 4,
+      "team": "Bayern",
+      "pts": 20,
+      "gd": 39,
+      "gs": 40,
+      "zone": "top_8"
+    },
+    {
+      "position": 5,
+      "team": "Liverpool",
+      "pts": 20,
+      "gd": 26,
+      "gs": 35,
+      "zone": "top_8"
+    },
+    {
+      "position": 6,
+      "team": "Real Madrid",
+      "pts": 19,
+      "gd": 12,
+      "gs": 20,
+      "zone": "top_8"
+    },
+    {
+      "position": 7,
+      "team": "Barcelona",
+      "pts": 18,
+      "gd": 30,
+      "gs": 43,
+      "zone": "top_8"
+    },
+    {
+      "position": 8,
+      "team": "Inter",
+      "pts": 17,
+      "gd": 26,
+      "gs": 36,
+      "zone": "top_8"
+    },
+    {
+      "position": 9,
+      "team": "Chelsea",
+      "pts": 16,
+      "gd": 23,
+      "gs": 31,
+      "zone": "playoff"
+    },
+    {
+      "position": 10,
+      "team": "Tottenham",
+      "pts": 15,
+      "gd": 10,
+      "gs": 18,
+      "zone": "playoff"
+    },
+    {
+      "position": 11,
+      "team": "Newcastle",
+      "pts": 15,
+      "gd": 1,
+      "gs": 13,
+      "zone": "playoff"
+    },
+    {
+      "position": 12,
+      "team": "Atletico Madrid",
+      "pts": 14,
+      "gd": 4,
+      "gs": 19,
+      "zone": "playoff"
+    },
+    {
+      "position": 13,
+      "team": "Juventus",
+      "pts": 13,
+      "gd": 13,
+      "gs": 20,
+      "zone": "playoff"
+    },
+    {
+      "position": 14,
+      "team": "Dortmund",
+      "pts": 13,
+      "gd": 10,
+      "gs": 21,
+      "zone": "playoff"
+    },
+    {
+      "position": 15,
+      "team": "Benfica",
+      "pts": 13,
+      "gd": 9,
+      "gs": 19,
+      "zone": "playoff"
+    },
+    {
+      "position": 16,
+      "team": "Club Brugge",
+      "pts": 13,
+      "gd": -1,
+      "gs": 23,
+      "zone": "playoff"
+    },
+    {
+      "position": 17,
+      "team": "Villarreal",
+      "pts": 12,
+      "gd": 6,
+      "gs": 17,
+      "zone": "playoff"
+    },
+    {
+      "position": 18,
+      "team": "Olympiacos",
+      "pts": 12,
+      "gd": -4,
+      "gs": 17,
+      "zone": "playoff"
+    },
+    {
+      "position": 19,
+      "team": "Atalanta",
+      "pts": 12,
+      "gd": -4,
+      "gs": 13,
+      "zone": "playoff"
+    },
+    {
+      "position": 20,
+      "team": "Galatasaray",
+      "pts": 12,
+      "gd": -9,
+      "gs": 11,
+      "zone": "playoff"
+    },
+    {
+      "position": 21,
+      "team": "Bayer Leverkusen",
+      "pts": 11,
+      "gd": 0,
+      "gs": 10,
+      "zone": "playoff"
+    },
+    {
+      "position": 22,
+      "team": "Napoli",
+      "pts": 10,
+      "gd": 7,
+      "gs": 20,
+      "zone": "playoff"
+    },
+    {
+      "position": 23,
+      "team": "Athletic Bilbao",
+      "pts": 9,
+      "gd": -18,
+      "gs": 7,
+      "zone": "playoff"
+    },
+    {
+      "position": 24,
+      "team": "Union SG",
+      "pts": 8,
+      "gd": -11,
+      "gs": 6,
+      "zone": "playoff"
+    },
+    {
+      "position": 25,
+      "team": "Copenhagen",
+      "pts": 6,
+      "gd": -11,
+      "gs": 15,
+      "zone": "eliminated"
+    },
+    {
+      "position": 26,
+      "team": "Eintracht Frankfurt",
+      "pts": 6,
+      "gd": -20,
+      "gs": 12,
+      "zone": "eliminated"
+    },
+    {
+      "position": 27,
+      "team": "Monaco",
+      "pts": 5,
+      "gd": -8,
+      "gs": 7,
+      "zone": "eliminated"
+    },
+    {
+      "position": 28,
+      "team": "PSV",
+      "pts": 5,
+      "gd": -14,
+      "gs": 5,
+      "zone": "eliminated"
+    },
+    {
+      "position": 29,
+      "team": "Slavia Prague",
+      "pts": 5,
+      "gd": -23,
+      "gs": 5,
+      "zone": "eliminated"
+    },
+    {
+      "position": 30,
+      "team": "Bodo/Glimt",
+      "pts": 4,
+      "gd": -15,
+      "gs": 3,
+      "zone": "eliminated"
+    },
+    {
+      "position": 31,
+      "team": "Qarabag",
+      "pts": 4,
+      "gd": -25,
+      "gs": 4,
+      "zone": "eliminated"
+    },
+    {
+      "position": 32,
+      "team": "Sporting",
+      "pts": 4,
+      "gd": -43,
+      "gs": 7,
+      "zone": "eliminated"
+    },
+    {
+      "position": 33,
+      "team": "Marseille",
+      "pts": 3,
+      "gd": -13,
+      "gs": 4,
+      "zone": "eliminated"
+    },
+    {
+      "position": 34,
+      "team": "Pafos",
+      "pts": 3,
+      "gd": -14,
+      "gs": 15,
+      "zone": "eliminated"
+    },
+    {
+      "position": 35,
+      "team": "Ajax",
+      "pts": 2,
+      "gd": -31,
+      "gs": 5,
+      "zone": "eliminated"
+    },
+    {
+      "position": 36,
+      "team": "Kairat",
+      "pts": 0,
+      "gd": -61,
+      "gs": 1,
+      "zone": "eliminated"
+    }
+  ],
+  "signals": {
+    "market_odds": {
+      "n_matches": 144,
+      "available": 144,
+      "available_pct": 100.0,
+      "avg_probability": 0.3333,
+      "weight": 0.1444
+    },
+    "player_form": {
+      "n_matches": 144,
+      "available": 144,
+      "available_pct": 100.0,
+      "avg_probability": 0.3333,
+      "weight": 0.1444
+    },
+    "refined_elo": {
+      "n_matches": 144,
+      "available": 144,
+      "available_pct": 100.0,
+      "avg_probability": 0.3333,
+      "weight": 0.1355
+    },
+    "rest_days": {
+      "n_matches": 144,
+      "available": 144,
+      "available_pct": 100.0,
+      "avg_probability": 0.3333,
+      "weight": 0.1444
+    },
+    "rolling_form": {
+      "n_matches": 144,
+      "available": 144,
+      "available_pct": 100.0,
+      "avg_probability": 0.3333,
+      "weight": 0.1398
+    },
+    "squad_value": {
+      "n_matches": 144,
+      "available": 144,
+      "available_pct": 100.0,
+      "avg_probability": 0.3333,
+      "weight": 0.1471
+    },
+    "team_synergy": {
+      "n_matches": 144,
+      "available": 144,
+      "available_pct": 100.0,
+      "avg_probability": 0.3333,
+      "weight": 0.1444
+    }
+  },
+  "elo_ratings": {
+    "PSG": 1967.87854004,
+    "Real Madrid": 1922.91210938,
+    "Man City": 1970.85375977,
+    "Bayern": 2000.87023926,
+    "Liverpool": 1910.79907227,
+    "Inter": 1888.60217285,
+    "Chelsea": 1831.10375977,
+    "Dortmund": 1834.76867676,
+    "Barcelona": 1951.58862305,
+    "Arsenal": 2063.75805664,
+    "Bayer Leverkusen": 1804.02624512,
+    "Atletico Madrid": 1827.67529297,
+    "Benfica": 1823.50878906,
+    "Atalanta": 1763.51818848,
+    "Villarreal": 1759.34484863,
+    "Juventus": 1772.25610352,
+    "Eintracht Frankfurt": 1663.77990723,
+    "Club Brugge": 1757.43847656,
+    "Tottenham": 1777.3092041,
+    "PSV": 1759.1348877,
+    "Ajax": 1578.02783203,
+    "Napoli": 1780.2956543,
+    "Sporting": 1500.0,
+    "Olympiacos": 1663.3762207,
+    "Slavia Prague": 1654.11633301,
+    "Bodo/Glimt": 1708.89233398,
+    "Marseille": 1716.74267578,
+    "Copenhagen": 1578.41003418,
+    "Monaco": 1717.51818848,
+    "Galatasaray": 1684.27099609,
+    "Union SG": 1716.76196289,
+    "Qarabag": 1554.37609863,
+    "Athletic Bilbao": 1677.90075684,
+    "Newcastle": 1837.53125,
+    "Pafos": 1561.03271484,
+    "Kairat": 1294.38867188
+  },
+  "calibration": {
+    "T": 0.537381,
+    "alpha": 1.860877,
+    "log_loss": 0.995298,
+    "log_loss_before": 1.017035,
+    "n_samples": 144
+  }
+}

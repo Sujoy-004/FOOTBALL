@@ -133,15 +133,21 @@ window.__resetResults = async function () {
 };
 
 // ── Overview (WC-style layout) ──
-function renderOverview() {
+async function renderOverview() {
   const tab = document.getElementById("tab-overview");
   if (!tab) return;
   const d = appState.data;
   if (!d) return;
   const signals = appState.signals;
   const sigKeys = Object.keys(signals);
-  const hasSim = d.all_teams && d.all_teams.length > 0 && d.mode !== "results";
-  const allTeams = d.all_teams || [];
+
+  // Fetch simulation data separately — never pollutes real data
+  let simData = null;
+  try {
+    simData = await (await fetch("/ucl/api/simulation")).json();
+  } catch { simData = null; }
+  const hasSim = simData?.status === "complete";
+  const allTeams = hasSim ? (simData?.odds || []) : [];
 
   let html = '';
 
@@ -149,12 +155,22 @@ function renderOverview() {
   html += '<div class="stats-row" id="statsRow">';
   html += '<div class="stat-card"><div class="val">' + d.n_teams + '</div><div class="lbl">Teams</div></div>';
   if (hasSim) {
-    html += '<div class="stat-card"><div class="val">' + d.n_iterations.toLocaleString() + '</div><div class="lbl">Simulations Run</div></div>';
+    html += '<div class="stat-card"><div class="val">' + (simData.n_iterations || 0).toLocaleString() + '</div><div class="lbl">Simulations Run</div></div>';
   } else {
     html += '<div class="stat-card"><div class="val">' + d.n_iterations.toLocaleString() + '</div><div class="lbl">Matchdays</div></div>';
   }
   html += '<div class="stat-card"><div class="val">' + sigKeys.length + '</div><div class="lbl">Active Signals</div></div>';
   html += '</div>';
+
+  // Unplayed matches notice
+  if (d.n_unplayed === 0 && !hasSim) {
+    html += '<div class="chart-section"><div class="title">Notice</div>';
+    html += '<div style="color:#E67E22;font-size:12px">All matches have been played. Run a simulation to see "what if" probabilities.</div></div>';
+  }
+  if (simData?.status === "no_unplayed_matches") {
+    html += '<div class="chart-section"><div class="title">Simulation</div>';
+    html += '<div style="color:#E67E22;font-size:12px">' + (simData.message || 'All matches have been played. Nothing to simulate.') + '</div></div>';
+  }
 
   // Post-sim: champion probability bar chart (WC-style absolute width)
   if (hasSim && allTeams.length > 0) {

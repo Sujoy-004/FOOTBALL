@@ -102,6 +102,7 @@ DATA_DIR = Path(__file__).parent.parent / "competitions" / "ucl" / "data"
 UCL_DIR = Path(__file__).parent.parent / "competitions" / "ucl"
 
 cache: dict = {}
+sim_cache: dict = {}
 boot_log_local: list[dict] = []
 sim_result: SimulationResult | None = None
 _mode: str = "results"
@@ -346,6 +347,32 @@ def _load_knockout_results() -> dict | None:
     return _load_knockout_results_pipeline(DATA_DIR)
 
 
+def _unplayed_match_count() -> int:
+    """Count UCL matches that haven't been played yet."""
+    fixtures_path = DATA_DIR / "fixtures.json"
+    if not fixtures_path.exists():
+        return 0
+    fixtures = json.loads(fixtures_path.read_text(encoding="utf-8"))
+    all_ids = set()
+    for md in fixtures.get("schedule", {}).get("matchdays", []):
+        for m in md:
+            if m.get("match_id"):
+                all_ids.add(m["match_id"])
+    results = _load_results() or []
+    knockout = _load_knockout_results() or {}
+    played_ids = {m["match_id"] for m in results if m.get("winner") and m.get("match_id")}
+    for round_matches in knockout.get("rounds", {}).values():
+        for m in round_matches:
+            mid = m.get("match_id")
+            if m.get("winner") and mid:
+                played_ids.add(mid)
+    for m in knockout.get("playoff", []):
+        mid = m.get("match_id")
+        if m.get("winner") and mid:
+            played_ids.add(mid)
+    return len(all_ids - played_ids)
+
+
 def _compute_deterministic_standings(results: list[dict]) -> list[dict]:
     return _compute_deterministic_standings_pipeline(results)
 
@@ -422,12 +449,28 @@ def api_data():
         "snapshot_date": cache.get("snapshot_date", ""),
         "champion": cache.get("champion"),
         "mode": _mode,
+        "n_unplayed": _unplayed_match_count(),
     })
 
 
 @ucl_app.get("/api/boot")
 def api_boot():
     return JSONResponse(cache.get("boot", []))
+
+
+@ucl_app.get("/api/simulation")
+def api_simulation():
+    return JSONResponse({
+        "odds": sim_cache.get("odds", []),
+        "standings": sim_cache.get("standings", []),
+        "signals": sim_cache.get("signals", {}),
+        "elo_ratings": sim_cache.get("elo_ratings", {}),
+        "champion": sim_cache.get("champion"),
+        "mode": sim_cache.get("mode", _mode),
+        "n_iterations": sim_cache.get("n_iterations", 0),
+        "snapshot_date": sim_cache.get("snapshot_date", ""),
+        "status": sim_cache.get("status", "none"),
+    })
 
 
 @ucl_app.get("/api/standings")
@@ -459,6 +502,15 @@ def api_signals():
 @ucl_app.post("/api/simulate")
 def api_simulate(req: dict = None):
     global _mode
+    remaining = _unplayed_match_count()
+    if remaining == 0:
+        global sim_cache
+        sim_cache = {"status": "no_unplayed_matches", "message": "All matches have been played. Nothing to simulate."}
+        return JSONResponse({
+            "status": "no_unplayed_matches",
+            "message": "All matches have been played. Nothing to simulate.",
+            "n_unplayed": 0,
+        })
     _mode = "simulation"
     task_id = str(uuid.uuid4())
     body = req or {}
@@ -503,6 +555,7 @@ def api_simulate(req: dict = None):
     return JSONResponse({
         "status": "ok", "task_id": task_id, "mode": _mode,
         "seed": seed, "weights": weights, "show_ci": show_ci,
+        "n_unplayed": remaining,
     })
 
 
@@ -514,7 +567,7 @@ def _run_mc_simulation(
     weights: dict[str, float] | None = None,
     show_ci: str = "auto",
 ):
-    global boot_log_local, sim_result, _mode, cache
+    global boot_log_local, sim_result, _mode, sim_cache
     _mode = "simulation"
     boot_log_local = []
     result = _run_mc_simulation_pipeline(
@@ -524,7 +577,7 @@ def _run_mc_simulation(
     )
     sim_result = None
     result["boot"] = boot_log_local
-    cache = result
+    sim_cache = result
     # Write snapshot
     snapshot_path = DATA_DIR / "snapshot.json"
     snapshot_data = {

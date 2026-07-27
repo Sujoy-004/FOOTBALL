@@ -67,7 +67,7 @@ function updateStatus() {
   if (refreshing) return;
   const signals = d.signals_meta?.signals || [];
   const nActive = signals.filter(s => s.available).length;
-  const hasSim = (d.top_teams || []).length > 0;
+  const hasSim = d.has_simulation === true;
   const btn = '<button class="status-btn" onclick="window.__refreshWC()">>> ' + (hasSim ? 'Re-Simulate' : 'Refresh & Simulate') + '</button>';
   updateStatusBar(
     ">> " + d.n_teams + " teams  |  " + d.n_played + " matches played  |  " + nActive + " active signals",
@@ -222,7 +222,9 @@ async function startSimulation() {
 window.__refreshWC = showSimPopup;
 
 // ── Overview (pre- and post-simulation) ──
-function renderOverview() {
+let _simData = null;
+
+async function renderOverview() {
   const tab = document.getElementById("tab-overview");
   if (!tab) return;
   const ov = appState.overview || appState.data;
@@ -230,29 +232,42 @@ function renderOverview() {
 
   const signals = ov.signals_meta?.signals || [];
   const nActive = signals.filter(s => s.available).length;
-  const topTeams = ov.top_teams || [];
-  const hasSim = topTeams.length > 0;
-  const signalEval = ov.signal_eval || {};
+  const hasSim = ov.has_simulation === true;
+
+  // Fetch simulation data separately — never pollutes real data
+  if (hasSim) {
+    try {
+      _simData = await (await fetch(API + "/simulation")).json();
+    } catch { _simData = null; }
+  }
+  const topTeams = (_simData?.top_teams) || [];
+  const signalEval = (_simData?.signal_eval) || {};
+  const simMeta = _simData?.simulation_meta || {};
 
   let html = '';
 
   // Stat cards (always)
   html += '<div class="stats-row" id="statsRow">';
-  if (hasSim) {
-    const simMeta = ov.simulation_meta || {};
-    html += '<div class="stat-card"><div class="val">' + ov.n_teams + '</div><div class="lbl">Teams</div></div>';
-    html += '<div class="stat-card"><div class="val">' + ov.n_played + '</div><div class="lbl">Matches Played</div></div>';
-    html += '<div class="stat-card"><div class="val">' + nActive + '/' + signals.length + '</div><div class="lbl">Signals</div></div>';
-    html += '<div class="stat-card"><div class="val">' + (simMeta.iterations || 0).toLocaleString() + '</div><div class="lbl">Simulations Run</div></div>';
-  } else {
-    html += '<div class="stat-card"><div class="val">' + ov.n_teams + '</div><div class="lbl">Teams</div></div>';
-    html += '<div class="stat-card"><div class="val">' + ov.n_played + '</div><div class="lbl">Matches Played</div></div>';
-    html += '<div class="stat-card"><div class="val">' + nActive + ' / ' + signals.length + '</div><div class="lbl">Signals Available</div></div>';
+  html += '<div class="stat-card"><div class="val">' + ov.n_teams + '</div><div class="lbl">Teams</div></div>';
+  html += '<div class="stat-card"><div class="val">' + ov.n_played + '</div><div class="lbl">Matches Played</div></div>';
+  html += '<div class="stat-card"><div class="val">' + nActive + ' / ' + signals.length + '</div><div class="lbl">Signals Available</div></div>';
+  if (hasSim && simMeta.iterations) {
+    html += '<div class="stat-card"><div class="val">' + simMeta.iterations.toLocaleString() + '</div><div class="lbl">Simulations Run</div></div>';
   }
   html += '</div>';
 
+  // Unplayed matches notice
+  if (ov.n_unplayed === 0 && !hasSim) {
+    html += '<div class="chart-section"><div class="title">Notice</div>';
+    html += '<div style="color:#E67E22;font-size:12px">All matches have been played. Run a simulation to see "what if" probabilities.</div></div>';
+  }
+  if (_simData?.status === "no_unplayed_matches") {
+    html += '<div class="chart-section"><div class="title">Simulation</div>';
+    html += '<div style="color:#E67E22;font-size:12px">' + (_simData.message || 'All matches have been played. Nothing to simulate.') + '</div></div>';
+  }
+
   // Post-sim: champion probability bar chart
-  if (hasSim) {
+  if (topTeams.length > 0) {
     html += '<div class="chart-section">';
     html += '<div class="title">Champion Probability (Top 10)</div>';
     html += '<div class="champ-chart" id="champChart">';
@@ -284,17 +299,17 @@ function renderOverview() {
   }
 
   // Post-sim: signal evaluation table
-  if (hasSim && Object.keys(signalEval).length > 0) {
+  if (Object.keys(signalEval).length > 0) {
     html += '<div class="chart-section">';
     html += '<div class="title">Signal Accuracy</div>';
     html += renderSignalEval(signalEval);
     html += '</div>';
   }
 
-  // Signals metadata (always — or only when no sim data)
-  if (!hasSim || signals.length > 0) {
+  // Signals metadata (always)
+  if (signals.length > 0) {
     html += '<div class="chart-section">';
-    html += '<div class="title">' + (hasSim ? 'Signal Cache Status' : 'Signals Data') + '</div>';
+    html += '<div class="title">Signal Cache Status</div>';
     html += '<div class="overview-signals" id="ovSignals">';
     html += renderOverviewSignals(signals);
     html += '</div></div>';
@@ -583,6 +598,14 @@ async function startMatchSim() {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ iterations: iters })
         })).json();
+        if (resp.status === 'no_unplayed_matches') {
+          resultDiv.textContent = resp.message || 'All matches played.';
+          resultDiv.style.display = 'block';
+          startBtn.disabled = false;
+          cancelBtn.style.display = '';
+          progressWrap.style.display = 'none';
+          return;
+        }
         const taskId = resp.task_id;
         await new Promise((resolve, reject) => {
           const poll = setInterval(async () => {

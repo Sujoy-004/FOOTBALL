@@ -33,6 +33,7 @@ FOOTBALL_DATA_ORG_KEY = os.getenv("FOOTBALL_DATA_ORG_KEY", "")
 DATA_DIR = constants.DATA_DIR
 
 cache: dict = {}
+sim_cache: dict = {}
 boot_log: list[dict] = []
 active_simulations: dict[str, dict] = {}
 sim_lock = threading.Lock()
@@ -367,6 +368,26 @@ def compute_overview() -> dict:
     return data
 
 
+def unplayed_match_count() -> int:
+    """Count matches that have neither played nor played_groups results."""
+    teams_raw = load_json(DATA_DIR, "teams.json")
+    groups_raw = load_groups(DATA_DIR, teams=teams_raw)
+    bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
+    played_raw = json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {}
+    played_groups_raw = json.loads((DATA_DIR / "played_groups.json").read_text(encoding="utf-8")) if (DATA_DIR / "played_groups.json").exists() else {}
+    played_ids = set(played_raw.keys()) | set(played_groups_raw.keys())
+    all_ids = set()
+    groups_data = groups_raw.get("groups", groups_raw) if isinstance(groups_raw, dict) else groups_raw
+    for g in groups_data.values():
+        for m in g.get("matches", []):
+            if m.get("match_id"):
+                all_ids.add(m["match_id"])
+    for m in bracket_raw:
+        if m.get("match_id"):
+            all_ids.add(m["match_id"])
+    return len(all_ids - played_ids)
+
+
 def compute_signal_stats():
     """Signal statistics from on-disk caches — no ledger dependency."""
     from competitions.worldcup.src.evaluation import compute_signal_stats as _eval
@@ -401,11 +422,13 @@ def api_data():
         "n_teams": cache.get("n_teams", 0),
         "total_iterations": cache.get("total_iterations", 0),
         "n_played": cache.get("n_played", 0),
+        "n_unplayed": unplayed_match_count(),
     })
 
 
 @wc_app.get("/api/overview")
 def api_overview():
+    has_sim = bool(sim_cache.get("status") == "complete")
     return JSONResponse({
         "standings": cache.get("standings", []),
         "teams": cache.get("teams", []),
@@ -413,9 +436,20 @@ def api_overview():
         "n_played": cache.get("n_played", 0),
         "signals_meta": cache.get("signals_meta", {"signals": [], "n_total": 0}),
         "governance": cache.get("governance", {}),
-        "top_teams": cache.get("top_teams", []),
-        "signal_eval": cache.get("signal_eval", {}),
-        "simulation_meta": cache.get("simulation_meta", None),
+        "has_simulation": has_sim,
+        "n_unplayed": unplayed_match_count(),
+    })
+
+
+@wc_app.get("/api/simulation")
+def api_simulation():
+    return JSONResponse({
+        "top_teams": sim_cache.get("top_teams", []),
+        "signal_eval": sim_cache.get("signal_eval", {}),
+        "simulation_meta": sim_cache.get("simulation_meta"),
+        "status": sim_cache.get("status", "none"),
+        "message": sim_cache.get("message"),
+        "n_unplayed": sim_cache.get("n_unplayed", unplayed_match_count()),
     })
 
 
@@ -492,9 +526,10 @@ def _run_simulation_task(
 ):
     """Background simulation with progress reporting.
 
-    Manages ``active_simulations`` and global ``cache``; delegates computation
-    to ``run_simulation_compute`` in the pipeline module.
+    Stores results in ``sim_cache`` (separate from ``cache``) so real data
+    is never overwritten. Delegates computation to ``run_simulation_compute``.
     """
+    global sim_cache
     try:
         t0 = time.time()
         with sim_lock:
@@ -503,6 +538,20 @@ def _run_simulation_task(
                 "total_iterations": iterations, "stage": "Loading data...",
                 "t0": t0, "elapsed": 0,
             }
+
+        remaining = unplayed_match_count()
+        if remaining == 0:
+            with sim_lock:
+                s = active_simulations[task_id]
+                s["status"] = "no_unplayed_matches"
+                s["progress"] = 100
+                s["elapsed"] = time.time() - t0
+                s["result"] = {
+                    "status": "no_unplayed_matches",
+                    "message": "All matches have been played. Nothing to simulate.",
+                }
+            sim_cache = {"status": "no_unplayed_matches", "message": "All matches have been played. Nothing to simulate."}
+            return
 
         def _progress(pct, stage):
             with sim_lock:
@@ -520,20 +569,24 @@ def _run_simulation_task(
         )
 
         _progress(97, "Building full bracket tree...")
-        global cache
         overview = result["overview"]
-        overview["top_teams"] = result["top_teams"][:20]
-        overview["signal_eval"] = result["eval_metrics"]
-        overview["simulation_meta"] = {
-            "iterations": iterations,
-            "seed": seed,
-            "weights": weights,
-            "show_ci": show_ci,
-            "n_top_teams": len(result["top_teams"]),
-            "n_signals_evaluated": len(result["eval_metrics"]),
+        sim_cache = {
+            "top_teams": result["top_teams"][:20],
+            "signal_eval": result["eval_metrics"],
+            "simulation_meta": {
+                "iterations": iterations,
+                "seed": seed,
+                "weights": weights,
+                "show_ci": show_ci,
+                "n_top_teams": len(result["top_teams"]),
+                "n_signals_evaluated": len(result["eval_metrics"]),
+                "unplayed_matches": remaining,
+            },
+            "full_bracket": result["full_bracket"],
+            "sim_result": result.get("sim_result"),
+            "n_unplayed": remaining,
+            "status": "complete",
         }
-        overview["full_bracket"] = result["full_bracket"]
-        cache = overview
 
         _progress(100, "Complete")
 
@@ -549,6 +602,7 @@ def _run_simulation_task(
             s["status"] = "complete"
             s["progress"] = 100
             s["elapsed"] = time.time() - t0
+            s["result"] = {"status": "complete", "n_unplayed": remaining}
     except Exception as e:
         with sim_lock:
             active_simulations[task_id]["status"] = "error"
@@ -560,6 +614,14 @@ def _run_simulation_task(
 def api_simulate(req: dict = None):
     if not req:
         return JSONResponse({"error": "request body required"})
+    remaining = unplayed_match_count()
+    if remaining == 0:
+        global sim_cache
+        sim_cache = {"status": "no_unplayed_matches", "message": "All matches have been played. Nothing to simulate."}
+        return JSONResponse({
+            "status": "no_unplayed_matches",
+            "message": "All matches have been played. Nothing to simulate.",
+        })
     iterations = int(req.get("iterations", 50000))
     iterations = max(1000, min(500000, iterations))
     seed = req.get("seed")
@@ -582,6 +644,7 @@ def api_simulate(req: dict = None):
         "seed": seed,
         "weights": weights,
         "show_ci": show_ci,
+        "n_unplayed": remaining,
     })
 
 
@@ -862,6 +925,12 @@ def api_simulation_progress(task_id: str):
         "elapsed": round(sim.get("elapsed", 0), 1),
     }
     if sim["status"] == "complete":
+        result = sim.get("result")
+        if result:
+            response["result"] = result
+        with sim_lock:
+            del active_simulations[task_id]
+    if sim["status"] == "no_unplayed_matches":
         result = sim.get("result")
         if result:
             response["result"] = result
