@@ -91,20 +91,6 @@ python -m web.server
 
 Open **http://127.0.0.1:8080** in your browser. You'll see a competition selector — click **World Cup 2026** or **UCL 2025/26** to enter the dashboard.
 
-The dashboard greets you with a **retro terminal** as the default tab. Try these commands:
-
-```text
-> help              # List all available commands
-> standings         # Show group/league standings
-> bracket           # Show knockout bracket
-> odds              # Show championship probabilities
-> simulate          # Run Monte Carlo simulation
-> what-if ARS.elo=1960  # Counterfactual scenario
-> clear             # Clear terminal
-```
-
-Press `` Ctrl+` `` (backtick) from any tab to open the terminal drawer without leaving your current view.
-
 **Routes:**
 
 | URL | Content |
@@ -126,7 +112,6 @@ The dashboard shows:
 - **Dashboard tab:** Top teams, champion probabilities, match results
 - **Bracket tab:** Resolved R32 → R16 → QF → SF → FINAL with signal breakdowns
 - **Standings tab:** Group tables with third-place bubble
-- **Terminal tab:** Retro CLI with commands for all operations
 
 **API endpoints:** `/worldcup/api/standings`, `/api/bracket`, `/api/evaluation`, `/api/signals`, `/api/blend`, `/api/governance`, `/api/refresh`, `/api/simulate`, `/api/what-if`, `/api/match/insight`, `/api/validation`, `/api/report`, `/api/calibrate`
 
@@ -140,7 +125,6 @@ The dashboard shows:
 - **Bracket tab:** Playoff → R16 → QF → SF → FINAL
 - **Odds tab:** Championship and qualification probabilities
 - **Signals tab:** Signal blend breakdown
-- **Terminal tab:** Retro CLI with commands for all operations
 
 **API endpoints:** `/ucl/api/standings`, `/api/bracket`, `/api/odds`, `/api/signals`, `/api/simulate`, `/api/what-if`, `/api/match/insight`, `/api/validation`, `/api/report`, `/api/calibrate`, `/api/mode`
 

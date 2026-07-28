@@ -93,9 +93,9 @@ uvicorn web.server:asgi_app --reload --host 127.0.0.1 --port 8080
 
 ### Caching
 
-On startup (`lifespan` event), the server pre-computes all prediction data and caches it in memory. The World Cup sub-app also persists a `cache.json` file under `web/`. The server adds `Cache-Control: no-cache` headers to all `/static/` responses to prevent stale asset serving during development.
+On startup (`lifespan` event), the server pre-computes all prediction data and caches it entirely in memory — there are no persistent cache files written by the web server. The server adds `Cache-Control: no-cache` headers to all `/static/` responses to prevent stale asset serving during development.
 
-To force full re-computation, delete `web/cache.json` and restart the server.
+To force full re-computation, restart the server.
 
 ---
 

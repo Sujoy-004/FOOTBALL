@@ -272,13 +272,11 @@ python -m pytest --cov=src --cov-report=html
 
 ## CI Test Configuration
 
-<!-- VERIFY: The following CI configuration is documented from a previously known workflow. No `.github/workflows/` directory exists in the repository — the workflow may be managed externally or has not been committed. Verify the actual CI pipeline before relying on this section. -->
+<!-- VERIFY: No CI workflow files were found anywhere in the repository after scanning all .github/workflows/ directories. If a CI pipeline is needed, it must be created. -->
 
-Only the **World Cup** competition is known to have a dedicated CI pipeline, historically defined at:
+No CI pipeline exists in the current repository. There is no `.github/workflows/` directory at the project root, under `competitions/worldcup/`, or in any subdirectory.
 
-`competitions/worldcup/.github/workflows/ci.yml`
-
-<!-- VERIFY: workflow location and actual CI steps -->
+<!-- VERIFY: No CI pipeline detected — no workflow YAML files exist at any path in the repository. -->
 No CI pipeline exists at the repository root level or for the UCL/football_core test suites.
 
 ---

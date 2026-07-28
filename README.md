@@ -1,7 +1,7 @@
 <!-- generated-by: gsd-doc-writer -->
 # FOOTBALL Monte Carlo Prediction Engine
 
-A Python Monte Carlo simulation engine that predicts football tournament outcomes — knockout probabilities, group standings, and championship odds — across three major competitions. The sole interface is a **FastAPI web dashboard** (`python -m web.server`) with a retro terminal-emulator aesthetic.
+A Python Monte Carlo simulation engine that predicts football tournament outcomes — knockout probabilities, group standings, and championship odds — across three major competitions. The sole interface is a **FastAPI web dashboard** (`python -m web.server`).
 
 | Competition | Route | Status | Tests |
 |---|---|---|---|
@@ -40,22 +40,11 @@ The dashboard is a **vanilla JS SPA** served from `web/static/` over a unified F
 | Path | Competition | Description |
 |---|---|---|
 | `/` | Landing page | Competition selector |
-| `/worldcup` | World Cup 2026 | Dashboard, bracket, standings, what-if, terminal |
+| `/worldcup` | World Cup 2026 | Dashboard, bracket, standings, what-if |
 | `/worldcup/api/*` | WC backend | REST API |
-| `/ucl` | UCL 2025/26 | Overview, league table, bracket, odds, terminal |
+| `/ucl` | UCL 2025/26 | Overview, league table, bracket, odds |
 | `/ucl/api/*` | UCL backend | REST API |
 | `/euro` | Euro 2028 | Stub (`{"status": "coming_soon"}`) |
-
-### CLI-Vibe Terminal UX
-
-The dashboard greets you with a **retro terminal** as the default tab. Type `help` to see available commands. The terminal supports:
-
-- **Commands:** `simulate`, `validate`, `calibrate`, `what-if`, `export`, `standings`, `bracket`, `odds`, `elo`, `signals`, `clear`, `help`, and more
-- **Inline progress bars:** `[====>    ] 60%` during long operations
-- **Sparklines:** `▁▂▃▄▅▆▇█` in result cells
-- **Animated spinner:** `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏` during API calls
-- **Collapsible drawer:** Press `` Ctrl+` `` or click the status-bar toggle to open the terminal from any tab (slides up 300px)
-- **Color-coded output:** Warm earth tones for WC, bluish for UCL
 
 ### API Endpoints
 
@@ -166,11 +155,10 @@ FOOTBALL/
 │   ├── ucl_app.py              UCL sub-app (mounted at /ucl)
 │   ├── insight.py              WC match insight engine
 │   ├── whatif_engine.py        Shared what-if scenario engine
-│   ├── cache.json              Web data cache (auto-generated)
 │   └── static/
 │       ├── index.html           SPA shell
 │       ├── shared.css           Design system CSS
-│       ├── shared.js            Router, terminal, modal, tabs
+│       ├── shared.js            Router, modal, tabs
 │       ├── wc.js                WC dashboard views
 │       └── ucl.js               UCL dashboard views
 │

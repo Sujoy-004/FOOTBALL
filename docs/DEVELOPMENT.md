@@ -219,7 +219,7 @@ FOOTBALL/
 │   ├── static/                      Single-page application frontend
 │   │   ├── index.html               SPA shell (Chart.js, custom CSS/JS)
 │   │   ├── shared.css               Global styles
-│   │   ├── shared.js                Competition registry, navigation, terminal UI
+│   │   ├── shared.js                Competition registry, navigation
 │   │   ├── wc.js                    World Cup dashboard views
 │   │   └── ucl.js                   UCL dashboard views
 │   └── __pycache__/
@@ -238,7 +238,7 @@ FOOTBALL/
 - **Continuous polling (World Cup):** The web server fetches live matches → updates Elo → refreshes signal caches → runs Monte Carlo simulation → caches probability tables. Accessible via `/worldcup` dashboard.
 - **Single-run Monte Carlo (UCL):** The web server fetches all data upfront, runs N iterations of league-phase + knockout simulation, caches results. Accessible via `/ucl` dashboard.
 - **Simpson's paradox avoidance:** The `result.py` contract in UCL provides a clean boundary between simulation computation and web serialization.
-- **Web dashboard as unified layer:** The `web/` package provides a FastAPI-based SPA that wraps both World Cup and UCL engines behind a REST API, adding caching, terminal UI, signal evaluation, and what-if scenario features.
+- **Web dashboard as unified layer:** The `web/` package provides a FastAPI-based SPA that wraps both World Cup and UCL engines behind a REST API, adding caching, signal evaluation, and what-if scenario features.
 
 ---
 
@@ -315,8 +315,7 @@ interface for both the World Cup and UCL predictors.
   (`/api/data`, `/api/standings`, `/api/bracket`, `/api/odds`, `/api/signals`,
   `/api/simulate`, `/api/what-if`, `/api/match/insight`).
 - **Caching layer:** Both sub-apps compute their data on startup and store it in
-  an in-memory `cache` dict. The World Cup sub-app also writes to a
-  `web/cache.json` file so data survives a server restart. The `/api/refresh`
+  an in-memory `cache` dict. The `/api/refresh`
   endpoint invalidates the cache and re-fetches live data from the BSD API.
 
 ### Running the Web Server
@@ -360,12 +359,12 @@ The SPA frontend lives in `web/static/`:
 - **`index.html`** — Shell page that loads Chart.js from CDN and mounts the
   competition registry UI.
 - **`shared.css`** — Global styles (Playfair Display + Orbitron fonts, dark
-  theme, status bar, terminal input).
+  theme, status bar).
 - **`shared.js`** — Competition registry (WC, UCL, Euro), navigation bar,
-  terminal input handler, and page routing.
+  and page routing.
 - **`wc.js`** — World Cup-specific views: dashboard with team probabilities,
-  bracket visualizer with signal breakdowns, standings table with third-place
-  rankings, and a terminal-style boot log display.
+  bracket visualizer with signal breakdowns, and standings table with third-place
+  rankings.
 - **`ucl.js`** — UCL-specific views: overview with top-4 teams, league table
   with zone coloring (top 8 / playoff / eliminated), bracket with Swiss playoff,
   odds breakdown, signal availability, and match insight.
