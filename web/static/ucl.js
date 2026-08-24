@@ -214,10 +214,11 @@ async function renderBracket() {
   if (lmdKeys.length) {
     html += '<div class="chart-section"><div class="title">\u26BD League Phase \u2014 Matchday Explorer</div><div class="md-accordion">';
     const firstMid = lmdKeys[0];
+    let mdHtml = "";
     lmdKeys.forEach(function(md, mdi) {
       const ms = lmd[md] || [];
       const isFirst = mdi === 0;
-      mdHtml = '<div class="md-card"><div class="md-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">';
+      mdHtml += '<div class="md-card"><div class="md-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">';
       mdHtml += '<span class="md-label">' + md.replace(/^MD/, "Matchday ") + '</span>';
       mdHtml += '<span class="md-count">' + ms.length + " matches</span>";
       mdHtml += '<span class="md-arrow">' + (isFirst ? "\u25BC" : "\u25B6") + "</span></div>";
