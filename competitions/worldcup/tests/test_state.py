@@ -19,8 +19,6 @@ from src.state import (
     load_groups,
     load_played,
     load_prediction_history,
-    load_probability_log,
-    append_probability_log,
     load_signal_cache,
     load_teams,
     migrate_prediction_history,
@@ -652,21 +650,3 @@ class TestMigratePredictionHistory:
         assert history[0]["actual"] == 0.0
 
 
-class TestProbabilityLog:
-    def test_load_empty_when_no_file(self, tmp_path):
-        assert load_probability_log(data_dir=tmp_path) == []
-
-    def test_append_and_load(self, tmp_path):
-        snapshot = {"timestamp": "2026-06-21T12:00:00", "probabilities": {}}
-        append_probability_log(snapshot, data_dir=tmp_path)
-        log = load_probability_log(data_dir=tmp_path)
-        assert len(log) == 1
-        assert log[0]["timestamp"] == "2026-06-21T12:00:00"
-
-    def test_multiple_appends(self, tmp_path):
-        append_probability_log({"timestamp": "t1", "probabilities": {}}, data_dir=tmp_path)
-        append_probability_log({"timestamp": "t2", "probabilities": {}}, data_dir=tmp_path)
-        append_probability_log({"timestamp": "t3", "probabilities": {}}, data_dir=tmp_path)
-        log = load_probability_log(data_dir=tmp_path)
-        assert len(log) == 3
-        assert [e["timestamp"] for e in log] == ["t1", "t2", "t3"]

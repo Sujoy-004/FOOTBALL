@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, runtime_checkable, List, Optional
 
@@ -55,15 +55,16 @@ class FixtureSchedule:
         return FixtureSchedule(teams=teams, matchdays=matchdays)
 
     def validate(self) -> None:
-        """Validate schedule against UCL league phase constraints.
+        """Validate the schedule structurally.
 
-        Raises ValueError on violation. Delegates to the existing
-        validate_ucl_fixtures() from competitions/ucl/src/validation.py.
+        Competition-specific validation (e.g. UCL league-phase constraints)
+        is the caller's responsibility — this core method must stay
+        competition-agnostic.
         """
-        from competitions.ucl.src.validation import validate_ucl_fixtures
-
-        fixture_dict = {"schedule": asdict(self)}
-        validate_ucl_fixtures(fixture_dict)
+        if not self.teams:
+            raise ValueError("Schedule has no teams")
+        if not self.matchdays:
+            raise ValueError("Schedule has no matchdays")
 
 
 @runtime_checkable
@@ -90,6 +91,20 @@ class MatchResultProvider(Protocol):
         ...
 
 
+@runtime_checkable
+class ResultHistoryProvider(Protocol):
+    """Provide completed match results for a team before a given date.
+
+    Used by RollingFormSignal for form computation (D-09).
+    Implementations: BSDMatchResultProvider (BSD API) and
+    ReplayMatchResultProvider (replay JSON files).
+    """
+
+    def get_team_results(
+        self, team: str, before_date: str, limit: int = 10
+    ) -> list[dict]: ...
+
+
 class FixtureProviderError(Exception):
     """Raised when a provider cannot produce a valid fixture schedule."""
 
@@ -108,26 +123,14 @@ class FixtureProvider(Protocol):
 
 @runtime_checkable
 class DataProvider(Protocol):
-    """Protocol for external data sources (matches, predictions, managers, players).
+    """Protocol for external data sources (match results / events).
 
-    Each method returns raw list-of-dict data from the provider.
-    Processing, caching, and persistence are handled by the caller.
-    Competition identifiers are provider-specific (e.g. ``"WC"``, ``"CL"``
-    for football-data.org; ``"27"``, ``"7"`` for BSD league IDs).
+    Returns raw list-of-dict data from the provider. Processing, caching,
+    and persistence are handled by the caller. Competition identifiers are
+    provider-specific (e.g. ``"WC"``, ``"CL"`` for football-data.org;
+    ``"27"``, ``"7"`` for BSD league IDs).
     """
 
     def fetch_matches(self, competition_id: str, **kwargs) -> list[dict]:
         """Fetch match results / events for *competition_id*."""
-        ...
-
-    def fetch_predictions(self, competition_id: str, **kwargs) -> list[dict]:
-        """Fetch ML predictions for *competition_id*."""
-        ...
-
-    def fetch_managers(self, competition_id: str, **kwargs) -> list[dict]:
-        """Fetch manager profiles for *competition_id*."""
-        ...
-
-    def fetch_players(self, competition_id: str, **kwargs) -> list[dict]:
-        """Fetch player profiles for *competition_id*."""
         ...

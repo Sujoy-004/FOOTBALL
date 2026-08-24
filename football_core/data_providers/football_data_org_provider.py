@@ -187,26 +187,3 @@ class FootballDataOrgProvider:
         raw_matches = data.get("matches", [])
         return [self._map_match(m) for m in raw_matches]
 
-    def fetch_predictions(
-        self,
-        competition_id: str = "WC",
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
-        """Not available from football-data.org."""
-        return []
-
-    def fetch_managers(
-        self,
-        competition_id: str = "WC",
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
-        """Not available from football-data.org."""
-        return []
-
-    def fetch_players(
-        self,
-        competition_id: str = "WC",
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
-        """Not available from football-data.org."""
-        return []

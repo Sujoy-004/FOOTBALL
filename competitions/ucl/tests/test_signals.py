@@ -8,7 +8,7 @@ from football_core.signals.market_odds import MarketOddsSignal
 from football_core.signals.rolling_form import RollingFormSignal
 from football_core.signals.squad_value import SquadValueSignal
 from football_core.signals.rest_days import RestDaysSignal
-from football_core.result_provider import MatchResultProvider
+from football_core.provider import ResultHistoryProvider
 
 
 class TestRefinedEloSignal:

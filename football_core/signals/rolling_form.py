@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 
 from football_core.elo import expected_score
-from football_core.result_provider import MatchResultProvider
+from football_core.provider import ResultHistoryProvider
 from football_core.signal import Signal, SignalOutput, PredictionContext
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class RollingFormSignal(Signal):
 
     def __init__(
         self,
-        result_provider: MatchResultProvider,
+        result_provider: ResultHistoryProvider,
         windows: list[int] | None = None,
         decay_factor: float = 0.9,
     ) -> None:

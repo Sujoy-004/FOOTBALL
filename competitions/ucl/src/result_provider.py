@@ -1,7 +1,7 @@
 """Match result providers for UCL — replay JSON file and BSD live fetch.
 
-Both implement the MatchResultProvider Protocol from football_core.
-ReplayMatchResultProvider loads from a local JSON file (replay mode).
+Both conform to the core MatchResultProvider Protocol (load()-based).
+ReplayMatchResultProvider loads from a local JSON file.
 BSDMatchResultProvider fetches from the BSD API (live mode).
 """
 
@@ -10,8 +10,6 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
-
-from football_core.provider import MatchResultProvider
 
 logger = logging.getLogger(__name__)
 

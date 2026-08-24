@@ -1,7 +1,7 @@
 """Evaluation metrics for prediction quality assessment.
 
 After D-04/D-05: imports metric primitives from football_core,
-retains WC-specific evaluate_all_matches() and backtest_tournament().
+retains WC-specific evaluate_all_matches() and signal-stats helpers.
 """
 
 import copy
@@ -40,7 +40,7 @@ def evaluate_all_matches(
         signal_name: Which signal to evaluate.
             - None (default, D-11): Multi-signal report with all available signal keys.
             - "elo": Replay through Elo pipeline (existing behavior), produce compound entries.
-            - "market_odds", "catboost", "blended": Read from prediction_history compound entries.
+            - "market_odds", "blended": Read from prediction_history compound entries.
         history: Prediction history entries. Required for signal_name=None and non-elo signals.
             Not used for signal_name="elo" (which replays from played/played_groups).
 
@@ -196,7 +196,7 @@ def evaluate_all_matches(
         # Caller is responsible for persisting history_entries if desired
         return report
 
-    # ── Case: Other signal_name (market_odds, catboost, blended) ──
+    # ── Case: Other signal_name (market_odds, blended) ──
     # Read from prediction_history compound entries (caller provides via history param)
     if not history:
         return {
@@ -250,142 +250,6 @@ def evaluate_all_matches(
     }
 
 
-def backtest_tournament(
-    tournament_matches: list[dict],
-    teams: dict[str, dict],
-    tournament_name: str = "",
-) -> dict:
-    """Replay a historical tournament through the Elo pipeline.
-
-    Takes a list of historical match dicts (with team_a, team_b, actual),
-    replays them chronologically through expected_score() and apply_elo_update(),
-    computes per-signal metrics and a winner prediction.
-
-    Args:
-        tournament_matches: List of dicts with team_a, team_b, actual, signals.elo.
-        teams: Team data dict (deep-copied for replay — original unchanged).
-        tournament_name: Label for the report (e.g., "2018").
-
-    Returns:
-        Per-tournament report dict with keys:
-        tournament, n_matches, per_signal, winner_prediction, signal_ranking,
-        available_signals, n_signals.
-    """
-    # Pitfall 6: deep-copy teams before replay
-    replay_teams = copy.deepcopy(teams)
-
-    # Sort matches chronologically (they should already be, but guard)
-    sorted_matches = sorted(
-        tournament_matches,
-        key=lambda m: (m.get("match_id", ""), m.get("team_a", "")),
-    )
-
-    if not sorted_matches or not teams:
-        return {
-            "tournament": tournament_name,
-            "n_matches": 0,
-            "per_signal": {},
-            "winner_prediction": {"predicted": None, "actual": None, "correct": False},
-            "signal_ranking": [],
-            "available_signals": [],
-            "n_signals": 0,
-        }
-
-    # Determine available signals (only elo for now, D-12 constraint)
-    all_signals: set[str] = set()
-    for m in sorted_matches:
-        sigs = m.get("signals", {})
-        if isinstance(sigs, dict):
-            all_signals.update(k for k in sigs if sigs[k].get("available", False))
-
-    # ── Elo replay ──
-    elo_predictions: list[float] = []
-    actuals: list[float] = []
-
-    for m in sorted_matches:
-        t_a, t_b = m["team_a"], m["team_b"]
-        if t_a not in replay_teams or t_b not in replay_teams:
-            continue
-        # Compute expected score before updating Elo
-        p_a = expected_score(replay_teams[t_a]["elo"], replay_teams[t_b]["elo"])
-        actual_a = m.get("actual")
-        if actual_a is None:
-            continue
-        elo_predictions.append(p_a)
-        actuals.append(actual_a)
-        # Apply Elo update for next match
-        try:
-            apply_elo_update(m, replay_teams)
-        except Exception:
-            pass
-
-    # ── Compute metrics per signal ──
-    per_signal: dict[str, dict] = {}
-    signal_ranking_entries: list[tuple[str, float]] = []
-
-    if elo_predictions and "elo" in all_signals:
-        metrics = compute_metrics(elo_predictions, actuals)
-        cal = calibration_curve(elo_predictions, actuals)
-        per_signal["elo"] = {
-            "brier": round(metrics["brier"], 6),
-            "log_loss": round(metrics["log_loss"], 6),
-            "ece": round(cal["ece"], 6),
-            "n": metrics["n"],
-        }
-        signal_ranking_entries.append(("elo", metrics["brier"]))
-
-    # ── Winner prediction: highest initial Elo at tournament start ──
-    winner_prediction = {"predicted": None, "actual": None, "correct": False}
-    if teams:
-        # Find team with highest Elo among those participating in tournament
-        participating_teams: set[str] = set()
-        for m in sorted_matches:
-            if m.get("team_a") in teams:
-                participating_teams.add(m["team_a"])
-            if m.get("team_b") in teams:
-                participating_teams.add(m["team_b"])
-        if participating_teams:
-            predicted_winner = max(
-                participating_teams,
-                key=lambda name: teams[name]["elo"],
-            )
-            # Actual winner = last match's winner (tournament final)
-            last_match = sorted_matches[-1]
-            actual_winner = last_match.get("winner")
-            winner_prediction = {
-                "predicted": predicted_winner,
-                "actual": actual_winner,
-                "correct": (
-                    predicted_winner == actual_winner
-                    if actual_winner is not None
-                    else False
-                ),
-            }
-
-    # ── Signal ranking (sorted by Brier ascending) ──
-    signal_ranking_entries.sort(key=lambda x: x[1])
-    signal_ranking = [s for s, _ in signal_ranking_entries]
-
-    # Architecture Q3: n_signals < 2 → omit blended
-    available_signals = list(all_signals)
-    n_signals = len(available_signals)
-
-    return {
-        "tournament": tournament_name,
-        "n_matches": len(elo_predictions),
-        "per_signal": per_signal,
-        "winner_prediction": winner_prediction,
-        "signal_ranking": signal_ranking,
-        "available_signals": available_signals,
-        "n_signals": n_signals,
-    }
-
-
-# ──────────────────────────────────────────────
-# Functions extracted from web.wc_app (Phase 2)
-# ──────────────────────────────────────────────
-
-
 def compute_signal_stats(data_dir: Path | None = None) -> dict:
     """Signal statistics from on-disk caches — no ledger dependency."""
     from src.state import load_signal_cache
@@ -397,14 +261,6 @@ def compute_signal_stats(data_dir: Path | None = None) -> dict:
 
     cache_files: list[tuple[str, str]] = [
         ("odds_cache.json", "market_odds"),
-        ("catboost_cache.json", "catboost"),
-        ("form_cache.json", "form"),
-        ("lineup_cache.json", "lineup_strength"),
-        ("defensive_cache.json", "defensive_quality"),
-        ("manager_effect_cache.json", "manager_effect"),
-        ("availability_cache.json", "availability"),
-        ("elo_odds_cache.json", "elo_odds"),
-        ("team_synergy_cache.json", "team_synergy"),
         ("rolling_form_cache.json", "rolling_form"),
         ("squad_value_cache.json", "squad_value"),
         ("rest_days_cache.json", "rest_days"),

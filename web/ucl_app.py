@@ -4,27 +4,18 @@ from __future__ import annotations
 
 import json
 import os
-import random
-import re
-import sys
-import tempfile
 import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 import fastapi
-import requests
-import uvicorn
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 
-from competitions.ucl.src.orchestrator import build_simulation_result, build_signal_engine, load_calibration, run_validation
+from competitions.ucl.src.orchestrator import build_simulation_result, run_validation
 from competitions.ucl.src.pipeline import (
-    fetch_ucl_managers as _fetch_ucl_managers_pipeline,
     compute_deterministic_standings as _compute_deterministic_standings_pipeline,
     build_deterministic_bracket as _build_deterministic_bracket_pipeline,
     compute_signal_eval as _compute_signal_eval_pipeline,
@@ -38,19 +29,13 @@ from competitions.ucl.src.pipeline import (
     run_mc_simulation as _run_mc_simulation_pipeline,
     run_calibration_task as _run_calibration_task_pipeline,
 )
-from competitions.ucl.src.analysis import run_validation_suite, run_calibrated_validation
-from competitions.ucl.src.calibrate import run_calibration
 from competitions.ucl.result import SimulationResult
-from competitions.ucl.src.elo_fetcher import fetch_team_elos, get_clubelo_snapshot_date
+from competitions.ucl.src.elo_fetcher import fetch_team_elos
 from competitions.ucl.src.provider import RepoFixtureProvider
-from competitions.ucl.src.groups import compute_swiss_standings
-from football_core.blender import compute_signal_contributions
-from football_core.constants import EXPECTED_GOALS_BASE_RATE
 from football_core.elo import expected_score
 from football_core.signal import PredictionContext
 
-from web.common import ts, boot_step
-from web.whatif_engine import handle_instant_scenario, parse_scenario
+from web.common import ts
 
 BSD_API_KEY: str = os.environ.get("BSD_API_KEY", "")
 FOOTBALL_DATA_ORG_KEY: str = os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
@@ -111,59 +96,12 @@ active_simulations: dict[str, dict] = {}
 sim_lock = threading.Lock()
 
 
-def _parse_what_if_scenario(scenario: str, match: dict) -> dict | None:
-    ta = match.get("team_a", "")
-    tb = match.get("team_b", "")
-    text = scenario.lower()
-    deltas: dict[str, float] = {}
-    for team, direction, base_delta in [
-        (ta, ["stronger", "boosted", "improved", "better", "upgraded", "advantage", "favorite"], 50),
-        (ta, ["weaker", "injured", "suspended", "down", "struggling", "worse", "underdog"], -50),
-        (tb, ["stronger", "boosted", "improved", "better", "upgraded", "advantage", "favorite"], 50),
-        (tb, ["weaker", "injured", "suspended", "down", "struggling", "worse", "underdog"], -50),
-    ]:
-        for kw in direction:
-            if kw in text:
-                name_key = team.lower().replace(" ", "")
-                text_key = text.replace(" ", "")
-                if name_key in text_key:
-                    delta = base_delta
-                    if "very" in text or "significantly" in text or "major" in text:
-                        delta = int(delta * 2)
-                    if "slightly" in text or "somewhat" in text or "a bit" in text:
-                        delta = int(delta * 0.5)
-                    deltas[team] = deltas.get(team, 0) + delta
-    return deltas if deltas else None
-
-
-def _get_ucl_data_provider():
-    """Select UCL data provider — BSD or football-data.org."""
-    from football_core.data_providers.bsd_provider import BSDDataProvider
-    from football_core.data_providers.football_data_org_provider import FootballDataOrgProvider
-
-    mode = os.environ.get("DATA_PROVIDER", "").lower()
-
-    if mode == "bsd" and BSD_API_KEY:
-        return BSDDataProvider(BSD_API_KEY, league_id=UCL_LEAGUE_ID)
-    if mode == "football-data" and FOOTBALL_DATA_ORG_KEY:
-        return FootballDataOrgProvider(FOOTBALL_DATA_ORG_KEY)
-
-    if BSD_API_KEY:
-        return BSDDataProvider(BSD_API_KEY, league_id=UCL_LEAGUE_ID)
-    if FOOTBALL_DATA_ORG_KEY:
-        return FootballDataOrgProvider(FOOTBALL_DATA_ORG_KEY)
-    return None
-
-
-def _fetch_ucl_managers() -> dict[str, dict]:
-    return _fetch_ucl_managers_pipeline(BSD_API_KEY, team_aliases=_BSD_TEAM_ALIASES)
-
-
 def _fetch_live_data() -> None:
     import logging
     logger = logging.getLogger(__name__)
 
-    provider = _get_ucl_data_provider()
+    from web.common import get_data_provider
+    provider = get_data_provider(BSD_API_KEY, FOOTBALL_DATA_ORG_KEY, UCL_LEAGUE_ID)
     if provider is None:
         logger.warning("[UCL] No data provider — skipping live fetch")
         boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] No data provider configured"})
@@ -395,8 +333,8 @@ def _build_deterministic_bracket(knockout: dict, standings: list[dict]) -> dict:
     return _build_deterministic_bracket_pipeline(knockout, standings, DATA_DIR)
 
 
-def _compute_signal_eval(results: list[dict], engine, elo_ratings: dict[str, float], bsd_manager_data: dict) -> dict:
-    return _compute_signal_eval_pipeline(results, engine, elo_ratings, bsd_manager_data)
+def _compute_signal_eval(results: list[dict], engine, elo_ratings: dict[str, float]) -> dict:
+    return _compute_signal_eval_pipeline(results, engine, elo_ratings)
 
 
 def deterministic_compute() -> dict:
@@ -608,7 +546,6 @@ def _run_mc_simulation(
         "standings": result.get("standings", []),
         "signals": result.get("signals", {}),
         "elo_ratings": result.get("elo_ratings", {}),
-        "calibration": load_calibration(),
     }
     snapshot_path.write_text(
         json.dumps(snapshot_data, indent=2, default=str, ensure_ascii=False),
@@ -621,13 +558,9 @@ def api_set_mode(req: dict = None):
     global _mode
     body = req or {}
     mode = str(body.get("mode", "simulate")).lower()
-    if mode not in ("simulate", "replay", "live"):
-        return JSONResponse({"error": f"invalid mode: {mode}. Must be simulate, replay, or live"})
+    if mode not in ("simulate", "live"):
+        return JSONResponse({"error": f"invalid mode: {mode}. Must be simulate or live"})
     _mode = mode
-    if mode == "replay":
-        replay_data = body.get("replay_data")
-        if replay_data:
-            cache["_replay_data"] = replay_data
     if mode == "live":
         api_key = body.get("api_key")
         if api_key:
@@ -683,7 +616,6 @@ def _run_calibration_task(task_id: str, replay_data: str | None = None):
             str(DATA_DIR), replay_data=replay_data, progress_cb=_progress,
         )
 
-        calib = load_calibration()
         with sim_lock:
             s = active_simulations.get(task_id)
             if s:
@@ -695,7 +627,6 @@ def _run_calibration_task(task_id: str, replay_data: str | None = None):
                     "n_matches": result.get("n_matches", 0),
                     "weights": result.get("weights", {}),
                     "per_signal": result.get("per_signal", {}),
-                    "calibration": calib,
                 }
     except Exception as e:
         with sim_lock:
@@ -762,11 +693,9 @@ def api_validation():
                 },
             }
 
-        calib = load_calibration()
         return JSONResponse({
             "validation": validation,
-            "calibration_available": calib is not None,
-            "calibration": calib,
+            "calibration_available": False,
         })
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -863,7 +792,6 @@ def api_match_insight(match_id: str = ""):
                 fixtures=[{"team_a": ta, "team_b": tb, "match_id": match_id}],
                 elo_ratings=elo_map,
                 played_results=[],
-                manager_data=cache.get("bsd_manager_data", {}),
             )
             bp = engine.evaluate({"team_a": ta, "team_b": tb, "match_id": match_id}, ctx)
             blended_prob = bp.home_prob
@@ -908,15 +836,25 @@ def api_match_insight(match_id: str = ""):
 
 @ucl_app.post("/api/what-if")
 def api_what_if(req: dict = None):
-    """What-if with instant AND simulate modes (mirrors WC pattern)."""
+    """Structured counterfactual: adjust one team's Elo by +-delta, re-run seeded MC.
+
+    Body: {"match_id": str, "elo_delta": int (default 50, applied +to team_a / -to team_b),
+           "iterations": int (default 10000, capped at 50000)}
+    Returns baseline vs adjusted champion probabilities for both teams.
+    """
     if not req:
         return JSONResponse({"error": "request body required"})
     match_id = req.get("match_id", "")
-    scenario = req.get("scenario", "")
-    mode = req.get("mode", "instant")
-
-    if not match_id or not scenario:
-        return JSONResponse({"error": "match_id and scenario required"})
+    if not match_id:
+        return JSONResponse({"error": "match_id required"})
+    try:
+        elo_delta = int(req.get("elo_delta", 50))
+        n_iterations = min(max(int(req.get("iterations", 10000)), 1000), 50000)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "elo_delta/iterations must be integers"})
+    if elo_delta == 0:
+        return JSONResponse({"error": "elo_delta must be non-zero"})
+    elo_delta = max(-600, min(600, elo_delta))
 
     br = cache.get("bracket_rounds", {})
     match_data = None
@@ -927,127 +865,55 @@ def api_what_if(req: dict = None):
                 break
         if match_data:
             break
-
     if not match_data:
         return JSONResponse({"error": "match not found"})
 
-    ta = match_data.get("team_a", "") or "?"
-    tb = match_data.get("team_b", "") or "?"
+    ta = match_data.get("team_a", "") or ""
+    tb = match_data.get("team_b", "") or ""
+    if not ta or not tb:
+        return JSONResponse({"error": "bracket slot unresolved"})
 
-    # Use the whatif_engine for rich response — same as WC
-    elo_map = cache.get("elo_ratings", {})
-    elo_a = elo_map.get(ta, 1500.0)
-    elo_b = elo_map.get(tb, 1500.0)
-    elo_p = expected_score(elo_a, elo_b)
-    elo_p = round(max(0.01, min(0.99, elo_p)), 4)
+    fixtures_path = str(DATA_DIR / "fixtures.json")
+    provider = RepoFixtureProvider(fixtures_path=fixtures_path).load()
+    team_names = [t.name for t in provider.teams]
+    elo_ratings = fetch_team_elos(team_names)
+    if not elo_ratings:
+        elo_ratings = {}
+        coefficients = {t.name: t.coefficient for t in provider.teams}
+        max_coeff = max(coefficients.values()) if coefficients else 100
+        for t in team_names:
+            c = coefficients.get(t, 50)
+            elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
 
-    # Build original signals from cache data
-    sigs = cache.get("signals", {})
-    original_signals = {}
-    for sk, sv in sigs.items():
-        w = sv.get("weight", 0)
-        p = sv.get("avg_probability", 0.5)
-        original_signals[sk] = {"probability": p, "weight": w}
-    if "elo" not in original_signals:
-        original_signals["elo"] = {"probability": elo_p, "weight": 0.1874}
+    baseline_elos = dict(elo_ratings)
+    baseline = build_simulation_result(
+        provider, baseline_elos, seed=42, n_iterations=n_iterations,
+    )
 
-    parsed = parse_scenario(scenario, ta, tb, {})
-    if parsed.confidence == 0.0:
-        return JSONResponse({"mode": mode, "error": "No meaningful scenario detected. Try describing a specific condition (e.g., 'injury', 'strong form', 'weak defense')."})
-    if mode == "instant":
-        result = handle_instant_scenario(scenario, ta, tb, original_signals, {}, elo_prob=elo_p)
-        return JSONResponse({"mode": "instant", **result})
+    adjusted_elos = dict(baseline_elos)
+    adjusted_elos[ta] = baseline_elos.get(ta, 1500.0) + elo_delta
+    adjusted_elos[tb] = max(100.0, baseline_elos.get(tb, 1500.0) - elo_delta)
+    adjusted = build_simulation_result(
+        provider, adjusted_elos, seed=42, n_iterations=n_iterations,
+    )
 
-    elif mode == "simulate":
-        task_id = str(uuid.uuid4())
-        with sim_lock:
-            active_simulations[task_id] = {
-                "status": "starting", "progress": 0, "iteration": 0,
-                "total_iterations": 0, "error": None, "result": None,
-            }
+    def _entry(name):
+        b = baseline.teams.get(name, {}).get("champion_prob", 0.0)
+        a = adjusted.teams.get(name, {}).get("champion_prob", 0.0)
+        return {"baseline": round(b, 4), "adjusted": round(a, 4),
+                "delta": round(a - b, 4)}
 
-        def _run_sim(task_id, scenario, match_id, ta, tb):
-            try:
-                with sim_lock:
-                    active_simulations[task_id]["status"] = "running"
-                fixtures_path = str(DATA_DIR / "fixtures.json")
-                provider = RepoFixtureProvider(fixtures_path=fixtures_path).load()
-                team_names = [t.name for t in provider.teams]
-                elo_ratings = fetch_team_elos(team_names)
-                if not elo_ratings:
-                    elo_ratings = {}
-                    coefficients = {t.name: t.coefficient for t in provider.teams}
-                    max_coeff = max(coefficients.values()) if coefficients else 100
-                    for t in team_names:
-                        c = coefficients.get(t, 50)
-                        elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
+    def _top5(result):
+        ranked = sorted(result.teams.items(),
+                        key=lambda kv: kv[1].get("champion_prob", 0), reverse=True)[:5]
+        return [{"team": t, "champion": round(v.get("champion_prob", 0), 4)} for t, v in ranked]
 
-                n_iterations = 10000
-                with sim_lock:
-                    active_simulations[task_id]["total_iterations"] = n_iterations
-
-                def _on_progress(current, total):
-                    with sim_lock:
-                        pct = round(current / total * 100, 1)
-                        active_simulations[task_id]["progress"] = pct
-                        active_simulations[task_id]["iteration"] = current
-
-                baseline_elos = dict(elo_ratings)
-                result = build_simulation_result(
-                    provider, baseline_elos, seed=42, n_iterations=n_iterations,
-                    progress_cb=_on_progress,
-                )
-
-                baseline_champ_probs = {
-                    t: td.get("champion_prob", 0)
-                    for t, td in result.teams.items()
-                }
-
-                adjustments = handle_instant_scenario(
-                    scenario, ta, tb, original_signals, {}, elo_prob=elo_p
-                ).get("adjusted_signals", {})
-
-                adj_factor = 1.0
-                for sk, sv in adjustments.items():
-                    if sv.get("was_adjusted"):
-                        orig = original_signals.get(sk, {}).get("probability", 0.5)
-                        if orig > 0:
-                            adj_factor *= sv["probability"] / orig
-
-                adjusted_elos = dict(baseline_elos)
-                if ta in adjusted_elos:
-                    adjusted_elos[ta] = adjusted_elos[ta] * (1.0 + 0.1 * (adj_factor - 1.0))
-                if tb in adjusted_elos:
-                    adjusted_elos[tb] = adjusted_elos[tb] * (1.0 - 0.1 * (adj_factor - 1.0))
-
-                adj_result = build_simulation_result(
-                    provider, adjusted_elos, seed=42, n_iterations=n_iterations,
-                    progress_cb=_on_progress,
-                )
-
-                insight_parts = [f"Scenario: {scenario}"]
-                for t in [ta, tb]:
-                    base = baseline_champ_probs.get(t, 0)
-                    adj = adj_result.teams.get(t, {}).get("champion_prob", 0)
-                    delta_str = f"+{adj-base:.1%}" if adj >= base else f"{adj-base:.1%}"
-                    insight_parts.append(f"{t}: {base:.1%} → {adj:.1%} ({delta_str})")
-
-                with sim_lock:
-                    active_simulations[task_id]["status"] = "complete"
-                    active_simulations[task_id]["progress"] = 100.0
-                    active_simulations[task_id]["iteration"] = n_iterations
-                    active_simulations[task_id]["result"] = {
-                        "baseline": {t: baseline_champ_probs.get(t, 0) for t in [ta, tb]},
-                        "adjusted": {t: adj_result.teams.get(t, {}).get("champion_prob", 0) for t in [ta, tb]},
-                    }
-                    active_simulations[task_id]["insight"] = "\n>> ".join(insight_parts)
-            except Exception as e:
-                with sim_lock:
-                    active_simulations[task_id]["status"] = "error"
-                    active_simulations[task_id]["error"] = str(e)
-
-        t = threading.Thread(target=_run_sim, args=(task_id, scenario, match_id, ta, tb), daemon=True)
-        t.start()
-        return JSONResponse({"mode": "simulate", "task_id": task_id, "status": "started"})
-
-    return JSONResponse({"error": f"unknown mode: {mode}"})
+    return JSONResponse({
+        "mode": "structured",
+        "match_id": match_id,
+        "elo_changes": {ta: adjusted_elos[ta], tb: adjusted_elos[tb]},
+        "iterations": n_iterations,
+        "teams": {ta: _entry(ta), tb: _entry(tb)},
+        "top5_baseline": _top5(baseline),
+        "top5_adjusted": _top5(adjusted),
+    })

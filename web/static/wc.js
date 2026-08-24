@@ -5,7 +5,7 @@ import {
 } from "./shared.js";
 
 const API = "/worldcup/api";
-const sigLabels = { elo: "Elo", form: "Form", lineup_strength: "Lineup", defensive_quality: "Defense", manager_effect: "Manager", market_odds: "Odds", catboost: "CatBoost" };
+const sigLabels = { elo: "Elo", market_odds: "Market Odds", rolling_form: "Rolling Form", squad_value: "Squad Value", rest_days: "Rest Days" };
 const appState = { data: null, overview: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} };
 let refreshing = false;
 let autoRefreshOn = false;
@@ -240,8 +240,8 @@ async function renderOverview() {
 }
 
 function renderSignalEval(signalEval) {
-  const sigOrder = ["elo", "all_signals", "form", "lineup_strength", "defensive_quality", "manager_effect", "market_odds", "catboost"];
-  const labels = { elo: "Elo", all_signals: "Blended", form: "Form", lineup_strength: "Lineup", defensive_quality: "Defense", manager_effect: "Manager", market_odds: "Odds", catboost: "CatBoost" };
+  const sigOrder = ["elo", "all_signals", "market_odds", "rolling_form", "squad_value", "rest_days"];
+  const labels = { elo: "Elo", all_signals: "Blended", market_odds: "Market Odds", rolling_form: "Rolling Form", squad_value: "Squad Value", rest_days: "Rest Days" };
   let html = '<table class="eval-table"><tr><th>Signal</th><th>Brier</th><th>Accuracy</th><th>Matches</th></tr>';
   sigOrder.forEach(sk => {
     const e = signalEval[sk];
@@ -647,7 +647,7 @@ async function openMatchModal(mid) {
 
   const ta = insight.teams.a, tb = insight.teams.b;
   const sigs = insight.signals || {};
-  const sigOrder = ["elo", "form", "lineup_strength", "defensive_quality", "manager_effect", "market_odds", "catboost"];
+  const sigOrder = ["elo", "market_odds", "rolling_form", "squad_value", "rest_days"];
   const ev = appState.eval || {};
   const outcome = insight.outcome_distribution || {};
   const ft = insight.form_trends || {};
@@ -681,15 +681,12 @@ async function openMatchModal(mid) {
   bottom.innerHTML = `
     <div class="sec-title warn">What-If Scenario</div>
     <div class="whatif-input-wrap">
-      <input type="text" id="whatifInput" placeholder="Describe a scenario... (e.g. Messi injured, defense weak)">
-      <button onclick="window.__sendWhatIf('${mid}')">&#9654;</button>
+      <input type="number" id="whatifDelta" value="50" step="10" style="width:90px">
+      <button onclick="window.__sendWhatIf('${mid}','${ta}','${tb}')">&#9654;</button>
     </div>
     <div class="whatif-controls">
-      <label>Mode:</label><select id="whatifMode"><option value="instant">Instant</option><option value="simulate">Simulate</option></select>
-      <label>Iterations:</label><select id="whatifIters"><option value="10000">10K</option><option value="50000" selected>50K</option><option value="100000">100K</option><option value="500000">500K</option></select>
+      <label>Elo boost for ${ta} (opponent lowered equally):</label>
     </div>
-    <div class="progress-bar-wrap" id="whatifProgress"><div class="progress-bar-fill" id="whatifProgressFill" style="width:0%"></div></div>
-    <div class="progress-lbl" id="whatifProgressLbl"></div>
     <div class="whatif-result" id="whatifResult"></div>
   `;
 
@@ -738,123 +735,32 @@ async function openMatchModal(mid) {
 }
 
 // ── What-If handler (exposed on window for onclick) ──
-window.__sendWhatIf = async function (mid) {
-  const input = document.getElementById("whatifInput");
-  const scenario = input.value.trim();
-  if (!scenario) return;
-  const mode = document.getElementById("whatifMode").value;
-  const iters = parseInt(document.getElementById("whatifIters").value) || 50000;
+window.__sendWhatIf = async function (mid, ta, tb) {
+  const deltaInput = document.getElementById("whatifDelta");
+  const eloDelta = parseInt(deltaInput.value) || 50;
   const resultDiv = document.getElementById("whatifResult");
-  const progressWrap = document.getElementById("whatifProgress");
-  const progressFill = document.getElementById("whatifProgressFill");
-  const progressLbl = document.getElementById("whatifProgressLbl");
-
-  resultDiv.style.display = "none";
-  resultDiv.innerHTML = "";
-
-  if (mode === "instant") {
-    try {
-      const resp = await (await fetch(API + "/what-if", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ match_id: mid, scenario, mode: "instant" })
-      })).json();
-
-      resultDiv.style.display = "block";
-      const insightText = resp.insight || "No analysis generated.";
-      let html = '<div class="wir-insight">>> ' + insightText.replace(/ >> /g, "<br>>></div><div class=\"wir-insight\">>> ") + "</div>";
-
-      if (resp.adjusted_signals) {
-        let sigDetail = "";
-        Object.entries(resp.adjusted_signals).forEach(([sk, sv]) => {
-          if (sv.was_adjusted) {
-            const deltaStr = (sv.delta * 100).toFixed(1);
-            const cls = sv.delta >= 0 ? "wir-diff-pos" : "wir-diff-neg";
-            sigDetail += '<div class="wir-sig-row"><span>' + (sigLabels[sk] || sk) + '</span><span class="wir-bar-wrap"><span class="wir-bar" style="width:' + (sv.probability * 100) + '%"></span></span><span class="wir-val">' + (sv.probability * 100).toFixed(1) + '%</span><span class="' + cls + '">' + (sv.delta >= 0 ? "+" : "") + deltaStr + '%</span></div>';
-          }
-        });
-        if (sigDetail) {
-          html += '<div class="wir-toggle" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">[+] Signal detail</div>';
-          html += '<div class="wir-sigs" style="display:none">' + sigDetail + "</div>";
-        }
-      }
-      if (resp.parsed && resp.parsed.explanation) {
-        const conf = resp.parsed.confidence || 0;
-        const confColor = conf >= 0.6 ? "#168777" : conf >= 0.3 ? "#15565B" : "#ff6b6b";
-        html += '<div class="wir-meta"><span style="color:' + confColor + '">Detection confidence: ' + (conf * 100).toFixed(0) + "%</span> &middot; " + resp.parsed.explanation + "</div>";
-      }
-      resultDiv.innerHTML = html;
-    } catch (e) {
-      resultDiv.style.display = "block";
-      resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + "</div>";
-    }
-  } else {
-    progressWrap.style.display = "block";
-    progressFill.style.width = "0%";
-    progressLbl.textContent = "Starting simulation...";
-    try {
-      const resp = await (await fetch(API + "/what-if", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ match_id: mid, scenario, mode: "simulate", iterations: iters })
-      })).json();
-      if (resp.error) {
-        progressWrap.style.display = "none";
-        resultDiv.style.display = "block";
-        resultDiv.innerHTML = '<div style="color:#ff6b6b">' + resp.error + "</div>";
-        return;
-      }
-      const taskId = resp.task_id;
-      let t0 = Date.now();
-      let prevPct = 0;
-      const pollInterval = setInterval(async () => {
-        try {
-          const prog = await (await fetch(API + "/simulation/progress/" + taskId)).json();
-          if (prog.status === "running" || prog.status === "complete") {
-            progressFill.style.width = prog.progress + "%";
-            const comp = prog.iteration.toLocaleString();
-            const total = prog.total_iterations.toLocaleString();
-            const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
-            let eta = "";
-            if (prog.progress > 2 && prog.progress < 98) {
-              const rate = (prog.progress - prevPct) / 0.2;
-              if (rate > 0) {
-                const remain = ((100 - prog.progress) / rate).toFixed(0);
-                eta = "  ETA " + remain + "s";
-              }
-            }
-            prevPct = prog.progress;
-            progressLbl.textContent = comp + " / " + total + "  (" + prog.progress.toFixed(1) + "%)  " + elapsed + "s" + eta;
-          }
-          if (prog.status === "complete") {
-            clearInterval(pollInterval);
-            progressFill.style.width = "100%";
-            progressLbl.textContent = "Complete!";
-            setTimeout(() => { progressWrap.style.display = "none"; }, 2000);
-            resultDiv.style.display = "block";
-            const simInsight = prog.insight || "Simulation complete.";
-            let html = '<div class="wir-insight">>> ' + simInsight.replace(/ >> /g, "<br>>></div><div class=\"wir-insight\">>> ") + "</div>";
-            const simResult = prog.result || {};
-            const teamsList = Object.entries(simResult).sort((a, b) => b[1].champion - a[1].champion).slice(0, 5);
-            html += '<div class="wir-head">Top 5 Champion Probabilities</div><div class="wir-grid">';
-            teamsList.forEach(([team, probs]) => {
-              const pct = (probs.champion * 100).toFixed(1);
-              html += '<div class="wir-grid-item"><span class="wir-grid-team">' + team + '</span><span class="wir-grid-val">' + pct + '%</span></div>';
-            });
-            html += "</div>";
-            resultDiv.innerHTML = html;
-          }
-          if (prog.status === "error") {
-            clearInterval(pollInterval);
-            progressLbl.textContent = "Error";
-            resultDiv.style.display = "block";
-            resultDiv.innerHTML = '<div style="color:#ff6b6b">Simulation error: ' + (prog.error || "unknown") + "</div>";
-          }
-        } catch (e) { clearInterval(pollInterval); }
-      }, 200);
-    } catch (e) {
-      progressWrap.style.display = "none";
-      resultDiv.style.display = "block";
-      resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + "</div>";
-    }
+  resultDiv.style.display = "block";
+  resultDiv.innerHTML = '<div style="color:#15565B;font-size:11px">Running seeded counterfactual...</div>';
+  try {
+    const resp = await (await fetch(API + "/what-if", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ match_id: mid, elo_delta: eloDelta })
+    })).json();
+    if (resp.error) { resultDiv.innerHTML = '<div style="color:#ff6b6b">' + resp.error + "</div>"; return; }
+    const row = (name, e) => {
+      const t = resp.teams[name] || {};
+      const d = t.delta || 0;
+      const cls = d >= 0 ? "wir-diff-pos" : "wir-diff-neg";
+      return '<tr><td>' + name + ' (Elo ' + e + ')</td><td class="num">' + ((t.baseline||0)*100).toFixed(1) + '%</td><td class="num">' + ((t.adjusted||0)*100).toFixed(1) + '%</td><td class="num ' + cls + '">' + (d>=0?"+":"") + (d*100).toFixed(1) + '%</td></tr>';
+    };
+    let html = '<div class="wir-head">Champion probability: baseline vs adjusted</div><table class="odds-table" style="width:100%"><tr><th>Team</th><th>Baseline</th><th>Adjusted</th><th>Delta</th></tr>';
+    html += row(ta, (resp.elo_changes||{})[ta] || "?");
+    html += row(tb, (resp.elo_changes||{})[tb] || "?");
+    html += "</table>";
+    html += '<div class="wir-meta">Seeded Monte Carlo (seed 42), ' + (resp.iterations||0).toLocaleString() + ' iterations.</div>';
+    resultDiv.innerHTML = html;
+  } catch (e) {
+    resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + "</div>";
   }
 };
 

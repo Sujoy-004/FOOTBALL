@@ -16,62 +16,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from competitions.ucl.src.orchestrator import build_simulation_result, build_signal_engine, load_calibration
+from competitions.ucl.src.orchestrator import build_simulation_result, build_signal_engine
 from football_core.signal import PredictionContext
 
 logger = logging.getLogger(__name__)
 
 
 # ── 1 ─────────────────────────────────────────────────────────────────────
-
-
-def fetch_ucl_managers(
-    bsd_api_key: str,
-    league_id: int = 7,
-    team_aliases: dict[str, str] | None = None,
-) -> dict[str, dict]:
-    """Fetch UCL manager data via BSD data provider.
-
-    Returns an empty dict when BSD is unavailable — the caller skips
-    manager-dependent features.
-    """
-    if not bsd_api_key:
-        return {}
-    from football_core.data_providers.bsd_provider import BSDDataProvider
-
-    provider = BSDDataProvider(bsd_api_key, league_id=league_id)
-    raw = provider.fetch_managers(league_id=league_id)
-    if not raw:
-        return {}
-    if team_aliases is None:
-        team_aliases = {}
-    mapped: dict[str, dict] = {}
-    for m in raw:
-        ct = m.get("current_team")
-        bsd_name = ct.get("name") if isinstance(ct, dict) else (ct if isinstance(ct, str) else "")
-        our_name = team_aliases.get(bsd_name)
-        if not our_name:
-            continue
-        mapped[our_name] = {
-            "name": m.get("name", ""),
-            "team": our_name,
-            "win_pct": m.get("win_pct") or 0.0,
-            "avg_goals_scored": m.get("avg_goals_scored") or 0.0,
-            "avg_goals_conceded": m.get("avg_goals_conceded") or 0.0,
-            "avg_xg_for": m.get("avg_xg_for") or 0.0,
-            "avg_xg_against": m.get("avg_xg_against") or 0.0,
-            "clean_sheet_pct": m.get("clean_sheet_pct") or 0.0,
-            "btts_pct": m.get("btts_pct") or 0.0,
-            "over_25_pct": m.get("over_25_pct") or 0.0,
-            "avg_possession": m.get("avg_possession") or 0.0,
-            "preferred_formation": m.get("preferred_formation", ""),
-            "formations_used": m.get("formations_used", []),
-            "team_style": m.get("team_style", "balanced"),
-            "pressing_intensity": m.get("pressing_intensity", ""),
-            "defensive_line": m.get("defensive_line", ""),
-            "profile": m.get("profile", ""),
-        }
-    return mapped
 
 
 # ── 2 ─────────────────────────────────────────────────────────────────────
@@ -212,13 +163,12 @@ def compute_signal_eval(
     results: list[dict],
     engine,
     elo_ratings: dict[str, float],
-    bsd_manager_data: dict,
 ) -> dict:
     """Evaluate signal accuracy against real results."""
     signal_matches = []
     for m in results:
         signal_matches.append({"team_a": m["team_a"], "team_b": m["team_b"], "match_id": m["match_id"]})
-    ctx = PredictionContext(fixtures=signal_matches, elo_ratings=elo_ratings, played_results=results, manager_data=bsd_manager_data)
+    ctx = PredictionContext(fixtures=signal_matches, elo_ratings=elo_ratings, played_results=results)
     sig_data: dict[str, dict] = {}
     try:
         blended = [engine.evaluate(m, ctx) for m in signal_matches]
@@ -640,17 +590,6 @@ def run_mc_simulation(
     if progress_cb:
         progress_cb(10, 0)
 
-    # Fetch & blend manager data
-    bsd_manager_data = fetch_ucl_managers(bsd_api_key, team_aliases=team_aliases or {})
-    if bsd_manager_data and elo_ratings:
-        for t in team_names:
-            base = elo_ratings.get(t, 1400.0)
-            mgr = bsd_manager_data.get(t)
-            if mgr:
-                win_pct = mgr.get("win_pct", 0.0) / 100.0
-                if win_pct > 0:
-                    mgr_elo = 1400.0 + (win_pct - 0.5) * 400.0
-                    elo_ratings[t] = round(base * 0.7 + mgr_elo * 0.3, 1)
 
     resolved_seed = seed if seed is not None else 42
     if progress_cb:
@@ -735,7 +674,6 @@ def run_mc_simulation(
                 signal_matches.append({"team_a": m.team_a, "team_b": m.team_b, "match_id": m.match_id})
         signal_context = PredictionContext(
             fixtures=signal_matches, elo_ratings=elo_ratings,
-            played_results=[], manager_data=bsd_manager_data,
         )
         blended = [engine.evaluate(m, signal_context) for m in signal_matches]
         sig_data = {}
@@ -765,9 +703,6 @@ def run_mc_simulation(
 
     if progress_cb:
         progress_cb(95, n_iterations)
-
-    calib = load_calibration()
-    if progress_cb:
         progress_cb(100, n_iterations)
 
     return {
@@ -778,7 +713,7 @@ def run_mc_simulation(
         "champion": result.bracket_champion, "standings": standings_display,
         "playoff": playoff_display, "bracket_rounds": enriched_bracket,
         "odds": odds_display, "signals": signal_stats, "elo_ratings": elo_ratings,
-        "calibration": calib, "show_ci": show_ci,
+        "show_ci": show_ci,
     }
 
 
@@ -805,9 +740,6 @@ def run_calibration_task(
     config = run_calibration(replay_data_path=replay_path)
     if progress_cb:
         progress_cb(90, "Saving calibration weights...")
-
-    calib = load_calibration()
-    if progress_cb:
         progress_cb(100, "Complete")
 
     return {
@@ -815,5 +747,4 @@ def run_calibration_task(
         "n_matches": config.get("n_matches", 0),
         "weights": config.get("weights", {}),
         "per_signal": config.get("per_signal", {}),
-        "calibration": calib,
     }

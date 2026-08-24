@@ -1,663 +1,50 @@
-"""Calibration, blending, and evaluation primitives — competition-agnostic.
+"""Canonical prediction ensemble — competition-agnostic.
 
-Pure-computation functions for Platt scaling, Brier-weighted blending,
-rolling Brier computation, and Poisson base rate computation.
+One blending mechanism only:
+
+    Signal predictions
+        -> inverse-log-loss weight fitting (compute_log_loss_weights)
+        -> normalized signal weights
+        -> EnsembleEngine weighted blend
+        -> match probabilities
+
+plus post-hoc explainability via compute_signal_contributions.
 
 Uses ONLY Python stdlib (math module). No numpy, no sklearn.
 """
 
 import json
-import math
 
-from football_core.elo import expected_score
 from football_core.signal import BlendedPrediction, PredictionContext, Signal, SignalRegistry, SignalOutput
 
-EPS = 1e-15
-RIDGE = 1e-6
-MAX_ITER = 50
-CONV_TOL = 1e-6
+_WEIGHT_FLOOR = 0.05
 
 
-def _brent_minimize(
-    f,
-    a: float,
-    b: float,
-    tol: float = 1e-6,
-    max_iter: int = 50,
-) -> float:
-    """Brent's method for 1D minimization (parabolic interpolation + golden section).
+def compute_log_loss_weights(log_losses: dict[str, float]) -> dict[str, float]:
+    """Compute inverse-log-loss normalized weights for ensemble blending.
 
-    Finds minimum of f(x) in [a, b] (unimodal) using Brent's method with
-    golden-section fallback. Pure Python stdlib — no numpy/scipy dependency.
+    w_i = (1 / max(ll_i, floor)) / sum_j (1 / max(ll_j, floor))
+
+    Deterministic for identical input. Weights are non-negative and sum
+    to ~1.0 (rounding to 6 dp). The floor prevents a near-zero log-loss
+    on a tiny sample from dominating the ensemble.
 
     Args:
-        f: Objective function to minimize (must be unimodal in [a, b]).
-        a: Left bracket.
-        b: Right bracket.
-        tol: Convergence tolerance on x.
-        max_iter: Maximum iterations.
+        log_losses: {signal_name: multiclass log-loss value} from fitting
+            on labeled historical outcomes.
 
     Returns:
-        Approximate minimizer x*.
-
-    Reference:
-        Brent, R. P. (1973). Algorithms for Minimization without Derivatives.
-        Implementation based on the algorithm in Numerical Recipes §10.2.
+        {signal_name: normalized_weight}
     """
-    # Golden ratio conjugate
-    φ = (3 - math.sqrt(5)) / 2  # ≈ 0.381966
-
-    # Ensure correct ordering
-    if a > b:
-        a, b = b, a
-
-    # Initial interior point
-    x = w = v = a + φ * (b - a)
-    fx = fw = fv = f(x)
-
-    # Previous step distance (e) and current step (d)
-    d = 0.0
-    e = 0.0
-
-    for _ in range(max_iter):
-        # Midpoint and convergence tolerance
-        xm = (a + b) * 0.5
-        tol1 = tol * abs(x) + 1e-10
-        tol2 = 2.0 * tol1
-
-        # --- Convergence check ---
-        if abs(x - xm) <= tol2 - 0.5 * (b - a):
-            break
-
-        # --- Attempt parabolic interpolation ---
-        # Only try if we have distinct points for a meaningful parabola
-        p, q = 0.0, 0.0
-        parabolic_ok = False
-
-        if abs(e) > tol1:
-            # Three distinct points for interpolation
-            # Parabolic minimizer: step = -0.5 * ( (x-w)^2*(fx-fv) - (x-v)^2*(fx-fw) )
-            #                           / ( (x-w)*(fx-fv) - (x-v)*(fx-fw) )
-            r = (x - w) * (fx - fv)
-            s = (x - v) * (fx - fw)
-            denom = 2.0 * (r - s)
-
-            if abs(denom) > 1e-15:
-                # Numerator = (x-w)^2 * (fx-fv) - (x-v)^2 * (fx-fw)
-                num = (x - w) * (x - w) * (fx - fv) - (x - v) * (x - v) * (fx - fw)
-                p = num / denom  # This gives the step directly
-                q = 1.0
-
-                # Accept parabolic step only if it falls within [a,b]
-                # and is not too large (less than half the previous step)
-                step = p  # step from x to parabolic minimum
-                if (abs(step) < abs(0.5 * e)
-                        and a + tol1 <= x + step <= b - tol1):
-                    parabolic_ok = True
-
-        # --- If parabolic step is invalid, do golden-section ---
-        if not parabolic_ok:
-            # Golden section: step toward the larger gap
-            if x >= xm:
-                e = a - x
-            else:
-                e = b - x
-            d = φ * e
-        else:
-            d = p  # Parabolic step
-            e = d
-
-        # Step magnitude must be at least tol1 (to avoid stagnation)
-        if abs(d) < tol1:
-            # Use sign of (xm - x) to step toward midpoint
-            d = tol1 if xm >= x else -tol1
-
-        # Take the step
-        u = x + d
-        fu = f(u)
-
-        # --- Update bracket and best point ---
-        if fu <= fx:
-            # New point is better — move bracket to contain it
-            if u >= x:
-                a = x
-            else:
-                b = x
-            # Shift points
-            v, w, x = w, x, u
-            fv, fw, fx = fw, fx, fu
-        else:
-            # x remains best — narrow bracket
-            if u >= x:
-                b = u
-            else:
-                a = u
-            # Update v, w (keep x as best)
-            if fu <= fw or abs(w - x) < tol1:
-                v, w = w, u
-                fv, fw = fw, fu
-            elif fu <= fv or abs(v - x) < tol1 or abs(v - w) < tol1:
-                v = u
-                fv = fu
-
-    return x
-
-
-def temperature_scale(prediction: 'BlendedPrediction', T: float) -> 'BlendedPrediction':
-    """Apply simplex temperature scaling to a BlendedPrediction.
-
-    Uses the corrected multiclass formulation for probability-only ensembles:
-        q_i = p_i^α / Σⱼ p_j^α    where α = 1/T
-
-    This is NOT logit-per-class temperature scaling (which requires pre-softmax
-    logits). Simplex scaling works directly on probability vectors via elementwise
-    exponentiation and L¹ renormalization.
-
-    Args:
-        prediction: BlendedPrediction with home/draw/away probs.
-        T: Temperature parameter. T=1.0 is identity (no change).
-           T > 1.0 flattens (reduces overconfidence).
-           T < 1.0 sharpens (increases confidence).
-           T=0.0 → uniform distribution (limit as T→∞ for α→0).
-
-    Returns:
-        New BlendedPrediction with calibrated probabilities.
-        signal_breakdown and weights_applied preserved unchanged.
-
-    Raises:
-        ValueError: If T <= 0.
-    """
-    if T <= 0:
-        raise ValueError(f"Temperature must be positive, got T={T}")
-
-    α = 1.0 / T
-
-    # Handle T→∞ case (α→0): all probabilities equal
-    if T == float('inf'):
-        return BlendedPrediction(
-            home_prob=1.0 / 3,
-            draw_prob=1.0 / 3,
-            away_prob=1.0 / 3,
-            signal_breakdown=prediction.signal_breakdown,
-            weights_applied=prediction.weights_applied,
-        )
-
-    # Clamp probabilities to [EPS, 1-EPS] before exponentiation
-    # to avoid numerical issues with zero/one inputs
-    p_h = max(EPS, min(1 - EPS, prediction.home_prob))
-    p_d = max(EPS, min(1 - EPS, prediction.draw_prob))
-    p_a = max(EPS, min(1 - EPS, prediction.away_prob))
-
-    # Elementwise exponentiation: p_i^α
-    # Use math.pow (or fallback to math.exp(α * log(p)))
-    def _pow_safe(base: float, exp: float) -> float:
-        """Safe exponentiation with underflow protection."""
-        if base <= 0:
-            return 0.0
-        try:
-            result = math.exp(exp * math.log(base))
-            # Clamp near-zero results to EPS
-            if result < EPS:
-                return 0.0
-            return result
-        except (OverflowError, ValueError):
-            if exp > 0:
-                return 0.0  # Underflow: very small base^positive → 0
-            return float('inf')  # Overflow: small base^negative → inf
-
-    q_h = _pow_safe(p_h, α)
-    q_d = _pow_safe(p_d, α)
-    q_a = _pow_safe(p_a, α)
-
-    # Renormalize by dividing by sum
-    total = q_h + q_d + q_a
-    if total <= 0:
-        # All underflowed — return uniform
-        return BlendedPrediction(
-            home_prob=1.0 / 3,
-            draw_prob=1.0 / 3,
-            away_prob=1.0 / 3,
-            signal_breakdown=prediction.signal_breakdown,
-            weights_applied=prediction.weights_applied,
-        )
-
-    q_h /= total
-    q_d /= total
-    q_a /= total
-
-    # Round for numerical consistency
-    q_h = round(q_h, 10)
-    q_d = round(q_d, 10)
-    q_a = round(q_a, 10)
-
-    return BlendedPrediction(
-        home_prob=q_h,
-        draw_prob=q_d,
-        away_prob=q_a,
-        signal_breakdown=prediction.signal_breakdown,
-        weights_applied=prediction.weights_applied,
-    )
-
-
-def multiclass_log_loss(predictions: list['BlendedPrediction'], outcomes: list) -> float:
-    """Compute multiclass log-loss for blended predictions vs actual match outcomes.
-
-    Args:
-        predictions: List of BlendedPrediction with home/draw/away probabilities.
-        outcomes: List of MatchOutcome objects with home_goals/away_goals.
-
-    Returns:
-        Average log-loss across all predictions. Lower is better.
-    """
-    if len(predictions) != len(outcomes):
-        raise ValueError(
-            f"predictions ({len(predictions)}) and outcomes ({len(outcomes)}) "
-            f"must have the same length"
-        )
-    if len(predictions) == 0:
-        return 0.0
-
-    total_loss = 0.0
-    for pred, outcome in zip(predictions, outcomes):
-        # Get probability assigned to actual outcome index
-        outcome_idx = outcome.outcome_index
-        probs = [pred.home_prob, pred.draw_prob, pred.away_prob]
-        p = max(EPS, min(1 - EPS, probs[outcome_idx]))
-        total_loss += -math.log(p)
-
-    return total_loss / len(predictions)
-
-
-class CalibrationPipeline:
-    """Temperature scaling calibration for match-level blended probabilities.
-
-    Learns a single parameter α (exponent for simplex scaling: q_i = p_i^α / Σ p_j^α)
-    by minimizing multiclass log-loss on held-out calibration data.
-
-    Lifecycle: fit() -> transform() / predict() -> save() / load()
-
-    Reference: CONTEXT.md D-01, D-03
-    """
-
-    def __init__(self, min_alpha: float = 0.1, max_alpha: float = 10.0):
-        """Initialize calibration pipeline with alpha bounds.
-
-        Args:
-            min_alpha: Minimum α = 1/T (default 0.1, corresponding to T=10).
-            max_alpha: Maximum α = 1/T (default 10.0, corresponding to T=0.1).
-        """
-        if min_alpha <= 0:
-            raise ValueError(f"min_alpha must be positive, got {min_alpha}")
-        if max_alpha < min_alpha:
-            raise ValueError(
-                f"max_alpha ({max_alpha}) must be >= min_alpha ({min_alpha})"
-            )
-
-        self.min_alpha = min_alpha
-        self.max_alpha = max_alpha
-        self.alpha_: float | None = None  # Fitted exponent
-        self.T_: float | None = None      # Fitted temperature = 1/α
-        self.log_loss_: float | None = None  # Log-loss after calibration
-        self.log_loss_before_: float | None = None  # Log-loss before calibration
-        self.n_samples_: int = 0
-
-    def fit(
-        self,
-        predictions: list['BlendedPrediction'],
-        outcomes: list,
-    ) -> float:
-        """Fit temperature scaling by minimizing log-loss via Brent's method.
-
-        Optimizes α (exponent parameter) directly, since simplex scaling
-        is parameterized by α = 1/T.
-
-        Args:
-            predictions: List of BlendedPrediction with uncalibrated probs.
-            outcomes: List of MatchOutcome with actual results.
-
-        Returns:
-            Optimized α value.
-        """
-        if len(predictions) != len(outcomes):
-            raise ValueError(
-                f"predictions ({len(predictions)}) and outcomes ({len(outcomes)}) "
-                f"must have same length"
-            )
-        if len(predictions) == 0:
-            raise ValueError("Cannot fit calibration on empty data")
-
-        self.n_samples_ = len(predictions)
-
-        # Compute log-loss before calibration (T=1, α=1)
-        self.log_loss_before_ = multiclass_log_loss(predictions, outcomes)
-
-        # Define objective: log-loss as a function of α
-        def objective(alpha: float) -> float:
-            # Apply temperature scaling with given α = 1/T
-            if alpha <= 0:
-                return 1e10  # Penalize non-positive α
-            T = 1.0 / alpha
-            scaled = [temperature_scale(p, T) for p in predictions]
-            return multiclass_log_loss(scaled, outcomes)
-
-        # Optimize α via Brent's method
-        self.alpha_ = _brent_minimize(
-            objective,
-            self.min_alpha,
-            self.max_alpha,
-            tol=1e-6,
-            max_iter=50,
-        )
-
-        # Compute T and final log-loss
-        self.T_ = 1.0 / self.alpha_
-        scaled_final = [temperature_scale(p, self.T_) for p in predictions]
-        self.log_loss_ = multiclass_log_loss(scaled_final, outcomes)
-
-        return self.alpha_
-
-    def transform(
-        self,
-        predictions: list['BlendedPrediction'],
-    ) -> list['BlendedPrediction']:
-        """Apply fitted temperature scaling to a list of predictions.
-
-        Args:
-            predictions: List of BlendedPrediction to calibrate.
-
-        Returns:
-            List of calibrated BlendedPrediction.
-
-        Raises:
-            RuntimeError: If fit() has not been called.
-        """
-        if self.T_ is None:
-            raise RuntimeError(
-                "CalibrationPipeline must be fit() before transform()"
-            )
-        return [temperature_scale(p, self.T_) for p in predictions]
-
-    def predict(
-        self,
-        prediction: 'BlendedPrediction',
-    ) -> 'BlendedPrediction':
-        """Apply fitted temperature scaling to a single prediction.
-
-        Convenience method wrapping transform() for single predictions.
-
-        Args:
-            prediction: Single BlendedPrediction to calibrate.
-
-        Returns:
-            Calibrated BlendedPrediction.
-
-        Raises:
-            RuntimeError: If fit() has not been called.
-        """
-        if self.T_ is None:
-            raise RuntimeError(
-                "CalibrationPipeline must be fit() before predict()"
-            )
-        return temperature_scale(prediction, self.T_)
-
-    def save(self, path: str) -> None:
-        """Serialize fitted calibration parameters to JSON.
-
-        Args:
-            path: File path to write calibration JSON.
-
-        Raises:
-            RuntimeError: If fit() has not been called.
-        """
-        if self.alpha_ is None:
-            raise RuntimeError(
-                "CalibrationPipeline must be fit() before save()"
-            )
-
-        data = {
-            "alpha": round(self.alpha_, 6),
-            "T": round(self.T_, 6),
-            "log_loss": round(self.log_loss_, 6) if self.log_loss_ is not None else None,
-            "log_loss_before": round(self.log_loss_before_, 6) if self.log_loss_before_ is not None else None,
-            "n_samples": self.n_samples_,
-        }
-
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2)
-
-    def load(self, path: str) -> None:
-        """Load calibration parameters from JSON file.
-
-        Supports both 'alpha' key (new format) and 'T' key (legacy format).
-
-        Args:
-            path: File path to calibration JSON.
-
-        Raises:
-            FileNotFoundError: If path does not exist.
-            ValueError: If JSON is invalid or missing required keys.
-        """
-        with open(path) as f:
-            data = json.load(f)
-
-        if "alpha" in data:
-            self.alpha_ = float(data["alpha"])
-            self.T_ = 1.0 / self.alpha_
-        elif "T" in data:
-            self.T_ = float(data["T"])
-            self.alpha_ = 1.0 / self.T_
-        else:
-            raise ValueError(
-                f"Calibration file must contain 'alpha' or 'T' key, "
-                f"got keys: {list(data.keys())}"
-            )
-
-        self.log_loss_ = data.get("log_loss")
-        self.log_loss_before_ = data.get("log_loss_before")
-        self.n_samples_ = data.get("n_samples", 0)
-
-    def __repr__(self) -> str:
-        if self.alpha_ is not None:
-            return (
-                f"CalibrationPipeline(α={self.alpha_:.4f}, T={self.T_:.4f}, "
-                f"log_loss={self.log_loss_:.4f}, n={self.n_samples_})"
-            )
-        return "CalibrationPipeline(unfitted)"
-
-
-def _sigmoid(x: float) -> float:
-    """Numerically stable sigmoid."""
-    if x < -100:
-        return EPS
-    if x > 100:
-        return 1 - EPS
-    return 1 / (1 + math.exp(-x))
-
-
-def _log_odds(p: float) -> float:
-    """Clamp p to [EPS, 1-EPS], return log(p/(1-p))."""
-    p = max(EPS, min(1 - EPS, p))
-    return math.log(p / (1 - p))
-
-
-def _platt_targets(actuals: list[float]) -> list[float]:
-    n_pos = sum(1 for a in actuals if a == 1.0)
-    n_neg = sum(1 for a in actuals if a == 0.0)
-
-    t_pos = (n_pos + 1) / (n_pos + 2) if n_pos > 0 else 0.5
-    t_neg = 1 / (n_neg + 2) if n_neg > 0 else 0.5
-
-    targets = []
-    for a in actuals:
-        if a == 1.0:
-            targets.append(t_pos)
-        elif a == 0.0:
-            targets.append(t_neg)
-        else:
-            targets.append(0.5)
-
-    return targets
-
-
-def calibrate_signal(predictions: list[float], actuals: list[float], threshold: int = 30) -> tuple[float, float]:
-    if not predictions or not actuals or len(predictions) != len(actuals):
-        return (1.0, 0.0)
-
-    if len(predictions) < threshold:
-        return (1.0, 0.0)
-
-    try:
-        x = [_log_odds(p) for p in predictions]
-    except (ValueError, OverflowError):
-        return (1.0, 0.0)
-
-    t = _platt_targets(actuals)
-
-    A = 0.0
-    B = 0.0
-
-    for _ in range(MAX_ITER):
-        f = [A * xi + B for xi in x]
-        p = [_sigmoid(fi) for fi in f]
-
-        dA = sum(xi * (pi - ti) for xi, pi, ti in zip(x, p, t))
-        dB = sum(pi - ti for pi, ti in zip(p, t))
-
-        H_AA = sum(xi * xi * pi * (1 - pi) for xi, pi in zip(x, p)) + RIDGE
-        H_AB = sum(xi * pi * (1 - pi) for xi, pi in zip(x, p))
-        H_BB = sum(pi * (1 - pi) for pi in p) + RIDGE
-
-        det = H_AA * H_BB - H_AB * H_AB
-        if abs(det) < 1e-12:
-            break
-
-        dA_step = (H_BB * dA - H_AB * dB) / det
-        dB_step = (H_AA * dB - H_AB * dA) / det
-
-        A -= dA_step
-        B -= dB_step
-
-        if abs(dA_step) < CONV_TOL and abs(dB_step) < CONV_TOL:
-            break
-
-    return (A, B)
-
-
-def apply_calibration(p_raw: float, A: float, B: float) -> float:
-    if A == 1.0 and B == 0.0:
-        p_clamped = max(EPS, min(1 - EPS, p_raw))
-        if p_clamped <= EPS:
-            return EPS
-        if p_clamped >= 1 - EPS:
-            return 1 - EPS
-        return round(p_clamped, 6)
-
-    p_clamped = max(EPS, min(1 - EPS, p_raw))
-
-    try:
-        log_odds_val = _log_odds(p_clamped)
-    except (ValueError, OverflowError):
-        p_fallback = max(EPS, min(1 - EPS, p_raw))
-        if p_fallback <= EPS:
-            return EPS
-        if p_fallback >= 1 - EPS:
-            return 1 - EPS
-        return round(p_fallback, 6)
-
-    x = A * log_odds_val + B
-    result = _sigmoid(x)
-
-    if result <= EPS:
-        return EPS
-    if result >= 1 - EPS:
-        return 1 - EPS
-    return round(result, 6)
-
-
-def compute_rolling_brier(entries: list[dict], signal_key: str, window: int = 50) -> float:
-    pairs = []
-
-    for entry in entries:
-        if not entry.get('available', True):
-            continue
-
-        signals = entry.get('signals', {})
-        if signal_key not in signals:
-            continue
-
-        signal_data = signals[signal_key]
-        probability = signal_data.get('probability')
-        actual = entry.get('actual')
-
-        if probability is None or actual is None:
-            continue
-
-        pairs.append((probability, actual))
-
-    if len(pairs) > window:
-        pairs = pairs[-window:]
-
-    if not pairs:
-        return 1.0
-
-    brier_sum = sum((p - a) ** 2 for p, a in pairs)
-    return brier_sum / len(pairs)
-
-
-def compute_blend_weights(signal_briers: dict[str, float]) -> dict[str, float]:
-    if not signal_briers:
+    if not log_losses:
         return {}
 
     raw_weights = {}
-    for signal, brier in signal_briers.items():
-        raw_weights[signal] = 1.0 / max(brier, 0.05)
+    for signal, ll in log_losses.items():
+        raw_weights[signal] = 1.0 / max(ll, _WEIGHT_FLOOR)
 
     total = sum(raw_weights.values())
-    normalized_weights = {}
-    for signal, raw_weight in raw_weights.items():
-        normalized_weights[signal] = round(raw_weight / total, 6)
-
-    return normalized_weights
-
-
-def blend_predictions(signal_preds: dict[str, float], weights: dict[str, float]) -> float:
-    available_signals = set(signal_preds.keys()) & set(weights.keys())
-
-    if not available_signals:
-        return 0.5
-
-    available_weights = {s: weights[s] for s in available_signals}
-    total_weight = sum(available_weights.values())
-
-    weighted_sum = sum(available_weights[s] * signal_preds[s] for s in available_signals)
-    blended = weighted_sum / total_weight
-
-    return round(blended, 6)
-
-
-def compute_poisson_base_rate(match_data_path: str | None = None, fallback: float = 1.25) -> float:
-    if match_data_path is None:
-        return fallback
-
-    try:
-        with open(match_data_path, 'r') as f:
-            data = json.load(f)
-
-        total_goals = 0
-        total_matches = 0
-
-        for match in data:
-            if 'goals' in match:
-                total_goals += match['goals']
-                total_matches += 1
-
-        if total_matches == 0:
-            return fallback
-
-        rate = total_goals / total_matches / 2
-        return round(rate, 4)
-    except (FileNotFoundError, json.JSONDecodeError, KeyError):
-        return fallback
+    return {s: round(w / total, 6) for s, w in raw_weights.items()}
 
 
 class EnsembleEngine:
@@ -665,6 +52,11 @@ class EnsembleEngine:
 
     Wraps SignalRegistry for signal evaluation, applies weighted averaging
     per outcome (home/draw/away independently), re-normalizes to 1.0.
+
+    Weight resolution precedence:
+        1. explicit ``weights`` dict
+        2. ``weights_path`` JSON file ({"weights": {...}})
+        3. uniform fallback over registered signals
     """
 
     def __init__(
@@ -730,12 +122,12 @@ class EnsembleEngine:
         total_w = sum(avail_weights.values())  # guaranteed > 0 since active is non-empty
         norm_weights = {n: w / total_w for n, w in avail_weights.items()}
 
-        # Blend each outcome independently per Pitfall 1
+        # Blend each outcome independently
         blended_h = sum(norm_weights[n] * r.home_prob for n, r in active.items())
         blended_d = sum(norm_weights[n] * r.draw_prob for n, r in active.items())
         blended_a = sum(norm_weights[n] * r.away_prob for n, r in active.items())
 
-        # Re-normalize to handle floating-point drift per D-01
+        # Re-normalize to handle floating-point drift
         total = blended_h + blended_d + blended_a
         if total > 0:
             blended_h /= total
@@ -764,24 +156,6 @@ class EnsembleEngine:
     def weights(self) -> dict[str, float]:
         """Return current weights dict (read-only)."""
         return dict(self._weights)
-
-
-def compute_log_loss_weights(log_losses: dict[str, float]) -> dict[str, float]:
-    """Compute inverse-log-loss normalized weights for ensemble blending.
-
-    w_i = (1/ll_i) / sum(1/ll_j for j in signals)
-
-    Delegates to compute_blend_weights() which implements the same
-    1/x normalization. This wrapper exists for API clarity — callers
-    pass log-loss values, not Brier scores.
-
-    Args:
-        log_losses: {signal_name: log_loss_value}
-
-    Returns:
-        {signal_name: normalized_weight} summing to 1.0
-    """
-    return compute_blend_weights(log_losses)
 
 
 def compute_signal_contributions(

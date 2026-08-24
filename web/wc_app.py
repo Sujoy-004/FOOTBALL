@@ -21,7 +21,6 @@ from competitions.worldcup.src.groups import (
 
 from competitions.worldcup.src.insight import compute_team_signal_strengths, compute_ko_signal_probs, compute_match_insight, compute_form_trend, compute_head_to_head, compute_match_outcome
 from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
-from web.whatif_engine import parse_scenario, handle_instant_scenario, generate_simulate_insight
 from web.common import ts, boot_step, load_json
 
 logger = logging.getLogger(__name__)
@@ -281,14 +280,6 @@ def compute_signals_meta() -> dict:
     """Check on-disk signal cache files and return metadata."""
     cache_files: list[tuple[str, str]] = [
         ("odds_cache.json", "market_odds"),
-        ("catboost_cache.json", "catboost"),
-        ("form_cache.json", "form"),
-        ("lineup_cache.json", "lineup_strength"),
-        ("defensive_cache.json", "defensive_quality"),
-        ("manager_effect_cache.json", "manager_effect"),
-        ("availability_cache.json", "availability"),
-        ("elo_odds_cache.json", "elo_odds"),
-        ("team_synergy_cache.json", "team_synergy"),
         ("rolling_form_cache.json", "rolling_form"),
         ("squad_value_cache.json", "squad_value"),
         ("rest_days_cache.json", "rest_days"),
@@ -321,14 +312,12 @@ def compute_overview() -> dict:
         "annex_c": json.loads((DATA_DIR / "annex_c.json").read_text(encoding="utf-8")),
         "played": json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {},
         "played_groups": json.loads((DATA_DIR / "played_groups.json").read_text(encoding="utf-8")) if (DATA_DIR / "played_groups.json").exists() else {},
-        "versions": json.loads((DATA_DIR / "versions.json").read_text(encoding="utf-8")) if (DATA_DIR / "versions.json").exists() else {},
     }, boot_log)
     if not ld:
         return {"boot": boot_log, "error": "data load failed"}
     teams, groups_data = ld["teams"], ld["groups"]["groups"]
     bracket, annex_c = ld["bracket"], ld["annex_c"]
     played, played_groups = ld["played"], ld["played_groups"]
-    versions = ld["versions"]
 
     total_played = sum(1 for m in played.values() if m.get("winner"))
     total_played += sum(1 for m in played_groups.values() if m.get("winner"))
@@ -343,13 +332,6 @@ def compute_overview() -> dict:
 
     signals_meta = compute_signals_meta()
 
-    gov = boot_step("Governance", lambda: {
-        "versions": versions,
-        "n_matches": total_played,
-        "n_signals": signals_meta.get("n_total", 0),
-        "status": "COLD_START" if total_played < 30 else "HEALTHY",
-    }, boot_log)
-
     team_list = [{"name": name, "elo": round(d["elo"], 1)} for name, d in sorted(teams.items(), key=lambda t: t[1].get("elo", 1500), reverse=True)]
 
     full_bracket = compute_full_bracket(
@@ -363,7 +345,6 @@ def compute_overview() -> dict:
     data["standings"] = gs
     data["bracket"] = bracket_display
     data["full_bracket"] = full_bracket
-    data["governance"] = gov if gov else {}
     data["signals_meta"] = signals_meta
     return data
 
@@ -402,7 +383,7 @@ def compute_signal_detail(name: str):
 def compute_blend_info():
     """Blend info from in-memory cache evaluation + backtest — no cached file."""
     from competitions.worldcup.src.evaluation import compute_blend_info as _eval
-    return _eval(constants.DATA_DIR, cache.get("evaluation", {}), cache.get("governance", {}))
+    return _eval(constants.DATA_DIR, cache.get("evaluation", {}), {})
 
 
 def _fetch_live_data() -> None:
@@ -435,7 +416,7 @@ def api_overview():
         "n_teams": cache.get("n_teams", 0),
         "n_played": cache.get("n_played", 0),
         "signals_meta": cache.get("signals_meta", {"signals": [], "n_total": 0}),
-        "governance": cache.get("governance", {}),
+        
         "has_simulation": has_sim,
         "n_unplayed": unplayed_match_count(),
     })
@@ -485,21 +466,6 @@ def api_bracket_data():
 @wc_app.get("/api/evaluation")
 def api_evaluation():
     return JSONResponse(cache.get("evaluation", {}))
-
-
-@wc_app.get("/api/governance")
-def api_governance():
-    return JSONResponse(cache.get("governance", {}))
-
-
-@wc_app.get("/api/backtest")
-def api_backtest():
-    return JSONResponse(cache.get("backtest", {}))
-
-
-@wc_app.get("/api/coverage")
-def api_coverage():
-    return JSONResponse(cache.get("coverage", {}))
 
 
 @wc_app.get("/api/signals")
@@ -728,14 +694,26 @@ def api_match_insight(match_id: str = ""):
 
 @wc_app.post("/api/what-if")
 def api_what_if(req: dict = None):
+    """Structured counterfactual: adjust one team's Elo by +-delta, re-run seeded MC.
+
+    Body: {"match_id": str, "elo_delta": int (default 50, applied +to team_a / -to team_b),
+           "iterations": int (default 10000, capped at 50000)}
+    Returns baseline vs adjusted champion probabilities.
+    """
     if not req:
         return JSONResponse({"error": "request body required"})
     match_id = req.get("match_id", "")
-    scenario = req.get("scenario", "")
-    mode = req.get("mode", "instant")
-    iterations = int(req.get("iterations", 50000))
-    if not match_id or not scenario:
-        return JSONResponse({"error": "match_id and scenario required"})
+    if not match_id:
+        return JSONResponse({"error": "match_id required"})
+    try:
+        elo_delta = int(req.get("elo_delta", 50))
+        iterations = min(max(int(req.get("iterations", 10000)), 1000), 50000)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "elo_delta/iterations must be integers"})
+    if elo_delta == 0:
+        return JSONResponse({"error": "elo_delta must be non-zero"})
+    elo_delta = max(-600, min(600, elo_delta))
+
     fb = cache.get("full_bracket", {})
     match_data = None
     for r, ms in fb.get("rounds", {}).items():
@@ -749,108 +727,48 @@ def api_what_if(req: dict = None):
         return JSONResponse({"error": "match not found in bracket"})
     ta = match_data.get("team_a", "")
     tb = match_data.get("team_b", "")
-    blend_info = compute_blend_info()
-    blend_weights = blend_info.get("blend_weights", {})
-    parsed = parse_scenario(scenario, ta, tb, blend_weights)
-    if parsed.confidence == 0.0:
-        return JSONResponse({"mode": mode, "error": "No meaningful scenario detected. Try describing a specific condition (e.g., 'injury', 'strong form', 'weak defense')."})
-    if mode == "instant":
-        teams_raw = load_json(DATA_DIR, "teams.json")
-        elo_ratings = {n: d["elo"] for n, d in teams_raw.items()}
-        ledger = json.loads((DATA_DIR / "predictions_ledger.json").read_text(encoding="utf-8"))
-        played = json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8"))
-        played_groups_raw = (DATA_DIR / "played_groups.json").read_text(encoding="utf-8")
-        played_groups = json.loads(played_groups_raw) if played_groups_raw.strip() else {}
-        team_strengths = compute_team_signal_strengths(ledger, played_groups)
-        sigs, elo_p = compute_ko_signal_probs(ta, tb, team_strengths, elo_ratings)
-        original_signals = {}
-        elo_w = blend_weights.get("elo", 0.1874)
-        original_signals["elo"] = {"probability": elo_p, "weight": elo_w}
-        for sk, prob in sigs.items():
-            w = blend_weights.get(sk, 0)
-            original_signals[sk] = {"probability": prob, "weight": w}
-        result = handle_instant_scenario(scenario, ta, tb, original_signals, blend_weights, elo_prob=elo_p, team_strengths=team_strengths)
-        return JSONResponse({"mode": "instant", **result})
-    elif mode == "simulate":
-        task_id = str(uuid.uuid4())
-        with sim_lock:
-            active_simulations[task_id] = {
-                "status": "starting", "progress": 0, "iteration": 0,
-                "total_iterations": iterations, "error": None, "result": None,
-            }
+    if not ta or not tb:
+        return JSONResponse({"error": "bracket slot unresolved"})
 
-        def _run_sim(task_id, scenario, match_id, ta, tb, iterations):
-            try:
-                with sim_lock:
-                    active_simulations[task_id]["status"] = "running"
-                teams_raw = load_json(DATA_DIR, "teams.json")
-                groups_raw = load_groups(DATA_DIR, teams=teams_raw)
-                bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
-                annex_c = load_annex_c(DATA_DIR)
-                played_raw = json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8"))
-                played_groups_raw = (DATA_DIR / "played_groups.json").read_text(encoding="utf-8")
-                played_groups = json.loads(played_groups_raw) if played_groups_raw.strip() else {}
-                ledger = json.loads((DATA_DIR / "predictions_ledger.json").read_text(encoding="utf-8"))
-                blend_info = compute_blend_info()
-                blend_weights = blend_info.get("blend_weights", {})
-                team_strengths = compute_team_signal_strengths(ledger, played_groups)
-                elo_ratings = {n: d["elo"] for n, d in teams_raw.items()}
-                sigs, elo_p = compute_ko_signal_probs(ta, tb, team_strengths, elo_ratings)
-                original_signals = {}
-                elo_w = blend_weights.get("elo", 0.1874)
-                original_signals["elo"] = {"probability": elo_p, "weight": elo_w}
-                for sk, prob in sigs.items():
-                    w = blend_weights.get(sk, 0)
-                    original_signals[sk] = {"probability": prob, "weight": w}
-                scenario_result = handle_instant_scenario(scenario, ta, tb, original_signals, blend_weights, elo_prob=elo_p)
-                xg_overrides = None
-                adj_sigs = scenario_result.get("adjusted_signals", {})
-                for sk, sv in adj_sigs.items():
-                    if sv.get("was_adjusted") and sk == "defensive_quality":
-                        xg_overrides = {}
-                        for s_name, s_val in adj_sigs.items():
-                            if s_val.get("was_adjusted"):
-                                override_factor = s_val["probability"] / max(original_signals.get(s_name, {}).get("probability", 0.5), 0.01)
-                                xg_overrides[ta] = (1.0, override_factor)
-                                xg_overrides[tb] = (override_factor, 1.0)
-                with sim_lock:
-                    active_simulations[task_id]["status"] = "running"
-                    active_simulations[task_id]["progress"] = 0.0
-                    active_simulations[task_id]["iteration"] = 0
+    teams_raw = load_json(DATA_DIR, "teams.json")
+    groups_raw = load_groups(DATA_DIR, teams=teams_raw)
+    bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
+    annex_c = load_annex_c(DATA_DIR)
+    played_raw = json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {}
+    played_groups_raw = (DATA_DIR / "played_groups.json").read_text(encoding="utf-8")
+    played_groups = json.loads(played_groups_raw) if played_groups_raw.strip() else {}
 
-                def _on_progress(current, total):
-                    with sim_lock:
-                        pct = round(current / total * 100, 1)
-                        active_simulations[task_id]["progress"] = pct
-                        active_simulations[task_id]["iteration"] = current
+    def _sim(teams):
+        return run_full_simulation(
+            teams, groups_raw, bracket_raw, annex_c, played_raw,
+            iterations=iterations, seed=42, played_groups=played_groups,
+        )
 
-                sim_result = run_full_simulation(
-                    teams_raw, groups_raw, bracket_raw, annex_c,
-                    played_raw, iterations=iterations,
-                    played_groups=played_groups,
-                    xg_overrides=xg_overrides,
-                    progress_cb=_on_progress,
-                )
-                baseline_raw = cache.get("simulation_raw")
-                if baseline_raw:
-                    insight = generate_simulate_insight(baseline_raw, sim_result, scenario, ta, tb, iterations)
-                else:
-                    insight = "No baseline data available for comparison."
-                with sim_lock:
-                    active_simulations[task_id]["status"] = "complete"
-                    active_simulations[task_id]["progress"] = 100.0
-                    active_simulations[task_id]["iteration"] = iterations
-                    active_simulations[task_id]["result"] = sim_result
-                    active_simulations[task_id]["insight"] = insight
-            except Exception as e:
-                with sim_lock:
-                    active_simulations[task_id]["status"] = "error"
-                    active_simulations[task_id]["error"] = str(e)
+    baseline = _sim(teams_raw)
+    adjusted_teams = json.loads(json.dumps(teams_raw))
+    adjusted_teams[ta]["elo"] = adjusted_teams[ta]["elo"] + elo_delta
+    adjusted_teams[tb]["elo"] = max(100.0, adjusted_teams[tb]["elo"] - elo_delta)
+    adjusted = _sim(adjusted_teams)
 
-        t = threading.Thread(target=_run_sim, args=(task_id, scenario, match_id, ta, tb, iterations), daemon=True)
-        t.start()
-        return JSONResponse({"mode": "simulate", "task_id": task_id, "status": "started"})
-    return JSONResponse({"error": "invalid mode"})
+    def _entry(name):
+        b = baseline.get(name, {}).get("champion", 0.0)
+        a = adjusted.get(name, {}).get("champion", 0.0)
+        return {"baseline": round(b, 4), "adjusted": round(a, 4),
+                "delta": round(a - b, 4)}
+
+    def _top5(result):
+        ranked = sorted(result.items(), key=lambda kv: kv[1].get("champion", 0), reverse=True)[:5]
+        return [{"team": t, "champion": round(v.get("champion", 0), 4)} for t, v in ranked]
+
+    return JSONResponse({
+        "mode": "structured",
+        "match_id": match_id,
+        "elo_changes": {ta: adjusted_teams[ta]["elo"], tb: adjusted_teams[tb]["elo"]},
+        "iterations": iterations,
+        "teams": {ta: _entry(ta), tb: _entry(tb)},
+        "top5_baseline": _top5(baseline),
+        "top5_adjusted": _top5(adjusted),
+    })
 
 
 def _run_calibration_task(task_id: str):

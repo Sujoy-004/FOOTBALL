@@ -240,22 +240,3 @@ class TestAggregateMCWithCI:
         assert r["B"]["champion_ci_lower"] == 0.0
         assert r["B"]["champion_ci_upper"] == 0.0
         assert r["B"]["champion_ci_width_pct"] == 0.0
-
-    def test_glicko_uncertainty_field(self, minimal_data):
-        """using_glicko=True adds uncertainty_contribution."""
-        positions, champions, stats = minimal_data
-        r = aggregate_mc_results(
-            positions, champions, stats, 3,
-            compute_ci=True, using_glicko=True,
-        )
-        assert "uncertainty_contribution" in r["A"]
-        assert r["A"]["uncertainty_contribution"] == r["A"]["champion_ci_width_pct"]
-
-    def test_no_uncertainty_without_glicko(self, minimal_data):
-        """using_glicko=False does not add uncertainty_contribution."""
-        positions, champions, stats = minimal_data
-        r = aggregate_mc_results(
-            positions, champions, stats, 3,
-            compute_ci=True, using_glicko=False,
-        )
-        assert "uncertainty_contribution" not in r["A"]

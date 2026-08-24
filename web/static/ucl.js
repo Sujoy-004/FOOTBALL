@@ -135,210 +135,11 @@ async function renderOverview() {
   const signals = appState.signals;
   const sigKeys = Object.keys(signals);
 
-  const sigLabelMap = { elo: "Elo", all_signals: "Blended", refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form", squad_value: "Squad Value", rest_days: "Rest Days" };
-
-  const signalList = [];
-  sigKeys.forEach(k => {
-    const s = signals[k];
-    if (!s) return;
-    const available = (s.available || s.available_pct > 0 || s.n_matches > 0) ? true : false;
-    signalList.push({ name: k, available: available, n_matches: s.n_matches || 0, avg_probability: s.avg_probability || 0, weight: s.weight || 0 });
-  });
-
-  let html = '<div class="stats-row" id="statsRow">';
-  html += '<div class="stat-card"><div class="val">' + d.n_teams + '</div><div class="lbl">Teams</div></div>';
-  html += '<div class="stat-card"><div class="val">' + (d.n_played || 0) + '</div><div class="lbl">Matches Played</div></div>';
-  html += '<div class="stat-card"><div class="val">' + signalList.filter(s => s.available).length + ' / ' + signalList.length + '</div><div class="lbl">Signals Available</div></div>';
-  html += '</div>';
-
-  if (signalList.length > 0) {
-    html += '<div class="chart-section"><div class="title">Signal Cache Status</div><table class="eval-table"><tr><th>Signal</th><th>Available</th><th>Matches</th><th>Avg Prob</th><th>Weight</th></tr>';
-    signalList.forEach(s => {
-      const dot = s.available ? 'dot-green' : 'dot-red';
-      const status = s.available ? 'Yes' : 'No';
-      const label = sigLabelMap[s.name] || s.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      html += '<tr><td>' + label + '</td><td class="num"><span class="' + dot + '">&#9679;</span> ' + status + '</td><td class="num">' + s.n_matches + '</td><td class="num">' + (s.avg_probability || 0).toFixed(3) + '</td><td class="num">' + ((s.weight || 0) * 100).toFixed(1) + '%</td></tr>';
-    });
-    html += '</table></div>';
-  }
-
-  tab.innerHTML = html;
-}
-
-// ── League Table ──
-function renderStandings() {
-  const tab = document.getElementById("tab-standings");
-  if (!tab) return;
-  const st = appState.standings;
-  if (!st || !st.length) {
-    tab.innerHTML = '<div style="color:#15565B;font-size:12px">No standings data.</div>';
-    return;
-  }
-  tab.innerHTML = `<div class="league-table-wrap"><table class="league-table">
-    <tr><th>Pos</th><th>Team</th><th>Pld</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th><th>Zone</th></tr>
-    ${st.map(r => {
-      const zone = r.zone || "eliminated";
-      const cls = zone === "top_8" ? "zone-top8" : zone === "playoff" ? "zone-playoff" : "";
-      const zoneLabel = zone === "top_8" ? "TOP 8" : zone === "playoff" ? "PLAYOFF" : "OUT";
-      const zoneCls = zone === "top_8" ? "top8" : zone === "playoff" ? "playoff" : "eliminated";
-      const gd = r.gd > 0 ? "+" + r.gd : String(r.gd);
-      const pld = (r.wins || 0) + (r.draws || 0) + (r.losses || 0);
-      return '<tr class="' + cls + '"><td class="num">' + r.position + '</td><td>' + r.team + '</td><td class="num">' + pld + '</td><td class="num">' + (r.wins || 0) + '</td><td class="num">' + (r.draws || 0) + '</td><td class="num">' + (r.losses || 0) + '</td><td class="num">' + (r.gs || 0) + '</td><td class="num">' + (r.ga || 0) + '</td><td class="num">' + gd + '</td><td class="num">' + (r.pts !== undefined && r.pts !== null ? r.pts : "?") + '</td><td><span class="zone-badge ' + zoneCls + '">' + zoneLabel + '</span></td></tr>';
-    }).join("")}
-  </table></div>`;
-}
-
-// ── Bracket ──
-function renderBracket() {
-  const tab = document.getElementById("tab-bracket");
-  if (!tab) return;
-  const br = appState.bracket;
-  if (!br) return;
-
-  window.__bracketData = br.bracket_rounds || {};
-
-  const playoff = br.playoff || [];
-  const poHtml = playoff.length ? '<div class="g-title" style="color:#16A085;font-size:12px;margin-bottom:6px">Playoff Round (9-24)</div><div class="playoff-grid">' +
-    playoff.map(t => {
-      const aggStr = t.aggregate_a + "-" + t.aggregate_b;
-      let detail = aggStr + " agg";
-      if (t.et_played) detail += " (ET)";
-      if (t.penalties_played) detail += " (pens)";
-      return '<div class="playoff-card"><div class="p-title">Tie ' + t.tie_num + '</div><div class="p-teams"><span class="p-team winner">' + t.team_a + '</span><span class="p-score">' + aggStr + '</span><span class="p-team">' + t.team_b + '</span></div><div class="p-detail">' + detail + "</div></div>";
-    }).join("") + "</div>" : "";
-
-  const lmd = br.league_matchdays || {};
-  const lmdKeys = Object.keys(lmd).sort();
-  let mdHtml = "";
-  if (lmdKeys.length) {
-    mdHtml = '<div class="g-title" style="color:#16A085;font-size:12px;margin:8px 0 6px">League Phase</div>';
-    mdHtml += '<div class="md-accordion">';
-    const firstMid = lmdKeys[0];
-    lmdKeys.forEach(md => {
-      const ms = lmd[md] || [];
-      const isFirst = md === firstMid;
-      mdHtml += '<div class="md-card"><div class="md-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">' +
-        '<span class="md-label">' + md + '</span><span class="md-count">' + ms.length + " matches</span>" +
-        '<span class="md-arrow">' + (isFirst ? "\u25BC" : "\u25B6") + "</span></div>" +
-        '<div class="md-body ' + (isFirst ? "open" : "") + '">' +
-        ms.map(m => '<div class="md-row"><span class="md-team">' + m.team_a + '</span><span class="md-score">' + m.home_score + "-" + m.away_score + '</span><span class="md-team">' + m.team_b + "</span></div>").join("") +
-        "</div></div>";
-    });
-    mdHtml += "</div>";
-  }
-
-  tab.innerHTML = '<div style="text-align:right;margin-bottom:8px"><button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining</button></div>' + mdHtml + poHtml + '<div class="bracket-wrap"><div class="bracket-grid" id="bracketGrid"></div><svg class="bracket-svg" id="bracketSvg"></svg></div>';
-
-  const rounds = br.bracket_rounds || {};
-  const grid = document.getElementById("bracketGrid");
-  if (!grid) return;
-
-  const roundOrder = ["R16", "QF", "SF", "FINAL"];
-  const roundLabel = { R16: "Round of 16", QF: "Quarter-Finals", SF: "Semi-Finals", FINAL: "Final" };
-  const byId = {};
-  for (const [, ms] of Object.entries(rounds)) for (const m of ms) byId[m.match_id] = m;
-
-  function getLeafOrder(mid) {
-    const m = byId[mid];
-    if (!m || !m.source_matches) return [mid];
-    return [...getLeafOrder(m.source_matches[0]), ...getLeafOrder(m.source_matches[1])];
-  }
-  const leafOrder = getLeafOrder("final_01");
-  const leafIdx = {};
-  leafOrder.forEach((id, i) => leafIdx[id] = i);
-
-  function getRowRange(mid) {
-    const m = byId[mid];
-    if (!m) return { start: 0, end: 2 };
-    if (m.round === "FINAL") return { start: 0, end: leafOrder.length };
-    const leaves = getLeafOrder(mid);
-    if (!leaves.length) return { start: 0, end: 2 };
-    return { start: leafIdx[leaves[0]], end: leafIdx[leaves[leaves.length - 1]] + 1 };
-  }
-
-  const ROW_UNIT = 28;
-  roundOrder.forEach((r, ri) => {
-    const col = document.createElement("div");
-    col.className = "bracket-col";
-    col.style.flex = String(1 + (ri === roundOrder.length - 1 ? 0.5 : 0));
-    col.innerHTML = '<div class="col-head">' + (roundLabel[r] || r) + "</div>";
-
-    const ms = (rounds[r] || []).slice().sort((a, b) => getRowRange(a.match_id).start - getRowRange(b.match_id).start);
-    let lastEnd = 0;
-    ms.forEach(m => {
-      const rr = getRowRange(m.match_id);
-      const gap = rr.start - lastEnd;
-      if (gap > 0) {
-        const sp = document.createElement("div");
-        sp.className = "match-slot";
-        sp.style.minHeight = (gap * ROW_UNIT) + "px";
-        col.appendChild(sp);
-      }
-      lastEnd = rr.end;
-
-      const slot = document.createElement("div");
-      slot.className = "match-slot";
-      slot.style.minHeight = Math.max((rr.end - rr.start) * ROW_UNIT, 40) + "px";
-
-      const ta = m.team_a || "TBD";
-      const tb = m.team_b || "TBD";
-      const isPlayed = m.winner ? true : false;
-      const isTbd = !m.team_a && !m.team_b;
-      let scoreStr, simProbHtml = "", simWinnerHtml = "";
-      if (m.score) {
-        scoreStr = m.score.home + "-" + m.score.away;
-      } else if (isPlayed) {
-        scoreStr = "1-0";
-      } else if (!isPlayed && appState.simBracket) {
-        const allSim = Object.values(appState.simBracket.bracket_rounds).flat();
-        const sm = allSim.find(x => x.match_id === m.match_id);
-        if (sm) {
-          const r = sm.result;
-          if (r && r.score_a != null) {
-            scoreStr = r.score_a + "-" + r.score_b;
-          } else if (r && r.aggregate_a != null) {
-            scoreStr = r.aggregate_a + "-" + r.aggregate_b;
-          } else if (sm.winner) {
-            scoreStr = sm.winner === ta ? "1-0" : "0-1";
-          } else {
-            scoreStr = "?-?";
-          }
-          if (sm.winner) {
-            simWinnerHtml = '<div class="m-winner-label" style="color:#8E44AD">' + sm.winner + ' (sim)</div>';
-          }
-        } else {
-          scoreStr = "?-?";
-        }
-      } else {
-        scoreStr = "?-?";
-      }
-      const cardClass = isTbd ? "tbd" : isPlayed ? "played" : "upcoming";
-
-      slot.innerHTML = '<div class="match-card ' + cardClass + '" data-mid="' + m.match_id + '">' +
-        '<div class="m-teams"><span class="m-team ' + (m.winner === ta ? "winner" : "") + '">' + ta + '</span>' +
-        '<span class="m-score">' + scoreStr + '</span>' +
-        '<span class="m-team ' + (m.winner === tb ? "winner" : "") + '">' + tb + '</span></div>' +
-        (m.winner ? '<div class="m-winner-label">' + m.winner + " advances</div>" : "") +
-        simWinnerHtml +
-        "</div>";
-      slot.querySelector(".match-card").onclick = () => openMatchModal(m);
-      col.appendChild(slot);
-    });
-    grid.appendChild(col);
-  });
-
-  setTimeout(drawBracketConnectors, 50);
-}
-
-const sigLabels = {
-  refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form",
-  squad_value: "Squad Value", rest_days: "Rest Days", availability: "Availability",
-  manager_effect: "Manager Effect", defensive_quality: "Defensive Quality",
-  player_form: "Player Form", team_synergy: "Team Synergy",
+  const sigLabelMap = { elo: "Elo", all_signals: "Blended", refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form",
+  squad_value: "Squad Value", rest_days: "Rest Days",
 };
 
-const sigOrder = ["refined_elo", "rolling_form", "market_odds", "defensive_quality",
-  "manager_effect", "squad_value", "player_form", "team_synergy", "availability", "rest_days"];
+const sigOrder = ["refined_elo", "rolling_form", "market_odds", "squad_value", "rest_days"];
 
 function getScoreStr(m) {
   if (m.score) return m.score.home + "-" + m.score.away;
@@ -403,9 +204,10 @@ async function openMatchModal(m) {
   bottom.innerHTML = `
     <div class="sec-title warn">What-If Scenario</div>
     <div class="whatif-input-wrap">
-      <input type="text" id="modalWhatifInput" placeholder="Describe a scenario... (e.g. PSG weaker, Arsenal stronger)">
+      <input type="number" id="modalWhatifDelta" value="50" step="10" style="width:90px">
       <button onclick="window.__sendModalWhatIf('${mid}','${ta}','${tb}')">&#9654;</button>
     </div>
+    <div class="whatif-controls"><label>Elo boost for ${ta} (opponent lowered equally):</label></div>
     <div class="whatif-modal-result" id="modalWhatifResult"></div>
   `;
 
@@ -456,40 +258,29 @@ async function openMatchModal(m) {
 }
 
 window.__sendModalWhatIf = async function (matchId, teamA, teamB) {
-  const scenario = document.getElementById("modalWhatifInput").value.trim();
+  const deltaInput = document.getElementById("modalWhatifDelta");
+  const eloDelta = parseInt(deltaInput.value) || 50;
   const resultDiv = document.getElementById("modalWhatifResult");
-  if (!scenario) { resultDiv.style.display = "none"; return; }
   resultDiv.style.display = "block";
-  resultDiv.innerHTML = '<div style="color:#15565B;font-size:11px">Processing...</div>';
+  resultDiv.innerHTML = '<div style="color:#15565B;font-size:11px">Running seeded counterfactual...</div>';
   try {
     const resp = await (await fetch(API + "/what-if", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ match_id: matchId, scenario }),
+      body: JSON.stringify({ match_id: matchId, elo_delta: eloDelta }),
     })).json();
-    let html = "";
-    if (resp.insight) {
-      html += '<div class="wir-insight">>> ' + resp.insight.replace(/ >> /g, "<br>>></div><div class=\"wir-insight\">>> ") + "</div>";
-    }
-    if (resp.adjusted_signals) {
-      let sigDetail = "";
-      Object.entries(resp.adjusted_signals).forEach(([sk, sv]) => {
-        if (sv.was_adjusted) {
-          const deltaStr = (sv.delta * 100).toFixed(1);
-          const cls = sv.delta >= 0 ? "wir-diff-pos" : "wir-diff-neg";
-          sigDetail += '<div class="wir-sig-row"><span>' + sk + '</span><span class="wir-bar-wrap"><span class="wir-bar" style="width:' + (sv.probability * 100) + '%"></span></span><span class="wir-val">' + (sv.probability * 100).toFixed(1) + '%</span><span class="' + cls + '">' + (sv.delta >= 0 ? "+" : "") + deltaStr + '%</span></div>';
-        }
-      });
-      if (sigDetail) {
-        html += '<div class="wir-toggle" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">[+] Signal detail</div>';
-        html += '<div class="wir-sigs" style="display:none">' + sigDetail + "</div>";
-      }
-    }
-    if (resp.parsed && resp.parsed.explanation) {
-      const conf = resp.parsed.confidence || 0;
-      const confColor = conf >= 0.6 ? "#168777" : conf >= 0.3 ? "#15565B" : "#ff6b6b";
-      html += '<div class="wir-meta"><span style="color:' + confColor + '">Detection confidence: ' + (conf * 100).toFixed(0) + "%</span> &middot; " + resp.parsed.explanation + "</div>";
-    }
-    resultDiv.innerHTML = html || '<div style="color:#15565B;font-size:11px">No adjustment triggered for this scenario.</div>';
+    if (resp.error) { resultDiv.innerHTML = '<div style="color:#ff6b6b">' + resp.error + "</div>"; return; }
+    const row = (name, e) => {
+      const t = resp.teams[name] || {};
+      const d = t.delta || 0;
+      const cls = d >= 0 ? "wir-diff-pos" : "wir-diff-neg";
+      return '<tr><td>' + name + ' (Elo ' + e + ')</td><td class="num">' + ((t.baseline||0)*100).toFixed(1) + '%</td><td class="num">' + ((t.adjusted||0)*100).toFixed(1) + '%</td><td class="num ' + cls + '">' + (d>=0?"+":"") + (d*100).toFixed(1) + '%</td></tr>';
+    };
+    let html = '<div class="wir-head">Champion probability: baseline vs adjusted</div><table class="odds-table" style="width:100%"><tr><th>Team</th><th>Baseline</th><th>Adjusted</th><th>Delta</th></tr>';
+    html += row(teamA, (resp.elo_changes||{})[teamA] || "?");
+    html += row(teamB, (resp.elo_changes||{})[teamB] || "?");
+    html += "</table>";
+    html += '<div class="wir-meta">Seeded Monte Carlo (seed 42), ' + (resp.iterations||0).toLocaleString() + ' iterations.</div>';
+    resultDiv.innerHTML = html;
   } catch (e) {
     resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + "</div>";
   }

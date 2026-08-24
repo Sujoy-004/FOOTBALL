@@ -49,8 +49,6 @@ def _build_signal_registry() -> SignalRegistry:
     from football_core.signals.rolling_form import RollingFormSignal
     from football_core.signals.squad_value import SquadValueSignal
     from football_core.signals.rest_days import RestDaysSignal
-    from football_core.signals.player_form import PlayerFormSignal
-    from football_core.signals.team_synergy import TeamSynergySignal
 
     registry = SignalRegistry()
     registry.register(RefinedEloSignal())
@@ -58,8 +56,6 @@ def _build_signal_registry() -> SignalRegistry:
     registry.register(RollingFormSignal(result_provider=_EmptyResultProvider()))
     registry.register(SquadValueSignal())
     registry.register(RestDaysSignal())
-    registry.register(PlayerFormSignal())
-    registry.register(TeamSynergySignal())
     return registry
 
 
@@ -187,12 +183,14 @@ def run_calibration(
     # 5. Compute inverse-log-loss weights per D-01
     weights = compute_log_loss_weights(log_losses)
 
-    # 6. Assemble config dict
+    # 6. Assemble config dict (with fitting provenance)
     config = {
         "version": 1,
         "calibrated_at": datetime.datetime.now(
             datetime.timezone.utc
         ).isoformat(),
+        "method": "inverse_log_loss",
+        "source": replay_data_path,
         "n_matches": max(n_matches.values()) if n_matches else 0,
         "threshold": threshold,
         "weights": weights,

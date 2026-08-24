@@ -17,15 +17,12 @@ from football_core.state import (
     load_signal_cache,
     save_signal_cache,
     load_prediction_history,
-    append_prediction_history,
     is_cache_valid,
     load_eloratings_cache,
     save_eloratings_cache,
     load_elo_update_log,
     save_elo_update_log,
     validate_bracket,
-    load_probability_log,
-    append_probability_log,
     _atomic_write_json,
 )
 
@@ -347,52 +344,3 @@ def save_calibration_params(params: dict, data_dir: Path | str | None = None) ->
     _atomic_write_json(params, path)
 
 
-# ─── Governance ─────────────────────────────────────────────────────────
-
-def load_versions(data_dir: Path | str | None = None) -> dict:
-    path = _resolve_data_dir(data_dir) / constants.GOV_DATA_FILE
-    if not path.exists():
-        return {
-            "data_version": "D0",
-            "model_version": "M0",
-            "run_version": "R0",
-            "last_data_change": None,
-            "last_model_change": None,
-            "last_run_timestamp": None,
-        }
-    with open(path, encoding="utf-8") as f:
-        return dict(json.load(f))
-
-
-def save_versions(versions: dict, data_dir: Path | str | None = None) -> None:
-    path = _resolve_data_dir(data_dir) / constants.GOV_DATA_FILE
-    _atomic_write_json(versions, path)
-
-
-def save_run_snapshot(snapshot: dict, data_dir: Path | str | None = None) -> None:
-    runs_dir = _resolve_data_dir(data_dir) / constants.GOV_RUNS_DIR
-    run_id = snapshot["run_version"]
-    safe_id = run_id.replace(":", "-")
-    path = runs_dir / f"{safe_id}.json"
-    _atomic_write_json(snapshot, path)
-
-    if constants.GOV_RUN_SNAPSHOT_RETENTION > 0:
-        files = sorted(runs_dir.glob("*.json"))
-        if len(files) > constants.GOV_RUN_SNAPSHOT_RETENTION:
-            to_delete = len(files) - constants.GOV_RUN_SNAPSHOT_RETENTION
-            for f in files[:to_delete]:
-                os.remove(str(f))
-
-
-def load_run_snapshot(run_id: str, data_dir: Path | str | None = None) -> dict | None:
-    safe_id = run_id.replace(":", "-")
-    path = _resolve_data_dir(data_dir) / constants.GOV_RUNS_DIR / f"{safe_id}.json"
-    if not path.exists():
-        return None
-    with open(path, encoding="utf-8") as f:
-        return dict(json.load(f))
-
-
-def save_backtest_report(report: dict, data_dir: Path | str | None = None) -> None:
-    path = _resolve_data_dir(data_dir) / "eval_backtest_report.json"
-    _atomic_write_json(report, path)

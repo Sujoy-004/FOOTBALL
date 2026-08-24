@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 KNOWN_SIGNALS = [
-    "elo", "form", "odds", "catboost", "lineup",
-    "defensive", "manager", "availability", "refined_elo",
+    "elo", "refined_elo",
     "rolling_form", "squad_value", "rest_days", "market_odds",
 ]
 
@@ -39,7 +38,7 @@ def parse_what_if(what_if_path: str, teams: dict) -> dict:
     if not isinstance(overrides, dict):
         raise ValueError("Override file must contain a JSON object")
 
-    allowed_keys = {"elo_changes", "blend_weights", "xg_overrides", "calibration_temperature"}
+    allowed_keys = {"elo_changes", "blend_weights", "xg_overrides"}
     unknown = set(overrides.keys()) - allowed_keys
     if unknown:
         raise ValueError(
@@ -83,14 +82,6 @@ def parse_what_if(what_if_path: str, teams: dict) -> dict:
                 raise ValueError(f"xg_overrides['{mid}'] values must be positive")
         validated["xg_overrides"] = xg
 
-    if "calibration_temperature" in overrides:
-        ct = overrides["calibration_temperature"]
-        if not isinstance(ct, (int, float)):
-            raise ValueError("calibration_temperature must be a number")
-        if ct <= 0:
-            raise ValueError(f"calibration_temperature must be positive (got {ct})")
-        validated["calibration_temperature"] = ct
-
     return validated
 
 
@@ -98,7 +89,7 @@ def parse_weights(weights_str: str, known_signals: list[str] | None = None) -> d
     """Parse K=V,K=V weight string, validate, normalize to sum 1.0.
 
     Args:
-        weights_str: "elo=0.4,odds=0.3,catboost=0.3"
+        weights_str: "elo=0.4,market_odds=0.3,squad_value=0.3"
         known_signals: list of known signal names for validation.
                        Defaults to KNOWN_SIGNALS.
 
@@ -179,16 +170,9 @@ def run_counterfactual(
         change_descriptions.append(f"{team}.elo: {int(old)} -> {int(new_rating)} ({delta:+d})")
 
     blend_params: dict | None = None
-    if "blend_weights" in overrides or "calibration_temperature" in overrides:
-        blend_params = {}
-        if "blend_weights" in overrides:
-            blend_params["weights"] = overrides["blend_weights"]
-            change_descriptions.append(f"blend_weights: {overrides['blend_weights']}")
-        if "calibration_temperature" in overrides:
-            blend_params["calibration_temperature"] = overrides["calibration_temperature"]
-            change_descriptions.append(
-                f"calibration_temperature: {overrides['calibration_temperature']}"
-            )
+    if "blend_weights" in overrides:
+        blend_params = {"weights": overrides["blend_weights"]}
+        change_descriptions.append(f"blend_weights: {overrides['blend_weights']}")
 
     xg_overrides = overrides.get("xg_overrides", None)
 
@@ -222,12 +206,12 @@ def run_calibrated_validation(
     data_dir: str,
     iterations: int = 50000,
 ) -> dict:
-    """Run validation twice: uncalibrated (baseline) and calibrated.
+    """Run tournament validation against the actual outcome (Brier/log-loss/accuracy).
 
-    Returns dict with keys: baseline, calibrated, delta, n_matches, calibration_available.
+    Calibration is now a single canonical ensemble — there is no separate
+    "calibrated" simulation leg, so ``calibrated``/``delta`` are always None.
     """
     from football_core.evaluation import brier_score, log_loss
-    from pathlib import Path
 
     def _compute_metrics(result: dict, actual_champion: str | None) -> dict:
         metrics: dict[str, float | None] = {
@@ -251,8 +235,8 @@ def run_calibrated_validation(
     if n_matches == 0:
         return {
             "baseline": {"brier": None, "log_loss": None, "champion_acc": None},
-            "calibrated": {"brier": None, "log_loss": None, "champion_acc": None},
-            "delta": {"brier": None, "log_loss": None, "champion_acc": None},
+            "calibrated": None,
+            "delta": None,
             "n_matches": 0,
             "calibration_available": False,
         }
@@ -263,37 +247,10 @@ def run_calibrated_validation(
     )
     baseline_metrics = _compute_metrics(baseline, actual_champion)
 
-    calib_path = Path(data_dir) / "calibration.json"
-    if not calib_path.exists():
-        return {
-            "baseline": baseline_metrics,
-            "calibrated": baseline_metrics,
-            "delta": {k: 0.0 if v is not None else None for k, v in baseline_metrics.items()},
-            "n_matches": n_matches,
-            "calibration_available": False,
-        }
-
-    blend_params: dict = {"calibrated": True}
-    calibrated = run_full_simulation(
-        teams, groups, bracket, annex_c, played,
-        iterations=iterations, seed=42, played_groups=played_groups,
-        blend_params=blend_params,
-    )
-    cal_metrics = _compute_metrics(calibrated, actual_champion)
-
-    delta = {}
-    for k in baseline_metrics:
-        bv = baseline_metrics[k]
-        cv = cal_metrics[k]
-        if bv is not None and cv is not None:
-            delta[k] = cv - bv
-        else:
-            delta[k] = None
-
     return {
         "baseline": baseline_metrics,
-        "calibrated": cal_metrics,
-        "delta": delta,
+        "calibrated": None,
+        "delta": None,
         "n_matches": n_matches,
-        "calibration_available": True,
+        "calibration_available": False,
     }

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 mimetypes.add_type('image/webp', '.webp')
 
 import fastapi
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -70,11 +70,6 @@ app = fastapi.FastAPI(title="FOOTBALL", lifespan=lifespan)
 def landing():
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     return HTMLResponse(html)
-
-
-@app.get("/euro")
-def euro_stub():
-    return JSONResponse({"status": "coming_soon", "message": "Euro 2028 coming soon."})
 
 
 app.mount("/worldcup", wc_app)

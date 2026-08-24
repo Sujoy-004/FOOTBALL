@@ -20,6 +20,7 @@ from football_core.provider import (
     FixtureProviderError,
 )
 from football_core.state import is_cache_valid, _atomic_write_json
+from competitions.ucl.src.validation import validate_ucl_fixtures
 from competitions.ucl.src.constants import (
     UCL_LEAGUE_ID,
     BSD_API_URL,
@@ -28,6 +29,13 @@ from competitions.ucl.src.constants import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _schedule_asdict(schedule: FixtureSchedule) -> dict:
+    """Serialize a FixtureSchedule to the plain-dict form expected by
+    :func:`validate_ucl_fixtures` (caller-side UCL validation)."""
+    from dataclasses import asdict
+    return asdict(schedule)
 
 
 class RepoFixtureProvider:
@@ -49,7 +57,7 @@ class RepoFixtureProvider:
         with open(self._path) as f:
             data = json.load(f)
         schedule = self._dict_to_schedule(data["schedule"])
-        schedule.validate()
+        validate_ucl_fixtures({"schedule": _schedule_asdict(schedule)})
         return schedule
 
     @staticmethod
@@ -126,7 +134,7 @@ class BSDFixtureProvider:
         schedule = self._build_schedule(future_events)
 
         # 5. Validate
-        schedule.validate()
+        validate_ucl_fixtures({"schedule": _schedule_asdict(schedule)})
 
         # 6. Cache and return
         self._save_cache(schedule)

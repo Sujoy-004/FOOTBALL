@@ -87,16 +87,6 @@ def save_prediction_history(history: list[dict], data_dir: Path | str | None = N
     _atomic_write_json(history, path)
 
 
-def append_prediction_history(
-    entry: dict,
-    data_dir: Path | str | None = None,
-) -> None:
-    history = load_prediction_history(data_dir)
-    history.append(entry)
-    path = _resolve_data_dir(data_dir) / "prediction_history.json"
-    _atomic_write_json(history, path)
-
-
 def load_eloratings_cache(data_dir: Path | str | None = None) -> dict:
     path = _resolve_data_dir(data_dir) / "eloratings_cache.json"
     if not path.exists():
@@ -198,18 +188,3 @@ def load_bracket(data_dir: Path | str | None = None) -> list[dict]:
         bracket: list[dict] = json.load(f)
     validate_bracket(bracket)
     return bracket
-
-
-def load_probability_log(data_dir: Path | str | None = None) -> list[dict]:
-    path = _resolve_data_dir(data_dir) / "probability_log.json"
-    if not path.exists():
-        return []
-    with open(path, encoding="utf-8") as f:
-        return list(json.load(f))
-
-
-def append_probability_log(snapshot: dict, data_dir: Path | str | None = None) -> None:
-    log = load_probability_log(data_dir)
-    log.append(snapshot)
-    path = _resolve_data_dir(data_dir) / "probability_log.json"
-    _atomic_write_json(log, path)

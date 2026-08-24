@@ -13,7 +13,7 @@ from football_core.signal import (
     PredictionContext,
     SignalRegistry,
 )
-from football_core.blender import EnsembleEngine, compute_log_loss_weights, compute_blend_weights
+from football_core.blender import EnsembleEngine, compute_log_loss_weights
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -283,7 +283,7 @@ class TestEnsembleEngine:
 
 
 class TestComputeLogLossWeights:
-    """Verify compute_log_loss_weights delegates to compute_blend_weights correctly."""
+    """Verify compute_log_loss_weights contract (canonical weight fitting)."""
 
     def test_basic_inverse(self):
         weights = compute_log_loss_weights({"a": 0.5, "b": 1.0})
@@ -320,11 +320,11 @@ class TestComputeLogLossWeights:
         assert abs(weights["b"] - uniform) < 1e-10
         assert abs(weights["c"] - uniform) < 1e-10
 
-    def test_delegates_to_compute_blend_weights(self):
-        log_losses = {"a": 0.5, "b": 1.0}
-        direct = compute_log_loss_weights(log_losses)
-        delegated = compute_blend_weights(log_losses)
-        assert direct == delegated
+    def test_deterministic(self):
+        """Same input always yields identical weights."""
+        a = compute_log_loss_weights({"a": 0.42, "b": 0.77, "c": 0.55})
+        b = compute_log_loss_weights({"a": 0.42, "b": 0.77, "c": 0.55})
+        assert a == b
 
 
 # ── TestWeightLoading ────────────────────────────────────────────────────────

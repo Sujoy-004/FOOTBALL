@@ -16,15 +16,6 @@ const competitions = {
     apiPrefix: "/ucl/api",
     tabs: ["Overview", "Bracket", "Standings"],
   },
-  euro: {
-    label: "Euro 2028",
-    short: "EUR",
-    module: null,
-    route: "/euro",
-    apiPrefix: "/euro/api",
-    disabled: true,
-    tabs: [],
-  },
 };
 
 // ── State ──
@@ -105,22 +96,22 @@ function renderLanding() {
         <div class="lf-card">
           <div class="lfc-icon"><span class="lfc-dot"></span></div>
           <div class="lfc-name">Elo Ratings</div>
-          <div class="lfc-desc">Dynamic team strength ratings updated with every match result, calibrated across international and club competitions.</div>
+          <div class="lfc-desc">Dynamic team strength ratings updated with every match result, drawn from international and club competition history.</div>
         </div>
         <div class="lf-card">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">Multi-Signal Blending</div>
-          <div class="lfc-desc">Refined Elo, market odds, manager effect, squad value, defensive quality, availability, and team synergy &mdash; weighted by proven accuracy.</div>
+          <div class="lfc-desc">Refined Elo, market odds, rolling form, squad value, and rest days &mdash; blended by a transparent weighted ensemble.</div>
         </div>
         <div class="lf-card">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">Monte Carlo Simulation</div>
-          <div class="lfc-desc">50,000 tournament simulations projecting every knockout path, group outcome, and championship probability with statistical confidence.</div>
+          <div class="lfc-desc">Seeded tournament simulations (default 50,000 iterations) projecting every knockout path, group outcome, and championship probability with bootstrap confidence intervals.</div>
         </div>
         <div class="lf-card">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">What-If Analysis</div>
-          <div class="lfc-desc">Ask &ldquo;what if my team&rsquo;s star player is injured?&rdquo; or &ldquo;what if they hit peak form?&rdquo; &mdash; see instant probability shifts.</div>
+          <div class="lfc-desc">Adjust a team&rsquo;s Elo rating and re-run the seeded simulation &mdash; see exactly how championship probabilities shift.</div>
         </div>
       </div>
     </div>

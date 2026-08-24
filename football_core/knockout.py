@@ -11,9 +11,6 @@ from football_core.constants import (
 from football_core.groups import _build_poisson_table, expected_goals
 
 
-KNOOKOUT_ROUNDS = {"R16", "QF", "SF", "FINAL", "TPP"}
-
-
 def _get_blended_prob(
     match_id: str,
     team_a: str,

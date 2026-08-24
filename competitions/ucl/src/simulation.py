@@ -4,9 +4,7 @@ Provides the top-level orchestration layer:
 
 - :func:`simulate_league_phase` — one complete league phase iteration
 - :func:`run_monte_carlo` — N-iteration Monte Carlo loop with aggregation
-- :func:`run_monte_carlo_glicko` — N-iteration MC loop with Glicko-1 uncertainty
 - :func:`aggregate_mc_results` — isolated aggregation function for testability
-- :func:`_sample_glicko_elos` — sample team strengths from N(μ, σ²)
 - :func:`compute_bootstrap_ci` — percentile bootstrap CI on champion probabilities
 - :func:`compute_bootstrap_ci_small_sample` — conservative CI for low-count teams
 
@@ -313,7 +311,6 @@ def aggregate_mc_results(
     stage_collectors: dict[str, list[int]] | None = None,
     compute_ci: bool = False,
     ci_seed: int = 42,
-    using_glicko: bool = False,
 ) -> dict[str, dict]:
     """Aggregate per-iteration results into per-team D-06/D-07/D-09 output.
 
@@ -326,9 +323,6 @@ def aggregate_mc_results(
     When *compute_ci* is True, also computes bootstrap confidence
     intervals on ``champion_prob`` and adds ``champion_ci_lower``,
     ``champion_ci_upper``, and ``champion_ci_width_pct`` fields.
-
-    When *using_glicko* is True, also adds ``uncertainty_contribution``
-    field capturing the CI width attributable to rating uncertainty.
 
     Parameters
     ----------
@@ -348,18 +342,13 @@ def aggregate_mc_results(
         If True, compute bootstrap confidence intervals (default False).
     ci_seed:
         Random seed for bootstrap resampling (default 42).
-    using_glicko:
-        If True, the input data came from a Glicko-1 uncertainty sampling
-        run, so ``uncertainty_contribution`` is set to the CI width
-        (default False).
 
     Returns
     -------
     dict[str, dict]
         Per-team dict with D-06/D-07 fields plus D-09 stage probability
         fields if *stage_collectors* was provided, plus CI fields
-        if *compute_ci* was True, plus ``uncertainty_contribution``
-        if *using_glicko* was True.
+        if *compute_ci* was True.
     """
     teams: dict[str, dict] = {}
     for team in positions:
@@ -403,16 +392,6 @@ def aggregate_mc_results(
             entry["champion_ci_lower"] = ci_lo
             entry["champion_ci_upper"] = ci_hi
             entry["champion_ci_width_pct"] = (ci_hi - ci_lo) * 100.0
-
-        # ── Glicko uncertainty contribution ─────────────────────────────
-        # When using Glicko-1 rating sampling, the CI width captures BOTH
-        # match randomness AND rating uncertainty. The uncertainty_contribution
-        # field reports the total CI width as the contribution from rating
-        # imprecision (since point-estimate Elo would produce narrower CIs
-        # containing only match variance).
-        if using_glicko:
-            for team, entry in teams.items():
-                entry["uncertainty_contribution"] = entry.get("champion_ci_width_pct", 0.0)
 
     return teams
 
@@ -576,199 +555,3 @@ def run_monte_carlo(
     }
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# ── Glicko-1 uncertainty propagation  (Phase 10, Plan 02)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def _sample_glicko_elos(
-    rating_system,
-    rng: random.Random,
-) -> dict[str, float]:
-    """Sample team strengths from N(μ, σ²) per Glicko rating.
-
-    Each iteration samples a point-estimate Elo from each team's
-    posterior distribution N(μ, σ²).  Values are clamped to [0, 3000]
-    to prevent degenerate outlier samples during early iterations when
-    σ is large (e.g., DEFAULT_SIGMA=350).
-
-    Parameters
-    ----------
-    rating_system:
-        :class:`~football_core.glicko.RatingSystem` with per-team
-        (μ, σ²) distributions.
-    rng:
-        Seeded ``random.Random`` for reproducibility.
-
-    Returns
-    -------
-    dict[str, float]
-        ``{team_name: sampled_mu}`` with all teams from the rating
-        system, each clamped to [0, 3000].
-    """
-    elos: dict[str, float] = {}
-    for team, rating in rating_system.teams():
-        sampled = rng.gauss(rating.mu, rating.sigma)
-        # Clamp to prevent degenerate outlier samples
-        sampled = max(0.0, min(3000.0, sampled))
-        elos[team] = sampled
-    return elos
-
-
-def run_monte_carlo_glicko(
-    fixtures: dict,
-    rating_system,
-    n_iterations: int = 10000,
-    seed: int = 42,
-    uefa_coefficients: dict[str, float] | None = None,
-    team_aliases: dict[str, str] | None = None,
-    played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
-    compute_ci: bool = False,
-    progress_cb: callable | None = None,
-) -> dict:
-    """Monte Carlo simulation with Glicko-1 uncertainty sampling.
-
-    Instead of a fixed point-estimate Elo rating per team (as in
-    :func:`run_monte_carlo`), this function samples each team's
-    strength from N(μ, σ²) at **every iteration**, propagating rating
-    uncertainty into the champion probability distribution.
-
-    The matchup lambdas (Poisson rates) are precomputed once using
-    the mean ratings (μ), while per-iteration Elo samples are used
-    for match simulation and the knockout pipeline.
-
-    Parameters
-    ----------
-    fixtures:
-        UCL fixture schedule dict (36 teams, 144 matches).
-    rating_system:
-        :class:`~football_core.glicko.RatingSystem` with per-team
-        (μ, σ²) distributions.  Must contain ratings for all 36 teams.
-    n_iterations:
-        Number of Monte Carlo iterations (default 10 000).
-    seed:
-        Random seed for reproducibility.
-    uefa_coefficients:
-        ``{team_name: coefficient}`` for tiebreaker step 10.
-    team_aliases:
-        Unused (reserved for future alias-based sampling).
-    played_matches:
-        ``{(team_a, team_b): (home_goals, away_goals)}`` dict for
-        conditioning on real results.
-    compute_ci:
-        If True, compute bootstrap confidence intervals on champion
-        probabilities (default False).
-
-    Returns
-    -------
-    dict
-        Same structure as :func:`run_monte_carlo`: ``{snapshot_date,
-        n_iterations, seed, teams, stage_order}``.
-        Plus CI fields when *compute_ci* is True.
-    """
-    # Use mean ratings for precomputation (per-iteration sampling is
-    # done inside the loop)
-    mean_elos: dict[str, float] = rating_system.to_elo_dict()
-
-    # ── 1. Initialise seeded RNG ────────────────────────────────────────
-    rng = random.Random(seed)
-
-    # ── 2. Precompute matchup lambdas ONCE using mean ratings ───────────
-    matchup_lambdas = precompute_swiss_matchup_lambdas(
-        fixtures, mean_elos, EXPECTED_GOALS_BASE_RATE,
-    )
-
-    # ── 3. Initialise per-team collectors ───────────────────────────────
-    team_names = [t["name"] for t in fixtures["schedule"]["teams"]]
-    positions: dict[str, list[int]] = {t: [] for t in team_names}
-    champions: dict[str, int] = {t: 0 for t in team_names}
-    stat_collectors: dict[str, dict[str, list[int | float]]] = {
-        t: {"pts": [], "gd": [], "gs": [], "away_gs": [],
-            "wins": [], "away_wins": []}
-        for t in team_names
-    }
-    stage_collectors: dict[str, list[int]] = {
-        t: [] for t in team_names
-    }
-
-    # ── 3b. Load competition data files ONCE ────────────────────────────
-    data_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "data",
-    )
-    pairings_path = os.path.join(data_dir, "playoff_pairings.json")
-    with open(pairings_path) as f:
-        _pairings_data = json.load(f)
-    bracket_path = os.path.join(data_dir, "bracket_rules.json")
-    with open(bracket_path) as f:
-        _bracket_data = json.load(f)
-
-    # ── 4. Main iteration loop ──────────────────────────────────────────
-    report_interval = max(1, n_iterations // 100)
-    for i in range(n_iterations):
-        # Sample team strengths from N(μ, σ²) — each iteration gets a
-        # different sample, propagating uncertainty into champion variance
-        sampled_elos = _sample_glicko_elos(rating_system, rng)
-
-        # Recompute lambdas per iteration from sampled Elos (fix Glicko decoupling)
-        iter_lambdas = precompute_swiss_matchup_lambdas(
-            fixtures, sampled_elos, EXPECTED_GOALS_BASE_RATE,
-        )
-        standings = simulate_league_phase(
-            fixtures,
-            sampled_elos,
-            rng,
-            uefa_coefficients=uefa_coefficients,
-            matchup_lambdas=iter_lambdas,
-            played_matches=played_matches,
-        )
-
-        # ── Knockout pipeline ───────────────────────────────────────────
-        playoff_result = simulate_playoff_round(
-            standings, sampled_elos, rng,
-            pairings_data=_pairings_data,
-        )
-        bracket = build_r16_bracket(
-            standings, playoff_result,
-            bracket_data=_bracket_data,
-            rng=rng,
-        )
-        tree_result = simulate_knockout_tree(
-            bracket, sampled_elos, rng,
-        )
-        stages = track_knockout_stages(standings, tree_result)
-
-        # ── Collect results ─────────────────────────────────────────────
-        for entry in standings:
-            team = entry["team"]
-            pos = entry["position"]
-            positions[team].append(pos)
-            stat_collectors[team]["pts"].append(entry["pts"])
-            stat_collectors[team]["gd"].append(entry["gd"])
-            stat_collectors[team]["gs"].append(entry["gs"])
-            stat_collectors[team]["away_gs"].append(entry["away_gs"])
-            stat_collectors[team]["wins"].append(entry["wins"])
-            stat_collectors[team]["away_wins"].append(entry["away_wins"])
-            if stages[team] == "champion":
-                champions[team] += 1
-            stage_collectors[team].append(STAGE_TO_VALUE[stages[team]])
-
-        if progress_cb and (i % report_interval == 0 or i == n_iterations - 1):
-            progress_cb(i + 1, n_iterations)
-
-    # ── 5. Aggregate and return ─────────────────────────────────────────
-    from competitions.ucl.src.elo_fetcher import get_clubelo_snapshot_date
-
-    return {
-        "snapshot_date": get_clubelo_snapshot_date(),
-        "n_iterations": n_iterations,
-        "seed": seed,
-        "teams": aggregate_mc_results(
-            positions, champions, stat_collectors, n_iterations,
-            stage_collectors=stage_collectors,
-            compute_ci=compute_ci,
-            using_glicko=True,
-        ),
-        "stage_order": STAGE_ORDER,
-        "using_glicko": True,
-    }

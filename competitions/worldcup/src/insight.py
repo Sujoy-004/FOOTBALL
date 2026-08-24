@@ -62,30 +62,12 @@ def compute_team_signal_strengths(ledger, played_groups):
                 continue
             _ensure(sk)
 
-            if sk == "defensive_quality":
-                ra = sv.get("defensive_rating_a")
-                rb = sv.get("defensive_rating_b")
-                if ra is not None:
-                    accum[sk].setdefault(ta, []).append(ra)
-                if rb is not None:
-                    accum[sk].setdefault(tb, []).append(rb)
-
-            elif sk == "manager_effect":
-                ra = sv.get("manager_rating_a")
-                rb = sv.get("manager_rating_b")
-                if ra is not None:
-                    accum[sk].setdefault(ta, []).append(ra)
-                if rb is not None:
-                    accum[sk].setdefault(tb, []).append(rb)
-
-            else:
-                prob = sv.get("probability")
-                if prob is not None:
-                    accum[sk].setdefault(ta, []).append(prob)
-                    accum[sk].setdefault(tb, []).append(1.0 - prob)
+            prob = sv.get("probability")
+            if prob is not None:
+                accum[sk].setdefault(ta, []).append(prob)
+                accum[sk].setdefault(tb, []).append(1.0 - prob)
 
     result = {}
-    rating_sigs = {"defensive_quality", "manager_effect"}
     for sk, team_vals in accum.items():
         result[sk] = {}
         for team, vals in team_vals.items():
@@ -99,7 +81,7 @@ def compute_ko_signal_probs(ta, tb, team_strengths, elo_ratings):
 
     Returns: {signal_name: probability}, elo_prob
     """
-    ALL_SIGNALS = ["form", "lineup_strength", "defensive_quality", "manager_effect", "market_odds", "catboost"]
+    ALL_SIGNALS = ["market_odds", "rolling_form", "squad_value", "rest_days"]
 
     elo_a = elo_ratings.get(ta, 1500)
     elo_b = elo_ratings.get(tb, 1500)

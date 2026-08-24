@@ -1,8 +1,7 @@
 """BSD API data provider — wraps sports.bzzoiro.com endpoints.
 
-Consolidates HTTP retry/auth/pagination logic from fetcher.py, manager.py,
-player.py, and catboost.py into a single class. Returns raw list-of-dict
-data; consumers handle parsing + caching.
+Encapsulates HTTP retry/auth logic for fetching raw match events.
+Returns raw list-of-dict data; consumers handle parsing + caching.
 """
 
 from __future__ import annotations
@@ -21,10 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class BSDDataProvider:
-    """Data provider for BSD API (sports.bzzoiro.com).
-
-    Encapsulates 4 endpoint types: matches, predictions, managers, players.
-    Each method returns raw list-of-dict data matching the existing BSD schema.
+    """Data provider for BSD API (sports.bzzoiro.com) — match events.
 
     Parameters
     ----------
@@ -80,18 +76,6 @@ class BSDDataProvider:
                 return None
         return None
 
-    def _paginate(self, url: str, timeout: int = 10) -> list[dict[str, Any]]:
-        """Fetch a paginated endpoint, following ``next`` links."""
-        results: list[dict[str, Any]] = []
-        next_url: str | None = url
-        while next_url:
-            data = self._request(next_url, timeout=timeout)
-            if data is None:
-                break
-            results.extend(data.get("results", []))
-            next_url = data.get("next")
-        return results
-
     # ── endpoint methods ─────────────────────────────────────────────────
 
     def fetch_matches(
@@ -135,40 +119,3 @@ class BSDDataProvider:
             if isinstance(e.get("league"), dict) and e["league"].get("id") == lid
         ]
 
-    def fetch_predictions(
-        self,
-        league_id: int | None = None,
-        timeout: int = 10,
-    ) -> list[dict[str, Any]]:
-        """Fetch predictions from BSD ``/api/predictions/``."""
-        lid = league_id if league_id is not None else self.league_id
-        url = f"{self.BASE_URL}/api/predictions/?league={lid}"
-        data = self._request(url, timeout=timeout)
-        if data is None:
-            return []
-        results = data.get("results", [])
-        return results if isinstance(results, list) else []
-
-    def fetch_managers(
-        self,
-        league_id: int | None = None,
-        timeout: int = 10,
-    ) -> list[dict[str, Any]]:
-        """Fetch manager profiles from BSD ``/api/managers/``."""
-        lid = league_id if league_id is not None else self.league_id
-        url = f"{self.BASE_URL}/api/managers/?league={lid}"
-        data = self._request(url, timeout=timeout)
-        if data is None:
-            return []
-        results = data.get("results", [])
-        return results if isinstance(results, list) else []
-
-    def fetch_players(
-        self,
-        league_id: int | None = None,
-        timeout: int = 10,
-    ) -> list[dict[str, Any]]:
-        """Fetch player profiles from BSD ``/api/v2/players/``."""
-        lid = league_id if league_id is not None else self.league_id
-        url = f"{self.BASE_URL}/api/v2/players/?league_id={lid}&limit=200"
-        return self._paginate(url, timeout=timeout)

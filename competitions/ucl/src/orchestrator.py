@@ -1,11 +1,8 @@
 """Simulation mode orchestrator for UCL.
 
-Routes between simulate, replay, and live modes per D-05.
-Each mode resolves played_matches from its source, then delegates
-to the simulation engine which is mode-agnostic.
-
-Extended in Phase 10 (Plan 02) to support Glicko-1 rating system
-uncertainty propagation via the *rating_system* parameter.
+Routes between simulate and live/results modes. Each mode resolves
+played_matches from its source, then delegates to the simulation engine
+which is mode-agnostic.
 
 Usage:
     from competitions.ucl.src.orchestrator import run_simulation
@@ -36,50 +33,6 @@ def _get_config_dir() -> str:
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "config",
     )
-
-
-def load_calibration() -> dict | None:
-    """Load temperature calibration from config/calibration.json."""
-    cal_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "config",
-        "calibration.json",
-    )
-    if not os.path.exists(cal_path):
-        return None
-
-    try:
-        with open(cal_path) as f:
-            data = json.load(f)
-        result: dict = {}
-        if "T" in data:
-            result["T"] = float(data["T"])
-        if "alpha" in data:
-            result["alpha"] = float(data["alpha"])
-            result.setdefault("T", 1.0 / result["alpha"])
-        if "log_loss" in data and data["log_loss"] is not None:
-            result["log_loss"] = float(data["log_loss"])
-        if "log_loss_before" in data and data["log_loss_before"] is not None:
-            result["log_loss_before"] = float(data["log_loss_before"])
-        if "n_samples" in data:
-            result["n_samples"] = int(data["n_samples"])
-        if "ece" in data and data["ece"] is not None:
-            result["ece"] = float(data["ece"])
-        return result if "T" in result else None
-    except (json.JSONDecodeError, KeyError, ValueError, ZeroDivisionError):
-        pass
-
-    return None
-
-
-def load_cache_ttls(data_dir: str) -> dict[str, int]:
-    """Load per-signal cache TTLs from config/cache_ttls.json."""
-    config_path = os.path.join(data_dir, "..", "config", "cache_ttls.json")
-    try:
-        with open(config_path) as f:
-            return dict(json.load(f))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {"odds": 12, "catboost": 24}
 
 
 class _ReplayResultProvider:
@@ -125,11 +78,6 @@ def build_signal_engine(
     from football_core.signals.rolling_form import RollingFormSignal
     from football_core.signals.squad_value import SquadValueSignal
     from football_core.signals.rest_days import RestDaysSignal
-    from football_core.signals.availability import AvailabilitySignal
-    from football_core.signals.manager_effect import ManagerEffectSignal
-    from football_core.signals.defensive_quality import DefensiveQualitySignal
-    from football_core.signals.player_form import PlayerFormSignal
-    from football_core.signals.team_synergy import TeamSynergySignal
 
     signals = [
         RefinedEloSignal(),
@@ -140,11 +88,6 @@ def build_signal_engine(
         ),
         SquadValueSignal(),
         RestDaysSignal(),
-        AvailabilitySignal(),
-        ManagerEffectSignal(),
-        DefensiveQualitySignal(),
-        PlayerFormSignal(),
-        TeamSynergySignal(),
     ]
 
     logger.debug("Building ensemble engine with %d signals: %s",
@@ -171,38 +114,24 @@ def build_simulation_result(
     seed: int,
     n_iterations: int,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
-    rating_system=None,
     progress_cb: callable | None = None,
 ) -> SimulationResult:
     """Run MC simulation + one representative bracket iteration, return SimulationResult."""
     fixtures_dict = {"schedule": asdict(fixtures)}
 
-    using_glicko = rating_system is not None
-    if using_glicko:
-        from competitions.ucl.src.simulation import run_monte_carlo_glicko
-        mc_result = run_monte_carlo_glicko(
-            fixtures_dict,
-            rating_system,
-            n_iterations=n_iterations,
-            seed=seed,
-            played_matches=played_matches,
-            progress_cb=progress_cb,
-        )
-    else:
-        from competitions.ucl.src.simulation import run_monte_carlo
-        mc_result = run_monte_carlo(
-            fixtures_dict,
-            elo_ratings=elo_ratings,
-            n_iterations=n_iterations,
-            seed=seed,
-            played_matches=played_matches,
-            progress_cb=progress_cb,
-        )
+    from competitions.ucl.src.simulation import run_monte_carlo
+    mc_result = run_monte_carlo(
+        fixtures_dict,
+        elo_ratings=elo_ratings,
+        n_iterations=n_iterations,
+        seed=seed,
+        played_matches=played_matches,
+        progress_cb=progress_cb,
+    )
 
     rng = random.Random(seed)
-    bracket_elos = rating_system.to_elo_dict() if using_glicko else elo_ratings
     from competitions.ucl.src.simulation import simulate_league_phase
-    standings = simulate_league_phase(fixtures_dict, bracket_elos, rng, played_matches=played_matches)
+    standings = simulate_league_phase(fixtures_dict, elo_ratings, rng, played_matches=played_matches)
 
     data_dir = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -222,7 +151,7 @@ def build_simulation_result(
     )
 
     playoff_result = simulate_playoff_round(
-        standings, bracket_elos, rng,
+        standings, elo_ratings, rng,
         pairings_data=pairings_data,
     )
     bracket = build_r16_bracket(
@@ -230,7 +159,7 @@ def build_simulation_result(
         bracket_data=bracket_data,
         rng=rng,
     )
-    tree_result = simulate_knockout_tree(bracket, bracket_elos, rng)
+    tree_result = simulate_knockout_tree(bracket, elo_ratings, rng)
     stages = track_knockout_stages(standings, tree_result)
 
     return SimulationResult(
@@ -357,7 +286,6 @@ def run_simulation(
     n_iterations: int,
     args,
     data_dir: str,
-    rating_system=None,
 ) -> object:
     """Orchestrate the full simulation: resolve mode, run MC, return result."""
     played_matches = resolve_played_matches(args, data_dir, fixtures_schedule)
@@ -365,7 +293,6 @@ def run_simulation(
     return build_simulation_result(
         fixtures_schedule, elo_ratings, seed, n_iterations,
         played_matches=played_matches,
-        rating_system=rating_system,
     )
 
 
@@ -385,7 +312,6 @@ def run_deterministic_compute(
     from competitions.ucl.src.pipeline import (
         load_results, load_knockout_results, compute_deterministic_standings,
         build_deterministic_bracket, build_league_matchdays, compute_signal_eval,
-        fetch_ucl_managers,
     )
     from web.common import ts, boot_step
 
@@ -422,7 +348,6 @@ def run_deterministic_compute(
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
         boot.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback"})
 
-    bsd_manager_data = _step("Fetch BSD managers", lambda: fetch_ucl_managers(bsd_api_key, team_aliases=team_aliases))
     standings = _step("Compute standings", lambda: compute_deterministic_standings(results))
     if not standings:
         return {"error": "standings computation failed", "boot": boot}
@@ -437,7 +362,7 @@ def run_deterministic_compute(
     engine = _step("Build signal engine", lambda: build_signal_engine(elo_ratings, results_file=_results_tmp.name))
     os.unlink(_results_tmp.name)
 
-    signal_stats = _step("Evaluate signals", lambda: compute_signal_eval(results, engine, elo_ratings, bsd_manager_data))
+    signal_stats = _step("Evaluate signals", lambda: compute_signal_eval(results, engine, elo_ratings))
 
     def _was_in_semis(t: str) -> bool:
         for m in knockout.get("rounds", {}).get("SF", []):
@@ -495,7 +420,6 @@ def run_deterministic_compute(
         "_results": results,
         "_signal_engine": engine,
         "boot": boot,
-        "bsd_manager_data": bsd_manager_data,
     }
 
 
@@ -511,7 +435,7 @@ def run_compute_all(
     Returns dict with keys: mode, teams, all_teams, standings, playoff,
     bracket_rounds, league_matchdays, odds, signals, elo_ratings, champion,
     boot, _results, _signal_engine, n_teams, n_iterations, n_total_matches,
-    seed, snapshot_date, bsd_manager_data, calibration, show_ci.
+    seed, snapshot_date, show_ci.
     """
     from web.common import ts, boot_step
 
@@ -529,9 +453,6 @@ def run_compute_all(
         return run_deterministic_compute(data_dir, bsd_api_key, team_aliases=team_aliases)
 
     # Simulation mode
-    from competitions.ucl.src.pipeline import (
-        fetch_ucl_managers,
-    )
     from competitions.ucl.src.provider import RepoFixtureProvider
     from competitions.ucl.src.elo_fetcher import fetch_team_elos
 
@@ -550,22 +471,6 @@ def run_compute_all(
             c = coefficients.get(t, 50)
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
         boot.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback"})
-
-    bsd_manager_data = _step("Fetch BSD managers", lambda: fetch_ucl_managers(bsd_api_key, team_aliases=team_aliases))
-
-    if bsd_manager_data and elo_ratings:
-        blended_count = 0
-        for t in team_names:
-            base = elo_ratings.get(t, 1400.0)
-            mgr = bsd_manager_data.get(t)
-            if mgr:
-                win_pct = mgr.get("win_pct", 0.0) / 100.0
-                if win_pct > 0:
-                    mgr_elo = 1400.0 + (win_pct - 0.5) * 400.0
-                    elo_ratings[t] = round(base * 0.7 + mgr_elo * 0.3, 1)
-                    blended_count += 1
-        if blended_count > 0:
-            boot.append({"step": "Elo blend (BSD managers)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Blended manager win% into Elo for {blended_count} teams"})
 
     # Run MC simulation
     result = _step("Monte Carlo simulation", lambda: build_simulation_result(provider, elo_ratings, seed, n_iterations))
@@ -642,7 +547,6 @@ def run_compute_all(
                 signal_matches.append({"team_a": m.team_a, "team_b": m.team_b, "match_id": m.match_id})
         signal_context = PredictionContext(
             fixtures=signal_matches, elo_ratings=elo_ratings,
-            played_results=[], manager_data=bsd_manager_data,
         )
         blended = [engine.evaluate(m, signal_context) for m in signal_matches]
         sig_data = {}
@@ -667,8 +571,6 @@ def run_compute_all(
     except Exception:
         signal_stats = {}
 
-    calib = load_calibration()
-
     return {
         "mode": "simulation",
         "teams": top4,
@@ -684,10 +586,8 @@ def run_compute_all(
         "odds": odds_display,
         "signals": signal_stats,
         "elo_ratings": elo_ratings,
-        "calibration": calib,
         "show_ci": "auto",
         "league_matchdays": {},
         "boot": boot,
         "_signal_engine": engine,
-        "bsd_manager_data": bsd_manager_data,
     }

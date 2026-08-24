@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from dataclasses import asdict
 
 from football_core.provider import (
     FixtureProvider,
@@ -11,6 +12,7 @@ from football_core.provider import (
     Team,
     Match,
 )
+from competitions.ucl.src.validation import validate_ucl_fixtures
 
 
 def _build_schedule_from_json(fixtures_path: str) -> FixtureSchedule:
@@ -55,51 +57,33 @@ class TestFixtureProviderProtocol:
 
 
 class TestFixtureScheduleValidation:
-    """Tests for FixtureSchedule.validate() — delegates to existing validate_ucl_fixtures()."""
+    """Tests for UCL schedule validation — caller-side validate_ucl_fixtures()."""
 
     def test_valid_schedule_passes(self, sample_fixture_path):
-        """A valid 36-team, 8-matchday schedule should pass validate() without raising."""
+        """A valid 36-team, 8-matchday schedule should pass validation without raising."""
         schedule = _build_schedule_from_json(sample_fixture_path)
         assert len(schedule.teams) == 36
         assert len(schedule.matchdays) == 8
-        # validate() should not raise for a valid schedule
-        schedule.validate()
+        # Validation should not raise for a valid schedule
+        validate_ucl_fixtures({"schedule": asdict(schedule)})
 
     def test_invalid_team_count_raises(self):
-        """A FixtureSchedule with 0 teams should raise ValueError on validate()."""
-        schedule = FixtureSchedule(teams=[], matchdays=[])
+        """A schedule with 0 teams should raise ValueError on validation."""
         with pytest.raises(ValueError, match="Expected 36 teams"):
-            schedule.validate()
+            validate_ucl_fixtures({"schedule": {"teams": [], "matchdays": []}})
 
     def test_invalid_matchday_count_raises(self, sample_36_teams_data):
-        """A FixtureSchedule with 0 matchdays should raise ValueError on validate()."""
+        """A schedule with 0 matchdays should raise ValueError on validation."""
         teams = [Team(**t) for t in sample_36_teams_data]
-        schedule = FixtureSchedule(teams=teams, matchdays=[])
+        schedule_dict = {"teams": [asdict(t) for t in teams], "matchdays": []}
         with pytest.raises(ValueError, match="Expected 8 matchdays"):
-            schedule.validate()
+            validate_ucl_fixtures({"schedule": schedule_dict})
 
-    def test_validation_delegates_to_existing(self, monkeypatch, sample_fixture_path):
-        """validate() should call validate_ucl_fixtures() from the existing validation module."""
-        call_count = 0
-        captured_arg = None
-
-        def mock_validate(fixtures):
-            nonlocal call_count, captured_arg
-            call_count += 1
-            captured_arg = fixtures
-            return fixtures
-
-        monkeypatch.setattr(
-            "competitions.ucl.src.validation.validate_ucl_fixtures",
-            mock_validate,
-        )
-
-        schedule = _build_schedule_from_json(sample_fixture_path)
-        schedule.validate()
-
-        assert call_count >= 1, "validate_ucl_fixtures was never called"
-        assert captured_arg is not None
-        assert "schedule" in captured_arg
+    def test_core_validate_is_competition_agnostic(self, sample_fixture_path):
+        """FixtureSchedule.validate() in core must NOT run UCL-specific checks."""
+        empty = FixtureSchedule(teams=[], matchdays=[])
+        with pytest.raises(ValueError, match="no teams"):
+            empty.validate()
 
 
 class TestRepoFixtureProvider:
@@ -157,8 +141,8 @@ class TestBSDFixtureProvider:
         # which won't pass the full 36-team/8-matchday UCL validation. The parse pipeline
         # is tested here; validation is tested separately in TestFixtureScheduleValidation.
         monkeypatch.setattr(
-            "competitions.ucl.src.provider.FixtureSchedule.validate",
-            lambda self: None,
+            "competitions.ucl.src.provider.validate_ucl_fixtures",
+            lambda fixtures: None,
         )
 
         # Provide aliases mapping BSD API team names to canonical names
@@ -241,8 +225,8 @@ class TestBSDFixtureProvider:
         # and will re-validate after load. This is the correct validation gate
         # behaviour — but we test the cache-hit path independently here.
         monkeypatch.setattr(
-            "competitions.ucl.src.provider.FixtureSchedule.validate",
-            lambda self: None,
+            "competitions.ucl.src.provider.validate_ucl_fixtures",
+            lambda fixtures: None,
         )
 
         call_count = 0

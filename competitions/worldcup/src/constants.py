@@ -137,14 +137,10 @@ All 48 World Cup 2026 teams. Codes in alphabetical order."""
 ODDS_CACHE_TTL_HOURS: int = 12
 """How long odds cache is valid in hours (D-06: resolved to 12h per research)."""
 
-CATBOOST_CACHE_TTL_HOURS: int = 24
-"""How long CatBoost cache is valid in hours (D-06: resolved to 24h per research)."""
 
 ODDS_CACHE_FILE: str = "odds_cache.json"
 """Filename for market odds cache in data/ directory (D-04)."""
 
-CATBOOST_CACHE_FILE: str = "catboost_cache.json"
-"""Filename for CatBoost prediction cache in data/ directory (D-04)."""
 
 PREDICTION_LEDGER_FILE: str = "predictions_ledger.json"
 """Filename for permanent prediction ledger in data/ directory (Phase 14a).
@@ -155,18 +151,17 @@ PREDICTION_HISTORY_SCHEMA_VERSION: int = 2
 """Schema version for prediction_history.json. v1=flat (Phase 12b), v2=compound (Phase 13+)."""
 
 PROBABILITY_LOG_FILE: str = "probability_log.json"
-"""Filename for rolling probability log in data/ directory (Phase 20).
-Array of snapshot dicts appended after every run_poll_cycle(). Never pruned."""
+"""Filename for rolling probability log in data/ directory.
+Array of snapshot dicts appended after every simulation cycle."""
 
-# ─── Blender Constants (Phase 14) ──────────────────────────────────────────
+# ─── Blender Constants ──────────────────────────────────────────────────────
 
 CALIBRATION_PARAMS_FILE: str = "calibration_params.json"
-"""Filename for fitted Platt scaling parameters (Phase 14).
-Stored as {signal_key: {A: float, B: float, n_matches: int, brier: float, fitted_at: str}}."""
+"""Legacy filename kept for backward compatibility; no longer written by the
+canonical ensemble."""
 
 COLD_START_THRESHOLD: int = 30
-"""Minimum matches before Platt scaling fitting activates (D-03/D-04).
-Below this, identity calibration (p_calibrated = p_raw) is used."""
+"""Minimum labeled predictions per signal before weight fitting activates."""
 
 BRIER_WINDOW_SIZE: int = 50
 """Rolling window for per-signal Brier computation used in blend weights (D-08).
@@ -203,7 +198,7 @@ avoid suppressing an already-small signal.
 
 This is a calibration constant, not an architecture decision.
 Expected to change once real multi-signal accumulation data is available.
-Platt scaling refines this as entries accumulate (>=30 threshold)."""
+Inverse-log-loss weight fitting refines this as entries accumulate (>=30 threshold)."""
 
 DEFAULT_LINEUP_K: float = 0.35
 """Default sigmoid steepness for lineup strength signal — TUNING PARAMETER (D-10).
@@ -223,42 +218,16 @@ without extreme probabilities.
 This is a calibration constant, not an architecture decision.
 Expected to change once real data accumulates."""
 
-FORM_CACHE_FILE: str = "form_cache.json"
-"""Filename for form signal cache in data/ directory. Form is computed locally
-(no API call) but follows same cache-dict schema as odds/catboost for consistency."""
 
-LINEUP_CACHE_FILE: str = "lineup_cache.json"
-"""Filename for lineup strength signal cache in data/ directory."""
 
-MANAGER_CACHE_TTL_HOURS: int = 24
-"""How long manager data cache is valid in hours.
-Manager profiles change rarely (only on managerial changes)."""
 
-MANAGER_CACHE_FILE: str = "manager_cache.json"
-"""Filename for manager data cache in data/ directory.
-Contains raw manager profiles used by both defensive_quality and manager_effect."""
 
-DEFENSIVE_CACHE_FILE: str = "defensive_cache.json"
-"""Filename for defensive quality signal cache in data/ directory."""
 
-MANAGER_EFFECT_CACHE_FILE: str = "manager_effect_cache.json"
-"""Filename for manager effect signal cache in data/ directory."""
 
-AVAILABILITY_CACHE_TTL_HOURS: int = 6
-"""How long player/availability data cache is valid in hours.
-Shorter TTL because player availability changes rapidly with squad announcements."""
-
-AVAILABILITY_CACHE_FILE: str = "availability_cache.json"
-"""Filename for availability signal cache in data/ directory.
-Player data (availability, injury_risk) from BSD /api/v2/players/."""
 
 # ─── World Cup Signal Cache Files (Phase 21) ─────────────────────────────────
 
-ELO_ODDS_CACHE_FILE: str = "elo_odds_cache.json"
-"""Filename for Elo-based odds signal cache in data/ directory."""
 
-TEAM_SYNERGY_CACHE_FILE: str = "team_synergy_cache.json"
-"""Filename for team synergy signal cache in data/ directory."""
 
 ROLLING_FORM_CACHE_FILE: str = "rolling_form_cache.json"
 """Filename for rolling form signal cache in data/ directory."""
@@ -275,42 +244,7 @@ LOCAL_SIGNAL_CACHE_TTL_HOURS: int = 1
 SQUAD_VALUE_CACHE_TTL_HOURS: int = 24
 """TTL for squad value cache — squad values change slowly (transfer window dependent)."""
 
-ELO_ODDS_CACHE_TTL_HOURS: int = 24
-"""TTL for Elo odds cache — pure computation from Elo ratings, updated daily."""
 
-DEFAULT_DEFENSIVE_K: float = 2.0
-"""Default sigmoid steepness for defensive quality signal.
-clean_sheet_pct ∈ [0, 1] and xga_norm ∈ [0, 1], so composite ∈ [0, 1].
-k=2.0 maps diff=0.5 to sigmoid(1.0)=0.73."""
 
-DEFAULT_MANAGER_K: float = 2.0
-"""Default sigmoid steepness for manager effect signal.
-win_pct ∈ [0, 1], rating ∈ [0, ~1.1] with bonuses.
-k=2.0 provides reasonable spread."""
 
-DEFAULT_AVAILABILITY_K: float = 3.0
-"""Default sigmoid steepness for availability signal.
-Unavailability ∈ [0, 1]. k=3.0 maps diff=0.5 to sigmoid(1.5)=0.82."""
 
-# ─── Governance Constants (Phase 16) ───────────────────────────────────
-
-GOV_DATA_FILE: str = "versions.json"
-"""Filename for version tracking state in data/ directory."""
-
-GOV_RUNS_DIR: str = "runs"
-"""Directory for run snapshots relative to data/."""
-
-GOV_INTERVAL_HOURS: int = 1
-"""How often to run governance checks (startup + hourly + on drift)."""
-
-GOVERNANCE_INTERVAL_SECONDS: int = 3600
-"""Governance runs at startup and hourly thereafter (1 hour = 3600 seconds)."""
-
-GOV_DRIFT_SIGMA_THRESHOLD: float = 2.0
-"""Number of standard deviations above reference baseline that triggers drift alert (D-09)."""
-
-GOV_BACKTEST_TOURNAMENTS: list[str] = ["2018", "2022"]
-"""Historical World Cups to backtest against (D-13)."""
-
-GOV_RUN_SNAPSHOT_RETENTION: int = 1000
-"""Maximum number of run snapshots to retain (the agent's discretion)."""

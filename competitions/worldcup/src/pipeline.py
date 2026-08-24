@@ -17,36 +17,21 @@ import logging
 import os
 import random
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from datetime import datetime, timezone
 from pathlib import Path
 
 from src import constants
 from src.constants import (
-    AVAILABILITY_CACHE_FILE,
-    CATBOOST_CACHE_FILE,
-    DEFENSIVE_CACHE_FILE,
-    ELO_ODDS_CACHE_FILE,
-    FORM_CACHE_FILE,
-    LINEUP_CACHE_FILE,
-    MANAGER_EFFECT_CACHE_FILE,
     ODDS_CACHE_FILE,
     REST_DAYS_CACHE_FILE,
     ROLLING_FORM_CACHE_FILE,
     SQUAD_VALUE_CACHE_FILE,
-    TEAM_SYNERGY_CACHE_FILE,
 )
 from src.knockout import run_full_simulation, resolve_knockout_slot_teams
 from src.state import (
     load_annex_c,
-    load_calibration_params,
     load_groups,
-    load_signal_cache,
     save_signal_cache,
-)
-from football_core.data_providers.bsd_provider import BSDDataProvider  # type: ignore[import-untyped]
-from football_core.data_providers.football_data_org_provider import (  # type: ignore[import-untyped]
-    FootballDataOrgProvider,
 )
 from football_core.signal import PredictionContext  # type: ignore[import-untyped]
 
@@ -56,28 +41,25 @@ logger = logging.getLogger(__name__)
 # ── helpers ──────────────────────────────────────────────────────────────
 
 
-def _get_data_provider(bsd_api_key: str, football_data_org_key: str):
-    """Select and return the active data provider based on env vars + API keys.
+# Surviving ensemble signal keys (canonical roster).
+SURVIVING_SIGNALS = ("elo", "market_odds", "rolling_form", "squad_value", "rest_days")
 
-    Order of precedence:
-      1. ``DATA_PROVIDER=bsd`` + ``bsd_api_key`` set  → BSDDataProvider
-      2. ``DATA_PROVIDER=football-data`` + ``football_data_org_key`` → FootballDataOrgProvider
-      3. No env set → auto-detect from whichever key is available
-      4. No key at all → ``None`` (caller must skip live fetch)
+
+def build_blend_params(engine_predictions: list, all_matches: list[dict], engine) -> dict:
+    """Build the simulation blend payload from canonical EnsembleEngine output.
+
+    This is the single blending path: EnsembleEngine blended probabilities
+    become per-match win probabilities for the Monte Carlo simulation.
     """
-    mode = os.getenv("DATA_PROVIDER", "").lower()
-
-    if mode == "bsd" and bsd_api_key:
-        return BSDDataProvider(bsd_api_key, league_id=constants.DEFAULT_LEAGUE_ID)
-    if mode == "football-data" and football_data_org_key:
-        return FootballDataOrgProvider(football_data_org_key)
-
-    # Auto-detect: try BSD first, then football-data
-    if bsd_api_key:
-        return BSDDataProvider(bsd_api_key, league_id=constants.DEFAULT_LEAGUE_ID)
-    if football_data_org_key:
-        return FootballDataOrgProvider(football_data_org_key)
-    return None
+    match_probs: dict[str, float] = {}
+    for bp, m in zip(engine_predictions, all_matches):
+        mid = m.get("match_id", "")
+        if mid:
+            match_probs[mid] = bp.home_prob
+    return {
+        "match_probs": match_probs,
+        "blend_weights": dict(engine.weights),
+    }
 
 
 # ── Function 1: fetch_live_data ──────────────────────────────────────────
@@ -95,7 +77,8 @@ def fetch_live_data(
     fetched via BSD API when the key is present; they degrade gracefully when
     unavailable (see Phase 4 of the provider-swap plan).
     """
-    provider = _get_data_provider(bsd_api_key, football_data_org_key)
+    from web.common import get_data_provider
+    provider = get_data_provider(bsd_api_key, football_data_org_key, constants.DEFAULT_LEAGUE_ID)
     if provider is None:
         logger.warning("fetch_live_data: no data provider configured, skipping")
         return
@@ -186,53 +169,15 @@ def fetch_live_data(
     #    BSD-dependent signals degrade gracefully (Phase 4) when BSD_API_KEY
     #    is missing or the network blocks sports.bzzoiro.com.
     try:
-        from src.predictors.availability import (
-            fetch_and_cache_availability_signal,
-        )
-        from src.predictors.catboost import fetch_and_cache_catboost
-        from src.predictors.elo_odds import compute_elo_odds_signal
-        from src.predictors.form import compute_form_signal
-        from src.predictors.lineup import compute_lineup_signal
-        from src.predictors.manager_signals import (
-            fetch_and_cache_manager_signals,
-        )
         from src.predictors.odds import fetch_and_cache_odds
         from src.predictors.rest_days import compute_rest_days_signal
         from src.predictors.rolling_form import compute_rolling_form_signal
         from src.predictors.squad_value import compute_squad_value_signal
-        from src.predictors.team_synergy import compute_team_synergy_signal
-
-        cb_cache = fetch_and_cache_catboost(
-            bsd_api_key, aliases, groups, bracket_raw
-        )
-        save_signal_cache(cb_cache, CATBOOST_CACHE_FILE, data_dir)
-
-        lineup_cache = compute_lineup_signal(groups, bracket=bracket_raw)
-        save_signal_cache(lineup_cache, LINEUP_CACHE_FILE, data_dir)
-
-        form_cache = compute_form_signal(teams, groups, bracket=bracket_raw)
-        save_signal_cache(form_cache, FORM_CACHE_FILE, data_dir)
 
         odds_cache = fetch_and_cache_odds(
             bsd_api_key, raw_matches, aliases, groups, bracket=bracket_raw
         )
         save_signal_cache(odds_cache, ODDS_CACHE_FILE, data_dir)
-
-        defensive_cache, manager_cache = fetch_and_cache_manager_signals(
-            bsd_api_key, groups, bracket=bracket_raw
-        )
-        save_signal_cache(defensive_cache, DEFENSIVE_CACHE_FILE, data_dir)
-        save_signal_cache(manager_cache, MANAGER_EFFECT_CACHE_FILE, data_dir)
-
-        elo_odds_cache = compute_elo_odds_signal(
-            teams, groups, bracket=bracket_raw
-        )
-        save_signal_cache(elo_odds_cache, ELO_ODDS_CACHE_FILE, data_dir)
-
-        team_synergy_cache = compute_team_synergy_signal(
-            teams, groups, bracket=bracket_raw
-        )
-        save_signal_cache(team_synergy_cache, TEAM_SYNERGY_CACHE_FILE, data_dir)
 
         rolling_form_cache = compute_rolling_form_signal(
             teams, groups, bracket=bracket_raw
@@ -250,23 +195,6 @@ def fetch_live_data(
             groups, bracket=bracket_raw
         )
         save_signal_cache(rest_days_cache, REST_DAYS_CACHE_FILE, data_dir)
-
-        ex = ThreadPoolExecutor(max_workers=1)
-        try:
-            f = ex.submit(
-                fetch_and_cache_availability_signal,
-                bsd_api_key,
-                groups,
-                bracket=bracket_raw,
-            )
-            avail_cache = f.result(timeout=30)
-            save_signal_cache(avail_cache, AVAILABILITY_CACHE_FILE, data_dir)
-        except FuturesTimeout:
-            logger.warning(
-                "fetch_live_data: availability signal timed out (30s)"
-            )
-        finally:
-            ex.shutdown(wait=False)
     except Exception as e:
         logger.warning("fetch_live_data: signal fetch failed: %s", e)
 
@@ -489,16 +417,16 @@ def simulate_from_match(
         all_matches.append(m)
 
     engine_predictions = []
-    if engine:
-        context = PredictionContext(
-            fixtures=all_matches,
-            elo_ratings=elo_ratings,
-            played_results=list(played_raw.values())
-            + list(played_groups_raw.values()),
-        )
-        for m in all_matches:
-            bp = engine.evaluate(m, context)
-            engine_predictions.append(bp)
+    context = PredictionContext(
+        fixtures=all_matches,
+        elo_ratings=elo_ratings,
+        played_results=list(played_raw.values())
+        + list(played_groups_raw.values()),
+    )
+    for m in all_matches:
+        bp = engine.evaluate(m, context)
+        engine_predictions.append(bp)
+    blend_params = build_blend_params(engine_predictions, all_matches, engine)
 
     def _noop_progress(current: int, total: int) -> None:
         pass
@@ -511,6 +439,7 @@ def simulate_from_match(
         played_raw,
         iterations=iterations,
         played_groups=played_groups_raw,
+        blend_params=blend_params,
         progress_cb=_noop_progress,
     )
 
@@ -638,17 +567,16 @@ def run_simulation_compute(
     for m in bracket_raw:
         all_matches.append(m)
 
-    engine_predictions = []
-    if engine:
-        context = PredictionContext(
-            fixtures=all_matches,
-            elo_ratings=elo_ratings,
-            played_results=list(played_raw.values())
-            + list(played_groups.values()),
-        )
-        for m in all_matches:
-            bp = engine.evaluate(m, context)
-            engine_predictions.append(bp)
+    # Canonical ensemble — blended match probabilities feed the simulation.
+    # No silent fallback: an ensemble failure fails the simulation request.
+    context = PredictionContext(
+        fixtures=all_matches,
+        elo_ratings=elo_ratings,
+        played_results=list(played_raw.values())
+        + list(played_groups.values()),
+    )
+    engine_predictions = [engine.evaluate(m, context) for m in all_matches]
+    blend_params = build_blend_params(engine_predictions, all_matches, engine)
 
     progress_cb(15, "Running Monte Carlo simulation...")
 
@@ -665,6 +593,7 @@ def run_simulation_compute(
         iterations=iterations,
         seed=seed if seed is not None else int(time.time()),
         played_groups=played_groups,
+        blend_params=blend_params,
         progress_cb=_sim_progress,
     )
 
@@ -734,7 +663,6 @@ def run_simulation_compute(
             "signals_meta", {"signals": [], "n_total": 0}
         ),
         "governance": overview.get("governance", {}),
-        "calibration": load_calibration_params(data_dir),
     }
 
     progress_cb(100, "Complete")
@@ -758,74 +686,92 @@ def run_calibration_compute(
     football_data_org_key: str = "",
     progress_cb: callable | None = None,  # noqa: UP035
 ) -> dict:
-    """Core calibration computation — returns results dict (no side effects).
+    """Fit ensemble weights by inverse log-loss on recorded prediction history.
 
-    The caller (web layer) is responsible for managing ``active_simulations``.
+    The single canonical weight-fitting method (football_core.compute_log_loss_weights).
+    Writes competitions/worldcup/config/signal_weights.json with provenance metadata
+    when enough labeled history exists; reports ``insufficient_data`` otherwise —
+    never invents weights.
     """
     if progress_cb is None:
         progress_cb = lambda pct, stage: None  # noqa: E731
 
-    progress_cb(5, "Loading teams and groups...")
-    teams_raw = json.loads(
-        (data_dir / "teams.json").read_text(encoding="utf-8")
-    )
-    groups_raw = load_groups(data_dir, teams=teams_raw)
-    bracket_raw = json.loads(
-        (data_dir / "bracket.json").read_text(encoding="utf-8")
-    )
+    import math
+    from datetime import datetime, timezone
 
-    progress_cb(15, "Loading signal caches...")
-    odds_cache = load_signal_cache("odds_cache.json", data_dir)
-    cb_cache = load_signal_cache("catboost_cache.json", data_dir)
-    form_cache = load_signal_cache("form_cache.json", data_dir)
-    lineup_cache = load_signal_cache("lineup_cache.json", data_dir)
-    defensive_cache = load_signal_cache("defensive_cache.json", data_dir)
-    manager_cache = load_signal_cache("manager_effect_cache.json", data_dir)
-    availability_cache = load_signal_cache(
-        "availability_cache.json", data_dir
-    )
-    elo_odds_cache = load_signal_cache("elo_odds_cache.json", data_dir)
-    team_synergy_cache = load_signal_cache("team_synergy_cache.json", data_dir)
-    rolling_form_cache = load_signal_cache(
-        "rolling_form_cache.json", data_dir
-    )
-    squad_value_cache = load_signal_cache("squad_value_cache.json", data_dir)
-    rest_days_cache = load_signal_cache("rest_days_cache.json", data_dir)
+    from football_core.blender import compute_log_loss_weights
 
-    progress_cb(30, "Running calibration...")
-    from src.engine import run_calibrate_and_blend  # noqa: PLC0415
+    progress_cb(10, "Loading prediction history...")
+    from src.state import load_prediction_history
 
-    def _cal_progress(pct: float) -> None:
-        progress_cb(30 + int(pct * 0.6), f"Calibrating... {pct:.0f}%")
+    history = load_prediction_history(data_dir)
 
-    blend_params = run_calibrate_and_blend(
-        teams=teams_raw,
-        groups=groups_raw,
-        bracket=bracket_raw,
-        odds_cache=odds_cache,
-        cb_cache=cb_cache,
-        form_cache=form_cache,
-        lineup_cache=lineup_cache,
-        defensive_cache=defensive_cache,
-        manager_cache=manager_cache,
-        availability_cache=availability_cache,
-        elo_odds_cache=elo_odds_cache,
-        team_synergy_cache=team_synergy_cache,
-        rolling_form_cache=rolling_form_cache,
-        squad_value_cache=squad_value_cache,
-        rest_days_cache=rest_days_cache,
-        data_dir=str(data_dir),
-    )
+    progress_cb(40, "Collecting per-signal outcomes...")
+    per_signal: dict[str, list[tuple[float, float]]] = {}
+    for entry in history or []:
+        actual = entry.get("actual")
+        signals = entry.get("signals", {})
+        if actual is None or not isinstance(signals, dict):
+            continue
+        for sig, sv in signals.items():
+            if sig not in SURVIVING_SIGNALS or not isinstance(sv, dict):
+                continue
+            if not sv.get("available", True):
+                continue
+            p = sv.get("probability")
+            if p is None:
+                continue
+            per_signal.setdefault(sig, []).append((float(p), float(actual)))
 
-    progress_cb(95, "Loading calibration params...")
-    calib_params = load_calibration_params(data_dir)
+    progress_cb(70, "Fitting weights...")
+    threshold = constants.COLD_START_THRESHOLD
+    eps = 1e-15
+    fitted_ll: dict[str, float] = {}
+    n_map: dict[str, int] = {}
+    for sig in SURVIVING_SIGNALS:
+        pairs = per_signal.get(sig, [])
+        n_map[sig] = len(pairs)
+        if len(pairs) < threshold:
+            continue
+        ll = 0.0
+        for p, a in pairs:
+            p_c = min(max(p, eps), 1 - eps)
+            # Soft-label binary cross-entropy vs actual ∈ {0.0 (loss), 0.5 (draw), 1.0 (win)}
+            ll += -(a * math.log(p_c) + (1 - a) * math.log(1 - p_c))
+        fitted_ll[sig] = ll / len(pairs)
+
+    if not fitted_ll:
+        progress_cb(100, "Insufficient data")
+        return {
+            "status": "insufficient_data",
+            "threshold": threshold,
+            "n_matches_per_signal": n_map,
+            "message": (
+                f"Fewer than {threshold} labeled predictions per signal — "
+                "keeping current weights (uniform fallback until real data accrues)."
+            ),
+        }
+
+    weights = compute_log_loss_weights(fitted_ll)
+
+    payload = {
+        "weights": weights,
+        "fitted_at": datetime.now(timezone.utc).isoformat(),
+        "method": "inverse_log_loss",
+        "source": "prediction_history",
+        "threshold": threshold,
+        "per_signal": {
+            s: {"log_loss": round(fitted_ll[s], 6), "n_matches": n_map[s]}
+            for s in sorted(fitted_ll)
+        },
+    }
+    out_path = Path(__file__).resolve().parent.parent / "config" / "signal_weights.json"
+    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     progress_cb(100, "Complete")
-
     return {
-        "blend_params": blend_params,
-        "calibration_params": calib_params,
-        "n_signals_calibrated": len(
-            (blend_params or {}).get("weights", {})
-        ),
+        "status": "ok",
+        "weights": weights,
+        "weights_file": str(out_path),
+        "per_signal": payload["per_signal"],
     }

@@ -25,7 +25,7 @@ Threat model:
 import logging
 from datetime import datetime, timedelta, timezone
 
-from football_core.result_provider import MatchResultProvider
+from football_core.provider import ResultHistoryProvider
 from football_core.signal import PredictionContext
 from football_core.signals.rolling_form import RollingFormSignal
 
