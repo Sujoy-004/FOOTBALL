@@ -139,6 +139,7 @@ async function renderOverview() {
   const sigLabelMap = { elo: "Elo", all_signals: "Blended", refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form",
   squad_value: "Squad Value", rest_days: "Rest Days",
 };
+}
 
 const sigOrder = ["refined_elo", "rolling_form", "market_odds", "squad_value", "rest_days"];
 
