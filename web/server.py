@@ -50,6 +50,13 @@ STATIC_DIR = HERE / "static"
 
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
+    from web.startup import apply_session_overrides, run_startup_flow
+
+    # Interactive live-vs-snapshot decision (never prompts without a TTY).
+    decision = run_startup_flow()
+    if decision.fdo_key:
+        apply_session_overrides(decision.fdo_key)
+
     import web.wc_app as _wc
     import web.ucl_app as _ucl
     _wc._fetch_live_data()
