@@ -99,3 +99,6 @@ competitions/ucl/data/knockout_results.json
 competitions/ucl/data/replay_2025_26.json
 competitions/ucl/data/live/
 
+
+# Private interview study guide (local only, never commit)
+study_guide/
