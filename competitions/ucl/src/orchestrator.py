@@ -17,9 +17,12 @@ import random
 import sys
 from dataclasses import asdict
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
+from football_core.domain import DataAvailability, load_json_store
 from football_core.provider import FixtureSchedule
+from football_core.signal import PredictionContext
 
 from competitions.ucl.result import SimulationResult
 from competitions.ucl.src.calibrate import _EmptyResultProvider
@@ -296,6 +299,55 @@ def run_simulation(
     )
 
 
+def resolve_compute_mode(data_dir: str | Path) -> tuple[str, str]:
+    """Decide 'results' vs 'simulation' from on-disk evidence.
+
+    Results mode requires a readable, non-empty ``results.json`` only.
+    Knockout data is NOT required: its availability is reported separately
+    so the UI can say "unavailable" instead of fabricating a whole season
+    over real league results (Exchange 1 architecture fix — previously a
+    missing knockout file flipped Reset/Refresh into simulation mode).
+
+    Returns ``(mode, reason)`` where mode is ``results``, ``simulation``
+    or ``error`` (results.json exists but cannot be read).
+    """
+    payload, availability, detail = load_json_store(Path(data_dir) / "results.json")
+    if availability is DataAvailability.AVAILABLE:
+        return "results", "real results present"
+    if availability is DataAvailability.EMPTY:
+        return "simulation", "results.json present but contains no matches"
+    if availability is DataAvailability.MISSING:
+        return "simulation", "results.json absent"
+    return "error", detail or "results.json unreadable"
+
+
+def _load_league_played_pairs(
+    data_dir: str | Path,
+) -> dict[tuple[str, str], tuple[int, int]] | None:
+    """Convert results.json into pair-keyed immutable facts for the MC engine.
+
+    Both orientations are stored, matching the MatchResultProvider
+    convention used by the simulation layer.
+    """
+    payload, availability, _ = load_json_store(Path(data_dir) / "results.json")
+    if availability is not DataAvailability.AVAILABLE:
+        return None
+    entries = payload.get("matches", payload) if isinstance(payload, dict) else payload
+    if not isinstance(entries, list):
+        return None
+    pairs: dict[tuple[str, str], tuple[int, int]] = {}
+    for m in entries:
+        try:
+            home_goals = int(m["home_score"])
+            away_goals = int(m["away_score"])
+            team_a, team_b = m["team_a"], m["team_b"]
+        except (KeyError, TypeError, ValueError):
+            continue
+        pairs[(team_a, team_b)] = (home_goals, away_goals)
+        pairs[(team_b, team_a)] = (away_goals, home_goals)
+    return pairs or None
+
+
 def run_deterministic_compute(
     data_dir: str,
     bsd_api_key: str = "",
@@ -325,12 +377,23 @@ def run_deterministic_compute(
         return {"error": "results.json not found", "boot": boot}
 
     knockout = _step("Load knockout results", lambda: load_knockout_results(data_dir))
+    _, ko_availability, ko_detail = load_json_store(
+        Path(data_dir) / "knockout_results.json"
+    )
     if not knockout:
-        # Snapshot mode or pre-knockout phase: proceed with empty knockout
-        # data — standings and odds are still computable from league results.
+        # Knockout data is unavailable (missing, empty, or unreadable):
+        # standings and odds remain computable from real league results,
+        # and the availability report tells the frontend to say so instead
+        # of guessing a stage.
         knockout = {"playoff": [], "rounds": {"R16": [], "QF": [], "SF": [], "FINAL": []}}
+        if ko_availability is DataAvailability.MISSING:
+            ko_msg = "[info] knockout_results.json absent — knockout data unavailable; bracket left empty"
+        elif ko_availability is DataAvailability.EMPTY:
+            ko_msg = "[info] knockout_results.json present but empty — knockout data unavailable; bracket left empty"
+        else:
+            ko_msg = f"[warn] knockout_results.json unreadable ({ko_detail}) — bracket left empty"
         boot.append({"step": "Load knockout results", "status": "ok", "elapsed": 0.0,
-                     "output": "[info] knockout_results.json absent — using empty bracket"})
+                     "output": ko_msg})
 
     from competitions.ucl.src.provider import RepoFixtureProvider
 
@@ -406,6 +469,10 @@ def run_deterministic_compute(
 
     return {
         "mode": "results",
+        "availability": {
+            "league_results": DataAvailability.AVAILABLE.value,
+            "knockout_results": ko_availability.value,
+        },
         "teams": top4,
         "all_teams": odds_display,
         "n_teams": len(standings),
@@ -449,14 +516,19 @@ def run_compute_all(
         return boot_step(name, fn, boot)
 
     results_path = os.path.join(data_dir, "results.json")
-    ko_path = os.path.join(data_dir, "knockout_results.json")
 
-    use_results_mode = os.path.exists(results_path) and os.path.exists(ko_path)
+    mode, mode_reason = resolve_compute_mode(data_dir)
 
-    if use_results_mode:
+    if mode == "results":
         return run_deterministic_compute(data_dir, bsd_api_key, team_aliases=team_aliases)
+    if mode == "error":
+        return {"error": f"results.json unreadable: {mode_reason}", "boot": boot}
 
-    # Simulation mode
+    # Simulation fallback. Real league results remain immutable facts even
+    # when knockout data is unavailable — a simulated season must never be
+    # rendered over unconditioned real results.
+    played_matches = _load_league_played_pairs(results_path)
+
     from competitions.ucl.src.provider import RepoFixtureProvider
     from competitions.ucl.src.elo_fetcher import fetch_team_elos
 
@@ -476,8 +548,11 @@ def run_compute_all(
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
         boot.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback"})
 
-    # Run MC simulation
-    result = _step("Monte Carlo simulation", lambda: build_simulation_result(provider, elo_ratings, seed, n_iterations))
+    # Run MC simulation (played league matches are injected as fixed facts)
+    result = _step(
+        "Monte Carlo simulation",
+        lambda: build_simulation_result(provider, elo_ratings, seed, n_iterations, played_matches=played_matches),
+    )
     if not result:
         return {"error": "simulation failed", "boot": boot}
 
@@ -575,8 +650,14 @@ def run_compute_all(
     except Exception:
         signal_stats = {}
 
+    _, league_availability, _ = load_json_store(Path(results_path))
     return {
         "mode": "simulation",
+        "availability": {
+            "league_results": league_availability.value,
+            "knockout_results": DataAvailability.MISSING.value,
+            "simulated": True,
+        },
         "teams": top4,
         "all_teams": odds_display,
         "n_teams": len(result.teams),

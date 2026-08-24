@@ -90,6 +90,7 @@ class BSDDataProvider:
         url: str | None = None,
         league_id: int | None = None,
         timeout: int = 10,
+        **kwargs,
     ) -> list[dict[str, Any]]:
         """Fetch raw match events from BSD ``/api/events/``.
 
@@ -102,6 +103,11 @@ class BSDDataProvider:
             Filter results to this league. Falls back to ``self.league_id``.
         timeout:
             Request timeout in seconds.
+        kwargs:
+            Accepts (and ignores) ``competition_id`` for
+            :class:`~football_core.provider.DataProvider` protocol
+            compatibility — BSD selects competitions via *league_id*, so a
+            caller-passed competition_id cannot be honored here.
         """
         lid = league_id if league_id is not None else self.league_id
         if url is None:

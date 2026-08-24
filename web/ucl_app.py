@@ -427,11 +427,19 @@ def _was_in_qf(team: str, knockout: dict) -> bool:
 
 
 def compute_all() -> dict:
-    results_path = DATA_DIR / "results.json"
-    ko_path = DATA_DIR / "knockout_results.json"
-    if results_path.exists() and ko_path.exists():
-        return deterministic_compute()
     global boot_log_local, sim_result, _mode
+    from competitions.ucl.src.orchestrator import resolve_compute_mode
+    mode, mode_reason = resolve_compute_mode(str(DATA_DIR))
+    if mode == "results":
+        return deterministic_compute()
+    if mode == "error":
+        # Real results exist but are unreadable: surface the failure instead
+        # of fabricating a simulated season over them.
+        _mode = "results"
+        sim_result = None
+        boot_log_local = [{"step": "Select data mode", "status": "error", "elapsed": 0.0,
+                           "output": f"[error] {mode_reason}"}]
+        return {"error": mode_reason, "boot": boot_log_local}
     _mode = "simulation"
     boot_log_local = []
     from competitions.ucl.src.orchestrator import run_compute_all as _f
@@ -473,6 +481,7 @@ def api_data():
         "snapshot_date": cache.get("snapshot_date", ""),
         "champion": cache.get("champion"),
         "mode": _mode,
+        "availability": cache.get("availability", {}),
         "n_unplayed": n_unplayed,
         "n_played": n_total - n_unplayed,
     })
