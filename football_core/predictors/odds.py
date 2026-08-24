@@ -90,6 +90,7 @@ def parse_odds_response(
             probs = remove_vig(odds_h, odds_d, odds_a)
             result[match_id] = {
                 "probability": probs["home"],
+                "draw_probability": probs["draw"],
                 "timestamp": now.isoformat(),
                 "available": True,
             }

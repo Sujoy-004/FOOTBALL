@@ -69,6 +69,24 @@ def compute_bracket_display(groups, teams, bracket, annex_c, played, played_grou
     return {"rounds": {"R32": matchups}, "n_matchups": len(matchups)}
 
 
+def _match_truth_fields(match_id, played_m, ta, tb):
+    """Explicit canonical state + probability availability (Exchange 2)."""
+    from football_core.domain import canonical_from_result_entry
+    if played_m:
+        cm = canonical_from_result_entry({**played_m, "match_id": match_id}, "worldcup")
+        return cm.status.value, cm.provenance.value
+    return "scheduled", "official"
+
+
+def _prob_availability(ta, tb, elo_ratings):
+    """(available, reason) for the Elo-based prob_a on a bracket node."""
+    if not ta or not tb:
+        return False, "slot_unresolved"
+    if ta not in elo_ratings or tb not in elo_ratings:
+        return False, "no_elo_rating"
+    return True, None
+
+
 def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups, engine_predictions=None):
     from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
@@ -109,6 +127,8 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
         prob_a = round(elo.expected_score(elo_ratings.get(ta, 1500), elo_ratings.get(tb, 1500)), 4) \
             if ta in elo_ratings and tb in elo_ratings else 0.5
         played_m = played.get(mid)
+        status, provenance = _match_truth_fields(mid, played_m, ta, tb)
+        p_avail, p_reason = _prob_availability(ta, tb, elo_ratings)
         sigs, elo_p = _signal_probs(ta, tb)
         resolved[mid] = {
             "match_id": mid, "round": rnd,
@@ -117,6 +137,10 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
             "winner": played_m.get("winner") if played_m else None,
             "score": _build_match_score(played_m),
             "played": mid in played,
+            "status": status,
+            "provenance": provenance,
+            "prob_available": p_avail,
+            "prob_reason": p_reason,
             "source_matches": be.get("source_matches") if be else None,
             "signals": sigs,
         }
@@ -150,6 +174,8 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
         prob_a = round(elo.expected_score(elo_ratings.get(ta, 1500), elo_ratings.get(tb, 1500)), 4) \
             if ta and tb and ta in elo_ratings and tb in elo_ratings else 0.5
         played_m = played.get(mid)
+        status, provenance = _match_truth_fields(mid, played_m, ta, tb)
+        p_avail, p_reason = _prob_availability(ta or "", tb or "", elo_ratings)
         sigs, elo_p = _signal_probs(ta or "", tb or "")
         resolved[mid] = {
             "match_id": mid, "round": entry["round"],
@@ -158,6 +184,10 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
             "winner": played_m.get("winner") if played_m else None,
             "score": _build_match_score(played_m),
             "played": mid in played,
+            "status": status,
+            "provenance": provenance,
+            "prob_available": p_avail,
+            "prob_reason": p_reason,
             "source_matches": entry.get("source_matches"),
             "signals": sigs,
         }
@@ -346,6 +376,9 @@ def compute_overview() -> dict:
     data["bracket"] = bracket_display
     data["full_bracket"] = full_bracket
     data["signals_meta"] = signals_meta
+    # Authoritative competition phase (competition brain owns derivation).
+    from competitions.worldcup.src.pipeline import compute_competition_phase
+    data["phase"] = boot_step("Competition Phase", lambda: compute_competition_phase(DATA_DIR), boot_log)
     # Freshness from the persisted refresh report (survives cache rebuilds).
     try:
         lr = json.loads(
@@ -422,6 +455,7 @@ def api_data():
         "n_teams": cache.get("n_teams", 0),
         "total_iterations": cache.get("total_iterations", 0),
         "n_played": cache.get("n_played", 0),
+        "phase": cache.get("phase", {}),
         "n_unplayed": unplayed_match_count(),
     })
 
@@ -446,7 +480,8 @@ def api_overview():
         "n_teams": cache.get("n_teams", 0),
         "n_played": cache.get("n_played", 0),
         "signals_meta": cache.get("signals_meta", {"signals": [], "n_total": 0}),
-        
+        "phase": cache.get("phase", {}),
+
         "has_simulation": has_sim,
         "n_unplayed": unplayed_match_count(),
     })

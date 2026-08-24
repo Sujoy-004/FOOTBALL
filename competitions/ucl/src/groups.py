@@ -76,9 +76,16 @@ def compute_swiss_standings(
         "pts": 0,
         "gd": 0,
         "gs": 0,
+        "ga": 0,
         "away_gs": 0,
+        "away_ga": 0,
+        "home_gs": 0,
+        "home_ga": 0,
         "wins": 0,
+        "draws": 0,
+        "losses": 0,
         "away_wins": 0,
+        "home_wins": 0,
         "yellow_cards": 0,
         "red_cards": 0,
         "opponents": set[str](),
@@ -91,6 +98,9 @@ def compute_swiss_standings(
         # --- Team A (home) ---
         team_stats[ta]["gd"] += sa - sb
         team_stats[ta]["gs"] += sa
+        team_stats[ta]["ga"] += sb
+        team_stats[ta]["home_gs"] += sa
+        team_stats[ta]["home_ga"] += sb
         team_stats[ta]["opponents"].add(tb)
         team_stats[ta]["yellow_cards"] += result["yellow_cards_a"]
         team_stats[ta]["red_cards"] += result["red_cards_a"]
@@ -98,22 +108,29 @@ def compute_swiss_standings(
         # --- Team B (away) ---
         team_stats[tb]["gd"] += sb - sa
         team_stats[tb]["gs"] += sb
+        team_stats[tb]["ga"] += sa
         team_stats[tb]["away_gs"] += sb
+        team_stats[tb]["away_ga"] += sa
         team_stats[tb]["opponents"].add(ta)
         team_stats[tb]["yellow_cards"] += result["yellow_cards_b"]
         team_stats[tb]["red_cards"] += result["red_cards_b"]
 
-        # --- Shared: points, wins, away_wins ---
+        # --- Shared: points, wins, draws, losses ---
         if sa > sb:
             team_stats[ta]["pts"] += 3
             team_stats[ta]["wins"] += 1
+            team_stats[ta]["home_wins"] += 1
+            team_stats[tb]["losses"] += 1
         elif sb > sa:
             team_stats[tb]["pts"] += 3
             team_stats[tb]["wins"] += 1
             team_stats[tb]["away_wins"] += 1
+            team_stats[ta]["losses"] += 1
         else:
             team_stats[ta]["pts"] += 1
             team_stats[tb]["pts"] += 1
+            team_stats[ta]["draws"] += 1
+            team_stats[tb]["draws"] += 1
 
     # Compute conduct scores from raw yellow/red card counts
     for team, stats in team_stats.items():
@@ -167,8 +184,15 @@ def compute_swiss_standings(
             "pts": stats["pts"],
             "gd": stats["gd"],
             "gs": stats["gs"],
-            "away_gs": stats["away_gs"],
+            "ga": stats["ga"],
             "wins": stats["wins"],
+            "draws": stats["draws"],
+            "losses": stats["losses"],
+            "away_gs": stats["away_gs"],
+            "away_ga": stats["away_ga"],
+            "home_wins": stats["home_wins"],
+            "home_gs": stats["home_gs"],
+            "home_ga": stats["home_ga"],
             "away_wins": stats["away_wins"],
             "opp_pts": opponent_stats[team]["opp_pts"],
             "opp_gd": opponent_stats[team]["opp_gd"],

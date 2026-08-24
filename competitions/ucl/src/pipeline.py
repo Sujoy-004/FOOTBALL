@@ -29,59 +29,36 @@ logger = logging.getLogger(__name__)
 
 
 def compute_deterministic_standings(results: list[dict]) -> list[dict]:
-    """Compute league standings from finished match results."""
-    stats: dict[str, dict] = defaultdict(lambda: {
-        "pts": 0, "gd": 0, "gs": 0, "ga": 0,
-        "wins": 0, "draws": 0, "losses": 0,
-        "away_wins": 0, "away_gs": 0, "away_ga": 0,
-        "home_wins": 0, "home_gs": 0, "home_ga": 0,
-    })
+    """Compute league standings from finished match results.
+
+    Exchange 2 unification: delegates to the UCL brain's canonical
+    ``compute_swiss_standings`` (full UEFA 10-step tiebreaker) instead of a
+    weaker parallel chain, so real-results and simulated tables are ordered
+    by identical rules. Result-ledger rows are adapted into the swiss match
+    shape with zero cards (no card data exists in the ledger).
+    """
+    from competitions.ucl.src.groups import compute_swiss_standings
+
+    matches: dict[str, dict] = {}
     for m in results:
-        ta, tb = m["team_a"], m["team_b"]
-        hs, aw = m["home_score"], m["away_score"]
-        stats[ta]["gs"] += hs
-        stats[ta]["ga"] += aw
-        stats[ta]["gd"] += (hs - aw)
-        stats[ta]["home_gs"] += hs
-        stats[ta]["home_ga"] += aw
-        stats[tb]["gs"] += aw
-        stats[tb]["ga"] += hs
-        stats[tb]["gd"] += (aw - hs)
-        stats[tb]["away_gs"] += aw
-        stats[tb]["away_ga"] += hs
-        if hs > aw:
-            stats[ta]["pts"] += 3
-            stats[ta]["wins"] += 1
-            stats[ta]["home_wins"] += 1
-            stats[tb]["losses"] += 1
-        elif hs < aw:
-            stats[tb]["pts"] += 3
-            stats[tb]["wins"] += 1
-            stats[tb]["away_wins"] += 1
-            stats[ta]["losses"] += 1
-        else:
-            stats[ta]["pts"] += 1
-            stats[tb]["pts"] += 1
-            stats[ta]["draws"] += 1
-            stats[tb]["draws"] += 1
-    standings_list = []
-    for team, s in stats.items():
-        standings_list.append({
-            "team": team, "pts": s["pts"], "gd": s["gd"], "gs": s["gs"], "ga": s["ga"],
-            "wins": s["wins"], "draws": s["draws"], "losses": s["losses"],
-            "away_wins": s["away_wins"], "away_gs": s["away_gs"],
-            "home_wins": s["home_wins"], "home_gs": s["home_gs"],
-        })
-    standings_list.sort(key=lambda x: (-x["pts"], -x["gd"], -x["gs"], -x["away_gs"], -x["wins"], -x["away_wins"]))
-    for i, entry in enumerate(standings_list, start=1):
-        entry["position"] = i
-        if i <= 8:
-            entry["zone"] = "top_8"
-        elif i <= 24:
-            entry["zone"] = "playoff"
-        else:
-            entry["zone"] = "eliminated"
-    return standings_list
+        mid = m.get("match_id")
+        if not mid:
+            continue
+        try:
+            hs, aw = int(m["home_score"]), int(m["away_score"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        matches[mid] = {
+            "team_a": m["team_a"],
+            "team_b": m["team_b"],
+            "score_a": hs,
+            "score_b": aw,
+            "yellow_cards_a": 0,
+            "red_cards_a": 0,
+            "yellow_cards_b": 0,
+            "red_cards_b": 0,
+        }
+    return compute_swiss_standings(matches)
 
 
 # ── 3 ─────────────────────────────────────────────────────────────────────
@@ -116,14 +93,19 @@ def build_deterministic_bracket(knockout: dict, standings: list[dict], data_dir:
     for rnd in ["R16", "QF", "SF", "FINAL"]:
         for m in ko_rounds.get(rnd, []):
             mid = _next_mid(rnd)
+            winner = m.get("winner", "")
             entry = {
                 "match_id": mid,
                 "round": rnd,
                 "team_a": m.get("team_a", ""),
                 "team_b": m.get("team_b", ""),
                 "score": {"home": m.get("score_a", 0), "away": m.get("score_b", 0)},
-                "winner": m.get("winner", ""),
+                "winner": winner,
                 "played": True,
+                # Explicit canonical state (Exchange 2): a stored tie is a
+                # played fact only when a winner exists.
+                "status": "played" if winner else "scheduled",
+                "provenance": "official",
                 "source_matches": source_map.get(mid) or None,
             }
             if rnd == "FINAL" and m.get("penalties"):
@@ -446,11 +428,23 @@ def load_knockout_results(data_dir: str | Path) -> dict | None:
 
 
 def build_league_matchdays(results: list[dict]) -> dict[str, list[dict]]:
-    """Group results by matchday prefix."""
+    """Group results by matchday prefix.
+
+    Each row gains explicit canonical state fields (Exchange 2 truth
+    contract): ``status`` ("played" — rows come from the results ledger),
+    derived ``winner``, and ``provenance``.
+    """
+    from football_core.domain import canonical_from_result_entry
+
     mds: dict[str, list[dict]] = defaultdict(list)
     for m in results:
         prefix = m.get("match_id", "").split("_")[0]
-        mds[prefix].append(m)
+        row = dict(m)
+        cm = canonical_from_result_entry(m, "ucl")
+        row.setdefault("winner", cm.winner)
+        row["status"] = cm.status.value
+        row["provenance"] = "official"
+        mds[prefix].append(row)
     return dict(sorted(mds.items()))
 
 
@@ -458,92 +452,48 @@ def build_league_matchdays(results: list[dict]) -> dict[str, list[dict]]:
 
 
 def ucl_form_trend(team: str, results: list[dict]) -> list[dict]:
-    """Return last 5 results for a team from results list."""
-    entries: list[dict] = []
-    for m in results:
-        ta, tb = m["team_a"], m["team_b"]
-        hs, aws = m["home_score"], m["away_score"]
-        if ta == team:
-            winner = ta if hs > aws else (tb if aws > hs else None)
-            r = "W" if winner == ta else ("L" if winner == tb else "D")
-            entries.append({"result": r, "gf": hs, "ga": aws, "opponent": tb, "match_id": m["match_id"]})
-        elif tb == team:
-            winner = ta if hs > aws else (tb if aws > hs else None)
-            r = "W" if winner == tb else ("L" if winner == ta else "D")
-            entries.append({"result": r, "gf": aws, "ga": hs, "opponent": ta, "match_id": m["match_id"]})
-    return entries[-5:]
+    """Return last 5 results for a team from results list.
+
+    Delegates to the shared kernel in football_core.insight.
+    """
+    from football_core.insight import form_trend as _core_form_trend
+    return _core_form_trend(results, team, limit=5)
 
 
 # ── 10 ────────────────────────────────────────────────────────────────────
 
 
 def ucl_head_to_head(ta: str, tb: str, results: list[dict]) -> dict:
-    """Return H2H stats between two teams from results list."""
-    a_wins = b_wins = draws = 0
-    matches: list[dict] = []
-    for m in results:
-        mt_a, mt_b = m["team_a"], m["team_b"]
-        if (mt_a == ta and mt_b == tb) or (mt_a == tb and mt_b == ta):
-            swapped = mt_a == tb
-            hs, aws = m["home_score"], m["away_score"]
-            a_score, b_score = (aws, hs) if swapped else (hs, aws)
-            if a_score > b_score:
-                a_wins += 1
-            elif b_score > a_score:
-                b_wins += 1
-            else:
-                draws += 1
-            matches.append({"match_id": m["match_id"], "team_a": ta, "score": f"{a_score}-{b_score}", "team_b": tb})
-    return {"matches": matches, "a_wins": a_wins, "b_wins": b_wins, "draws": draws, "total": a_wins + b_wins + draws}
+    """H2H stats between two teams from results list.
+
+    Delegates to the shared kernel in football_core.insight.
+    """
+    from football_core.insight import head_to_head as _core_head_to_head
+    return _core_head_to_head(results, ta, tb)
 
 
 # ── 11 ────────────────────────────────────────────────────────────────────
 
 
 def ucl_outcome_dist(blended_prob: float, elo_a: float, elo_b: float) -> dict:
-    """Estimate outcome distribution from blended probability."""
-    elo_diff = abs(elo_a - elo_b)
-    draw_est = 0.26 if elo_diff < 50 else (0.20 if elo_diff < 150 else (0.14 if elo_diff < 300 else 0.09))
-    a_win = round(blended_prob * (1 - draw_est), 4)
-    draw = round(draw_est, 4)
-    b_win = round((1 - blended_prob) * (1 - draw_est), 4)
-    total = a_win + draw + b_win
-    if abs(total - 1.0) > 0.001:
-        a_win = round(a_win / total, 4)
-        draw = round(draw / total, 4)
-        b_win = round(b_win / total, 4)
-    return {"a_win": a_win, "draw": draw, "b_win": b_win}
+    """Estimate outcome distribution from blended probability.
+
+    Delegates to the shared kernel in football_core.insight.
+    """
+    from football_core.insight import outcome_distribution as _core_outcome_dist
+    return _core_outcome_dist(blended_prob, elo_a, elo_b)
 
 
 # ── 12 ────────────────────────────────────────────────────────────────────
 
 
 def ucl_insight_text(ta: str, tb: str, signals: dict, form_trends: dict, h2h: dict, outcome: dict, eval_data: dict) -> str:
-    """Generate natural-language insight for a match."""
-    lines: list[str] = []
-    if signals:
-        winner_sig = max(signals.items(), key=lambda x: x[1].get("weight", 0) * x[1].get("probability", 0.5))[0]
-        sp = signals[winner_sig]
-        label = winner_sig.replace("_", " ").title()
-        lines.append(f"{ta} is led by {label} (P={sp.get('probability', 0.5)*100:.0f}%).")
-    for team in (ta, tb):
-        ft = form_trends.get(team, [])
-        if ft:
-            streak = "".join(r["result"] for r in ft)
-            lines.append(f"{team} form: {streak} in last {len(ft)}.")
-    if h2h and h2h["total"] > 0:
-        lines.append(f"H2H: {ta} {h2h['a_wins']}-{h2h['draws']}-{h2h['b_wins']} {tb} ({h2h['total']} meetings).")
-    if outcome:
-        lines.append(f"Predicted: {ta} {outcome['a_win']*100:.0f}% / Draw {outcome['draw']*100:.0f}% / {tb} {outcome['b_win']*100:.0f}%.")
-    if eval_data:
-        valid = {k: v for k, v in eval_data.items() if v.get("n_matches", 0) > 5}
-        if valid:
-            best = max(valid.items(), key=lambda x: x[1].get("accuracy", 0))
-            lines.append(f"Most reliable: {best[0].replace('_',' ').title()} ({best[1]['accuracy']*100:.0f}% accuracy).")
-            worst = max(valid.items(), key=lambda x: x[1].get("brier", 0))
-            if worst[1].get("brier", 0) >= 0.25:
-                lines.append(f"Warning: {worst[0].replace('_',' ').title()} signal unreliable (Brier {worst[1]['brier']:.2f}).")
-    return " >> ".join(lines) if lines else f"{ta} vs {tb}: no insight data available."
+    """Generate natural-language insight for a match.
+
+    Delegates to the shared kernel in football_core.insight.
+    """
+    from football_core.insight import insight_text as _core_insight_text
+    return _core_insight_text(ta, tb, signals, form_trends, h2h, outcome, eval_data)
 
 
 # ── 13 ────────────────────────────────────────────────────────────────────

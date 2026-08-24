@@ -299,6 +299,73 @@ def run_simulation(
     )
 
 
+_PHASE_LABELS = {
+    "not_started": "Not Started",
+    "league_stage": "League Phase",
+    "league_stage_complete": "League Phase Complete",
+    "knockout_playoffs": "Knockout Playoffs",
+    "knockout": "Knockout",
+    "completed": "Completed",
+}
+
+
+def compute_competition_phase(data_dir: str | Path) -> dict:
+    """Authoritative competition-phase report for UCL (competition brain).
+
+    Derived from on-disk evidence only; the frontend must render this instead
+    of inferring stage from payload shapes. ``stores`` carries DataAvailability
+    values so 'phase not reached' and 'data unavailable' stay distinguishable.
+    """
+    results_path = Path(data_dir)
+    _, league_availability, _ = load_json_store(results_path / "results.json")
+    league_rows: list = []
+    if league_availability is DataAvailability.AVAILABLE:
+        payload, _, _ = load_json_store(results_path / "results.json")
+        league_rows = payload.get("matches", payload) if isinstance(payload, dict) else payload
+        if not isinstance(league_rows, list):
+            league_rows = []
+    n_league = sum(
+        1 for m in league_rows
+        if isinstance(m, dict) and m.get("home_score") is not None
+    )
+
+    _, ko_availability, _ = load_json_store(results_path / "knockout_results.json")
+    ko_state: dict = {}
+    if ko_availability is DataAvailability.AVAILABLE:
+        payload, _, _ = load_json_store(results_path / "knockout_results.json")
+        ko_state = payload.get("matches", {}) if isinstance(payload, dict) else {}
+        if not isinstance(ko_state, dict):
+            ko_state = {}
+    ko_rounds = ko_state.get("rounds", {}) or {}
+    n_playoff = len(ko_state.get("playoff", []) or [])
+    n_ko_matches = sum(len(v or []) for v in ko_rounds.values())
+    champion = ko_state.get("champion") or None
+
+    if champion:
+        phase = "completed"
+    elif n_ko_matches > 0:
+        phase = "knockout"
+    elif n_playoff > 0:
+        phase = "knockout_playoffs"
+    elif n_league >= 144:
+        phase = "league_stage_complete"
+    elif n_league > 0:
+        phase = "league_stage"
+    else:
+        phase = "not_started"
+
+    return {
+        "phase": phase,
+        "label": _PHASE_LABELS[phase],
+        "champion": champion,
+        "progress": {"played": n_league, "total": 144},
+        "stores": {
+            "league_results": league_availability.value,
+            "knockout_results": ko_availability.value,
+        },
+    }
+
+
 def resolve_compute_mode(data_dir: str | Path) -> tuple[str, str]:
     """Decide 'results' vs 'simulation' from on-disk evidence.
 
@@ -473,6 +540,7 @@ def run_deterministic_compute(
             "league_results": DataAvailability.AVAILABLE.value,
             "knockout_results": ko_availability.value,
         },
+        "phase": compute_competition_phase(data_dir),
         "teams": top4,
         "all_teams": odds_display,
         "n_teams": len(standings),
@@ -658,6 +726,7 @@ def run_compute_all(
             "knockout_results": DataAvailability.MISSING.value,
             "simulated": True,
         },
+        "phase": compute_competition_phase(data_dir),
         "teams": top4,
         "all_teams": odds_display,
         "n_teams": len(result.teams),

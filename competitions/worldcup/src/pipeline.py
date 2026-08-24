@@ -845,3 +845,72 @@ def run_calibration_compute(
         "weights_file": str(out_path),
         "per_signal": payload["per_signal"],
     }
+
+
+# ── Competition phase (Exchange 2 truth contract) ────────────────────────
+
+_PHASE_LABELS = {
+    "not_started": "Not Started",
+    "group_stage": "Group Stage",
+    "group_stage_complete": "Groups Complete",
+    "knockout": "Knockout",
+    "completed": "Completed",
+}
+
+WC_GROUP_MATCH_TOTAL = 72
+WC_KNOCKOUT_MATCH_TOTAL = 32
+
+
+def compute_competition_phase(data_dir: Path | None = None) -> dict:
+    """Authoritative competition-phase report for the World Cup brain.
+
+    Derived from on-disk evidence only; frontends render this instead of
+    inferring stage from array lengths. ``stores`` uses DataAvailability
+    values so 'phase not reached' and 'data unavailable' stay distinct.
+    """
+    from football_core.domain import DataAvailability, load_json_store
+    from src.constants import DATA_DIR
+
+    data_dir = Path(data_dir) if data_dir is not None else DATA_DIR
+    _, pg_availability, _ = load_json_store(data_dir / "played_groups.json")
+    played_groups: dict = {}
+    if pg_availability is DataAvailability.AVAILABLE:
+        payload, _, _ = load_json_store(data_dir / "played_groups.json")
+        if isinstance(payload, dict):
+            played_groups = payload
+    n_group_matches = sum(
+        1 for m in played_groups.values()
+        if isinstance(m, dict)
+        and m.get("home_score") is not None and m.get("away_score") is not None
+    )
+
+    _, ko_availability, _ = load_json_store(data_dir / "played.json")
+    played_ko: dict = {}
+    if ko_availability is DataAvailability.AVAILABLE:
+        payload, _, _ = load_json_store(data_dir / "played.json")
+        if isinstance(payload, dict):
+            played_ko = payload
+    champion = (played_ko.get("FINAL", {}) or {}).get("winner") or None
+
+    if champion:
+        phase = "completed"
+    elif len(played_ko) > 0:
+        phase = "knockout"
+    elif n_group_matches >= WC_GROUP_MATCH_TOTAL:
+        phase = "group_stage_complete"
+    elif n_group_matches > 0:
+        phase = "group_stage"
+    else:
+        phase = "not_started"
+
+    total = WC_GROUP_MATCH_TOTAL + WC_KNOCKOUT_MATCH_TOTAL
+    return {
+        "phase": phase,
+        "label": _PHASE_LABELS[phase],
+        "champion": champion,
+        "progress": {"played": n_group_matches + len(played_ko), "total": total},
+        "stores": {
+            "group_results": pg_availability.value,
+            "knockout_results": ko_availability.value,
+        },
+    }

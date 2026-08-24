@@ -14,7 +14,11 @@ from pathlib import Path
 import fastapi
 from fastapi.responses import JSONResponse
 
-from competitions.ucl.src.orchestrator import build_simulation_result, run_validation
+from competitions.ucl.src.orchestrator import (
+    build_simulation_result,
+    run_validation,
+    _load_league_played_pairs,
+)
 from competitions.ucl.src.pipeline import (
     compute_deterministic_standings as _compute_deterministic_standings_pipeline,
     build_deterministic_bracket as _build_deterministic_bracket_pipeline,
@@ -482,6 +486,7 @@ def api_data():
         "champion": cache.get("champion"),
         "mode": _mode,
         "availability": cache.get("availability", {}),
+        "phase": cache.get("phase", {}),
         "n_unplayed": n_unplayed,
         "n_played": n_total - n_unplayed,
     })
@@ -879,6 +884,17 @@ def api_match_insight(match_id: str = ""):
     if not ta or not tb:
         return JSONResponse({"error": "match teams not set"})
 
+    # Truthful match state (Exchange 2): league-phase rows carry scores but no
+    # winner key, so derive played-ness from the canonical evidence instead of
+    # bool(winner) which reported false for every played league match.
+    has_scores = (match_data.get("home_score") is not None
+                  and match_data.get("away_score") is not None)
+    score = match_data.get("score")
+    if score is None and has_scores:
+        score = {"home": match_data.get("home_score"), "away": match_data.get("away_score")}
+    winner = match_data.get("winner") or ""
+    played_flag = bool(winner) or has_scores
+
     elo_map = cache.get("elo_ratings", {})
     elo_a = elo_map.get(ta, 1500.0)
     elo_b = elo_map.get(tb, 1500.0)
@@ -886,7 +902,9 @@ def api_match_insight(match_id: str = ""):
 
     engine = cache.get("_signal_engine")
     signals_with_weights: dict = {}
-    blended_prob = 0.5
+    blended_prob: float | None = None
+    prob_available = False
+    prob_reason = "engine_unavailable"
 
     if engine:
         try:
@@ -896,7 +914,9 @@ def api_match_insight(match_id: str = ""):
                 played_results=[],
             )
             bp = engine.evaluate({"team_a": ta, "team_b": tb, "match_id": match_id}, ctx)
-            blended_prob = bp.home_prob
+            blended_prob = round(bp.home_prob, 4)
+            prob_available = True
+            prob_reason = None
             for sig, sd in bp.signal_breakdown.items():
                 prob = sd.get("home", 0.5)
                 weight = sd.get("weight", 0)
@@ -906,7 +926,13 @@ def api_match_insight(match_id: str = ""):
                     "label": sig.replace("_", " ").title(),
                 }
         except Exception:
-            pass
+            blended_prob = None
+            prob_available = False
+            prob_reason = "engine_evaluation_failed"
+
+    # No fabricated distribution from a fallback probability: when the blend
+    # is unavailable the outcome chart data is explicitly absent.
+    outcome = _ucl_outcome_dist(blended_prob, elo_a, elo_b) if blended_prob is not None else None
 
     results = cache.get("_results", [])
     form_trends: dict = {}
@@ -915,19 +941,23 @@ def api_match_insight(match_id: str = ""):
         form_trends = {ta: _ucl_form_trend(ta, results), tb: _ucl_form_trend(tb, results)}
         h2h = _ucl_head_to_head(ta, tb, results)
 
-    outcome = _ucl_outcome_dist(blended_prob, elo_a, elo_b)
     eval_data = cache.get("signals", {})
-    insight = _ucl_insight_text(ta, tb, signals_with_weights, form_trends, h2h, outcome, eval_data)
+    insight = _ucl_insight_text(ta, tb, signals_with_weights, form_trends, h2h,
+                                outcome or {}, eval_data)
 
     return JSONResponse({
         "match_id": match_id,
         "round": match_data.get("round"),
         "teams": {"a": ta, "b": tb},
-        "played": bool(match_data.get("winner")),
-        "score": match_data.get("score"),
-        "winner": match_data.get("winner"),
+        "played": played_flag,
+        "score": score,
+        "winner": winner or None,
+        "match_status": "played" if played_flag else "scheduled",
+        "provenance": "official",
         "signals": signals_with_weights,
-        "blended_prob": round(blended_prob, 4),
+        "blended_prob": blended_prob,
+        "prob_available": prob_available,
+        "prob_reason": prob_reason,
         "elo_prob": round(elo_prob, 4),
         "form_trends": form_trends,
         "head_to_head": h2h,
@@ -967,6 +997,14 @@ def api_what_if(req: dict = None):
                 break
         if match_data:
             break
+
+    # League-phase fallback: mirror the insight handler so counterfactuals
+    # work for every clickable match, not only knockout ties.
+    if not match_data:
+        for m in _load_results():
+            if m["match_id"] == match_id:
+                match_data = m
+                break
     if not match_data:
         return JSONResponse({"error": "match not found"})
 
@@ -988,8 +1026,11 @@ def api_what_if(req: dict = None):
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
 
     baseline_elos = dict(elo_ratings)
+    # Real played league matches are immutable facts in both scenarios.
+    played_matches = _load_league_played_pairs(str(DATA_DIR))
     baseline = build_simulation_result(
         provider, baseline_elos, seed=42, n_iterations=n_iterations,
+        played_matches=played_matches,
     )
 
     adjusted_elos = dict(baseline_elos)
@@ -997,6 +1038,7 @@ def api_what_if(req: dict = None):
     adjusted_elos[tb] = max(100.0, baseline_elos.get(tb, 1500.0) - elo_delta)
     adjusted = build_simulation_result(
         provider, adjusted_elos, seed=42, n_iterations=n_iterations,
+        played_matches=played_matches,
     )
 
     def _entry(name):

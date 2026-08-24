@@ -413,15 +413,21 @@ function renderBracket() {
       if (m.score) {
         scoreStr = m.score.home + '-' + m.score.away;
       } else if (m.winner) {
-        scoreStr = '1-0';
+        // Real result with unrecorded scorelines: show the fact (winner)
+        // without inventing a numeric score.
+        scoreStr = '—';
       } else if (simM && simM.predicted_score) {
         scoreStr = simM.predicted_score.home + '-' + simM.predicted_score.away;
       } else {
         scoreStr = '?-?';
       }
       if (simM && simM.predicted_score) {
-        const pct = (simM.prob_a != null) ? Math.round(simM.prob_a * 100) : 50;
-        simProbHtml = '<div class="m-prob" style="font-size:9px;color:#8E44AD;text-align:center;line-height:1.2">' + pct + '% / ' + (100 - pct) + '%</div>';
+        // Projection overlay only when the simulation actually produced a
+        // probability; never substitute a default 50%.
+        if (simM.prob_a != null) {
+          const pct = Math.round(simM.prob_a * 100);
+          simProbHtml = '<div class="m-prob" style="font-size:9px;color:#8E44AD;text-align:center;line-height:1.2">' + pct + '% / ' + (100 - pct) + '%</div>';
+        }
       }
 
       const cardClass = isTbd ? 'tbd' : isPlayed ? 'played' : 'upcoming';
@@ -708,7 +714,7 @@ async function openMatchModal(mid) {
   const sigCanvas = document.getElementById("sigChart");
   if (sigCanvas) {
     const sigKeys = sigOrder.filter(sk => sigs[sk] !== undefined);
-    const sigVals = sigKeys.map(sk => Math.round((sigs[sk].probability || 0.5) * 100));
+    const sigVals = sigKeys.map(sk => Math.round((sigs[sk].probability != null ? sigs[sk].probability : 0) * 100));
     const sigColors = sigKeys.map(sk => sk === "elo" ? "#16A085" : "#156F69");
     modalCharts.signals = new Chart(sigCanvas, {
       type: "bar",
@@ -721,11 +727,16 @@ async function openMatchModal(mid) {
     });
   }
 
+  // Render the doughnut only from a real distribution; never fabricate
+  // slices when outcome data is absent.
   const ocCanvas = document.getElementById("outcomeChart");
-  if (ocCanvas) {
+  if (ocCanvas && typeof insight.outcome_distribution === "object" &&
+      typeof outcome.a_win === "number" &&
+      typeof outcome.draw === "number" &&
+      typeof outcome.b_win === "number") {
     modalCharts.outcome = new Chart(ocCanvas, {
       type: "doughnut",
-      data: { labels: [ta + " win", "Draw", tb + " win"], datasets: [{ data: [outcome.a_win || 0, outcome.draw || 0, outcome.b_win || 0], backgroundColor: ["#16A085", "#156F69", "#153D4C"], borderColor: "#140C30", borderWidth: 2 }] },
+      data: { labels: [ta + " win", "Draw", tb + " win"], datasets: [{ data: [outcome.a_win, outcome.draw, outcome.b_win], backgroundColor: ["#16A085", "#156F69", "#153D4C"], borderColor: "#140C30", borderWidth: 2 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { position: "bottom", labels: { color: "#F6DBC0", font: { size: 9 }, boxWidth: 10, padding: 6 } }, tooltip: { callbacks: { label: ctx => ctx.label + ": " + (ctx.parsed * 100).toFixed(1) + "%" } } },

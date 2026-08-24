@@ -20,10 +20,15 @@ class RefinedEloSignal(Signal):
         k_factor: int = 60,
         home_advantage: int = 100,
         goal_diff_weighting: bool = True,
+        name: str | None = None,
     ) -> None:
         self._k_factor = k_factor
         self._home_advantage = home_advantage
         self._goal_diff_weighting = goal_diff_weighting
+        if name is not None:
+            # Instance-level override lets competitions keep historical signal
+            # identities (e.g. WC's "elo") while sharing this implementation.
+            self.name = name
 
     def predict(
         self, match: dict, context: PredictionContext

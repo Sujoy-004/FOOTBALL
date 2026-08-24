@@ -3,6 +3,12 @@
 Builds the canonical EnsembleEngine over the surviving signal roster
 (base Elo + market_odds / rolling_form / squad_value / rest_days caches)
 with the standard weight-resolution precedence.
+
+All signal implementations come from football_core: the base Elo signal is
+``RefinedEloSignal`` registered under WC's historical name ``"elo"`` (weight
+files, calibration filters, and UI labels depend on that identity), and the
+cache-backed refinement signals are ``CachedProbabilitySignal``, which honor
+each cache entry's own draw probability instead of any hardcoded constant.
 """
 
 import logging
@@ -15,7 +21,6 @@ from src.constants import (
     SQUAD_VALUE_CACHE_FILE,
     REST_DAYS_CACHE_FILE,
 )
-from football_core.signal import PredictionContext
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +35,9 @@ def build_signal_engine(
 ) -> Any:
     """Build an EnsembleEngine: base Elo + the 4 cache-backed refinement signals."""
     from football_core.blender import EnsembleEngine
-    from football_core.signal import Signal, SignalOutput, PredictionContext
+    from football_core.signal import Signal, PredictionContext  # noqa: F401
+    from football_core.signals.cached import CachedProbabilitySignal
+    from football_core.signals.refined_elo import RefinedEloSignal
 
     _caches = {
         "market_odds": (odds_cache or {}).get("matches", {}),
@@ -39,40 +46,9 @@ def build_signal_engine(
         "rest_days": (rest_days_cache or {}).get("matches", {}),
     }
 
-    class _CacheSignal(Signal):
-        name: str = ""
-
-        def __init__(self, name: str, cache: dict) -> None:
-            self.name = name
-            self._cache = cache
-
-        def predict(self, match: dict, context: PredictionContext) -> SignalOutput:
-            mid = match.get("match_id", "")
-            entry = self._cache.get(mid) if self._cache else None
-            if entry:
-                prob = entry.get("probability", 1 / 3)
-                draw_prob = 0.25
-                return SignalOutput(prob, draw_prob, 1.0 - prob - draw_prob)
-            return SignalOutput(1 / 3, 1 / 3, 1 / 3)
-
-    class _EloSignal(Signal):
-        name: str = "elo"
-
-        def predict(self, match: dict, context: PredictionContext) -> SignalOutput:
-            from football_core.elo import expected_score
-            team_a = match.get("team_a", "")
-            team_b = match.get("team_b", "")
-            elo_ratings = context.elo_ratings or {}
-            home = elo_ratings.get(team_a, 1500)
-            away = elo_ratings.get(team_b, 1500)
-            home_prob = expected_score(home, away, home_advantage=100)
-            draw_prob = max(0.0, 1.0 - abs(home_prob - 0.5) * 2.0) * 0.35
-            away_prob = 1.0 - home_prob - draw_prob
-            return SignalOutput(home_prob, draw_prob, away_prob)
-
-    signals: list[Signal] = [_EloSignal()]
-    for name, cache in _caches.items():
-        signals.append(_CacheSignal(name, cache))
+    signals: list[Signal] = [RefinedEloSignal(name="elo")]
+    for cache_name, cache in _caches.items():
+        signals.append(CachedProbabilitySignal(cache_name, cache))
 
     if weights is not None:
         return EnsembleEngine(signals, weights=weights)

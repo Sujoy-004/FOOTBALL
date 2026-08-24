@@ -6,7 +6,7 @@ import {
 } from "./shared.js";
 
 const API = "/ucl/api";
-const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, matches: [] };
+const appState = { data: null, standings: [], bracket: null, odds: [], signals: {} };
 
 const sigLabels = {
   refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form",
@@ -34,18 +34,6 @@ async function loadAll() {
     appState.bracket = br;
     appState.odds = o.odds || [];
     appState.signals = sig.signals || {};
-
-    const matches = [];
-    const lmd = br.league_matchdays || {};
-    Object.keys(lmd).sort().forEach(md => {
-      (lmd[md] || []).forEach(m => matches.push({ ...m, matchday: md }));
-    });
-    if (br.bracket_rounds) {
-      Object.entries(br.bracket_rounds).forEach(([rnd, ms]) => {
-        ms.forEach(m => matches.push({ ...m, round: rnd }));
-      });
-    }
-    appState.matches = matches;
   } catch (e) {
     console.error("loadAll API fetch failed:", e);
     const tab = document.getElementById("tab-overview");
@@ -56,7 +44,6 @@ async function loadAll() {
   renderOverview();
   renderStandings();
   renderBracket();
-  renderOdds();
   updateStatus();
 }
 
@@ -77,14 +64,12 @@ async function reloadData() {
   } catch (e) {
     console.error("reloadData failed:", e);
   }
-  renderOverview(); renderStandings(); renderBracket(); renderOdds(); updateStatus();
+  renderOverview(); renderStandings(); renderBracket(); updateStatus();
 }
 
 function updateStatus() {
   const d = appState.data;
   if (!d) return;
-  const signals = appState.signals;
-  const sigKeys = Object.keys(signals);
   const stale = d.refresh && d.refresh.stale;
   updateStatusBar(
     d.n_teams + " teams  |  " + (d.n_played || 0) + " matches played",
@@ -92,45 +77,7 @@ function updateStatus() {
   );
 }
 
-window.__resetResults = async function () {
-  try {
-    const resp = await safeJson(API + "/reset", { method: "POST" });
-    if (resp.status === "error") { console.error("Reset error:", resp.error); return; }
-    await reloadData();
-    renderOverview(); renderStandings(); renderBracket(); renderOdds();
-  } catch (e) { console.error("Reset failed:", e); }
-};
-
 // ── Overview ─────────────────────────────────────────────────────────
-
-// ── Stage derivation (data-driven, never assumed) ────────────────────
-
-function countLeagueMatches(lmd) {
-  let total = 0, played = 0;
-  Object.keys(lmd).forEach(function(md) {
-    (lmd[md] || []).forEach(function(m) {
-      total++;
-      if (m.home_score !== undefined && m.home_score !== null &&
-          m.away_score !== undefined && m.away_score !== null) played++;
-    });
-  });
-  return { total: total, played: played };
-}
-
-function deriveStage() {
-  const br = appState.bracket || {};
-  if (br.champion) return "Completed";
-  const rounds = br.bracket_rounds || {};
-  const order = [["FINAL", "Final"], ["SF", "Semi-Finals"], ["QF", "Quarter-Finals"], ["R16", "Round of 16"]];
-  for (let i = 0; i < order.length; i++) {
-    if ((rounds[order[i][0]] || []).length) return order[i][1];
-  }
-  if ((br.playoff || []).length) return "Knockout Playoffs";
-  const lm = countLeagueMatches(br.league_matchdays || {});
-  if (lm.total > 0 && lm.played >= lm.total) return "League Phase Complete";
-  if (lm.played > 0) return "League Phase";
-  return "Not Started";
-}
 
 async function renderOverview() {
   const tab = document.getElementById("tab-overview");
@@ -142,7 +89,9 @@ async function renderOverview() {
   const signals = appState.signals || {};
   const sigKeys = Object.keys(signals);
   const nActive = sigOrder.filter(function(sk) { return signals[sk] !== undefined; }).length;
-  const stage = deriveStage();
+  // Authoritative competition phase from the backend (never inferred here).
+  const phase = d.phase || {};
+  const stage = phase.label || "Unknown";
 
   // Stat cards: Teams / Matches Played / Stage  (WC-style hierarchy)
   let html = '<div class="stats-row">';
@@ -183,11 +132,33 @@ async function renderOverview() {
   }
   html += '</div>';
 
-  // Simulation availability (honest state - never fabricate probabilities)
+  // Outcomes section: label facts vs projections honestly. In results mode
+  // the served values are deterministic season outcomes (1.0/0.0), never
+  // model probabilities; in simulation mode they are Monte Carlo projections.
   const odds = appState.odds || [];
-  const hasSim = odds.some(function(o) { return (o.champion_prob || 0) > 0.001; });
-  html += '<div class="chart-section"><div class="title">Simulation</div>';
-  if (hasSim) {
+  const isResultsMode = d.mode === "results";
+  html += '<div class="chart-section"><div class="title">'
+    + (isResultsMode ? "Season Outcomes" : "Simulation")
+    + '</div>';
+  if (isResultsMode) {
+    html += '<div class="dim" style="padding:2px 8px;font-size:11px">Final outcomes from real results - not model probabilities.</div>';
+    if (odds.length) {
+      html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Season Outcome</th></tr>';
+      odds.slice(0, 5).forEach(function(o, i) {
+        const champ = (o.champion_prob || 0) > 0.001;
+        const outcomeTxt = champ ? "Champion"
+          : ((o.final_prob || 0) > 0.001 ? "Runner-up"
+          : ((o.sf_prob || 0) > 0.001 ? "Semi-finalist"
+          : ((o.qf_prob || 0) > 0.001 ? "Quarter-finalist" : "Eliminated")));
+        html += '<tr><td class="num">' + (i + 1) + '</td><td>' + o.team + '</td>'
+          + '<td class="num">' + outcomeTxt + '</td></tr>';
+      });
+      html += '</table>';
+    } else {
+      html += '<div class="dim">No results data available.</div>';
+    }
+  } else if (odds.some(function(o) { return (o.champion_prob || 0) > 0.001; })) {
+    html += '<div class="dim" style="padding:2px 8px;font-size:11px">Monte Carlo projections from the latest simulation run.</div>';
     html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion %</th></tr>';
     odds.slice(0, 5).forEach(function(o, i) {
       const pct = ((o.champion_prob || 0) * 100).toFixed(1);
@@ -195,8 +166,7 @@ async function renderOverview() {
     });
     html += '</table>';
   } else {
-    html += '<div class="dim">Simulation results not available in current snapshot. '
-      + 'Run a simulation from the Odds tab to generate championship probabilities.</div>';
+    html += '<div class="dim">No simulation has been run in this session, so no projected probabilities exist.</div>';
   }
   html += '</div>';
 
@@ -262,7 +232,9 @@ async function renderBracket() {
       ms.forEach(function(m) {
         const hs = m.home_score !== undefined && m.home_score !== null ? m.home_score : "-";
         const as_ = m.away_score !== undefined && m.away_score !== null ? m.away_score : "-";
-        const played = hs !== "-" && as_ !== "-";
+        // Backend supplies explicit status on league rows (Exchange 2);
+        // score presence remains the fallback for older payloads.
+        const played = m.status ? m.status === "played" : (hs !== "-" && as_ !== "-");
         const statusDot = played
           ? '<span class="dot-green">\u25CF</span>'
           : '<span class="dot-orange">\u25CF</span>';
@@ -271,7 +243,6 @@ async function renderBracket() {
           + ' data-match-id="' + m.match_id + '"'
           + ' data-team-a="' + m.team_a + '"'
           + ' data-team-b="' + m.team_b + '"'
-          + ' onclick="openMatchModalFromEl(this)"'
           + ' style="cursor:pointer;transition:background .15s;display:flex;justify-content:space-between;align-items:center;padding:4px 8px;border-bottom:1px solid rgba(21,61,76,.15)"'
           + ' onmouseover="this.style.background=\'rgba(22,160,133,0.1\)\'"'
           + ' onmouseout="this.style.background=\'\'">'
@@ -296,7 +267,6 @@ async function renderBracket() {
       if (t.penalties_played) detail += " (pens)";
       html += '<div class="playoff-card match-clickable" data-match-id="' + (t.match_id || "") + '"'
         + ' data-team-a="' + (t.team_a || "") + '" data-team-b="' + (t.team_b || "") + '"'
-        + ' onclick="openMatchModalFromEl(this)"'
         + ' style="cursor:pointer">'
         + '<div class="p-title">Tie ' + t.tie_num + '</div>'
         + '<div class="p-teams"><span class="p-team">' + (t.team_a || "?") + '</span><span class="p-score">' + aggStr + '</span><span class="p-team">' + (t.team_b || "?") + '</span></div>'
@@ -346,8 +316,7 @@ async function renderBracket() {
       const winner = m.winner || "";
       koSection += '<div class="ko-match-card match-clickable"'
         + ' data-match-id="' + (m.match_id || "") + '"'
-        + ' data-team-a="' + ta + '" data-team-b="' + tb + '"'
-        + ' onclick="openMatchModalFromEl(this)">'
+        + ' data-team-a="' + ta + '" data-team-b="' + tb + '">'
         + '<div class="ko-round-tag">' + rm.label + '</div>'
         + '<div class="ko-teams"><span>' + ta + '</span><span class="ko-vs">vs</span><span>' + tb + '</span></div>'
         + '<div class="ko-score">' + agg + '</div>'
@@ -364,54 +333,23 @@ async function renderBracket() {
   html += koSection;
 
   tab.innerHTML = html;
+  bindMatchClicks(tab);
 }
 
-// ── Odds ─────────────────────────────────────────────────────────────
-
-function renderOdds() {
-  const tab = document.getElementById("tab-odds");
-  if (!tab) return;
-  const odds = appState.odds;
-  if (!odds || !odds.length) {
-    tab.innerHTML = '<div style="color:#15565B;font-size:12px">No odds data.</div>';
-    return;
-  }
-  tab.innerHTML = '<div class="odds-wrap"><table class="odds-table">'
-    + '<tr><th>#</th><th>Team</th><th>Champion</th><th>Final</th><th>SF</th><th>QF</th><th>Top 8</th></tr>'
-    + odds.map(function(t, i) {
-      return '<tr><td class="num">' + (i + 1) + '</td><td>' + t.team + '</td>'
-        + ['champion', 'final', 'sf', 'qf', 'top_8'].map(function(k) {
-          const v = t[k + '_prob'];
-          return '<td class="num">' + (v != null ? (v * 100).toFixed(1) + '%' : '-')
-            + '<span class="odds-bar-wrap"><span class="odds-bar" style="width:' + Math.max(2, (v || 0) * 200) + '%"></span></span></td>';
-        }).join("") + '</tr>';
-    }).join("") + '</table></div>';
-}
-
-// ── Signals ──────────────────────────────────────────────────────────
-
-function renderSignals() {
-  const meta = compute_signals_meta();
-  const signals = meta.signals || [];
-  let html = "";
-  signals.forEach(function(s) {
-    html += '<div class="signal-row"><span>' + s.name + '</span>'
-      + '<span class="' + (s.available ? 'dot-green' : 'dot-red') + '">\u25CF</span>'
-      + '<span class="dim">' + (s.last_updated || 'never') + '</span></div>';
+// ES modules create no globals, so inline onclick attributes cannot reach
+// openMatchModalFromEl; bind listeners after each render instead.
+function bindMatchClicks(scope) {
+  scope.querySelectorAll(".match-clickable").forEach(function (el) {
+    el.addEventListener("click", function () { openMatchModalFromEl(el); });
   });
 }
+
+// ── Match intelligence modal ─────────────────────────────────────────
 
 function openMatchModalFromEl(el) {
   const mid = el.getAttribute('data-match-id');
   if (!mid) return;
   openMatchModal({ match_id: mid, team_a: el.getAttribute('data-team-a') || '', team_b: el.getAttribute('data-team-b') || '' });
-}
-
-function getScoreStr(m) {
-  if (m.score) return m.score.home + '-' + m.score.away;
-  if (m.result && m.result.score_a !== undefined) return m.result.score_a + '-' + m.result.score_b;
-  if (m.home_score !== undefined) return m.home_score + '-' + m.away_score;
-  return 'No result';
 }
 
 async function openMatchModal(m) {
@@ -448,23 +386,40 @@ async function openMatchModal(m) {
   var ta = insight.teams.a, tb = insight.teams.b;
   var sigs = insight.signals || {};
   var sigKeys = Object.keys(sigs);
-  var bp = insight.blended_prob || 0.5;
-  var outcome = insight.outcome_distribution || {};
+  // Truth contract: blended_prob is null when the model could not produce a
+  // prediction. Never substitute a default probability for it.
+  var bpAvailable = insight.prob_available === true && typeof insight.blended_prob === "number";
+  var bp = bpAvailable ? insight.blended_prob : null;
+  var outcome = (bpAvailable && insight.outcome_distribution) || null;
   var ft = insight.form_trends || {};
+  var playedFlag = insight.played === true;
 
-  left.innerHTML =
+  var leftHtml =
     '<div class="sec-title">Blended Prediction</div>' +
-    '<div class="stat-card" style="margin:4px 0"><div class="val">' +
-    Math.round(bp * 100) + '%</div><div class="lbl">' + ta + ' win</div></div>' +
-    '<div class="sec-title">Form Trend</div><div class="form-charts">' +
+    (bpAvailable
+      ? '<div class="stat-card" style="margin:4px 0"><div class="val">' +
+        Math.round(bp * 100) + '%</div><div class="lbl">' + ta + ' win</div></div>'
+      : '<div class="dim" style="padding:6px 4px;font-size:12px">Prediction unavailable'
+        + (insight.prob_reason ? ' (' + insight.prob_reason + ')' : '') + '.</div>');
+
+  leftHtml += '<div class="sec-title">Form Trend</div><div class="form-charts">' +
     [ta, tb].map(function(team) {
       return '<div class="form-chart-box"><div class="fc-label">' + team +
         '</div><canvas id="fc-' + team.replace(/\s/g, "") + '"></canvas></div>';
     }).join("") +
     '</div><div class="sec-title">Signal Comparison</div>' +
     '<div class="chart-box"><canvas id="sigChart"></canvas></div>' +
-    '<div class="sec-title">Outcome Distribution</div><div class="outcome-charts">' +
-    '<div class="outcome-chart-box"><canvas id="outcomeChart"></canvas></div></div>';
+    '<div class="sec-title">Outcome Distribution</div>';
+  leftHtml += (outcome
+    ? '<div class="outcome-charts"><div class="outcome-chart-box"><canvas id="outcomeChart"></canvas></div></div>'
+    : '<div class="dim" style="padding:4px;font-size:11px">Outcome distribution unavailable without a blended prediction.</div>');
+  leftHtml += '<div class="sec-title">Result</div>';
+  leftHtml += playedFlag
+    ? '<div class="dim" style="padding:4px;font-size:12px">Played' +
+      (insight.score ? ' - ' + insight.score.home + ' - ' + insight.score.away : '') +
+      (insight.winner ? ' (winner: ' + insight.winner + ')' : '') + '</div>'
+    : '<div class="dim" style="padding:4px;font-size:12px">Scheduled - no result yet.</div>';
+  left.innerHTML = leftHtml;
 
   var sigHtml = '<div class="sec-title">Signal Breakdown</div>';
   sigHtml += '<table class="insight-table"><tr><th>Signal</th><th>Prob</th><th>Weight</th></tr>';
@@ -474,8 +429,8 @@ async function openMatchModal(m) {
     if (!sd) return;
     hasSignals = true;
     sigHtml += '<tr><td>' + (sd.label || sk) + '</td><td class="num">' +
-      Math.round((sd.probability || 0.5) * 100) + '%</td><td class="num">' +
-      ((sd.weight || 0) * 100).toFixed(1) + '%</td></tr>';
+      Math.round((sd.probability != null ? sd.probability : 0) * 100) + '%</td><td class="num">' +
+      ((sd.weight != null ? sd.weight : 0) * 100).toFixed(1) + '%</td></tr>';
   });
   if (!hasSignals) sigHtml += '<tr><td colspan="3" style="color:#15565B">No signal data for this match.</td></tr>';
   sigHtml += '</table>';
@@ -487,7 +442,7 @@ async function openMatchModal(m) {
   bottomEl.innerHTML =
     '<div class="sec-title warn">What-If Scenario</div>' +
     '<div class="whatif-input-wrap"><input type="number" id="modalWhatifDelta" value="50" step="10" style="width:90px">' +
-    '<button onclick="window.__sendUclWhatIf(\'' + mid.replace(/'/g, "\\'") + '\',\'' + ta.replace(/'/g, "\\'") + '\',\'' + tb.replace(/'/g, "\\'") + '\')">&#9654;</button></div>' +
+    '<button onclick="window.__sendModalWhatIf(\'' + mid.replace(/'/g, "\\'") + '\',\'' + ta.replace(/'/g, "\\'") + '\',\'' + tb.replace(/'/g, "\\'") + '\')">&#9654;</button></div>' +
     '<div class="whatif-controls"><label>Elo boost for ' + ta + ':</label></div>' +
     '<div class="whatif-modal-result" id="modalWhatifResult"></div>';
 
@@ -511,7 +466,7 @@ async function openMatchModal(m) {
   var sigCanvas = document.getElementById("sigChart");
   if (sigCanvas && typeof Chart !== "undefined" && sigKeys.length > 0) {
     var sigVals = sigKeys.map(function(sk) {
-      return Math.round((sigs[sk].probability || 0.5) * 100);
+      return Math.round((sigs[sk].probability != null ? sigs[sk].probability : 0) * 100);
     });
     var sigColors = sigKeys.map(function(sk, i) {
       return i === 0 ? "#16A085" : "#156F69";
@@ -530,12 +485,17 @@ async function openMatchModal(m) {
     });
   }
 
+  // Doughnut only when a real distribution exists - never draw fabricated
+  // equal-thirds slices for missing data.
   var ocCanvas = document.getElementById("outcomeChart");
-  if (ocCanvas && typeof Chart !== "undefined" && outcome.a_win !== undefined) {
+  if (ocCanvas && typeof Chart !== "undefined" && outcome &&
+      typeof outcome.a_win === "number" &&
+      typeof outcome.draw === "number" &&
+      typeof outcome.b_win === "number") {
     modalCharts.outcome = new Chart(ocCanvas.getContext("2d"), {
       type: "doughnut",
       data: { labels: [ta + " win", "Draw", tb + " win"],
-        datasets: [{ data: [outcome.a_win || 0.33, outcome.draw || 0.33, outcome.b_win || 0.33],
+        datasets: [{ data: [outcome.a_win, outcome.draw, outcome.b_win],
           backgroundColor: ["#16A085", "#156F69", "#153D4C"],
           borderColor: "#140C30", borderWidth: 2 }] },
       options: { responsive: true, maintainAspectRatio: false,
