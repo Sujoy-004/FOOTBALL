@@ -845,13 +845,24 @@ def api_match_insight(match_id: str = ""):
         return JSONResponse({"error": "match_id parameter required"})
     br = cache.get("bracket_rounds", {})
     match_data = None
+    match_round = ""
     for r, matches in br.items():
         for m in matches:
             if m["match_id"] == match_id:
                 match_data = m
+                match_round = r
                 break
         if match_data:
             break
+
+    # League-phase fallback: search results.json when not found in bracket
+    if not match_data:
+        for m in _load_results():
+            if m["match_id"] == match_id:
+                match_data = m
+                match_round = "League Phase"
+                break
+
     if not match_data:
         return JSONResponse({"error": "match not found"})
     ta = match_data.get("team_a", "")

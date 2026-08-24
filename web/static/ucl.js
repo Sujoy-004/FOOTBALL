@@ -168,13 +168,19 @@ function renderBracket() {
   const playoff = br.playoff || [];
   let poHtml = "";
   if (playoff.length) {
-    poHtml = '<div class="g-title">Playoff Round (9-24)</div><div class="playoff-grid">';
+    poHtml = '<div class="g-title">Knockout Playoffs</div><div class="playoff-grid">';
     playoff.forEach(function(t) {
       const aggStr = t.aggregate_a + "-" + t.aggregate_b;
       let detail = aggStr + " agg";
       if (t.et_played) detail += " (ET)";
       if (t.penalties_played) detail += " (pens)";
-      poHtml += '<div class="playoff-card"><div class="p-title">Tie ' + t.tie_num + '</div><div class="p-teams"><span class="p-team winner">' + t.team_a + '</span><span class="p-score">' + aggStr + '</span><span class="p-team">' + t.team_b + '</span></div><div class="p-detail">' + detail + "</div></div>";
+      const winnerCls = t.winner ? ' p-winner' : '';
+      poHtml += '<div class="playoff-card match-clickable" data-match-id="' + (t.match_id || t.tie_num || '') + '"'
+        + ' data-team-a="' + (t.team_a || '') + '" data-team-b="' + (t.team_b || '') + '"'
+        + ' onclick="openMatchModalFromEl(this)">'
+        + '<div class="p-title">Tie ' + t.tie_num + '</div>'
+        + '<div class="p-teams"><span class="p-team">' + (t.team_a || "?") + '</span><span class="p-score">' + aggStr + '</span><span class="p-team">' + (t.team_b || "?") + '</span></div>'
+        + '<div class="p-detail">' + detail + "</div></div>";
     });
     poHtml += "</div>";
   }
@@ -195,13 +201,30 @@ function renderBracket() {
       ms.forEach(function(m) {
         const hs = m.home_score !== undefined ? m.home_score : "-";
         const as_ = m.away_score !== undefined ? m.away_score : "-";
-        mdHtml += "<tr><td>" + m.match_id + "</td><td>" + m.team_a + "</td><td>" + hs + "-" + as_ + "</td><td>" + m.team_b + "</td></tr>";
+        const clickAttrs = 'data-match-id="' + m.match_id + '"'
+          + ' data-team-a="' + (m.team_a || "") + '" data-team-b="' + (m.team_b || "") + '"';
+        mdHtml += '<tr class="match-clickable" ' + clickAttrs
+          + ' onclick="openMatchModalFromEl(this)"'
+          + ' style="cursor:pointer;transition:background .15s"'
+          + ' onmouseover="this.style.background=\'rgba(22,160,133,0.08)\'"'
+          + ' onmouseout="this.style.background=\'\'">'
+          + "<td>" + m.match_id + "</td><td>" + m.team_a + "</td><td>" + hs + "-" + as_ + "</td><td>" + m.team_b + "</td></tr>";
       });
       mdHtml += "</table></div></div>";
     });
     mdHtml += "</div>";
   }
   tab.innerHTML = poHtml + mdHtml;
+}
+
+function openMatchModalFromEl(el) {
+  const mid = el.getAttribute("data-match-id");
+  if (!mid) return;
+  openMatchModal({
+    match_id: mid,
+    team_a: el.getAttribute("data-team-a") || "",
+    team_b: el.getAttribute("data-team-b") || "",
+  });
 }
 
 
