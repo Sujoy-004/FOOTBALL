@@ -1,3 +1,22 @@
+// ── Safe JSON fetch ──────────────────────────────────────────────────
+// Never blindly parse: surfaces status + URL + body snippet on failure so
+// empty/truncated/error responses produce a readable message instead of
+// "Unexpected end of input".
+async function safeJson(url, options) {
+  const r = await fetch(url, options);
+  const t = await r.text();
+  if (!r.ok) {
+    throw new Error("[" + r.status + "] " + url + ": "
+      + (t.slice(0, 120) || "empty body"));
+  }
+  try {
+    return JSON.parse(t);
+  } catch (e) {
+    throw new Error("[" + r.status + "] " + url
+      + ": non-JSON response (" + (t.slice(0, 80) || "empty body") + ")");
+  }
+}
+
 // ── Competition Registry ──
 const competitions = {
   worldcup: {
@@ -125,8 +144,8 @@ function renderLanding() {
 
 async function loadLandingStats() {
   const results = await Promise.allSettled([
-    fetch("/worldcup/api/data").then(r => r.json()),
-    fetch("/ucl/api/data").then(r => r.json()),
+    safeJson("/worldcup/api/data"),
+    safeJson("/ucl/api/data"),
   ]);
   if (results[0].status === "fulfilled") {
     const wc = results[0].value;
@@ -458,4 +477,5 @@ export {
   updateStatusBar,
   createSimPopup,
   showSimPopup,
+  safeJson,
 };

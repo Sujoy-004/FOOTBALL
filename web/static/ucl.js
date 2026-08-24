@@ -2,7 +2,7 @@
 import {
   destroyModalCharts, modalCharts, drawBracketConnectors,
   updateStatusBar, competitions, showSimPopup,
-  buildTable,
+  buildTable, safeJson,
 } from "./shared.js";
 
 const API = "/ucl/api";
@@ -15,11 +15,11 @@ export function init(comp) {
 async function loadAll() {
   try {
     const [d, s, br, o, sig] = await Promise.all([
-      fetch(API + "/data").then(r => r.json()),
-      fetch(API + "/standings").then(r => r.json()),
-      fetch(API + "/bracket").then(r => r.json()),
-      fetch(API + "/odds").then(r => r.json()),
-      fetch(API + "/signals").then(r => r.json()),
+      safeJson(API + "/data"),
+      safeJson(API + "/standings"),
+      safeJson(API + "/bracket"),
+      safeJson(API + "/odds"),
+      safeJson(API + "/signals"),
     ]);
     appState.data = d;
     appState.standings = s.standings || [];
@@ -62,11 +62,11 @@ function updateStatus() {
 async function reloadData() {
   try {
     const [d, s, br, o, sig] = await Promise.all([
-      fetch(API + "/data").then(r => r.json()),
-      fetch(API + "/standings").then(r => r.json()),
-      fetch(API + "/bracket").then(r => r.json()),
-      fetch(API + "/odds").then(r => r.json()),
-      fetch(API + "/signals").then(r => r.json()),
+      safeJson(API + "/data"),
+      safeJson(API + "/standings"),
+      safeJson(API + "/bracket"),
+      safeJson(API + "/odds"),
+      safeJson(API + "/signals"),
     ]);
     appState.data = d; appState.standings = s.standings || [];
     appState.bracket = br; appState.odds = o.odds || [];
@@ -92,7 +92,7 @@ window.__simulateAllRemaining = function () {
     onComplete: async () => {
       await reloadData();
       try {
-        const simResp = await fetch("/ucl/api/simulation").then(r => r.json());
+        const simResp = await safeJson("/ucl/api/simulation");
         appState.simBracket = (simResp.bracket_rounds || simResp.playoff) ? {
           bracket_rounds: simResp.bracket_rounds || {},
           playoff: simResp.playoff || []
@@ -105,17 +105,17 @@ window.__simulateAllRemaining = function () {
 
 window.__resetResults = async function () {
   try {
-    const resp = await (await fetch(API + "/reset", { method: "POST" })).json();
+    const resp = await safeJson(API + "/reset", { method: "POST" });
     if (resp.status === "error") {
       console.error("Reset error:", resp.error);
       return;
     }
     const [d, s, br, o, sig] = await Promise.all([
-      fetch(API + "/data").then(r => r.json()),
-      fetch(API + "/standings").then(r => r.json()),
-      fetch(API + "/bracket").then(r => r.json()),
-      fetch(API + "/odds").then(r => r.json()),
-      fetch(API + "/signals").then(r => r.json()),
+      safeJson(API + "/data"),
+      safeJson(API + "/standings"),
+      safeJson(API + "/bracket"),
+      safeJson(API + "/odds"),
+      safeJson(API + "/signals"),
     ]);
     appState.data = d; appState.standings = s.standings || [];
     appState.bracket = br; appState.odds = o.odds || [];
@@ -163,7 +163,7 @@ async function openMatchModal(m) {
   const bottom = document.getElementById("modalBottom");
 
   let insight;
-  try { insight = await (await fetch(API + "/match/insight?match_id=" + mid)).json(); } catch { insight = { error: "fetch failed" }; }
+  try { insight = await safeJson(API + "/match/insight?match_id=" + mid); } catch { insight = { error: "fetch failed" }; }
   if (insight.error) {
     bodyEl.innerHTML = '<div style="color:#ff6b6b;font-size:12px">Failed to load match insight.</div>';
     return;
@@ -265,10 +265,10 @@ window.__sendModalWhatIf = async function (matchId, teamA, teamB) {
   resultDiv.style.display = "block";
   resultDiv.innerHTML = '<div style="color:#15565B;font-size:11px">Running seeded counterfactual...</div>';
   try {
-    const resp = await (await fetch(API + "/what-if", {
+    const resp = await safeJson(API + "/what-if", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ match_id: matchId, elo_delta: eloDelta }),
-    })).json();
+    });
     if (resp.error) { resultDiv.innerHTML = '<div style="color:#ff6b6b">' + resp.error + "</div>"; return; }
     const row = (name, e) => {
       const t = resp.teams[name] || {};
