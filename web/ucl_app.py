@@ -138,6 +138,16 @@ def _fetch_live_data() -> None:
     import logging
     logger = logging.getLogger(__name__)
 
+    from web.startup import is_snapshot_mode
+    if is_snapshot_mode():
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "[UCL] snapshot mode - live refresh skipped")
+        boot_log_local.append({"step": "UCL live fetch", "status": "skip",
+                               "elapsed": 0.0,
+                               "output": f"[{ts()}] Snapshot mode - live refresh skipped"})
+        return
+
     from web.common import get_data_provider
     provider = get_data_provider(BSD_API_KEY, FOOTBALL_DATA_ORG_KEY, UCL_LEAGUE_ID)
     if provider is None:
@@ -441,6 +451,15 @@ async def lifespan(app: fastapi.FastAPI):
 
 ucl_app = fastapi.FastAPI(lifespan=lifespan)
 
+@ucl_app.exception_handler(Exception)
+async def _json_error_handler(request, exc):
+    """Never emit an empty/non-JSON body - the SPA parses every response."""
+    import logging as _logging
+    _logging.getLogger(__name__).error(
+        "[UCL] unhandled error on %s: %s", request.url.path, exc)
+    return JSONResponse({"error": f"internal error: {exc.__class__.__name__}"},
+                        status_code=500)
+
 
 @ucl_app.get("/api/data")
 def api_data():
@@ -645,6 +664,10 @@ def api_reset():
 @ucl_app.post("/api/refresh")
 def api_refresh():
     global cache, _mode
+    from web.startup import is_snapshot_mode
+    if is_snapshot_mode():
+        return JSONResponse({"status": "skipped",
+                             "reason": "snapshot mode selected at startup"})
     try:
         _fetch_live_data()
         cache = compute_all()

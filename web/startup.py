@@ -28,6 +28,14 @@ class StartupDecision(NamedTuple):
     fdo_key: str       # session key to propagate ("" for snapshot)
 
 
+_last_decision: StartupDecision | None = None
+
+
+def is_snapshot_mode() -> bool:
+    """True once startup chose snapshot mode (unset => live semantics)."""
+    return _last_decision is not None and _last_decision.mode == "snapshot"
+
+
 def is_interactive() -> bool:
     try:
         return sys.stdin.isatty() and sys.stdout.isatty()
@@ -86,19 +94,25 @@ def run_startup_flow(
     key_input_fn = key_input_fn or getpass.getpass
     echo = echo or print
 
+    global _last_decision
+
+    def _decide(mode, key=''):
+        global _last_decision
+        _last_decision = StartupDecision(mode, key)
+        return _last_decision
     existing = os.getenv("FOOTBALL_DATA_ORG_KEY", "")
 
     # Case A — usable key already configured: no prompt.
     if has_usable_fdo_key(existing):
         echo("Live data provider configured.")
         echo("Starting server...")
-        return StartupDecision("live-configured", existing)
+        return _decide("live-configured", existing)
 
     # Case B — no key: prompt only in an interactive terminal.
     if not interactive_fn():
         echo("No valid live API key configured (non-interactive) — "
              "using existing snapshot data.")
-        return StartupDecision("snapshot", "")
+        return _decide("snapshot", "")
 
     echo("")
     echo("FOOTBALL Data Mode")
@@ -115,7 +129,7 @@ def run_startup_flow(
         if choice == "2":
             echo("Starting with existing snapshot data.")
             echo("Live refresh was skipped by user.")
-            return StartupDecision("snapshot", "")
+            return _decide("snapshot", "")
 
         if choice != "1":
             echo("Please choose 1 or 2.")
@@ -132,7 +146,7 @@ def run_startup_flow(
                     echo("Live API access confirmed.")
                     echo("Data refresh completed.")
                     echo("Starting server...")
-                    return StartupDecision("live-entered", key)
+                    return _decide("live-entered", key)
                 echo(f"Live API validation/refresh failed: {err}")
 
             while True:
@@ -142,7 +156,7 @@ def run_startup_flow(
                 if sub == "2":
                     echo("Starting with existing snapshot data.")
                     echo("Live refresh was skipped by user.")
-                    return StartupDecision("snapshot", "")
+                    return _decide("snapshot", "")
                 if sub == "3":
                     raise SystemExit(0)
                 echo("Please choose 1, 2 or 3.")
