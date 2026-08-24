@@ -133,15 +133,78 @@ async function renderOverview() {
   if (!tab) return;
   const d = appState.data;
   if (!d) return;
-  const signals = appState.signals;
-  const sigKeys = Object.keys(signals);
-
-  const sigLabelMap = { elo: "Elo", all_signals: "Blended", refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form",
-  squad_value: "Squad Value", rest_days: "Rest Days",
-};
+  const html = '<div class="stats-row">' +
+    '<div class="stat-card"><div class="val">' + d.n_teams + '</div><div class="lbl">Teams</div></div>' +
+    '<div class="stat-card"><div class="val">' + (d.n_played || 0) + '</div><div class="lbl">Matches</div></div>' +
+    '</div>';
+  tab.innerHTML = html;
 }
 
-const sigOrder = ["refined_elo", "rolling_form", "market_odds", "squad_value", "rest_days"];
+function renderStandings() {
+  const tab = document.getElementById("tab-standings");
+  if (!tab) return;
+  const st = appState.standings || [];
+  if (!st.length) { tab.innerHTML = '<div style="color:#15565B;font-size:12px">No standings data.</div>'; return; }
+  let html = '<div class="league-table-wrap"><table class="league-table"><tr><th>Pos</th><th>Team</th><th>Pld</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th><th>Zone</th></tr>';
+  st.forEach(function(r) {
+    const zone = r.zone || "eliminated";
+    const cls = zone === "top_8" ? "zone-top8" : zone === "playoff" ? "zone-playoff" : "";
+    const zoneLabel = zone === "top_8" ? "TOP 8" : zone === "playoff" ? "PLAYOFF" : "OUT";
+    const zoneCls = zone === "top_8" ? "top8" : zone === "playoff" ? "playoff" : "eliminated";
+    const gd = r.gd > 0 ? "+" + r.gd : String(r.gd);
+    const pld = (r.wins || 0) + (r.draws || 0) + (r.losses || 0);
+    html += '<tr class="' + cls + '"><td class="num">' + r.position + '</td><td>' + r.team + '</td><td class="num">' + pld + '</td><td class="num">' + (r.wins || 0) + '</td><td class="num">' + (r.draws || 0) + '</td><td class="num">' + (r.losses || 0) + '</td><td class="num">' + (r.gs || 0) + '</td><td class="num">' + (r.ga || 0) + '</td><td class="num">' + gd + '</td><td class="num">' + (r.pts !== undefined && r.pts !== null ? r.pts : "?") + '</td><td><span class="zone-badge ' + zoneCls + '">' + zoneLabel + '</span></td></tr>';
+  });
+  html += "</table></div>";
+  tab.innerHTML = html;
+}
+
+function renderBracket() {
+  const tab = document.getElementById("tab-bracket");
+  if (!tab) return;
+  const br = appState.bracket;
+  if (!br) { tab.innerHTML = "<p>No bracket data.</p>"; return; }
+
+  const playoff = br.playoff || [];
+  let poHtml = "";
+  if (playoff.length) {
+    poHtml = '<div class="g-title">Playoff Round (9-24)</div><div class="playoff-grid">';
+    playoff.forEach(function(t) {
+      const aggStr = t.aggregate_a + "-" + t.aggregate_b;
+      let detail = aggStr + " agg";
+      if (t.et_played) detail += " (ET)";
+      if (t.penalties_played) detail += " (pens)";
+      poHtml += '<div class="playoff-card"><div class="p-title">Tie ' + t.tie_num + '</div><div class="p-teams"><span class="p-team winner">' + t.team_a + '</span><span class="p-score">' + aggStr + '</span><span class="p-team">' + t.team_b + '</span></div><div class="p-detail">' + detail + "</div></div>";
+    });
+    poHtml += "</div>";
+  }
+
+  const lmd = br.league_matchdays || {};
+  const lmdKeys = Object.keys(lmd).sort();
+  let mdHtml = "";
+  if (lmdKeys.length) {
+    mdHtml = '<div class="g-title">League Phase</div><div class="md-accordion">';
+    const firstMid = lmdKeys[0];
+    lmdKeys.forEach(function(md) {
+      const ms = lmd[md] || [];
+      const isFirst = md === firstMid;
+      mdHtml += '<div class="md-card"><div class="md-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">';
+      mdHtml += '<span class="md-label">' + md + '</span><span class="md-count">' + ms.length + " matches</span>";
+      mdHtml += "</div>";
+      mdHtml += '<div class="md-body' + (isFirst ? " open" : "") + '"><table class="league-table"><tr><th>#</th><th>Home</th><th>Score</th><th>Away</th></tr>';
+      ms.forEach(function(m) {
+        const hs = m.home_score !== undefined ? m.home_score : "-";
+        const as_ = m.away_score !== undefined ? m.away_score : "-";
+        mdHtml += "<tr><td>" + m.match_id + "</td><td>" + m.team_a + "</td><td>" + hs + "-" + as_ + "</td><td>" + m.team_b + "</td></tr>";
+      });
+      mdHtml += "</table></div></div>";
+    });
+    mdHtml += "</div>";
+  }
+  tab.innerHTML = poHtml + mdHtml;
+}
+
+
 
 function getScoreStr(m) {
   if (m.score) return m.score.home + "-" + m.score.away;
@@ -342,7 +405,6 @@ function renderSignals() {
   html += "</table>";
   tab.innerHTML = html;
 }
-
 
 
 
