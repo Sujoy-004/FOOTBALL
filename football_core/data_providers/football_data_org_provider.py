@@ -55,6 +55,7 @@ class FootballDataOrgProvider:
 
     def __init__(self, api_key: str) -> None:
         self.api_key = api_key
+        self.last_error: str | None = None
         self._session = requests.Session()
         self._session.headers.update({"X-Auth-Token": api_key})
 
@@ -66,22 +67,27 @@ class FootballDataOrgProvider:
         for attempt in range(3):
             try:
                 resp = self._session.get(url, timeout=timeout)
-                if resp.status_code == 401:
-                    logger.warning("HTTP 401 (invalid API key) for %s", url)
+                if resp.status_code in (400, 401):
+                    msg = (resp.json() or {}).get("message", "") if resp.content else ""
+                    self.last_error = f"HTTP {resp.status_code}: {msg or resp.reason}"
+                    logger.warning("HTTP %s for %s (%s)", resp.status_code, url, msg)
                     return None
                 if resp.status_code == 429:
                     logger.warning("Rate limited (429) for %s — retrying", url)
                     time.sleep(2 ** attempt)
                     continue
                 resp.raise_for_status()
+                self.last_error = None
                 return resp.json()
             except requests.exceptions.Timeout:
+                self.last_error = f"timeout (attempt {attempt + 1}/3)"
                 logger.debug("Request timed out (attempt %d/3): %s", attempt + 1, url)
                 if attempt < 2:
                     time.sleep(backoff[attempt])
                     continue
                 return None
-            except requests.exceptions.ConnectionError:
+            except requests.exceptions.ConnectionError as exc:
+                self.last_error = f"connection error: {exc.__class__.__name__}"
                 logger.debug("Connection error (attempt %d/3): %s", attempt + 1, url)
                 if attempt < 2:
                     time.sleep(backoff[attempt])

@@ -35,6 +35,7 @@ class BSDDataProvider:
     def __init__(self, api_key: str, league_id: int = 27) -> None:
         self.api_key = api_key
         self.league_id = league_id
+        self.last_error: str | None = None
         self._session = requests.Session()
         self._session.headers.update({"Authorization": f"Token {api_key}"})
 
@@ -49,23 +50,29 @@ class BSDDataProvider:
             try:
                 resp = self._session.get(url, timeout=timeout)
                 if resp.status_code == 401:
+                    self.last_error = f"HTTP 401 invalid API key for {url}"
                     logger.debug("HTTP 401 (invalid API key) for %s", url)
                     return None
                 resp.raise_for_status()
+                self.last_error = None
                 return resp.json()
             except requests.exceptions.Timeout:
+                self.last_error = f"timeout (attempt {attempt + 1}/3)"
                 logger.debug("Request timed out (attempt %d/3): %s", attempt + 1, url)
                 if attempt < 2:
                     time.sleep(backoff[attempt])
                     continue
                 return None
-            except requests.exceptions.ConnectionError:
+            except requests.exceptions.ConnectionError as exc:
+                self.last_error = f"connection error: {exc.__class__.__name__}"
                 logger.debug("Connection error (attempt %d/3): %s", attempt + 1, url)
                 if attempt < 2:
                     time.sleep(backoff[attempt])
                     continue
                 return None
-            except requests.exceptions.HTTPError:
+            except requests.exceptions.HTTPError as exc:
+                code = exc.response.status_code if exc.response is not None else "?"
+                self.last_error = f"HTTP error {code}"
                 logger.debug("HTTP error (attempt %d/3): %s", attempt + 1, url)
                 if attempt < 2:
                     time.sleep(backoff[attempt])

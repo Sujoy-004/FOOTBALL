@@ -346,6 +346,14 @@ def compute_overview() -> dict:
     data["bracket"] = bracket_display
     data["full_bracket"] = full_bracket
     data["signals_meta"] = signals_meta
+    # Freshness from the persisted refresh report (survives cache rebuilds).
+    try:
+        lr = json.loads(
+            (Path(__file__).parent / "last_refresh.json").read_text(encoding="utf-8")
+        )
+        data["refresh"] = lr.get("worldcup", {})
+    except Exception:
+        data["refresh"] = {}
     return data
 
 
@@ -386,10 +394,20 @@ def compute_blend_info():
     return _eval(constants.DATA_DIR, cache.get("evaluation", {}), {})
 
 
-def _fetch_live_data() -> None:
-    """Fetch live match data + signal caches — delegates to pipeline."""
+def _fetch_live_data() -> dict:
+    """Fetch live match data + signal caches — delegates to pipeline.
+
+    Returns the refresh report (provider/success/error/staleness/ingestion
+    counters) and stores it in cache["refresh"] for the API surface.
+    """
     from competitions.worldcup.src.pipeline import fetch_live_data as _pipeline_fetch
-    _pipeline_fetch(BSD_API_KEY, FOOTBALL_DATA_ORG_KEY, DATA_DIR)
+    try:
+        report = _pipeline_fetch(BSD_API_KEY, FOOTBALL_DATA_ORG_KEY, DATA_DIR)
+    except Exception as e:  # never let a refresh crash boot; mark stale
+        report = {"provider": None, "attempted": True, "success": False,
+                  "error": str(e), "stale": True, "finished": {}}
+    cache["refresh"] = report
+    return report
 
 
 
@@ -399,6 +417,7 @@ wc_app = fastapi.FastAPI()
 @wc_app.get("/api/data")
 def api_data():
     return JSONResponse({
+        "refresh": _current_refresh_report(),
         "teams": cache.get("teams", []),
         "n_teams": cache.get("n_teams", 0),
         "total_iterations": cache.get("total_iterations", 0),
@@ -407,10 +426,21 @@ def api_data():
     })
 
 
+def _current_refresh_report() -> dict:
+    try:
+        lr = json.loads(
+            (Path(__file__).parent / "last_refresh.json").read_text(encoding="utf-8")
+        )
+        return lr.get("worldcup", {})
+    except Exception:
+        return {}
+
+
 @wc_app.get("/api/overview")
 def api_overview():
     has_sim = bool(sim_cache.get("status") == "complete")
     return JSONResponse({
+        "refresh": _current_refresh_report(),
         "standings": cache.get("standings", []),
         "teams": cache.get("teams", []),
         "n_teams": cache.get("n_teams", 0),

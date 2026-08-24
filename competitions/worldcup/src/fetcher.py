@@ -39,13 +39,20 @@ def process_matches(
     bracket: list[dict],
     aliases: dict[str, list[str]],
     played_ids: set[str],
+    ingestion_stats: dict | None = None,
 ) -> list[dict]:
+    from football_core.fetcher import (
+        new_ingestion_stats, count_finished, note_unmatchable,
+        note_no_target, summarize_ingestion,
+    )
+    istats = ingestion_stats if ingestion_stats is not None else new_ingestion_stats()
     alias_lookup = _build_alias_lookup(aliases, bracket)
     results: list[dict] = []
 
     for match in raw_matches:
         if match.get("status") != "finished":
             continue
+        count_finished(istats)
 
         match_id = str(match.get("id", ""))
         if match_id in played_ids:
@@ -58,12 +65,15 @@ def process_matches(
         away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
-            logger.debug("Unmatchable team names: home=%r, away=%r", home_name, away_name)
+            note_unmatchable(istats, logger, home_name, away_name,
+                             (match.get("home_score"), match.get("away_score")))
             continue
+
+        istats["normalized"] += 1
 
         bracket_id = find_bracket_match(home_norm, away_norm, bracket)
         if bracket_id is None:
-            logger.debug("No bracket match found for %s vs %s", home_norm, away_norm)
+            note_no_target(istats, logger, home_norm, away_norm)
             continue
         if bracket_id in played_ids:
             continue
@@ -138,7 +148,9 @@ def process_matches(
             entry["ai_preview"] = ai_preview
 
         results.append(entry)
+        istats["ingested"] += 1
 
+    summarize_ingestion(istats, logger, "knockout")
     return results
 
 
@@ -149,7 +161,13 @@ def process_group_matches(
     aliases: dict[str, list[str]],
     played_group_ids: set[str],
     played_bsd_event_ids: set[str],
+    ingestion_stats: dict | None = None,
 ) -> list[dict]:
+    from football_core.fetcher import (
+        new_ingestion_stats, count_finished, note_unmatchable,
+        note_no_target, summarize_ingestion,
+    )
+    istats = ingestion_stats if ingestion_stats is not None else new_ingestion_stats()
     alias_lookup = _build_alias_lookup(aliases, [])
     groups_data = groups.get("groups", groups)
     for group_data in groups_data.values():
@@ -161,9 +179,12 @@ def process_group_matches(
     for match in raw_matches:
         if match.get("status") != "finished":
             continue
+        count_finished(istats)
 
         group_name = match.get("group_name")
         if group_name is None:
+            # Not a group-stage event for this processor (e.g. knockout event).
+            istats["skipped_no_target"] += 1
             continue
 
         bsd_id = str(match.get("id", ""))
@@ -173,7 +194,11 @@ def process_group_matches(
 
         group_letter = _extract_group_letter(group_name)
         if group_letter is None:
-            logger.debug("Invalid group_name: %r", group_name)
+            note_no_target(istats, logger, match.get("home_team", ""), match.get("away_team", ""))
+            logger.warning(
+                "RESULT INGESTION SKIP (unparseable group_name %r): %r vs %r",
+                group_name, match.get("home_team"), match.get("away_team"),
+            )
             continue
 
         home_name = match.get("home_team", "")
@@ -182,20 +207,18 @@ def process_group_matches(
         away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
-            logger.debug(
-                "Unmatchable team names: home=%r, away=%r", home_name, away_name
-            )
+            note_unmatchable(istats, logger, home_name, away_name,
+                             (match.get("home_score"), match.get("away_score")))
             continue
+
+        istats["normalized"] += 1
 
         round_number = match.get("round_number", 0)
         match_id = find_group_match(
             home_norm, away_norm, group_letter, round_number, groups
         )
         if match_id is None:
-            logger.debug(
-                "No group match found for %s vs %s in group %s (round %d)",
-                home_norm, away_norm, group_letter, round_number,
-            )
+            note_no_target(istats, logger, home_norm, away_norm)
             continue
 
         if match_id in played_group_ids:
@@ -237,5 +260,7 @@ def process_group_matches(
             entry["ai_preview"] = ai_preview
 
         results.append(entry)
+        istats["ingested"] += 1
 
+    summarize_ingestion(istats, logger, "group stage")
     return results

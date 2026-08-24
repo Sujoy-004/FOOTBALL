@@ -96,6 +96,44 @@ active_simulations: dict[str, dict] = {}
 sim_lock = threading.Lock()
 
 
+def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None,
+                          n_matches: int | None = None, n_updated: int | None = None,
+                          finished: dict | None = None) -> dict:
+    """Record the UCL refresh outcome for the API surface + last_refresh.json."""
+    global _refresh_report
+    _refresh_report = {
+        "provider": provider_name,
+        "attempted": True,
+        "success": ok,
+        "error": error,
+        "stale": not ok,
+        "last_refresh": datetime.now(timezone.utc).isoformat(),
+        **({"n_matches": n_matches} if n_matches is not None else {}),
+        **({"n_updated": n_updated} if n_updated is not None else {}),
+        **({"finished": finished} if finished is not None else {}),
+    }
+    try:
+        refresh_path = Path(__file__).parent / "last_refresh.json"
+        refresh_data = {}
+        if refresh_path.exists():
+            try:
+                refresh_data = json.loads(refresh_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        entry = dict(_refresh_report)
+        entry["mode"] = provider_name
+        entry["n_matches"] = n_matches or 0
+        entry["n_updated"] = n_updated or 0
+        refresh_data["ucl"] = entry
+        refresh_path.write_text(json.dumps(refresh_data, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return _refresh_report
+
+
+_refresh_report: dict = {}
+
+
 def _fetch_live_data() -> None:
     import logging
     logger = logging.getLogger(__name__)
@@ -105,12 +143,15 @@ def _fetch_live_data() -> None:
     if provider is None:
         logger.warning("[UCL] No data provider — skipping live fetch")
         boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] No data provider configured"})
+        _store_refresh_report(False, "no data provider configured", None)
         return
 
     raw = provider.fetch_matches(competition_id="CL")
     if not raw:
-        logger.warning("[UCL] No matches returned from provider")
-        boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] Provider returned 0 matches"})
+        err = getattr(provider, "last_error", None) or "provider returned 0 matches"
+        logger.warning("[UCL] Refresh failed: %s — UCL data may be STALE", err)
+        boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] Provider returned 0 matches ({err})"})
+        _store_refresh_report(False, err, type(provider).__name__)
         return
 
     logger.info("[UCL] Fetched %d raw matches from %s", len(raw), type(provider).__name__)
@@ -158,11 +199,14 @@ def _fetch_live_data() -> None:
 
     ko_legs: dict[str, dict[frozenset, list[dict]]] = {s: {} for s in KO_STAGE_MAP}
     n_new = 0
+    from football_core.fetcher import new_ingestion_stats, count_finished, note_unmatchable, note_no_target, summarize_ingestion
+    ucl_stats = new_ingestion_stats()
 
     for event in raw:
         status = (event.get("status") or "").lower()
         if status != "finished":
             continue
+        count_finished(ucl_stats)
 
         home_name = event.get("home_team", "")
         away_name = event.get("away_team", "")
@@ -170,8 +214,10 @@ def _fetch_live_data() -> None:
         away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
-            logger.debug("[UCL] Unmatchable teams: %r vs %r", home_name, away_name)
+            note_unmatchable(ucl_stats, logger, home_name, away_name,
+                             (event.get("home_score"), event.get("away_score")))
             continue
+        ucl_stats["normalized"] += 1
 
         home_score = event.get("home_score") or 0
         away_score = event.get("away_score") or 0
@@ -180,7 +226,7 @@ def _fetch_live_data() -> None:
         if stage == "LEAGUE_STAGE":
             match_id = fixture_lookup.get((home_norm, away_norm))
             if match_id is None:
-                logger.debug("[UCL] No league fixture for %s vs %s", home_norm, away_norm)
+                note_no_target(ucl_stats, logger, home_norm, away_norm)
                 continue
             updated = False
             if match_id in existing_by_id:
@@ -261,16 +307,25 @@ def _fetch_live_data() -> None:
             refresh_data = json.loads(refresh_path.read_text(encoding="utf-8"))
         except Exception:
             pass
+    summarize_ingestion(ucl_stats, logger, "UCL")
+    provider_error = getattr(provider, "last_error", None)
     refresh_data["ucl"] = {
         "last_refresh": datetime.now(timezone.utc).isoformat(),
         "mode": type(provider).__name__,
+        "ok": bool(raw),
+        "error": provider_error,
+        "stale": not bool(raw),
         "n_matches": len(raw),
         "n_updated": n_new,
+        "finished": ucl_stats,
     }
     refresh_path.write_text(
         json.dumps(refresh_data, indent=2, ensure_ascii=False), encoding="utf-8",
     )
 
+    _store_refresh_report(True, None, type(provider).__name__,
+                          n_matches=len(raw), n_updated=n_new,
+                          finished=ucl_stats)
     boot_log_local.append({
         "step": "UCL live fetch", "status": "ok", "elapsed": 0.0,
         "output": f"[{ts()}] {type(provider).__name__}: {len(raw)} raw matches, {n_new} updated",
@@ -391,6 +446,7 @@ ucl_app = fastapi.FastAPI(lifespan=lifespan)
 def api_data():
     n_unplayed, n_total = _match_counts()
     return JSONResponse({
+        "refresh": _refresh_report,
         "teams": cache.get("teams", []),
         "all_teams": cache.get("all_teams", []),
         "n_teams": cache.get("n_teams", 0),
@@ -405,7 +461,10 @@ def api_data():
 
 @ucl_app.get("/api/boot")
 def api_boot():
-    return JSONResponse(cache.get("boot", []))
+    return JSONResponse({
+        "boot": cache.get("boot", []),
+        "refresh": _refresh_report,
+    })
 
 
 @ucl_app.get("/api/simulation")

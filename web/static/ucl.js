@@ -52,9 +52,10 @@ function updateStatus() {
   const signals = appState.signals;
   const sigKeys = Object.keys(signals);
   const nActive = sigKeys.filter(k => { const s = signals[k]; return s && (s.available || s.available_pct > 0 || s.n_matches > 0); }).length;
+  const stale = d.refresh && d.refresh.stale;
   updateStatusBar(
     d.n_teams + " teams  |  " + (d.n_played || 0) + " matches played  |  " + nActive + " / " + sigKeys.length + " signals",
-    ""
+    stale ? '<span style="color:#e6a817">⚠ STALE — live refresh failed; showing snapshot data</span>' : ""
   );
 }
 

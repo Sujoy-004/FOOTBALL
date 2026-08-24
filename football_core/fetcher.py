@@ -7,6 +7,59 @@ from football_core.data_providers.bsd_provider import BSDDataProvider
 logger = logging.getLogger(__name__)
 
 
+def new_ingestion_stats() -> dict:
+    """Create a zeroed result-ingestion stats dict (truth-ingestion contract).
+
+    Invariant: finished_received == normalized + skipped_unmatchable + skipped_no_target
+    (ingested ⊆ normalized). Any finished match that is not ingested must appear
+    in exactly one skipped_* bucket and be logged at WARNING level.
+    """
+    return {
+        "finished_received": 0,
+        "normalized": 0,
+        "ingested": 0,
+        "skipped_unmatchable": 0,
+        "skipped_no_target": 0,
+    }
+
+
+def count_finished(stats: dict) -> None:
+    stats["finished_received"] += 1
+
+
+def note_unmatchable(stats: dict, log: logging.Logger,
+                     home_name: str, away_name: str, score=None) -> None:
+    """A FINISHED result could not be matched to known teams — surface loudly."""
+    stats["skipped_unmatchable"] += 1
+    score_str = f" {score}" if score else ""
+    log.warning(
+        "RESULT INGESTION SKIP (unmatchable team names): %r vs %r%s "
+        "— this finished match will be simulated unless re-ingested",
+        home_name, away_name, score_str,
+    )
+
+
+def note_no_target(stats: dict, log: logging.Logger,
+                   home_norm: str, away_norm: str) -> None:
+    stats["skipped_no_target"] += 1
+    log.warning(
+        "RESULT INGESTION SKIP (no matching fixture/slot): %r vs %r",
+        home_norm, away_norm,
+    )
+
+
+def summarize_ingestion(stats: dict, log: logging.Logger, context: str) -> None:
+    """Log the ingestion invariant summary; WARN when finished results were lost."""
+    lost = stats["skipped_unmatchable"] + stats["skipped_no_target"]
+    log.log(
+        logging.WARNING if lost else logging.INFO,
+        "Ingestion summary [%s]: finished=%d normalized=%d ingested=%d "
+        "skipped_unmatchable=%d skipped_no_target=%d",
+        context, stats["finished_received"], stats["normalized"],
+        stats["ingested"], stats["skipped_unmatchable"], stats["skipped_no_target"],
+    )
+
+
 def fetch_raw_matches(api_key: str, api_url: str, league_id: int, timeout: int = 10) -> list[dict]:
     """Thin wrapper — delegates to :class:`BSDDataProvider.fetch_matches`."""
     provider = BSDDataProvider(api_key, league_id=league_id)

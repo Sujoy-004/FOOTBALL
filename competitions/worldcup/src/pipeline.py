@@ -69,19 +69,49 @@ def fetch_live_data(
     bsd_api_key: str,
     football_data_org_key: str,
     data_dir: Path,
-) -> None:
+) -> dict:
     """Fetch live match data + signal caches from the configured provider.
 
-    Match results flow through the provider selected by ``DATA_PROVIDER`` env var
-    (or auto-detected from available API keys). BSD-dependent signals are still
-    fetched via BSD API when the key is present; they degrade gracefully when
-    unavailable (see Phase 4 of the provider-swap plan).
+    Returns a refresh report {provider, attempted, success, error, stale,
+    finished: <ingestion counters>, last_success_at} which is also merged
+    into <repo>/web/last_refresh.json under "worldcup" so a failed or
+    stale refresh is never mistaken for fresh data.
     """
+    from football_core.fetcher import new_ingestion_stats
+
+    repo_root = Path(__file__).resolve().parents[3]
+    last_refresh_path = repo_root / "web" / "last_refresh.json"
+
+    def _read_prev() -> dict:
+        try:
+            return json.loads(last_refresh_path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    def _fail(reason: str, provider_name=None) -> dict:
+        prev = _read_prev().get("worldcup", {})
+        report = {
+            "provider": provider_name,
+            "attempted": True,
+            "success": False,
+            "error": reason,
+            "stale": True,
+            "last_success_at": prev.get("last_success_at"),
+            "finished": new_ingestion_stats(),
+        }
+        try:
+            payload = _read_prev()
+            payload["worldcup"] = report
+            last_refresh_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        logger.warning("fetch_live_data FAILED: %s — WC data may be STALE", reason)
+        return report
+
     from web.common import get_data_provider
     provider = get_data_provider(bsd_api_key, football_data_org_key, constants.DEFAULT_LEAGUE_ID)
     if provider is None:
-        logger.warning("fetch_live_data: no data provider configured, skipping")
-        return
+        return _fail("no data provider configured")
 
     try:
         teams = json.loads((data_dir / "teams.json").read_text(encoding="utf-8"))
@@ -97,13 +127,18 @@ def fetch_live_data(
         return
 
     # 1. Fetch and process match results via provider
+    group_stats = new_ingestion_stats()
+    ko_stats = new_ingestion_stats()
     try:
         from src.fetcher import process_group_matches, process_matches
 
         raw_matches = provider.fetch_matches(competition_id="WC")
         if not raw_matches:
-            logger.warning("fetch_live_data: provider returned no matches")
-            return
+            reason = "provider returned no matches"
+            err = getattr(provider, "last_error", None)
+            if err:
+                reason += f" ({err})"
+            return _fail(reason, type(provider).__name__)
 
         played_groups_path = data_dir / "played_groups.json"
         played_groups = (
@@ -152,7 +187,8 @@ def fetch_live_data(
             ]
             played_ids = set(played.keys())
             new_ko = process_matches(
-                raw_matches, teams, resolved_bracket, aliases, played_ids
+                raw_matches, teams, resolved_bracket, aliases, played_ids,
+                ingestion_stats=ko_stats,
             )
             if not new_ko:
                 break
@@ -197,6 +233,28 @@ def fetch_live_data(
         save_signal_cache(rest_days_cache, REST_DAYS_CACHE_FILE, data_dir)
     except Exception as e:
         logger.warning("fetch_live_data: signal fetch failed: %s", e)
+
+    # Success report — persisted so stale data can't masquerade as fresh.
+    report = {
+        "provider": type(provider).__name__,
+        "attempted": True,
+        "success": True,
+        "error": None,
+        "stale": False,
+        "last_success_at": datetime.now(timezone.utc)
+            .isoformat().replace("+00:00", "Z"),
+        "finished": {
+            "group_stage": group_stats,
+            "knockout": ko_stats,
+        },
+    }
+    try:
+        payload = _read_prev()
+        payload["worldcup"] = report
+        last_refresh_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return report
 
 
 # ── Function 2: build_chronological_matches ──────────────────────────────
