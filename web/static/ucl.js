@@ -88,7 +88,7 @@ function updateStatus() {
   const stale = d.refresh && d.refresh.stale;
   updateStatusBar(
     d.n_teams + " teams  |  " + (d.n_played || 0) + " matches played",
-    stale ? '<span style="color:#e6a817">\u26A0 STALE \u2014 live refresh failed; showing snapshot data</span>' : ""
+    stale ? '<span style="color:#e6a817">STALE - live refresh failed; showing snapshot data</span>' : ""
   );
 }
 
@@ -103,66 +103,102 @@ window.__resetResults = async function () {
 
 // ── Overview ─────────────────────────────────────────────────────────
 
+// ── Stage derivation (data-driven, never assumed) ────────────────────
+
+function countLeagueMatches(lmd) {
+  let total = 0, played = 0;
+  Object.keys(lmd).forEach(function(md) {
+    (lmd[md] || []).forEach(function(m) {
+      total++;
+      if (m.home_score !== undefined && m.home_score !== null &&
+          m.away_score !== undefined && m.away_score !== null) played++;
+    });
+  });
+  return { total: total, played: played };
+}
+
+function deriveStage() {
+  const br = appState.bracket || {};
+  if (br.champion) return "Completed";
+  const rounds = br.bracket_rounds || {};
+  const order = [["FINAL", "Final"], ["SF", "Semi-Finals"], ["QF", "Quarter-Finals"], ["R16", "Round of 16"]];
+  for (let i = 0; i < order.length; i++) {
+    if ((rounds[order[i][0]] || []).length) return order[i][1];
+  }
+  if ((br.playoff || []).length) return "Knockout Playoffs";
+  const lm = countLeagueMatches(br.league_matchdays || {});
+  if (lm.total > 0 && lm.played >= lm.total) return "League Phase Complete";
+  if (lm.played > 0) return "League Phase";
+  return "Not Started";
+}
+
 async function renderOverview() {
   const tab = document.getElementById("tab-overview");
   if (!tab) return;
   const d = appState.data;
-  if (!d) { tab.innerHTML = '<div class="dim">Loading\u2026</div>'; return; }
+  if (!d) { tab.innerHTML = '<div class="dim">Loading...</div>'; return; }
 
   const standings = appState.standings || [];
   const signals = appState.signals || {};
   const sigKeys = Object.keys(signals);
-  const odds = appState.odds || [];
+  const nActive = sigOrder.filter(function(sk) { return signals[sk] !== undefined; }).length;
+  const stage = deriveStage();
 
-  // Stat cards
+  // Stat cards: Teams / Matches Played / Stage  (WC-style hierarchy)
   let html = '<div class="stats-row">';
   html += '<div class="stat-card"><div class="val">' + (d.n_teams || 0) + '</div><div class="lbl">Teams</div></div>';
   html += '<div class="stat-card"><div class="val">' + (d.n_played || 0) + '</div><div class="lbl">Matches Played</div></div>';
-  html += '<div class="stat-card"><div class="val">' + sigKeys.length + ' / ' + sigOrder.length + '</div><div class="lbl">Signals Active</div></div>';
+  html += '<div class="stat-card"><div class="val" style="font-size:.75em">' + stage + '</div><div class="lbl">Stage</div></div>';
+  html += '<div class="stat-card"><div class="val">' + nActive + ' / ' + sigOrder.length + '</div><div class="lbl">Signals Available</div></div>';
   if (d.snapshot_date) html += '<div class="stat-card"><div class="val" style="font-size:.8em">' + d.snapshot_date + '</div><div class="lbl">Season</div></div>';
   html += '</div>';
 
-  // Top teams preview (top 8 by position)
-  if (standings.length >= 8) {
-    html += '<div class="chart-section"><div class="title">Top Teams \u2014 League Phase</div>';
-    html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Pts</th><th>GD</th><th>Form</th></tr>';
-    standings.slice(0, 8).forEach(function(r, i) {
+  // Current leaders (compact top-8 preview)
+  if (standings.length >= 4) {
+    html += '<div class="chart-section"><div class="title">Current Leaders - Top 8</div>';
+    html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Pts</th><th>GD</th></tr>';
+    standings.slice(0, 8).forEach(function(r) {
       const gd = r.gd > 0 ? "+" + r.gd : String(r.gd);
-      const zoneCls = i < 8 ? 'zone-top8' : '';
-      html += '<tr><td class="num">' + (i + 1) + '</td><td>' + r.team + '</td>'
+      html += '<tr><td class="num">' + r.position + '</td><td>' + r.team + '</td>'
         + '<td class="num">' + (r.pts !== undefined ? r.pts : '-') + '</td>'
-        + '<td class="num">' + gd + '</td>'
-        + '<td' + (i < 2 ? ' style="color:#16A085"' : '') + '>' + (i < 8 ? '\u25B2 TOP 8' : '') + '</td></tr>';
+        + '<td class="num">' + gd + '</td></tr>';
     });
     html += '</table></div>';
   }
 
-  // Signal availability
+  // Signal availability (WC-style status table)
+  html += '<div class="chart-section"><div class="title">Signal Availability</div>';
   if (sigKeys.length > 0) {
-    html += '<div class="chart-section"><div class="title">Signal Availability</div>';
     html += '<table class="eval-table"><tr><th>Signal</th><th>Status</th></tr>';
     sigOrder.forEach(function(sk) {
       const s = signals[sk];
       const available = s !== undefined;
       html += '<tr><td>' + (sigLabels[sk] || sk) + '</td><td>'
-        + '<span class="' + (available ? 'dot-green' : 'dot-red') + '">\u25CF</span> '
-        + (available ? 'Available' : 'Unavailable') + '</td></tr>';
+        + '<span class="' + (available ? 'dot-green' : 'dot-red') + '">&#9679;</span> '
+        + (available ? 'Yes' : 'No') + '</td></tr>';
     });
-    html += '</table></div>';
+    html += '</table>';
+  } else {
+    html += '<div class="dim">No signal data available.</div>';
   }
+  html += '</div>';
 
-  // Odds preview
-  if (odds.length >= 5) {
-    html += '<div class="chart-section"><div class="title">Championship Odds (Top 5)</div>';
-    html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion %</th><th></th></tr>';
+  // Simulation availability (honest state - never fabricate probabilities)
+  const odds = appState.odds || [];
+  const hasSim = odds.some(function(o) { return (o.champion_prob || 0) > 0.001; });
+  html += '<div class="chart-section"><div class="title">Simulation</div>';
+  if (hasSim) {
+    html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion %</th></tr>';
     odds.slice(0, 5).forEach(function(o, i) {
       const pct = ((o.champion_prob || 0) * 100).toFixed(1);
-      html += '<tr><td class="num">' + (i + 1) + '</td><td>' + o.team + '</td>'
-        + '<td class="num">' + pct + '%</td>'
-        + '<td><div class="bar-wrap"><div class="bar" style="width:' + Math.max(2, (o.champion_prob || 0) * 200) + '%"></div></div></td></tr>';
+      html += '<tr><td class="num">' + (i + 1) + '</td><td>' + o.team + '</td><td class="num">' + pct + '%</td></tr>';
     });
-    html += '</table></div>';
+    html += '</table>';
+  } else {
+    html += '<div class="dim">Simulation results not available in current snapshot. '
+      + 'Run a simulation from the Odds tab to generate championship probabilities.</div>';
   }
+  html += '</div>';
 
   tab.innerHTML = html;
 }
@@ -212,7 +248,7 @@ async function renderBracket() {
 
   // ── Section 1: League Phase (interactive matchday accordion) ──
   if (lmdKeys.length) {
-    html += '<div class="chart-section"><div class="title">\u26BD League Phase \u2014 Matchday Explorer</div><div class="md-accordion">';
+    html += '<div class="chart-section"><div class="title">League Phase</div><div class="md-accordion">';
     const firstMid = lmdKeys[0];
     let mdHtml = "";
     lmdKeys.forEach(function(md, mdi) {
@@ -221,7 +257,7 @@ async function renderBracket() {
       mdHtml += '<div class="md-card"><div class="md-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">';
       mdHtml += '<span class="md-label">' + md.replace(/^MD/, "Matchday ") + '</span>';
       mdHtml += '<span class="md-count">' + ms.length + " matches</span>";
-      mdHtml += '<span class="md-arrow">' + (isFirst ? "\u25BC" : "\u25B6") + "</span></div>";
+      mdHtml += '<span class="md-arrow">' + (isFirst ? "-" : "+") + "</span></div>";
       mdHtml += '<div class="md-body' + (isFirst ? " open" : "") + '">';
       ms.forEach(function(m) {
         const hs = m.home_score !== undefined && m.home_score !== null ? m.home_score : "-";
@@ -250,9 +286,9 @@ async function renderBracket() {
     html += mdHtml + '</div></div>';
   }
 
-  // ── Section 2: Knockout Playoffs (if data exists) ──
+  // ── Section 2: Knockout Playoffs ──
   if (playoff.length) {
-    html += '<div class="chart-section"><div class="title">\u26BE Knockout Playoffs</div><div class="playoff-grid">';
+    html += '<div class="chart-section"><div class="title">Knockout Playoffs</div><div class="playoff-grid">';
     playoff.forEach(function(t) {
       const aggStr = t.aggregate_a + "-" + t.aggregate_b;
       let detail = aggStr + " agg";
@@ -268,11 +304,25 @@ async function renderBracket() {
     });
     html += "</div></div>";
   } else {
-    html += '<div class="chart-section"><div class="title">\u26BE Knockout Playoffs</div>';
-    html += '<div class="dim" style="padding:8px;color:#15565B;font-size:11px">Playoff results not yet available in snapshot data.</div></div>';
+    // Data-derived qualification view: positions 9-24 from final standings.
+    html += '<div class="chart-section"><div class="title">Knockout Playoffs</div>';
+    const st = appState.standings || [];
+    const qual = st.filter(function(r) { return r.zone === "playoff"; });
+    if (qual.length) {
+      html += '<div class="dim" style="padding:4px 8px;font-size:11px;color:#15565B">'
+        + 'Playoff results unavailable in current snapshot. Qualified teams (positions 9-24):</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px">';
+      qual.forEach(function(r) {
+        html += '<span class="zone-badge playoff">' + r.position + '. ' + r.team + '</span>';
+      });
+      html += '</div>';
+    } else {
+      html += '<div class="dim" style="padding:8px;color:#15565B;font-size:11px">Playoff results unavailable in current snapshot.</div>';
+    }
+    html += '</div>';
   }
 
-  // ── Section 3: Knockout Rounds (R16 → QF → SF → Final) ──
+  // ── Section 3: Knockout Rounds (R16 -> QF -> SF -> Final) ──
   const roundMeta = [
     { key: "R16", label: "Round of 16" },
     { key: "QF", label: "Quarter-Finals" },
@@ -280,7 +330,7 @@ async function renderBracket() {
     { key: "FINAL", label: "Final" },
   ];
 
-  let koSection = '<div class="chart-section"><div class="title">\uD83C\uDFC6 Knockout Stage</div>';
+  let koSection = '<div class="chart-section"><div class="title">Knockout Stage</div>';
   let anyKoData = false;
 
   roundMeta.forEach(function(rm) {
@@ -301,14 +351,14 @@ async function renderBracket() {
         + '<div class="ko-round-tag">' + rm.label + '</div>'
         + '<div class="ko-teams"><span>' + ta + '</span><span class="ko-vs">vs</span><span>' + tb + '</span></div>'
         + '<div class="ko-score">' + agg + '</div>'
-        + (winner ? '<div class="ko-winner">\u2713 ' + winner + '</div>' : '')
+        + (winner ? '<div class="ko-winner">Winner: ' + winner + '</div>' : '')
         + '</div>';
     });
     koSection += '</div>';
   });
 
   if (!anyKoData) {
-    koSection += '<div class="dim" style="padding:8px;font-size:11px">Knockout stage has not started yet. Results will appear here once the playoff round begins.</div>';
+    koSection += '<div class="dim" style="padding:8px;font-size:11px">Knockout results unavailable in current snapshot.</div>';
   }
   koSection += '</div>';
   html += koSection;
