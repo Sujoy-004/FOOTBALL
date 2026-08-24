@@ -59,6 +59,16 @@ def test_ucl_refresh_endpoint_blocked_in_snapshot(snapshot_env):
     assert is_snapshot_mode()
 
 
+def test_ucl_deterministic_compute_no_knockout_results():
+    """Missing knockout_results.json must NOT suppress standings/odds/signals."""
+    from competitions.ucl.src.orchestrator import run_deterministic_compute
+    result = run_deterministic_compute(str(UCL_DATA), bsd_api_key="")
+    assert "error" not in result, f"deterministic_compute errored: {result.get('error')}"
+    standings = result.get("standings", [])
+    assert len(standings) == 36, f"expected 36 teams, got {len(standings)}"
+    assert result.get("mode") == "results"
+
+
 def test_ucl_api_data_valid_json_in_snapshot():
     """3+4. /ucl/api/data returns valid JSON in snapshot mode (no empty body)."""
     from fastapi.testclient import TestClient

@@ -326,7 +326,11 @@ def run_deterministic_compute(
 
     knockout = _step("Load knockout results", lambda: load_knockout_results(data_dir))
     if not knockout:
-        return {"error": "knockout_results.json not found", "boot": boot}
+        # Snapshot mode or pre-knockout phase: proceed with empty knockout
+        # data — standings and odds are still computable from league results.
+        knockout = {"playoff": [], "rounds": {"R16": [], "QF": [], "SF": [], "FINAL": []}}
+        boot.append({"step": "Load knockout results", "status": "ok", "elapsed": 0.0,
+                     "output": "[info] knockout_results.json absent — using empty bracket"})
 
     from competitions.ucl.src.provider import RepoFixtureProvider
 
