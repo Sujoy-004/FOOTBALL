@@ -125,7 +125,7 @@ function renderLanding() {
         <div class="lf-card">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">Monte Carlo Simulation</div>
-          <div class="lfc-desc">Seeded tournament simulations (default 50,000 iterations) projecting every knockout path, group outcome, and championship probability with bootstrap confidence intervals.</div>
+          <div class="lfc-desc">Seeded tournament simulations projecting every knockout path, group outcome, and championship probability. You choose whether to simulate and how many runs to run.</div>
         </div>
         <div class="lf-card">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
@@ -427,12 +427,15 @@ async function _startSim(apiPrefix, onComplete, bodyBuilder) {
       body: JSON.stringify(bodyBuilder(iters)),
     })).json();
     if (resp.error) throw new Error(resp.error);
-    if (resp.status === "no_unplayed_matches") {
-      progressLbl.textContent = resp.message || "All matches played.";
+    if (resp.status === "not_needed") {
+      progressLbl.textContent = resp.message || "Nothing to simulate.";
       startBtn.disabled = false;
       cancelBtn.style.display = "";
       _simPolling = false;
       return;
+    }
+    if (resp.status === "validation_error") {
+      throw new Error(resp.error || "invalid simulation request");
     }
     const taskId = resp.task_id;
     const t0 = Date.now();
@@ -448,8 +451,8 @@ async function _startSim(apiPrefix, onComplete, bodyBuilder) {
           label += "  (" + p.progress.toFixed(0) + "%)  " + elapsed + "s";
           if (p.elapsed) label += "  ETA: " + Math.max(0, Math.round(p.elapsed * ((100 - p.progress) / Math.max(p.progress, 1)))) + "s";
           progressLbl.textContent = label;
-          if (p.status === "complete") { clearInterval(poll); resolve(); }
-          if (p.status === "error") { clearInterval(poll); reject(new Error(p.error || "simulation failed")); }
+          if (p.status === "completed") { clearInterval(poll); resolve(); }
+          if (p.status === "failed" || p.status === "not_found") { clearInterval(poll); reject(new Error(p.error || "simulation failed")); }
         } catch (e) { clearInterval(poll); reject(e); }
       }, 200);
     });

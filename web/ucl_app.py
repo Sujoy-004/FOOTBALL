@@ -39,7 +39,10 @@ from competitions.ucl.src.provider import RepoFixtureProvider
 from football_core.elo import expected_score
 from football_core.signal import PredictionContext
 
+from typing import Optional
+
 from web.common import ts
+from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 BSD_API_KEY: str = os.environ.get("BSD_API_KEY", "")
 FOOTBALL_DATA_ORG_KEY: str = os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
@@ -98,6 +101,7 @@ _mode: str = "results"
 
 active_simulations: dict[str, dict] = {}
 sim_lock = threading.Lock()
+service = SimulationTaskService()
 
 
 def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None,
@@ -150,6 +154,14 @@ def _fetch_live_data() -> None:
         boot_log_local.append({"step": "UCL live fetch", "status": "skip",
                                "elapsed": 0.0,
                                "output": f"[{ts()}] Snapshot mode - live refresh skipped"})
+        # Parity with WC (Exchange 4): record WHY no live fetch happened so
+        # the frontend can disclose snapshot data instead of silently
+        # looking live-fresh.
+        globals()["_refresh_report"] = {
+            "provider": None, "attempted": False, "success": True,
+            "stale": True,
+            "skipped_reason": "snapshot mode selected at startup",
+        }
         return
 
     from web.common import get_data_provider
@@ -487,6 +499,7 @@ def api_data():
         "mode": _mode,
         "availability": cache.get("availability", {}),
         "phase": cache.get("phase", {}),
+        "simulation": _simulation_state_block(),
         "n_unplayed": n_unplayed,
         "n_played": n_total - n_unplayed,
     })
@@ -511,7 +524,7 @@ def api_simulation():
         "mode": sim_cache.get("mode", _mode),
         "n_iterations": sim_cache.get("n_iterations", 0),
         "snapshot_date": sim_cache.get("snapshot_date", ""),
-        "status": sim_cache.get("status", "none"),
+        "status": sim_cache.get("status", "not_requested"),
         "simulation_meta": sim_cache.get("simulation_meta"),
         "bracket_rounds": sim_cache.get("bracket_rounds"),
         "playoff": sim_cache.get("playoff"),
@@ -546,94 +559,32 @@ def api_signals():
 
 @ucl_app.post("/api/simulate")
 def api_simulate(req: dict = None):
-    global _mode
-    remaining = _unplayed_match_count()
-    champion_undecided = _season_outcome_undecided()
-    if remaining == 0 and not champion_undecided:
-        global sim_cache
-        sim_cache = {
-            "status": "no_outstanding_outcomes",
-            "message": "Every match has a real result and the season "
-                       "outcome is decided - nothing to simulate.",
-        }
-        return JSONResponse({
-            "status": "no_outstanding_outcomes",
-            "message": sim_cache["message"],
-            "n_unplayed": 0,
-        })
-    _mode = "simulation"
-    task_id = str(uuid.uuid4())
     body = req or {}
-    # Explicit None handling: a literal 0 must reach validation, never be
-    # silently swapped for the default by an or-chain.
-    raw_iterations = body.get("iterations")
-    if raw_iterations is None:
-        raw_iterations = body.get("n_iterations")
-    if raw_iterations is None:
-        raw_iterations = 10000
-    try:
-        from football_core.simulation import (
-            SimulationContractError,
-            validate_n_simulations,
-        )
-        n_iterations = validate_n_simulations(int(raw_iterations))
-    except SimulationContractError as exc:
-        return JSONResponse({
-            "status": "invalid_request",
-            "error": f"invalid simulation count {raw_iterations!r}: {exc}",
-        }, status_code=400)
-    except (TypeError, ValueError) as exc:
-        return JSONResponse({
-            "status": "invalid_request",
-            "error": f"invalid simulation count {raw_iterations!r}: {exc}",
-        }, status_code=400)
-    seed = body.get("seed")
-    if seed is not None:
-        seed = int(seed)
     weights = body.get("weights")
     show_ci = str(body.get("show_ci", "auto"))
-    with sim_lock:
-        active_simulations[task_id] = {
-            "status": "starting", "progress": 0, "iteration": 0,
-            "total_iterations": n_iterations, "error": None, "result": None,
-        }
+    raw_count = body.get("iterations")
+    if raw_count is None:
+        raw_count = body.get("n_iterations")
 
-    def _task(tid):
-        try:
-            def on_progress(pct, iteration):
-                with sim_lock:
-                    s = active_simulations.get(tid)
-                    if s:
-                        s["status"] = "running"
-                        s["progress"] = pct
-                        if iteration:
-                            s["iteration"] = iteration
-            _run_mc_simulation(progress_cb=on_progress, n_iterations=n_iterations, seed=seed, weights=weights, show_ci=show_ci)
-            with sim_lock:
-                s = active_simulations.get(tid)
-                if s:
-                    s["status"] = "complete"
-                    s["progress"] = 100.0
-                    s["iteration"] = n_iterations
-        except Exception as e:
-            with sim_lock:
-                s = active_simulations.get(tid)
-                if s:
-                    s["status"] = "error"
-                    s["error"] = str(e)
+    def eligibility():
+        if _season_outcome_undecided():
+            return True, None, ""
+        return False, "no_outstanding_outcomes", (
+            "Every match has a real result and the season outcome is "
+            "decided - nothing to simulate.")
 
-    t = threading.Thread(target=_task, args=(task_id,), daemon=True)
-    t.start()
-    return JSONResponse({
-        "status": "ok", "task_id": task_id, "mode": _mode,
-        "requested": True,
-        "requested_count": n_iterations,
-        "count": n_iterations,
-        # Engine-generated seed is returned via simulation metadata on completion.
-        "seed": seed, "weights": weights, "show_ci": show_ci,
-        "n_unplayed": remaining,
-    })
-
+    http_status, payload = service.start(
+        competition_id="ucl",
+        raw_count=raw_count,
+        default_count=10000,
+        seed=body.get("seed"),
+        runner=_ucl_sim_runner,
+        eligibility_fn=eligibility,
+        on_result=_store_ucl_sim_result,
+        options={"weights": weights, "show_ci": show_ci},
+        extra_ack={"mode": "simulation", "n_unplayed": _unplayed_match_count()},
+    )
+    return JSONResponse(payload, status_code=http_status)
 
 
 def _season_outcome_undecided() -> bool:
@@ -652,51 +603,70 @@ def _season_outcome_undecided() -> bool:
     return not cache.get("champion")
 
 
-def _run_mc_simulation(
-    progress_cb=None,
-    n_iterations=10000,
-    seed: int | None = None,
-    weights: dict[str, float] | None = None,
-    show_ci: str = "auto",
-):
-    global boot_log_local, sim_result, _mode, sim_cache
-    _mode = "simulation"
+def simulation_eligibility() -> tuple[bool, Optional[str], str]:
+    """Shared eligibility truth (adapter + handler both use this)."""
+    if _season_outcome_undecided():
+        return True, None, ""
+    return False, "no_outstanding_outcomes", (
+        "Every match has a real result and the season outcome is decided "
+        "- nothing to simulate.")
+
+
+def _simulation_state_block() -> dict:
+    """Shared product contract: availability + request lifecycle."""
+    eligible, reason, _msg = simulation_eligibility()
+    sim_status = sim_cache.get("status", "not_requested")
+    request_state = {
+        "running": "running",
+        "completed": "completed",
+        "failed": "failed",
+    }.get(sim_status, "not_requested")
+    return {
+        "availability": "available" if eligible else "not_needed",
+        "reason": reason,
+        "request_state": request_state,
+    }
+
+
+def _ucl_sim_runner(progress_cb, count: int, seed):
+    """Competition runner: offline Elo reuse + pipeline call.
+
+    Deliberately does NOT flip the global _mode: canonical cache data stays
+    factual ("results"); simulation provenance lives in simulation_meta.
+    """
+    global boot_log_local, sim_result
     boot_log_local = []
-    # Offline-safe: reuse the cached Elo snapshot instead of refetching
-    # ClubElo; fall back to coefficient-derived ratings without network.
     cached_elo = cache.get("elo_ratings") or None
     result = _run_mc_simulation_pipeline(
-        str(DATA_DIR), n_iterations=n_iterations, seed=seed,
-        weights=weights, show_ci=show_ci, bsd_api_key=BSD_API_KEY,
+        str(DATA_DIR), n_iterations=count, seed=seed,
+        weights=None, show_ci="auto", bsd_api_key=BSD_API_KEY,
         team_aliases=_BSD_TEAM_ALIASES, progress_cb=progress_cb,
         elo_ratings_override=cached_elo,
     )
+    return result
+
+
+def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
+    """Cache/snapshot side effects. Returns the public task summary."""
+    global boot_log_local, sim_result, _mode, sim_cache
     sim_result = None
     result["boot"] = boot_log_local
+    meta_block = result.get("_meta") or {}
     sim_cache = result
-    resolved_seed = (result.get("_meta") or {}).get("seed")
-    sim_cache["simulation_meta"] = {
-        "requested": True,
-        "status": "complete",
-        "requested_count": n_iterations,
-        "count": result.get("n_iterations"),
-        "seed": resolved_seed,
-        "provenance": {
-            "real_results_preserved": True,
-            "simulated_matches_only": True,
-            **((result.get("_meta") or {}).get("provenance") or {}),
-        },
-    }
-    # Write snapshot
+    sim_cache["simulation_meta"] = build_simulation_meta(
+        requested_count=count,
+        actual_count=result.get("n_iterations"),
+        seed=meta_block.get("seed"),
+        provenance_extra=meta_block.get("provenance") or {},
+        engine_version=meta_block.get("engine_version"),
+    )
     snapshot_path = DATA_DIR / "snapshot.json"
     snapshot_data = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "mode": result.get("mode", "simulation"),
         "iterations": result.get("n_iterations"),
-        "seed": resolved_seed,
+        "seed": meta_block.get("seed"),
         "requested_seed": seed,
-        "weights": weights,
-        "show_ci": show_ci,
         "n_teams": result.get("n_teams", 0),
         "champion": result.get("champion"),
         "snapshot_date": result.get("snapshot_date", ""),
@@ -709,6 +679,8 @@ def _run_mc_simulation(
         json.dumps(snapshot_data, indent=2, default=str, ensure_ascii=False),
         encoding="utf-8",
     )
+    return {"champion": result.get("champion"),
+            "count": result.get("n_iterations")}
 
 
 @ucl_app.post("/api/mode")
@@ -877,27 +849,7 @@ def api_report():
 
 @ucl_app.get("/api/simulation/progress/{task_id}")
 def api_simulation_progress(task_id: str):
-    with sim_lock:
-        sim = active_simulations.get(task_id)
-    if not sim:
-        return JSONResponse({"error": "task not found"})
-    response = {
-        "status": sim["status"],
-        "progress": sim.get("progress", 0),
-        "iteration": sim.get("iteration", 0),
-        "total_iterations": sim.get("total_iterations", 0),
-    }
-    if sim["status"] == "complete" and sim.get("result"):
-        response["result"] = sim["result"]
-        if sim.get("insight"):
-            response["insight"] = sim["insight"]
-        with sim_lock:
-            del active_simulations[task_id]
-    if sim["status"] == "error":
-        response["error"] = sim.get("error")
-        with sim_lock:
-            del active_simulations[task_id]
-    return JSONResponse(response)
+    return JSONResponse(service.poll(task_id))
 
 
 # ── Match insight helpers ──

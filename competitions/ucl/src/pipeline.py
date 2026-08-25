@@ -530,12 +530,12 @@ def run_mc_simulation(
     from competitions.ucl.src.provider import RepoFixtureProvider
 
     if progress_cb:
-        progress_cb(0, 0)
+        progress_cb(0, 100, "Loading fixtures...")
 
     fixtures_path = str(dp / "fixtures.json")
     provider = RepoFixtureProvider(fixtures_path=fixtures_path).load()
     if progress_cb:
-        progress_cb(5, 0)
+        progress_cb(5, 100, "Loading fixtures...")
 
     if elo_ratings_override:
         elo_ratings = dict(elo_ratings_override)
@@ -551,7 +551,7 @@ def run_mc_simulation(
                 c = coefficients.get(t, 50)
                 elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
     if progress_cb:
-        progress_cb(10, 0)
+        progress_cb(10, 100, "Resolving Elo ratings...")
 
     # Real league results are immutable facts for every iteration.
     from competitions.ucl.src.orchestrator import _load_league_played_pairs

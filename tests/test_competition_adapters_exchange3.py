@@ -118,7 +118,7 @@ class TestApiValidationContract:
             r = client.post("/api/simulate", json={"iterations": 2_000_000})
             assert r.status_code == 400
             body = r.json()
-            assert body["status"] == "invalid_request"
+            assert body["status"] == "validation_error"
             assert "1000000" in body["error"] or "1,000,000" in body["error"]
 
     def test_wc_rejects_zero_even_when_season_complete(self, snapshot_mode):
@@ -126,7 +126,7 @@ class TestApiValidationContract:
         with TestClient(wc_app) as client:
             r = client.post("/api/simulate", json={"iterations": 0})
             assert r.status_code == 400
-            assert r.json()["status"] == "invalid_request"
+            assert r.json()["status"] == "validation_error"
 
     def test_wc_completed_season_short_circuits_honestly(self, snapshot_mode):
         from web.wc_app import wc_app
@@ -135,7 +135,10 @@ class TestApiValidationContract:
             # Completed real tournament: nothing outstanding, and the real
             # champion stands - simulation neither runs nor replaces history.
             assert r.status_code == 200
-            assert r.json()["status"] == "no_unplayed_matches"
+            body = r.json()
+            assert body["status"] == "not_needed"
+            assert body["reason"] == "no_unplayed_matches"
+            assert "not needed" in body["message"].lower()
 
     def test_ucl_rejects_invalid_count(self, snapshot_mode):
         from web.ucl_app import ucl_app
@@ -143,7 +146,7 @@ class TestApiValidationContract:
             for bad in (0, -3):
                 r = client.post("/api/simulate", json={"iterations": bad})
                 assert r.status_code == 400
-                assert r.json()["status"] == "invalid_request"
+                assert r.json()["status"] == "validation_error"
 
     def test_ucl_accepts_min_and_runs_with_generated_seed(
             self, snapshot_mode, tmp_path, monkeypatch):
@@ -182,9 +185,9 @@ class TestApiValidationContract:
                 payload = client.get(
                     f"/api/simulation/progress/{task_id}").json()
                 status = payload.get("status", "")
-                if status in ("complete", "error"):
+                if status in ("completed", "failed"):
                     break
-            assert status == "complete", payload
+            assert status == "completed", payload
             sim = client.get("/api/simulation").json()
             meta = sim["simulation_meta"]
             assert meta["requested"] is True
@@ -198,6 +201,6 @@ class TestApiValidationContract:
         wc_app.sim_cache = {}
         with TestClient(wc_app.wc_app) as client:
             sim = client.get("/api/simulation").json()
-            assert sim["status"] == "none"
+            assert sim["status"] == "not_requested"
             overview = client.get("/api/overview").json()
             assert overview["has_simulation"] is False

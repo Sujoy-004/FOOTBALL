@@ -6,7 +6,7 @@ import {
 
 const API = "/worldcup/api";
 const sigLabels = { elo: "Elo", market_odds: "Market Odds", rolling_form: "Rolling Form", squad_value: "Squad Value", rest_days: "Rest Days" };
-const appState = { data: null, overview: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} };
+const appState = { data: null, overview: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} , simMeta: null };
 let refreshing = false;
 let autoRefreshOn = false;
 let autoTimer = null;
@@ -56,7 +56,6 @@ function updateStatus() {
   );
 }
 
-window.__refreshWC = showSimPopup;
 
 function toggleAuto(on) {
   autoRefreshOn = on;
@@ -151,7 +150,7 @@ async function startSimulation() {
       return;
     }
 
-    if (resp.status === "no_unplayed_matches") {
+    if (resp.status === "not_needed") {
       progressLbl.textContent = resp.message || "All matches played.";
       startBtn.disabled = false;
       cancelBtn.style.display = "";
@@ -179,11 +178,11 @@ async function startSimulation() {
           if (p.elapsed) label += "  ETA: " + Math.max(0, Math.round(p.elapsed * ((100 - p.progress) / Math.max(p.progress, 1)))) + "s";
           progressLbl.textContent = label;
 
-          if (p.status === "complete") {
+          if (p.status === "completed") {
             clearInterval(poll);
             resolve();
           }
-          if (p.status === "error") {
+          if (p.status === "failed") {
             clearInterval(poll);
             reject(new Error(p.error || "simulation failed"));
           }
@@ -211,7 +210,6 @@ async function startSimulation() {
   }
   refreshing = false;
 }
-window.__refreshWC = showSimPopup;
 
 // ── Overview (real data only) ──
 
@@ -316,7 +314,23 @@ function renderBracket() {
 
   let html = '';
 
-  html += '<div style="text-align:right;margin-bottom:8px"><button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining</button></div>';
+  const nUnplayed = (appState.data && appState.data.n_unplayed != null) ? appState.data.n_unplayed : null;
+    if (nUnplayed === 0) {
+      html += '<div class="dim" style="text-align:right;margin-bottom:8px;font-size:11px">All competition results are already known from real match data. Simulation is not needed.</div>';
+    } else {
+      html += '<div style="text-align:right;margin-bottom:8px"><button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining Matches</button></div>';
+    }
+
+  // Truth banners (Exchange 4): simulation provenance + not-requested state.
+  if (appState.simMeta && appState.simMeta.status === "completed") {
+    const m = appState.simMeta;
+    html += '<div class="chart-section" style="border:1px solid rgba(142,68,173,.5)">'
+      + '<div class="title">SIMULATION &middot; ' + (m.count || 0).toLocaleString() + ' RUNS'
+      + ' &middot; seed ' + (m.seed != null ? m.seed : 'auto') + '</div>'
+      + '<div class="dim" style="font-size:11px;padding:2px 8px">Projected outcomes are model output - real played results above are unchanged.</div></div>';
+  } else if (nUnplayed !== 0) {
+    html += '<div class="dim" style="padding:2px 4px;font-size:11px;margin-bottom:6px">Unplayed matches are shown as scheduled. Run a simulation to project their outcomes.</div>';
+  }
 
   // Section 1: Group Stage Accordion
   html += '<div class="chart-section"><div class="title">Group Stage</div><div class="md-accordion">';
@@ -417,7 +431,7 @@ function renderBracket() {
         // without inventing a numeric score.
         scoreStr = '—';
       } else if (simM && simM.predicted_score) {
-        scoreStr = simM.predicted_score.home + '-' + simM.predicted_score.away;
+        scoreStr = 'SIM ' + simM.predicted_score.home + '-' + simM.predicted_score.away;
       } else {
         scoreStr = '?-?';
       }
@@ -426,7 +440,7 @@ function renderBracket() {
         // probability; never substitute a default 50%.
         if (simM.prob_a != null) {
           const pct = Math.round(simM.prob_a * 100);
-          simProbHtml = '<div class="m-prob" style="font-size:9px;color:#8E44AD;text-align:center;line-height:1.2">' + pct + '% / ' + (100 - pct) + '%</div>';
+          simProbHtml = '<div class="m-prob" style="font-size:9px;color:#8E44AD;text-align:center;line-height:1.2">SIM ' + pct + '% / ' + (100 - pct) + '%</div>';
         }
       }
 
@@ -490,7 +504,7 @@ function showMatchSimPopup(title) {
           <button data-iters="10000" class="active">10K</button>
           <button data-iters="50000">50K</button>
         </div>
-        <input type="number" id="matchSimIters" value="10000" min="1000" max="100000">
+        <input type="number" id="matchSimIters" value="10000" min="1" max="1000000"><input type="number" id="matchSimSeed" placeholder="seed (auto)" style="width:110px;margin-left:6px;background:#0d2430;color:#F6DBC0;border:1px solid rgba(21,61,76,.4);border-radius:4px;padding:4px 6px;font-size:11px">
         <div class="sim-actions">
           <button id="matchSimCancelBtn">Cancel</button>
           <button id="matchSimStartBtn">&#9654; Start</button>
@@ -520,100 +534,81 @@ function showMatchSimPopup(title) {
 }
 
 async function startMatchSim() {
-  const iters = parseInt(document.getElementById('matchSimIters').value) || 10000;
+  const itersRaw = document.getElementById('matchSimIters').value;
+  const iters = parseInt(itersRaw);
+  const seedInput = document.getElementById('matchSimSeed');
+  const seedVal = (seedInput && seedInput.value.trim() !== '') ? parseInt(seedInput.value) : null;
   const startBtn = document.getElementById('matchSimStartBtn');
   const cancelBtn = document.getElementById('matchSimCancelBtn');
   const progressWrap = document.getElementById('matchSimProgress');
   const progressFill = document.getElementById('matchSimProgressFill');
+  const progressLbl = document.getElementById('matchSimProgressLbl');
   const resultDiv = document.getElementById('matchSimResult');
+
+  if (!Number.isFinite(iters) || iters < 1 || iters > 1000000) {
+    resultDiv.textContent = 'Simulation count must be between 1 and 1,000,000.';
+    resultDiv.style.display = 'block';
+    return;
+  }
 
   startBtn.disabled = true;
   cancelBtn.style.display = 'none';
   progressWrap.style.display = 'block';
   progressFill.style.width = '0%';
+  if (progressLbl) { progressLbl.textContent = 'Starting simulation...'; progressLbl.style.display = 'block'; }
   resultDiv.style.display = 'none';
 
   try {
-    if (simMatchId === '__all__') {
-      // Full tournament simulation
-      const startBtn2 = document.getElementById('simStartBtn');
-      if (startBtn2) {
-        document.getElementById('matchSimOverlay').classList.remove('show');
-        document.getElementById('simCustomIters').value = iters;
-        startSimulation();
-      } else {
-        // Fallback: call POST /api/simulate
-        const resp = await (await fetch(API + '/simulate', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ iterations: iters })
-        })).json();
-        if (resp.status === 'no_unplayed_matches') {
-          resultDiv.textContent = resp.message || 'All matches played.';
-          resultDiv.style.display = 'block';
-          startBtn.disabled = false;
-          cancelBtn.style.display = '';
-          progressWrap.style.display = 'none';
-          return;
-        }
-        const taskId = resp.task_id;
-        await new Promise((resolve, reject) => {
-          const poll = setInterval(async () => {
-            const p = await (await fetch(API + '/simulation/progress/' + taskId)).json();
-            if (p.status === 'complete') { clearInterval(poll); resolve(); }
-            if (p.status === 'error') { clearInterval(poll); reject(new Error(p.error)); }
-            progressFill.style.width = p.progress + '%';
-          }, 200);
-        });
-        await loadAll();
-        try {
-          const simResp = await fetch(API + '/simulation').then(r => r.json());
-          appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
-        } catch { appState.simBracket = null; }
-        renderBracket();
-        document.getElementById('matchSimOverlay').classList.remove('show');
-      }
-      return;
-    }
-
-    // Single match simulation
-    const resp = await (await fetch(API + '/simulate-from-match', {
+    // Full tournament simulation via the shared contract.
+    const resp = await (await fetch(API + '/simulate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ match_id: simMatchId, iterations: iters })
+      body: JSON.stringify(seedVal != null ? { iterations: iters, seed: seedVal } : { iterations: iters })
     })).json();
-
-    if (resp.error) {
-      resultDiv.textContent = 'Error: ' + resp.error;
+    if (!resp.task_id) {
+      // not_needed / validation_error / failed: show the honest reason.
+      resultDiv.textContent = resp.message || resp.error ||
+        ('Simulation unavailable: ' + resp.status);
       resultDiv.style.display = 'block';
       startBtn.disabled = false;
       cancelBtn.style.display = '';
+      progressWrap.style.display = 'none';
       return;
     }
-
-    // Show predictions
-    let resultHtml = '<div style="color:#168777;font-weight:bold;margin-bottom:6px">Simulation Complete</div>';
-    if (resp.predictions && resp.predictions.length) {
-      resultHtml += '<div style="margin-bottom:4px">Top contenders:</div>';
-      resp.predictions.forEach(p => {
-        const cp = (p.champion * 100).toFixed(1);
-        const fn = (p.final * 100).toFixed(1);
-        resultHtml += '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.05)">' +
-          '<span>' + p.name + '</span><span style="color:#16A085">' + cp + '% champ, ' + fn + '% final</span></div>';
-      });
-    }
-    if (resp.downstream && resp.downstream.length) {
-      resultHtml += '<div style="margin-top:6px;font-size:10px;color:#15565B">' + resp.downstream.length + ' downstream matches simulated</div>';
-    }
-    resultDiv.innerHTML = resultHtml;
-    resultDiv.style.display = 'block';
-    progressFill.style.width = '100%';
-    progressWrap.style.display = 'none';
+    const taskId = resp.task_id;
+    await new Promise((resolve, reject) => {
+      const poll = setInterval(async () => {
+        try {
+          const p = await (await fetch(API + '/simulation/progress/' + taskId)).json();
+          if (p.error && p.status === 'not_found') { clearInterval(poll); reject(new Error(p.error)); return; }
+          if (p.status === 'completed') { clearInterval(poll); resolve(); return; }
+          if (p.status === 'failed') { clearInterval(poll); reject(new Error(p.error || 'simulation failed')); return; }
+          progressFill.style.width = (p.progress || 0) + '%';
+          if (progressLbl) {
+            let label = p.stage || 'Simulating...';
+            if (p.total_iterations > 0) label += '  ' + (p.iteration || 0).toLocaleString() + '/' + p.total_iterations.toLocaleString();
+            label += '  (' + Math.round(p.progress || 0) + '%)';
+            progressLbl.textContent = label;
+          }
+        } catch (e) { clearInterval(poll); reject(e); }
+      }, 200);
+    });
+    await loadAll();
+    try {
+      const simResp = await fetch(API + '/simulation').then(r => r.json());
+      appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
+      appState.simMeta = simResp.simulation_meta || null;
+    } catch { appState.simBracket = null; appState.simMeta = null; }
+    renderBracket();
+    document.getElementById('matchSimOverlay').classList.remove('show');
   } catch (e) {
     resultDiv.textContent = 'Error: ' + (e.message || 'unknown');
     resultDiv.style.display = 'block';
+    startBtn.disabled = false;
+    cancelBtn.style.display = '';
+    progressWrap.style.display = 'none';
   }
-  startBtn.disabled = false;
-  cancelBtn.style.display = '';
 }
+
 
 // ── Match Insight Modal ──
 async function openMatchModal(mid) {

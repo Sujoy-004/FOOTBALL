@@ -593,13 +593,13 @@ def run_simulation_compute(
     * Writing the ``snapshot`` to disk
     """
     if progress_cb is None:
-        progress_cb = lambda pct, stage: None  # noqa: E731
+        progress_cb = lambda done, total, stage="": None  # noqa: E731
 
     # Exchange 3 truth invariant: a simulation request never mutates
     # canonical stores. Live refresh is an explicit /api/refresh concern;
     # the simulation conditions on whatever results are on disk right now.
 
-    progress_cb(0, "Loading data files...")
+    progress_cb(0, 100, "Loading data files...")
     teams_raw = json.loads(
         (data_dir / "teams.json").read_text(encoding="utf-8")
     )
@@ -620,12 +620,12 @@ def run_simulation_compute(
         json.loads(played_groups_raw) if played_groups_raw.strip() else {}
     )
 
-    progress_cb(5, "Building prediction engine...")
+    progress_cb(5, 100, "Building prediction engine...")
     from src.engine import build_engine_from_caches  # noqa: PLC0415
 
     engine = build_engine_from_caches(weights=weights)
 
-    progress_cb(10, "Computing engine predictions...")
+    progress_cb(10, 100, "Computing engine predictions...")
     elo_ratings = {n: d["elo"] for n, d in teams_raw.items()}
     groups_data = (
         groups_raw.get("groups", groups_raw)
@@ -650,11 +650,10 @@ def run_simulation_compute(
     engine_predictions = [engine.evaluate(m, context) for m in all_matches]
     blend_params = build_blend_params(engine_predictions, all_matches, engine)
 
-    progress_cb(15, "Running Monte Carlo simulation...")
+    progress_cb(15, 100, "Running Monte Carlo simulation...")
 
     def _sim_progress(current: int, total: int) -> None:
-        pct = 15 + (current / max(total, 1) * 75)
-        progress_cb(pct, f"Simulating match {current} of {total}")
+        progress_cb(current, total, f"Simulating match {current} of {total}")
 
     sim_result = run_full_simulation(
         teams_raw,
@@ -670,7 +669,7 @@ def run_simulation_compute(
     )
     sim_meta = sim_result.pop("_meta", {})
 
-    progress_cb(92, "Computing top team rankings...")
+    progress_cb(92, 100, "Computing top team rankings...")
     top_teams = sorted(
         [
             {"name": name, **probs}
@@ -680,7 +679,7 @@ def run_simulation_compute(
         reverse=True,
     )
 
-    progress_cb(95, "Evaluating prediction accuracy...")
+    progress_cb(95, 100, "Evaluating prediction accuracy...")
     # Phase 2 will move compute_signal_eval out of web.wc_app.
     from web.wc_app import compute_signal_eval  # noqa: PLC0415
 
@@ -692,7 +691,7 @@ def run_simulation_compute(
         all_matches,
     )
 
-    progress_cb(97, "Building full bracket tree...")
+    progress_cb(97, 100, "Building full bracket tree...")
     from web.wc_app import (  # noqa: PLC0415
         compute_full_bracket,
         compute_overview,
@@ -747,7 +746,7 @@ def run_simulation_compute(
         "governance": overview.get("governance", {}),
     }
 
-    progress_cb(100, "Complete")
+    progress_cb(100, 100, "Complete")
 
     return {
         "overview": overview,
@@ -777,7 +776,7 @@ def run_calibration_compute(
     never invents weights.
     """
     if progress_cb is None:
-        progress_cb = lambda pct, stage: None  # noqa: E731
+        progress_cb = lambda done, total, stage="": None  # noqa: E731
 
     import math
     from datetime import datetime, timezone

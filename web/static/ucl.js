@@ -6,7 +6,7 @@ import {
 } from "./shared.js";
 
 const API = "/ucl/api";
-const appState = { data: null, standings: [], bracket: null, odds: [], signals: {} };
+const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, simProjections: null, simMeta: null, simRunCount: 0 };
 
 const sigLabels = {
   refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form",
@@ -132,45 +132,156 @@ async function renderOverview() {
   }
   html += '</div>';
 
-  // Outcomes section: label facts vs projections honestly. In results mode
-  // the served values are deterministic season outcomes (1.0/0.0), never
-  // model probabilities; in simulation mode they are Monte Carlo projections.
-  const odds = appState.odds || [];
-  const isResultsMode = d.mode === "results";
-  html += '<div class="chart-section"><div class="title">'
-    + (isResultsMode ? "Season Outcomes" : "Simulation")
-    + '</div>';
-  if (isResultsMode) {
-    html += '<div class="dim" style="padding:2px 8px;font-size:11px">Final outcomes from real results - not model probabilities.</div>';
-    if (odds.length) {
-      html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Season Outcome</th></tr>';
-      odds.slice(0, 5).forEach(function(o, i) {
-        const champ = (o.champion_prob || 0) > 0.001;
-        const outcomeTxt = champ ? "Champion"
-          : ((o.final_prob || 0) > 0.001 ? "Runner-up"
-          : ((o.sf_prob || 0) > 0.001 ? "Semi-finalist"
-          : ((o.qf_prob || 0) > 0.001 ? "Quarter-finalist" : "Eliminated")));
-        html += '<tr><td class="num">' + (i + 1) + '</td><td>' + o.team + '</td>'
-          + '<td class="num">' + outcomeTxt + '</td></tr>';
+  // ── Simulation section (Exchange 4 shared product contract) ──────
+  // Driven by the backend's availability/request-state block; the UI never
+  // infers eligibility and never fabricates outcomes for undecided stages.
+  const simState = d.simulation || {};
+  const availability = simState.availability ||
+    (isResultsMode ? "not_needed" : "available");
+  const requestState = simState.request_state || "not_requested";
+  html += '<div class="chart-section"><div class="title">Simulation</div>';
+
+  if (availability === "not_needed") {
+    html += '<div class="dim" style="padding:4px 8px;font-size:12px">'
+      + 'All competition results are already known from real match data. '
+      + 'Simulation is not needed.</div>';
+  } else if (requestState === "running") {
+    html += '<div class="dim" style="padding:4px 8px;font-size:12px">'
+      + 'A simulation is currently running. Reload in a moment to see its '
+      + 'projections.</div>';
+  } else {
+    if (requestState === "completed" && appState.simProjections
+        && appState.simProjections.length) {
+      const m = appState.simMeta || {};
+      html += '<div class="dim" style="padding:2px 8px;font-size:11px;color:#8E44AD">'
+        + 'SIMULATION &middot; ' + (appState.simRunCount || 0).toLocaleString()
+        + ' RUNS' + (m.seed != null ? ' &middot; seed ' + m.seed : '')
+        + ' - projected probabilities, not real results.</div>';
+      html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion %</th></tr>';
+      appState.simProjections.slice(0, 5).forEach(function(o, i) {
+        const pct = ((o.champion_prob || 0) * 100).toFixed(1);
+        html += '<tr><td class="num">' + (i + 1) + '</td><td>' + o.team
+          + '</td><td class="num">' + pct + '%</td></tr>';
       });
       html += '</table>';
+    } else if (requestState === "failed") {
+      html += '<div class="dim" style="padding:4px 8px;font-size:12px;color:#ff6b6b">'
+        + 'The last simulation failed. No projected probabilities exist.</div>';
     } else {
-      html += '<div class="dim">No results data available.</div>';
+      html += '<div class="dim" style="padding:2px 8px;font-size:11px">'
+        + 'No simulation has been run in this session, so no projected '
+        + 'probabilities exist.</div>';
     }
-  } else if (odds.some(function(o) { return (o.champion_prob || 0) > 0.001; })) {
-    html += '<div class="dim" style="padding:2px 8px;font-size:11px">Monte Carlo projections from the latest simulation run.</div>';
-    html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion %</th></tr>';
-    odds.slice(0, 5).forEach(function(o, i) {
-      const pct = ((o.champion_prob || 0) * 100).toFixed(1);
-      html += '<tr><td class="num">' + (i + 1) + '</td><td>' + o.team + '</td><td class="num">' + pct + '%</td></tr>';
-    });
-    html += '</table>';
-  } else {
-    html += '<div class="dim">No simulation has been run in this session, so no projected probabilities exist.</div>';
+
+    // Control card: user chooses whether/how to simulate.
+    html += '<div style="padding:6px 8px">';
+    html += '<div style="margin-bottom:4px;font-size:11px;color:#15565B">Runs:'
+      + '</div>'
+      + '<button class="status-btn sim-preset" data-runs="1000">1K</button> '
+      + '<button class="status-btn sim-preset active" data-runs="10000">10K</button> '
+      + '<button class="status-btn sim-preset" data-runs="100000">100K</button> '
+      + '<input type="number" id="uclSimCustom" placeholder="custom" min="1"'
+      + ' max="1000000" style="width:90px;background:#0d2430;color:#F6DBC0;'
+      + 'border:1px solid rgba(21,61,76,.4);border-radius:4px;padding:4px 6px;'
+      + 'font-size:11px"> '
+      + '<input type="number" id="uclSimSeed" placeholder="seed (auto)"'
+      + ' style="width:110px;background:#0d2430;color:#F6DBC0;border:1px solid '
+      + 'rgba(21,61,76,.4);border-radius:4px;padding:4px 6px;font-size:11px"> ';
+    html += '<div style="margin-top:6px">'
+      + '<button class="status-btn" id="uclSimStartBtn">&#9654; Run Simulation</button>'
+      + '<span id="uclSimProgressLbl" class="dim" style="margin-left:8px;font-size:11px"></span></div>';
+    html += '</div>';
   }
   html += '</div>';
 
+  html += '</div>';
+
   tab.innerHTML = html;
+  bindSimulationControls();
+}
+
+// ── Simulation controls (shared product contract) ────────────────────
+
+let _uclSimPolling = false;
+
+function _selectedRuns() {
+  const custom = document.getElementById("uclSimCustom");
+  const customVal = custom && custom.value.trim() !== "" ? parseInt(custom.value) : NaN;
+  if (Number.isFinite(customVal)) return customVal;
+  const active = document.querySelector(".sim-preset.active");
+  return active ? parseInt(active.dataset.runs) : 10000;
+}
+
+function bindSimulationControls() {
+  document.querySelectorAll(".sim-preset").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      document.querySelectorAll(".sim-preset").forEach(function(b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      const custom = document.getElementById("uclSimCustom");
+      if (custom) custom.value = "";
+    });
+  });
+  const startBtn = document.getElementById("uclSimStartBtn");
+  if (startBtn) startBtn.addEventListener("click", startUclSimulation);
+}
+
+async function startUclSimulation() {
+  if (_uclSimPolling) return;
+  const runs = _selectedRuns();
+  const seedInput = document.getElementById("uclSimSeed");
+  const seedRaw = seedInput && seedInput.value.trim() !== "" ? parseInt(seedInput.value) : null;
+  const lbl = document.getElementById("uclSimProgressLbl");
+  const startBtn = document.getElementById("uclSimStartBtn");
+  if (!Number.isFinite(runs) || runs < 1 || runs > 1000000) {
+    if (lbl) lbl.textContent = "Runs must be between 1 and 1,000,000.";
+    return;
+  }
+  _uclSimPolling = true;
+  if (startBtn) startBtn.disabled = true;
+  if (lbl) lbl.textContent = "Starting...";
+  try {
+    const body = seedRaw != null ? { iterations: runs, seed: seedRaw } : { iterations: runs };
+    const resp = await safeJson(API + "/simulate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.task_id) {
+      // not_needed / validation_error: honest reason, no fake numbers.
+      if (lbl) lbl.textContent = resp.message || resp.error || resp.status;
+      return;
+    }
+    const t0 = Date.now();
+    await new Promise(function(resolve, reject) {
+      const poll = setInterval(async function() {
+        try {
+          const pr = await safeJson(API + "/simulation/progress/" + resp.task_id);
+          if (pr.status === "not_found") { clearInterval(poll); reject(new Error(pr.error)); return; }
+          if (pr.status === "completed") { clearInterval(poll); resolve(); return; }
+          if (pr.status === "failed") { clearInterval(poll); reject(new Error(pr.error || "simulation failed")); return; }
+          if (lbl) {
+            let text = (pr.stage || "Simulating...");
+            if (pr.total_iterations > 0) text += "  " + (pr.iteration || 0).toLocaleString() + "/" + pr.total_iterations.toLocaleString();
+            text += "  (" + Math.round(pr.progress || 0) + "%)";
+            const elapsedS = Math.round((Date.now() - t0) / 1000);
+            if (elapsedS > 0) text += "  " + elapsedS + "s";
+            lbl.textContent = text;
+          }
+        } catch (e) { clearInterval(poll); reject(e); }
+      }, 250);
+    });
+    const sim = await safeJson(API + "/simulation");
+    appState.simProjections = (sim.odds || []).slice()
+      .sort(function(a, b) { return (b.champion_prob || 0) - (a.champion_prob || 0); });
+    appState.simMeta = sim.simulation_meta || {};
+    appState.simRunCount = (sim.simulation_meta && sim.simulation_meta.count) || runs;
+    renderOverview();
+  } catch (e) {
+    if (lbl) lbl.textContent = "Error: " + (e.message || "unknown");
+  } finally {
+    _uclSimPolling = false;
+    const btn2 = document.getElementById("uclSimStartBtn");
+    if (btn2) btn2.disabled = false;
+  }
 }
 
 // ── Standings ────────────────────────────────────────────────────────
