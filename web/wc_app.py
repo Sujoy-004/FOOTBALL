@@ -602,12 +602,22 @@ def _run_simulation_task(
 
         _progress(97, "Building full bracket tree...")
         overview = result["overview"]
+        sim_meta = result.get("simulation_meta", {})
         sim_cache = {
             "top_teams": result["top_teams"][:20],
             "signal_eval": result["eval_metrics"],
             "simulation_meta": {
-                "iterations": iterations,
-                "seed": seed,
+                "requested": True,
+                "status": "complete",
+                "requested_count": iterations,
+                "count": sim_meta.get("n_simulations", iterations),
+                "seed": sim_meta.get("seed"),
+                "engine_version": sim_meta.get("engine_version"),
+                "provenance": {
+                    "real_results_preserved": True,
+                    "simulated_matches_only": True,
+                    **(sim_meta.get("provenance") or {}),
+                },
                 "weights": weights,
                 "show_ci": show_ci,
                 "n_top_teams": len(result["top_teams"]),
@@ -646,6 +656,28 @@ def _run_simulation_task(
 def api_simulate(req: dict = None):
     if not req:
         return JSONResponse({"error": "request body required"})
+    # Validate BEFORE the eligibility short-circuit: an invalid request is
+    # invalid regardless of competition state (no silent clamping).
+    iterations_raw = req.get("iterations", 50000)
+    try:
+        from football_core.simulation import (
+            SimulationContractError,
+            validate_n_simulations,
+        )
+        iterations = validate_n_simulations(int(iterations_raw))
+    except SimulationContractError as exc:
+        return JSONResponse({"status": "invalid_request", "error": str(exc)},
+                            status_code=400)
+    except (TypeError, ValueError):
+        return JSONResponse({
+            "status": "invalid_request",
+            "error": f"iterations must be an integer: {iterations_raw!r}"},
+            status_code=400)
+    seed = req.get("seed")
+    if seed is not None:
+        seed = int(seed)
+    weights = req.get("weights")
+    show_ci = str(req.get("show_ci", "auto"))
     remaining = unplayed_match_count()
     if remaining == 0:
         global sim_cache
@@ -654,13 +686,6 @@ def api_simulate(req: dict = None):
             "status": "no_unplayed_matches",
             "message": "All matches have been played. Nothing to simulate.",
         })
-    iterations = int(req.get("iterations", 50000))
-    iterations = max(1000, min(500000, iterations))
-    seed = req.get("seed")
-    if seed is not None:
-        seed = int(seed)
-    weights = req.get("weights")
-    show_ci = str(req.get("show_ci", "auto"))
     task_id = str(uuid.uuid4())
     t = threading.Thread(
         target=_run_simulation_task,
@@ -672,7 +697,11 @@ def api_simulate(req: dict = None):
     return JSONResponse({
         "task_id": task_id,
         "status": "started",
-        "iterations": iterations,
+        "requested_count": iterations,
+        "count": iterations,
+        "requested": True,
+        # The engine generates and records a reproducible seed when none given;
+        # it is returned in simulation_meta + snapshot on completion.
         "seed": seed,
         "weights": weights,
         "show_ci": show_ci,

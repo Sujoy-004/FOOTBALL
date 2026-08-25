@@ -508,8 +508,18 @@ def run_mc_simulation(
     bsd_api_key: str = "",
     team_aliases: dict[str, str] | None = None,
     progress_cb=None,
+    elo_ratings_override: dict[str, float] | None = None,
+    played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
 ) -> dict:
     """Run a full Monte Carlo simulation pipeline.
+
+    Exchange 3 truth semantics:
+    - real league results on disk are injected as immutable facts into
+      every iteration (never resampled);
+    - an explicit ``elo_ratings_override`` avoids live ClubElo calls so a
+      simulation can run fully offline (snapshot mode);
+    - ``seed=None`` lets the generic engine generate a seed that is
+      returned in the payload for reproducibility.
 
     Returns a dict with keys: mode, teams, all_teams, n_teams, n_iterations,
     seed, snapshot_date, champion, standings, playoff, bracket_rounds, odds,
@@ -518,7 +528,6 @@ def run_mc_simulation(
     """
     dp = Path(data_dir) if isinstance(data_dir, str) else data_dir
     from competitions.ucl.src.provider import RepoFixtureProvider
-    from competitions.ucl.src.elo_fetcher import fetch_team_elos
 
     if progress_cb:
         progress_cb(0, 0)
@@ -528,20 +537,30 @@ def run_mc_simulation(
     if progress_cb:
         progress_cb(5, 0)
 
-    team_names = [t.name for t in provider.teams]
-    elo_ratings = fetch_team_elos(team_names)
-    if not elo_ratings:
-        elo_ratings = {}
-        coefficients = {t.name: t.coefficient for t in provider.teams}
-        max_coeff = max(coefficients.values()) if coefficients else 100
-        for t in team_names:
-            c = coefficients.get(t, 50)
-            elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
+    if elo_ratings_override:
+        elo_ratings = dict(elo_ratings_override)
+    else:
+        from competitions.ucl.src.elo_fetcher import fetch_team_elos
+        team_names = [t.name for t in provider.teams]
+        elo_ratings = fetch_team_elos(team_names)
+        if not elo_ratings:
+            elo_ratings = {}
+            coefficients = {t.name: t.coefficient for t in provider.teams}
+            max_coeff = max(coefficients.values()) if coefficients else 100
+            for t in team_names:
+                c = coefficients.get(t, 50)
+                elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
     if progress_cb:
         progress_cb(10, 0)
 
+    # Real league results are immutable facts for every iteration.
+    from competitions.ucl.src.orchestrator import _load_league_played_pairs
+    played_pairs = (
+        played_matches if played_matches is not None
+        else _load_league_played_pairs(dp)
+    )
 
-    resolved_seed = seed if seed is not None else 42
+    resolved_seed = seed  # None -> engine generates one and returns it
     if progress_cb:
 
         def _mc_progress(current, total):
@@ -550,7 +569,7 @@ def run_mc_simulation(
     else:
         _mc_progress = None
 
-    result = build_simulation_result(provider, elo_ratings, resolved_seed, n_iterations, progress_cb=_mc_progress)
+    result = build_simulation_result(provider, elo_ratings, resolved_seed, n_iterations, played_matches=played_pairs, progress_cb=_mc_progress)
     if progress_cb:
         progress_cb(85, n_iterations)
 
@@ -664,6 +683,18 @@ def run_mc_simulation(
         "playoff": playoff_display, "bracket_rounds": enriched_bracket,
         "odds": odds_display, "signals": signal_stats, "elo_ratings": elo_ratings,
         "show_ci": show_ci,
+        "_meta": {
+            # SimulationResult.seed is the ENGINE-RESOLVED seed (generated
+            # when the request passed None), so runs stay reproducible.
+            "n_simulations": result.n_iterations,
+            "seed": result.seed,
+            "engine_version": "monte-carlo-v1",
+            "provenance": {
+                "real_results_preserved": True,
+                "simulated_matches_only": True,
+                "league_matches_conditioned": sorted(played_pairs) if played_pairs else [],
+            },
+        },
     }
 
 

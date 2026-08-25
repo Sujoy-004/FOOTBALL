@@ -595,7 +595,9 @@ def run_simulation_compute(
     if progress_cb is None:
         progress_cb = lambda pct, stage: None  # noqa: E731
 
-    fetch_live_data(bsd_api_key, football_data_org_key, data_dir)
+    # Exchange 3 truth invariant: a simulation request never mutates
+    # canonical stores. Live refresh is an explicit /api/refresh concern;
+    # the simulation conditions on whatever results are on disk right now.
 
     progress_cb(0, "Loading data files...")
     teams_raw = json.loads(
@@ -661,11 +663,12 @@ def run_simulation_compute(
         annex_c,
         played_raw,
         iterations=iterations,
-        seed=seed if seed is not None else int(time.time()),
+        seed=seed,  # None lets the engine generate + return a reproducible seed
         played_groups=played_groups,
         blend_params=blend_params,
         progress_cb=_sim_progress,
     )
+    sim_meta = sim_result.pop("_meta", {})
 
     progress_cb(92, "Computing top team rankings...")
     top_teams = sorted(
@@ -720,8 +723,17 @@ def run_simulation_compute(
 
     snapshot = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "iterations": iterations,
-        "seed": seed,
+        "mode": "simulation",
+        "iterations": sim_meta.get("n_simulations", iterations),
+        # Resolved seed: when the caller passed None the engine generated
+        # one and it is recorded here so the run can be reproduced.
+        "seed": sim_meta.get("seed"),
+        "requested_seed": seed,
+        "provenance": {
+            "real_results_preserved": True,
+            "simulated_matches_only": True,
+            **(sim_meta.get("provenance") or {}),
+        },
         "weights": weights,
         "n_teams": overview.get("n_teams", 0),
         "n_played": overview.get("n_played", 0),
@@ -743,6 +755,7 @@ def run_simulation_compute(
         "eval_metrics": eval_metrics,
         "full_bracket": full_bracket,
         "sim_result": sim_result,
+        "simulation_meta": sim_meta,
         "snapshot": snapshot,
     }
 

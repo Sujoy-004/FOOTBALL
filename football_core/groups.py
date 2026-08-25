@@ -415,9 +415,16 @@ def simulate_league_matches(
 
     played_lookup: dict[tuple[str, str], tuple[int, int]] = {}
     if played_matches:
+        # Immutability-critical (Exchange 3 fix): callers may pass already-
+        # bidirectional dicts ({(a,b): s} plus {(b,a): reversed s}). First
+        # insertion wins per key; the synthesized reverse orientation flips
+        # the score so the mirrored lookup can never corrupt real facts.
         for (ta, tb), score in played_matches.items():
-            played_lookup[(ta, tb)] = score
-            played_lookup[(tb, ta)] = score
+            if (ta, tb) not in played_lookup:
+                played_lookup[(ta, tb)] = score
+            reverse = (tb, ta)
+            if reverse not in played_lookup:
+                played_lookup[reverse] = (score[1], score[0])
 
     results: dict[str, dict] = {}
     for matchday in schedule["matchdays"]:

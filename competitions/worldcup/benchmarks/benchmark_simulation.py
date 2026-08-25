@@ -89,7 +89,8 @@ def main() -> None:
             )
             elapsed = time.perf_counter() - start
             times.append(elapsed)
-            champ_sum = sum(v["champion"] for v in out.values())
+            champ_sum = sum(v["champion"] for k, v in out.items()
+                            if not k.startswith("_"))
             assert abs(champ_sum - 1.0) < 0.05, "probabilities must sum to ~1"
         best = min(times)
         median = sorted(times)[len(times) // 2]

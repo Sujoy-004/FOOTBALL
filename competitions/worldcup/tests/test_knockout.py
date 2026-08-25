@@ -134,9 +134,10 @@ class TestRunFullSimulation:
             teams, groups, bracket, annex_c, {},
             iterations=100, seed=42,
         )
-        assert len(result) == 48
-        for team in result:
-            assert set(result[team].keys()) == {"qf", "sf", "final", "champion"}
+        team_entries = {k: v for k, v in result.items() if not k.startswith("_")}
+        assert len(team_entries) == 48
+        for team in team_entries.values():
+            assert set(team.keys()) == {"qf", "sf", "final", "champion"}
 
     def test_champion_probs_sum_to_one(self, full_data):
         """Champion probabilities sum to ~100%."""
@@ -145,7 +146,8 @@ class TestRunFullSimulation:
             teams, groups, bracket, annex_c, {},
             iterations=1000, seed=42,
         )
-        total = sum(p["champion"] for p in result.values())
+        total = sum(p["champion"] for k, p in result.items()
+                    if not k.startswith("_"))
         assert abs(total - 1.0) <= 0.001
 
     def test_deterministic_with_seed(self, full_data):
@@ -181,6 +183,8 @@ class TestRunFullSimulation:
             teams, groups, bracket, annex_c, {},
             iterations=100, seed=42,
         )
-        for team in result:
+        for team, probs in result.items():
+            if team.startswith("_"):
+                continue
             for key in ("qf", "sf", "final", "champion"):
-                assert 0.0 <= result[team][key] <= 1.0
+                assert 0.0 <= probs[key] <= 1.0

@@ -129,8 +129,14 @@ def simulate_playoff_round(
     # Simulates the UEFA draw ceremony: seeded pairs (9/10, 11/12, etc.)
     # and challenger pairs (23/24, 21/22, etc.) are randomly assigned
     # to silver/blue bracket sides.
+    #
+    # Immutability (Exchange 3): work on per-call copies so the caller's
+    # pairings structure is never mutated — the same pairings object is
+    # reused across Monte Carlo iterations and must not leak state between
+    # them.
+    working_pairings = [dict(p) for p in pairings]
     draw_groups: dict[str, list[dict]] = {}
-    for p in pairings:
+    for p in working_pairings:
         dg = p.get("draw_group")
         if dg:
             draw_groups.setdefault(dg, []).append(p)
@@ -166,7 +172,7 @@ def simulate_playoff_round(
     winners: dict[int, str] = {}
     tie_results: dict[int, dict] = {}
 
-    for pairing in pairings:
+    for pairing in working_pairings:
         tie_num = pairing["tie"]
         pos_a = pairing["position_a"]
         pos_b = pairing["position_b"]
@@ -202,6 +208,13 @@ def simulate_playoff_round(
     return {
         "winners": winners,
         "ties": tie_results,
+        # Resolved draw outcome per tie (Exchange 3): exposes the shuffled
+        # positions explicitly so consumers never depend on input mutation.
+        "positions_used": [
+            {"tie": p["tie"], "position_a": p["position_a"],
+             "position_b": p["position_b"]}
+            for p in working_pairings
+        ],
         "standings": standings,
     }
 
@@ -333,6 +346,13 @@ def build_r16_bracket(
 
         with open(bracket_rules_path) as f:
             bracket_data = json.load(f)
+    else:
+        # Immutability (Exchange 3): work on per-call copies so the caller's
+        # pre-loaded bracket rules are never mutated — the same structure is
+        # reused across Monte Carlo iterations.
+        bracket_data = {
+            "matches": [dict(m) for m in bracket_data.get("matches", [])]
+        }
 
     # ── 2. Validate bracket entries (T-02-08) ─────────────────────────────
     for entry in bracket_data["matches"]:

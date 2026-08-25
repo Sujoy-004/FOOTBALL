@@ -181,69 +181,53 @@ def run_full_simulation(
     xg_overrides: dict[str, tuple[float, float]] | None = None,
     progress_cb: callable = None,
 ) -> dict[str, dict[str, float]]:
-    rng = random.Random(seed)
-    round_map = _build_round_map(bracket)
-    elo_ratings = {name: data["elo"] for name, data in teams.items()}
+    """Run N Monte Carlo tournament realizations via the generic engine.
 
-    counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    Exchange 3 migration: iteration mechanics, RNG ownership, validation
+    and aggregation live in football_core.simulation.MonteCarloEngine; this
+    function is now a compatibility wrapper that adapts the historical
+    signature to WorldCupRules + SimulationRequest and converts the engine's
+    aggregates back into the legacy ``{team: {qf, sf, final, champion}}``
+    proportions contract.
 
-    matchup_lambdas = precompute_matchup_lambdas(groups, elo_ratings, base_rate=constants.EXPECTED_GOALS_BASE_RATE, xg_overrides=xg_overrides)
+    Returns also engine metadata under key ``_meta`` (resolved seed, count,
+    provenance attestation); callers reading only team entries are unaffected.
+    """
+    from football_core.simulation import MonteCarloEngine, SimulationRequest
+    from competitions.worldcup.src.rules import WorldCupRules
 
-    report_interval = max(1, iterations // 100)
+    rules = WorldCupRules(
+        teams=teams, groups=groups, bracket=bracket, annex_c=annex_c,
+        played=played, played_groups=played_groups or {},
+        blend_params=blend_params, xg_overrides=xg_overrides,
+    )
+    request = SimulationRequest(
+        competition_id="worldcup", season="2026",
+        n_simulations=iterations, seed=seed,
+    )
+    result = MonteCarloEngine().run(request, rules, progress_cb=progress_cb)
 
-    for i in range(iterations):
-        winner_progression: dict[str, str] = {}
-        sf_losers: dict[str, str | None] = {}
+    n = result.aggregates["n_simulations"]
+    champ_counts = result.aggregates["champion"]["counts"]
+    stage_counts = {
+        stage: result.aggregates[stage]["counts"]
+        for stage in ("qf", "sf", "final")
+    }
 
-        results = simulate_group_matches(groups, teams, elo_ratings, rng, fair_play=False, matchup_lambdas=matchup_lambdas, played_groups=played_groups, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
-        standings = compute_standings(results, elo_ratings)
-        third_ranked = rank_third_placed(standings)
-        advancers = select_advancers(standings, third_ranked)
-        r32_matchups = resolve_r32_matchups(advancers, standings, third_ranked, annex_c)
-
-        wp = _simulate_r32_resolved(r32_matchups, played, elo_ratings, rng, blend_params)
-        winner_progression.update(wp)
-
-        _simulate_r16(round_map, played, winner_progression, rng, elo_ratings, blend_params)
-
-        for rn in ["QF", "SF"]:
-            _simulate_knockout_round(
-                round_map, rn, played, winner_progression, sf_losers, rng, elo_ratings, blend_params
-            )
-
-        _simulate_tpp(round_map, played, winner_progression, sf_losers, rng, elo_ratings, blend_params)
-
-        _simulate_knockout_round(
-            round_map, "FINAL", played, winner_progression, None, rng, elo_ratings, blend_params
-        )
-
-        for round_name in ROUND_ORDER:
-            if round_name not in round_map:
-                continue
-            for match in round_map[round_name]:
-                sources = match.get("source_matches")
-                if sources is None:
-                    continue
-                for src in sources:
-                    if src in winner_progression:
-                        team = winner_progression[src]
-                        rk = ROUND_KEYS.get(round_name)
-                        if rk:
-                            counts[team][rk] += 1
-
-        if "FINAL" in winner_progression:
-            counts[winner_progression["FINAL"]]["champion"] += 1
-
-        if progress_cb and (i % report_interval == 0 or i == iterations - 1):
-            progress_cb(i + 1, iterations)
-
-    result: dict[str, dict[str, float]] = {}
+    out: dict[str, dict[str, float]] = {}
     for team in teams:
-        result[team] = {
-            "qf": counts[team].get("qf", 0) / iterations,
-            "sf": counts[team].get("sf", 0) / iterations,
-            "final": counts[team].get("final", 0) / iterations,
-            "champion": counts[team].get("champion", 0) / iterations,
+        out[team] = {
+            "qf": stage_counts["qf"].get(team, 0) / n,
+            "sf": stage_counts["sf"].get(team, 0) / n,
+            "final": stage_counts["final"].get(team, 0) / n,
+            "champion": champ_counts.get(team, 0) / n,
         }
 
-    return result
+    result.aggregates.setdefault("provenance", {})
+    out["_meta"] = {
+        "n_simulations": n,
+        "seed": result.metadata.seed,
+        "engine_version": result.metadata.engine_version,
+        "provenance": result.aggregates.get("provenance", {}),
+    }
+    return out

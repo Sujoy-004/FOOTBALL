@@ -104,7 +104,8 @@ class TestCounterfactualImpact:
             teams, groups, bracket, annex_c, played,
             iterations=100, seed=42, played_groups=played_groups,
         )
-        favorite = max(baseline, key=lambda k: baseline[k]["champion"])
+        favorite = max((k for k in baseline if not k.startswith("_")),
+               key=lambda k: baseline[k]["champion"])
         overrides = {"elo_changes": {favorite: teams[favorite]["elo"] + 200}}
         cf_result, _ = run_counterfactual(
             teams, groups, bracket, annex_c, played, played_groups,
@@ -129,7 +130,8 @@ class TestCounterfactualImpact:
             teams, groups, bracket, annex_c, played,
             iterations=100, seed=42, played_groups=played_groups,
         )
-        favorite = max(baseline, key=lambda k: baseline[k]["champion"])
+        favorite = max((k for k in baseline if not k.startswith("_")),
+               key=lambda k: baseline[k]["champion"])
         overrides = {"elo_changes": {favorite: max(100, teams[favorite]["elo"] - 200)}}
         cf_result, _ = run_counterfactual(
             teams, groups, bracket, annex_c, played, played_groups,
@@ -160,6 +162,8 @@ class TestCounterfactualImpact:
             iterations=100, seed=42, played_groups=played_groups,
         )
         for team in baseline:
+            if team.startswith("_"):
+                continue
             if cf_result.get(team, {}).get("champion", 0.0) != baseline[team]["champion"]:
                 break
         else:

@@ -83,7 +83,7 @@ function showSimPopup() {
           <button data-iters="100000">100K</button>
           <button data-iters="500000">500K</button>
         </div>
-        <input type="number" id="simCustomIters" value="50000" min="1000" max="500000">
+        <input type="number" id="simCustomIters" value="50000" min="1" max="1000000">
         <div class="sim-actions">
           <button id="simCancelBtn">Cancel</button>
           <button id="simStartBtn">&#9654; Start</button>

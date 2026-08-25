@@ -68,12 +68,17 @@ class TestSimulationRequest:
             req.n_simulations = 2000  # type: ignore[misc]
 
     def test_request_enforces_bounds_at_construction(self):
+        # Exchange 3 lowered MIN_SIMULATIONS from 100 to 1; counts below 1
+        # and above the hard maximum remain invalid at construction time.
         with pytest.raises(SimulationContractError):
-            SimulationRequest(competition_id="WC", season="2026", n_simulations=10)
+            SimulationRequest(competition_id="WC", season="2026", n_simulations=0)
         with pytest.raises(SimulationContractError):
             SimulationRequest(
                 competition_id="WC", season="2026", n_simulations=2_000_000
             )
+        assert SimulationRequest(
+            competition_id="WC", season="2026", n_simulations=1
+        ).n_simulations == 1
 
     def test_empty_competition_or_season_rejected(self):
         with pytest.raises(SimulationContractError):

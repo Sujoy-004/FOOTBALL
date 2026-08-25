@@ -249,9 +249,8 @@ class TestPlayoffRound:
             sample_playoff_standings, elos, sample_rng,
             pairings_data=sample_playoff_pairings,
         )
-        pairings = sample_playoff_pairings["pairings"]
         pos_to_team = {e["position"]: e["team"] for e in sample_playoff_standings}
-        for pairing in pairings:
+        for pairing in result["positions_used"]:
             tie_num = pairing["tie"]
             pos_a = pairing["position_a"]
             pos_b = pairing["position_b"]
@@ -298,8 +297,7 @@ class TestPlayoffRound:
             pairings_data=sample_playoff_pairings,
         )
         pos_to_team = {e["position"]: e["team"] for e in sample_playoff_standings}
-        pairings = sample_playoff_pairings["pairings"]
-        for pairing in pairings:
+        for pairing in result["positions_used"]:
             tie_num = pairing["tie"]
             seeded_team = pos_to_team[pairing["position_a"]]
             tie_result = result["ties"][tie_num]

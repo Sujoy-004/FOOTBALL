@@ -512,6 +512,7 @@ def api_simulation():
         "n_iterations": sim_cache.get("n_iterations", 0),
         "snapshot_date": sim_cache.get("snapshot_date", ""),
         "status": sim_cache.get("status", "none"),
+        "simulation_meta": sim_cache.get("simulation_meta"),
         "bracket_rounds": sim_cache.get("bracket_rounds"),
         "playoff": sim_cache.get("playoff"),
     })
@@ -547,18 +548,45 @@ def api_signals():
 def api_simulate(req: dict = None):
     global _mode
     remaining = _unplayed_match_count()
-    if remaining == 0:
+    champion_undecided = _season_outcome_undecided()
+    if remaining == 0 and not champion_undecided:
         global sim_cache
-        sim_cache = {"status": "no_unplayed_matches", "message": "All matches have been played. Nothing to simulate."}
+        sim_cache = {
+            "status": "no_outstanding_outcomes",
+            "message": "Every match has a real result and the season "
+                       "outcome is decided - nothing to simulate.",
+        }
         return JSONResponse({
-            "status": "no_unplayed_matches",
-            "message": "All matches have been played. Nothing to simulate.",
+            "status": "no_outstanding_outcomes",
+            "message": sim_cache["message"],
             "n_unplayed": 0,
         })
     _mode = "simulation"
     task_id = str(uuid.uuid4())
     body = req or {}
-    n_iterations = max(10, min(1000000, int(body.get("iterations") or body.get("n_iterations") or 10000)))
+    # Explicit None handling: a literal 0 must reach validation, never be
+    # silently swapped for the default by an or-chain.
+    raw_iterations = body.get("iterations")
+    if raw_iterations is None:
+        raw_iterations = body.get("n_iterations")
+    if raw_iterations is None:
+        raw_iterations = 10000
+    try:
+        from football_core.simulation import (
+            SimulationContractError,
+            validate_n_simulations,
+        )
+        n_iterations = validate_n_simulations(int(raw_iterations))
+    except SimulationContractError as exc:
+        return JSONResponse({
+            "status": "invalid_request",
+            "error": f"invalid simulation count {raw_iterations!r}: {exc}",
+        }, status_code=400)
+    except (TypeError, ValueError) as exc:
+        return JSONResponse({
+            "status": "invalid_request",
+            "error": f"invalid simulation count {raw_iterations!r}: {exc}",
+        }, status_code=400)
     seed = body.get("seed")
     if seed is not None:
         seed = int(seed)
@@ -598,10 +626,30 @@ def api_simulate(req: dict = None):
     t.start()
     return JSONResponse({
         "status": "ok", "task_id": task_id, "mode": _mode,
+        "requested": True,
+        "requested_count": n_iterations,
+        "count": n_iterations,
+        # Engine-generated seed is returned via simulation metadata on completion.
         "seed": seed, "weights": weights, "show_ci": show_ci,
         "n_unplayed": remaining,
     })
 
+
+
+def _season_outcome_undecided() -> bool:
+    """True when the real season still has undecided outcomes worth projecting.
+
+    League matches unplayed, or knockout data missing/empty/unreadable with
+    no recorded champion, both count as outstanding. A genuinely completed
+    real season (champion on file) is decided.
+    """
+    if _unplayed_match_count() > 0:
+        return True
+    availability = cache.get("availability", {})
+    ko_state = availability.get("knockout_results")
+    if ko_state in ("missing", "empty", "unavailable"):
+        return True
+    return not cache.get("champion")
 
 
 def _run_mc_simulation(
@@ -614,21 +662,39 @@ def _run_mc_simulation(
     global boot_log_local, sim_result, _mode, sim_cache
     _mode = "simulation"
     boot_log_local = []
+    # Offline-safe: reuse the cached Elo snapshot instead of refetching
+    # ClubElo; fall back to coefficient-derived ratings without network.
+    cached_elo = cache.get("elo_ratings") or None
     result = _run_mc_simulation_pipeline(
         str(DATA_DIR), n_iterations=n_iterations, seed=seed,
         weights=weights, show_ci=show_ci, bsd_api_key=BSD_API_KEY,
         team_aliases=_BSD_TEAM_ALIASES, progress_cb=progress_cb,
+        elo_ratings_override=cached_elo,
     )
     sim_result = None
     result["boot"] = boot_log_local
     sim_cache = result
+    resolved_seed = (result.get("_meta") or {}).get("seed")
+    sim_cache["simulation_meta"] = {
+        "requested": True,
+        "status": "complete",
+        "requested_count": n_iterations,
+        "count": result.get("n_iterations"),
+        "seed": resolved_seed,
+        "provenance": {
+            "real_results_preserved": True,
+            "simulated_matches_only": True,
+            **((result.get("_meta") or {}).get("provenance") or {}),
+        },
+    }
     # Write snapshot
     snapshot_path = DATA_DIR / "snapshot.json"
     snapshot_data = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "mode": result.get("mode", "simulation"),
-        "iterations": n_iterations,
-        "seed": seed,
+        "iterations": result.get("n_iterations"),
+        "seed": resolved_seed,
+        "requested_seed": seed,
         "weights": weights,
         "show_ci": show_ci,
         "n_teams": result.get("n_teams", 0),

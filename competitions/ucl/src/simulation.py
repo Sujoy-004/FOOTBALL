@@ -455,103 +455,98 @@ def run_monte_carlo(
         team_names = [t["name"] for t in fixtures["schedule"]["teams"]]
         elo_ratings = fetch_team_elos(team_names)
 
-    # ── 2. Initialise seeded RNG ────────────────────────────────────────
-    rng = random.Random(seed)
+    # ── 2-5. Run N realizations via the generic engine ───────────────────
+    # Exchange 3 migration: iteration mechanics, RNG ownership, validation
+    # and aggregation live in football_core.simulation.MonteCarloEngine;
+    # UCLRules supplies the format-specific realization and this wrapper
+    # reassembles the historical D-06/D-07/D-09 payload from aggregates.
+    from football_core.simulation import MonteCarloEngine, SimulationRequest
+    from competitions.ucl.src.rules import UCLRules
 
-    # ── 3. Precompute matchup lambdas ONCE (Pitfall 4) ──────────────────
-    matchup_lambdas = precompute_swiss_matchup_lambdas(
-        fixtures, elo_ratings, EXPECTED_GOALS_BASE_RATE,
+    rules = UCLRules(
+        fixtures=fixtures,
+        elo_ratings=elo_ratings,
+        uefa_coefficients=uefa_coefficients,
+        played_matches=played_matches,
+    )
+    request = SimulationRequest(
+        competition_id="ucl", season="2025/26",
+        n_simulations=n_iterations, seed=seed,
     )
 
-    # ── 4. Initialise per-team collectors (post-aggregation pattern) ────
-    team_names = [t["name"] for t in fixtures["schedule"]["teams"]]
-    positions: dict[str, list[int]] = {t: [] for t in team_names}
-    champions: dict[str, int] = {t: 0 for t in team_names}
-    stat_collectors: dict[str, dict[str, list[int | float]]] = {
-        t: {"pts": [], "gd": [], "gs": [], "away_gs": [],
-            "wins": [], "away_wins": []}
-        for t in team_names
-    }
-    # D-09: stage tracking collector (value 0-6 per iteration)
-    stage_collectors: dict[str, list[int]] = {
-        t: [] for t in team_names
-    }
+    def _engine_progress(done: int, total: int) -> None:
+        if progress_cb and (
+            done % max(1, total // 100) == 0 or done == 1 or done == total
+        ):
+            progress_cb(done, total)
 
-    # Pre-build Elo dict lookup for knockout pipeline (T-02-13)
-    elo_dict: dict[str, float] = dict(elo_ratings)
+    mc_result = MonteCarloEngine().run(
+        request, rules, progress_cb=_engine_progress)
 
-    # ── 4b. Load competition data files ONCE (perf: avoid O(n) disk I/O) ─
-    data_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "data",
-    )
-    pairings_path = os.path.join(data_dir, "playoff_pairings.json")
-    with open(pairings_path) as f:
-        _pairings_data = json.load(f)
-    bracket_path = os.path.join(data_dir, "bracket_rules.json")
-    with open(bracket_path) as f:
-        _bracket_data = json.load(f)
+    n = mc_result.aggregates["n_simulations"]
+    resolved_seed = mc_result.metadata.seed
+    champion_counts = mc_result.aggregates["champion"]["counts"]
+    ladder_counts = mc_result.aggregates["ladder"]
+    position_hist = mc_result.aggregates["positions"]
+    stats_avgs = mc_result.aggregates["stats"]
 
-    # ── 5. Main iteration loop ──────────────────────────────────────────
-    report_interval = max(1, n_iterations // 100)
-    for i in range(n_iterations):
-        standings = simulate_league_phase(
-            fixtures,
-            elo_ratings,
-            rng,
-            uefa_coefficients=uefa_coefficients,
-            matchup_lambdas=matchup_lambdas,
-            played_matches=played_matches,
-        )
+    # ── 6. Aggregate and return (identical semantics to aggregate_mc_results)
+    teams_out: dict[str, dict] = {}
+    for team, buckets in position_hist.items():
+        total = sum(buckets.values())
+        if not total:
+            continue
+        entry = {
+            "top_8_prob": sum(c for p, c in buckets.items() if p <= 8) / n,
+            "playoff_prob": sum(c for p, c in buckets.items() if 9 <= p <= 24) / n,
+            "eliminated_prob": sum(c for p, c in buckets.items() if p >= 25) / n,
+            "champion_prob": champion_counts.get(team, 0) / n,
+            "avg_position": sum(p * c for p, c in buckets.items()) / total,
+        }
+        team_stats = stats_avgs.get(team, {})
+        for stat in ("pts", "gd", "gs", "away_gs", "wins", "away_wins"):
+            entry[f"avg_{stat}"] = team_stats.get(stat, 0.0)
+        teams_out[team] = entry
 
-        # ── Knockout pipeline (Phase 2) ─────────────────────────────────
-        playoff_result = simulate_playoff_round(
-            standings, elo_dict, rng,
-            pairings_data=_pairings_data,
-        )
-        bracket = build_r16_bracket(
-            standings, playoff_result,
-            bracket_data=_bracket_data,
-            rng=rng,
-        )
-        tree_result = simulate_knockout_tree(
-            bracket, elo_dict, rng,
-        )
-        stages = track_knockout_stages(standings, tree_result)
-        # ── end knockout pipeline ──────────────────────────────────────────
+    # Stage probabilities: exact best-attained-stage fractions (D-09),
+    # computed from LadderCounter tallies against STAGE_ORDER indices.
+    ladder_index = {name: i for i, name in enumerate(STAGE_ORDER)}
+    for team in list(teams_out.keys()):
+        best_counts_raw = mc_result.aggregates["ladder"].get(team) or {}
+        best_counts = {
+            ladder_index[name]: cnt
+            for name, cnt in best_counts_raw.items()
+            if name in ladder_index
+        }
+        for stage_name, value in STAGE_TO_VALUE.items():
+            teams_out[team][f"stage_{stage_name}_prob"] = (
+                best_counts.get(value, 0) / n)
 
-        for entry in standings:
-            team = entry["team"]
-            pos = entry["position"]
-            positions[team].append(pos)
-            stat_collectors[team]["pts"].append(entry["pts"])
-            stat_collectors[team]["gd"].append(entry["gd"])
-            stat_collectors[team]["gs"].append(entry["gs"])
-            stat_collectors[team]["away_gs"].append(entry["away_gs"])
-            stat_collectors[team]["wins"].append(entry["wins"])
-            stat_collectors[team]["away_wins"].append(entry["away_wins"])
-            # D-09: champion determined by knockout tree, not league position 1
-            if stages[team] == "champion":
-                champions[team] += 1
-            # D-09: track stage value for post-aggregation
-            stage_collectors[team].append(STAGE_TO_VALUE[stages[team]])
+    if compute_ci:
+        cis = compute_bootstrap_ci(champion_counts, n, seed=resolved_seed)
+        small_cis = compute_bootstrap_ci_small_sample(champion_counts, n)
+        for team, entry in teams_out.items():
+            ci_lo, ci_hi = cis.get(team, (0.0, 0.0))
+            if team in small_cis:
+                ci_lo, ci_hi = small_cis[team]
+            entry["champion_ci_lower"] = ci_lo
+            entry["champion_ci_upper"] = ci_hi
+            entry["champion_ci_width_pct"] = (ci_hi - ci_lo) * 100.0
 
-        if progress_cb and (i % report_interval == 0 or i == n_iterations - 1):
-            progress_cb(i + 1, n_iterations)
-
-    # ── 6. Aggregate and return ─────────────────────────────────────────
     from competitions.ucl.src.elo_fetcher import get_clubelo_snapshot_date
 
     return {
         "snapshot_date": get_clubelo_snapshot_date(),
-        "n_iterations": n_iterations,
-        "seed": seed,
-        "teams": aggregate_mc_results(
-            positions, champions, stat_collectors, n_iterations,
-            stage_collectors=stage_collectors,
-            compute_ci=compute_ci,
-        ),
+        "n_iterations": n,
+        "seed": resolved_seed,
+        "teams": teams_out,
         "stage_order": STAGE_ORDER,  # D-09 metadata for consumers
+        "_meta": {
+            "n_simulations": n,
+            "seed": resolved_seed,
+            "engine_version": mc_result.metadata.engine_version,
+            "provenance": mc_result.aggregates.get("provenance", {}),
+        },
     }
 
 
