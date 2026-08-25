@@ -23,9 +23,11 @@ Match probabilities
         ↓
 Poisson score model (per-match expected goals from rating difference)
         ↓
-Seeded Monte Carlo tournament simulation (reproducible: seed=42 by default)
+User-triggered Monte Carlo simulation
+(validated 1..1,000,000 runs; optional seed - auto-generated seeds are returned)
         ↓
-Standings · knockout bracket · championship odds (+ bootstrap confidence intervals)
+Standings · knockout bracket · championship odds (labeled as simulated)
+
 ```
 
 **Weights:** the runtime currently uses **uniform ensemble weights** (the
@@ -60,11 +62,18 @@ seed data and simulated fixtures.
 ## Repository layout
 
 ```text
-football_core/            shared kernel: Elo, Poisson sim, EnsembleEngine,
-                          weight fitting, evaluation metrics, persistence
-competitions/worldcup/    WC format logic + signal caches + tests + benchmark
-competitions/ucl/         UCL Swiss/knockout logic + calibration + tests
-web/                      FastAPI apps + vanilla-JS dashboard
+football_core/            shared kernel: canonical domain/truth model,
+                          5-signal ensemble, Poisson sim, generic Monte
+                          Carlo engine (SimulationRules boundary),
+                          shared match insight, evaluation metrics,
+                          provider protocols + persistence
+competitions/worldcup/    WC brain: groups/Annex-C/knockout rules,
+                          SimulationRules adapter, signal caches, tests,
+                          benchmark
+competitions/ucl/         UCL brain: Swiss/playoff/bracket rules,
+                          SimulationRules adapter, calibration, tests
+web/                      CompetitionRegistry, shared simulation task
+                          service, FastAPI sub-apps, vanilla-JS dashboard
 tests/                    cross-cutting regression tests
 docs/                     ARCHITECTURE · GETTING-STARTED · TESTING
 ```

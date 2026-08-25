@@ -148,6 +148,16 @@ class TestWorldCupCanonicalIntegration:
             assert kwargs.get("blend_params") is not None, \
                 "simulation must receive canonical blend_params (no pure-Elo fallback)"
             assert "market_odds" in kwargs["blend_params"]["blend_weights"]
+            mp = kwargs["blend_params"]["match_probs"]
+            # Exchange 5 fix: only REAL team pairings may carry blended
+            # probabilities - unresolved knockout slots must use the
+            # matchup-aware Elo fallback instead of slot-keyed constants.
+            assert len(mp) == 72, (
+                f"expected exactly the 72 group fixtures, got {len(mp)}")
+            ko_ids = [k for k in mp if not k.startswith("GS_")]
+            assert not ko_ids, (
+                f"slot-keyed KO probabilities leaked into match_probs: "
+                f"{ko_ids[:5]}")
             return {t: {"champion": 1 / len(teams)} for t in teams}
 
         monkeypatch.setattr(wc_pipeline, "run_full_simulation", spy_sim)
@@ -159,7 +169,7 @@ class TestWorldCupCanonicalIntegration:
         result = wc_pipeline.run_simulation_compute(data_dir=data_dir, iterations=10, seed=42)
 
         bp = captured["blend_params"]
-        assert len(bp["match_probs"]) > 100  # all fixtures blended
+        assert len(bp["match_probs"]) == 72  # the 72 real group pairings
         assert set(bp["blend_weights"]) == {"elo", "market_odds", "rolling_form",
                                             "squad_value", "rest_days"}
         assert "calibration_params" not in bp

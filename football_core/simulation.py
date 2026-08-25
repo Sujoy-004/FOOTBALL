@@ -73,16 +73,6 @@ def validate_n_simulations(n_simulations: int) -> int:
 
 
 @dataclass(frozen=True)
-class SampledOutcome:
-    """One sampled match outcome. Regulation + extra time goals; pens optional."""
-
-    home_goals: int
-    away_goals: int
-    pens_home: Optional[int] = None
-    pens_away: Optional[int] = None
-
-
-@dataclass(frozen=True)
 class SimulationRequest:
     """A validated, immutable simulation request.
 
@@ -173,84 +163,6 @@ def ensure_simulated(result: SimulationResult) -> SimulationResult:
 # ── protocols (the seams competitions implement) ────────────────────────────
 
 
-@runtime_checkable
-class ProbabilitySource(Protocol):
-    """Per-match outcome probabilities feeding the sampler.
-
-    Returns ``(home, draw, away)`` summing to ~1.0, or ``None`` when no
-    signal-based estimate is available for the match (callers then fall
-    back to their declared default policy — probabilities are never
-    fabricated silently).
-    """
-
-    def match_probabilities(
-        self, match_id: str, team_a: str, team_b: str
-    ) -> Optional[tuple[float, float, float]]: ...
-
-
-@runtime_checkable
-class TournamentRules(Protocol):
-    """The competition brain's side of the contract.
-
-    Implemented per competition: knows the format, which matches remain,
-    and how to advance rounds. The generic engine calls these hooks; it
-    never encodes tournament structure itself.
-    """
-
-    def eligible_matches(self) -> Sequence[Mapping[str, Any]]:
-        """Unplayed fixtures eligible for sampling (played ones excluded)."""
-        ...
-
-    def immutable_results(self) -> Mapping[str, Mapping[str, Any]]:
-        """Real played results by match_id. Engines must never alter these."""
-        ...
-
-    def apply_result(self, match_id: str, outcome: SampledOutcome) -> None:
-        """Apply one sampled outcome to the competition state."""
-        ...
-
-    def advance(self) -> None:
-        """Advance the tournament one round/stage using current state."""
-        ...
-
-    def champion(self) -> Optional[str]:
-        """Champion once the format completes; ``None`` before that."""
-        ...
-
-    def final_standings(self) -> Sequence[Mapping[str, Any]]:
-        """Final table/qualifiers once the format completes."""
-        ...
-
-
-@runtime_checkable
-class MatchSampler(Protocol):
-    """Samples one match outcome.
-
-    Implementations own the scoreline model (e.g. Poisson from expected
-    goals). When *probabilities* is ``None`` the sampler applies its own
-    documented fallback; it must not invent availability metadata.
-    """
-
-    def sample(
-        self,
-        match: Mapping[str, Any],
-        probabilities: Optional[tuple[float, float, float]],
-        rng: random.Random,
-    ) -> SampledOutcome: ...
-
-
-@runtime_checkable
-class SimulationEngine(Protocol):
-    """Generic N-iteration Monte Carlo driver."""
-
-    def run(
-        self,
-        request: SimulationRequest,
-        rules: Any,
-        sampler: Optional[MatchSampler] = None,
-        probabilities: Optional[ProbabilitySource] = None,
-        progress_cb: Optional[PROGRESS_CB] = None,
-    ) -> SimulationResult: ...
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -271,16 +183,14 @@ class SimulationEngine(Protocol):
 class RunContext:
     """Everything one tournament realization may consume.
 
-    ``rng`` is owned by the engine for this request. ``sampler`` and
-    ``probabilities`` are optional injections; rules fall back to their own
-    documented mechanics when absent. Rules must treat every member as
-    read-only except consuming randomness.
+    ``rng`` is owned by the engine for this request. Rules must treat it as
+    read-only except consuming randomness. (Exchange 5 cleanup: speculative
+    sampler/probability injection points were removed — both shipped brains
+    realize tournaments directly from their own competition mechanics.)
     """
 
     rng: random.Random
     request: SimulationRequest
-    sampler: Optional[MatchSampler] = None
-    probabilities: Optional[ProbabilitySource] = None
 
 
 @runtime_checkable
@@ -509,14 +419,10 @@ class MonteCarloEngine:
 
     ENGINE_VERSION = "monte-carlo-v1"
 
-    def __init__(self, sampler: Optional[MatchSampler] = None) -> None:
-        self._sampler = sampler
-
     def run(
         self,
         request: SimulationRequest,
         rules: Any,
-        probabilities: Optional[ProbabilitySource] = None,
         progress_cb: Optional[PROGRESS_CB] = None,
     ) -> SimulationResult:
         n = validate_n_simulations(request.n_simulations)
@@ -534,10 +440,7 @@ class MonteCarloEngine:
         if callable(attest_fn):
             attestation = attest_fn() or {}
 
-        context = RunContext(
-            rng=rng, request=request,
-            sampler=self._sampler, probabilities=probabilities,
-        )
+        context = RunContext(rng=rng, request=request)
 
         report_every = max(1, n // 200)
         for done in range(1, n + 1):

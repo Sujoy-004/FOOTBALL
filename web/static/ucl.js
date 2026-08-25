@@ -70,10 +70,16 @@ async function reloadData() {
 function updateStatus() {
   const d = appState.data;
   if (!d) return;
-  const stale = d.refresh && d.refresh.stale;
+  const refresh = d.refresh || {};
+  let notice = "";
+  if (refresh.skipped_reason) {
+    notice = '<span style="color:#e6a817">SNAPSHOT - showing stored data (live refresh skipped)</span>';
+  } else if (refresh.stale) {
+    notice = '<span style="color:#e6a817">STALE - live refresh failed; showing last known data</span>';
+  }
   updateStatusBar(
     d.n_teams + " teams  |  " + (d.n_played || 0) + " matches played",
-    stale ? '<span style="color:#e6a817">STALE - live refresh failed; showing snapshot data</span>' : ""
+    notice
   );
 }
 
@@ -136,8 +142,7 @@ async function renderOverview() {
   // Driven by the backend's availability/request-state block; the UI never
   // infers eligibility and never fabricates outcomes for undecided stages.
   const simState = d.simulation || {};
-  const availability = simState.availability ||
-    (isResultsMode ? "not_needed" : "available");
+  const availability = simState.availability || "available";
   const requestState = simState.request_state || "not_requested";
   html += '<div class="chart-section"><div class="title">Simulation</div>';
 
@@ -178,7 +183,8 @@ async function renderOverview() {
     html += '<div style="margin-bottom:4px;font-size:11px;color:#15565B">Runs:'
       + '</div>'
       + '<button class="status-btn sim-preset" data-runs="1000">1K</button> '
-      + '<button class="status-btn sim-preset active" data-runs="10000">10K</button> '
+      + '<button class="status-btn sim-preset active" data-runs="5000">5K</button> '
+      + '<button class="status-btn sim-preset" data-runs="10000">10K</button> '
       + '<button class="status-btn sim-preset" data-runs="100000">100K</button> '
       + '<input type="number" id="uclSimCustom" placeholder="custom" min="1"'
       + ' max="1000000" style="width:90px;background:#0d2430;color:#F6DBC0;'
@@ -209,7 +215,7 @@ function _selectedRuns() {
   const customVal = custom && custom.value.trim() !== "" ? parseInt(custom.value) : NaN;
   if (Number.isFinite(customVal)) return customVal;
   const active = document.querySelector(".sim-preset.active");
-  return active ? parseInt(active.dataset.runs) : 10000;
+  return active ? parseInt(active.dataset.runs) : 5000;
 }
 
 function bindSimulationControls() {
@@ -438,7 +444,14 @@ async function renderBracket() {
   });
 
   if (!anyKoData) {
-    koSection += '<div class="dim" style="padding:8px;font-size:11px">Knockout results unavailable in current snapshot.</div>';
+    // Distinguish "stage not reached / undecided" from genuinely missing data.
+    const koStore = (appState.data && appState.data.phase
+      && appState.data.phase.stores
+      && appState.data.phase.stores.knockout_results) || "missing";
+    const msg = koStore === "unavailable"
+      ? "Knockout data exists but could not be read."
+      : "No knockout results yet - the knockout stage has not been played.";
+    koSection += '<div class="dim" style="padding:8px;font-size:11px">' + msg + '</div>';
   }
   koSection += '</div>';
   html += koSection;

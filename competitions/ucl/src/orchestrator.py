@@ -30,6 +30,25 @@ from competitions.ucl.src.calibrate import _EmptyResultProvider
 logger = logging.getLogger(__name__)
 
 
+def _resolve_elo_ratings(team_names: list[str]) -> dict[str, float]:
+    """Snapshot-safe Elo resolution.
+
+    Snapshot mode guarantees ZERO live requests, so ClubElo is skipped and
+    coefficient-derived ratings are used directly. Live mode attempts the
+    real fetch and degrades to coefficients on failure.
+    """
+    from web.startup import is_snapshot_mode
+
+    if not is_snapshot_mode():
+        from competitions.ucl.src.elo_fetcher import fetch_team_elos
+        ratings = fetch_team_elos(team_names)
+        if ratings:
+            return ratings
+    # Coefficient fallback (also the offline path for live mode failures).
+    return {}
+
+
+
 def _get_config_dir() -> str:
     """Return absolute path to competitions/ucl/config/ directory."""
     return os.path.join(
@@ -82,6 +101,11 @@ def build_signal_engine(
     from football_core.signals.squad_value import SquadValueSignal
     from football_core.signals.rest_days import RestDaysSignal
 
+    squad_values_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "data",
+        "squad_values.json",
+    )
     signals = [
         RefinedEloSignal(),
         MarketOddsSignal(),
@@ -89,7 +113,7 @@ def build_signal_engine(
             result_provider=_ReplayResultProvider(results_file) if results_file and os.path.exists(results_file)
             else _EmptyResultProvider()
         ),
-        SquadValueSignal(),
+        SquadValueSignal(data_path=squad_values_path),
         RestDaysSignal(),
     ]
 
@@ -472,7 +496,14 @@ def run_deterministic_compute(
     team_names = [t.name for t in provider.teams]
     from competitions.ucl.src.elo_fetcher import fetch_team_elos
 
-    elo_ratings = _step("Fetch Elo ratings", lambda: fetch_team_elos(team_names))
+    elo_ratings = _step("Fetch Elo ratings", lambda: _resolve_elo_ratings(team_names))
+    if not elo_ratings:
+        elo_ratings = {}
+        coefficients = {t.name: t.coefficient for t in provider.teams}
+        max_coeff = max(coefficients.values()) if coefficients else 100
+        for t in team_names:
+            c = coefficients.get(t, 50)
+            elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
     if not elo_ratings:
         elo_ratings = {}
         coefficients = {t.name: t.coefficient for t in provider.teams}
@@ -606,7 +637,14 @@ def run_compute_all(
         return {"error": "fixtures load failed", "boot": boot}
 
     team_names = [t.name for t in provider.teams]
-    elo_ratings = _step("Fetch Elo ratings", lambda: fetch_team_elos(team_names))
+    elo_ratings = _step("Fetch Elo ratings", lambda: _resolve_elo_ratings(team_names))
+    if not elo_ratings:
+        elo_ratings = {}
+        coefficients = {t.name: t.coefficient for t in provider.teams}
+        max_coeff = max(coefficients.values()) if coefficients else 100
+        for t in team_names:
+            c = coefficients.get(t, 50)
+            elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
     if not elo_ratings:
         elo_ratings = {}
         coefficients = {t.name: t.coefficient for t in provider.teams}
@@ -719,11 +757,13 @@ def run_compute_all(
         signal_stats = {}
 
     _, league_availability, _ = load_json_store(Path(results_path))
+    _, ko_availability, _ = load_json_store(
+        Path(data_dir) / "knockout_results.json")
     return {
         "mode": "simulation",
         "availability": {
             "league_results": league_availability.value,
-            "knockout_results": DataAvailability.MISSING.value,
+            "knockout_results": ko_availability.value,
             "simulated": True,
         },
         "phase": compute_competition_phase(data_dir),

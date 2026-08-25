@@ -1,4 +1,4 @@
-"""World Cup TournamentRules adapter for the generic simulation engine.
+"""World Cup SimulationRules adapter for the generic simulation engine.
 
 The competition brain owns everything format-specific here: groups and
 points, the 12-group/third-place/Annex-C qualification chain, knockout slot

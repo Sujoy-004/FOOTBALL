@@ -3,33 +3,34 @@
 import json
 import logging
 import math
-import os
 
 from football_core.signal import Signal, SignalOutput, PredictionContext
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_DATA_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "competitions",
-    "ucl",
-    "data",
-    "squad_values.json",
-)
-
-
 class SquadValueSignal(Signal):
     """Squad strength signal using Transfermarkt values with log-transform.
-    Log-transform prevents billionaires from dominating linearly."""
+    Log-transform prevents billionaires from dominating linearly.
+
+    The values file is competition data: the caller (competition brain)
+    supplies its own path via ``data_path``. football_core never reaches
+    into competition packages.
+    """
 
     name: str = "squad_value"
 
     def __init__(self, data_path: str | None = None) -> None:
-        self._data_path = data_path or _DEFAULT_DATA_PATH
+        # ``data_path`` is supplied by the competition composition root.
+        # When omitted, values must come from ``PredictionContext``; the
+        # signal degrades to uniform thirds rather than reading anything.
+        self._data_path = data_path
         self._values: dict[str, float] | None = None
 
     def _load_values(self) -> dict[str, float]:
         if self._values is not None:
+            return self._values
+        if not self._data_path:
+            self._values = {}
             return self._values
         try:
             with open(self._data_path) as f:

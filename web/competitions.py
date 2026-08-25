@@ -121,18 +121,9 @@ def build_default_registry() -> CompetitionRegistry:
         }
 
     def wc_simulation_support() -> dict[str, Any]:
-        eligible, reason, _msg = wc_app.simulation_eligibility()
-        sim_status = wc_app.sim_cache.get("status", "not_requested")
-        request_state = {
-            "running": "running",
-            "completed": "completed",
-            "failed": "failed",
-        }.get(sim_status, "not_requested" if sim_status in ("", "none", "not_requested") else sim_status)
-        return {
-            "availability": "available" if eligible else "not_needed",
-            "reason": reason,
-            "request_state": request_state,
-        }
+        # Delegate to the app's own block so handler and adapter cannot
+        # drift apart.
+        return wc_app._simulation_state_block()
 
     registry.register(CompetitionAdapter(
         id="worldcup",
@@ -159,18 +150,7 @@ def build_default_registry() -> CompetitionRegistry:
         }
 
     def ucl_simulation_support() -> dict[str, Any]:
-        eligible, reason, _msg = ucl_app.simulation_eligibility()
-        sim_status = ucl_app.sim_cache.get("status", "not_requested")
-        request_state = {
-            "running": "running",
-            "completed": "completed",
-            "failed": "failed",
-        }.get(sim_status, "not_requested" if sim_status in ("", "none", "not_requested") else sim_status)
-        return {
-            "availability": "available" if eligible else "not_needed",
-            "reason": reason,
-            "request_state": request_state,
-        }
+        return ucl_app._simulation_state_block()
 
     registry.register(CompetitionAdapter(
         id="ucl",

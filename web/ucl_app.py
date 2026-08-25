@@ -16,16 +16,11 @@ from fastapi.responses import JSONResponse
 
 from competitions.ucl.src.orchestrator import (
     build_simulation_result,
-    run_validation,
     _load_league_played_pairs,
 )
 from competitions.ucl.src.pipeline import (
-    compute_deterministic_standings as _compute_deterministic_standings_pipeline,
-    build_deterministic_bracket as _build_deterministic_bracket_pipeline,
-    compute_signal_eval as _compute_signal_eval_pipeline,
     load_results as _load_results_pipeline,
     load_knockout_results as _load_knockout_results_pipeline,
-    build_league_matchdays as _build_league_matchdays_pipeline,
     ucl_form_trend as _ucl_form_trend_pipeline,
     ucl_head_to_head as _ucl_head_to_head_pipeline,
     ucl_outcome_dist as _ucl_outcome_dist_pipeline,
@@ -33,7 +28,6 @@ from competitions.ucl.src.pipeline import (
     run_mc_simulation as _run_mc_simulation_pipeline,
     run_calibration_task as _run_calibration_task_pipeline,
 )
-from competitions.ucl.result import SimulationResult
 from competitions.ucl.src.elo_fetcher import fetch_team_elos
 from competitions.ucl.src.provider import RepoFixtureProvider
 from football_core.elo import expected_score
@@ -96,11 +90,8 @@ UCL_DIR = Path(__file__).parent.parent / "competitions" / "ucl"
 cache: dict = {}
 sim_cache: dict = {}
 boot_log_local: list[dict] = []
-sim_result: SimulationResult | None = None
 _mode: str = "results"
 
-active_simulations: dict[str, dict] = {}
-sim_lock = threading.Lock()
 service = SimulationTaskService()
 
 
@@ -402,22 +393,6 @@ def _match_counts() -> tuple[int, int]:
     return len(all_ids - played_ids), len(all_ids)
 
 
-def _compute_deterministic_standings(results: list[dict]) -> list[dict]:
-    return _compute_deterministic_standings_pipeline(results)
-
-
-def _build_league_matchdays(results: list[dict]) -> dict[str, list[dict]]:
-    return _build_league_matchdays_pipeline(results)
-
-
-def _build_deterministic_bracket(knockout: dict, standings: list[dict]) -> dict:
-    return _build_deterministic_bracket_pipeline(knockout, standings, DATA_DIR)
-
-
-def _compute_signal_eval(results: list[dict], engine, elo_ratings: dict[str, float]) -> dict:
-    return _compute_signal_eval_pipeline(results, engine, elo_ratings)
-
-
 def deterministic_compute() -> dict:
     global boot_log_local, _mode
     boot_log_local = []
@@ -428,22 +403,8 @@ def deterministic_compute() -> dict:
     return result
 
 
-def _was_in_semis(team: str, knockout: dict) -> bool:
-    for m in knockout.get("rounds", {}).get("SF", []):
-        if team in (m.get("team_a"), m.get("team_b")):
-            return True
-    return False
-
-
-def _was_in_qf(team: str, knockout: dict) -> bool:
-    for m in knockout.get("rounds", {}).get("QF", []):
-        if team in (m.get("team_a"), m.get("team_b")):
-            return True
-    return False
-
-
 def compute_all() -> dict:
-    global boot_log_local, sim_result, _mode
+    global boot_log_local, _mode
     from competitions.ucl.src.orchestrator import resolve_compute_mode
     mode, mode_reason = resolve_compute_mode(str(DATA_DIR))
     if mode == "results":
@@ -452,7 +413,6 @@ def compute_all() -> dict:
         # Real results exist but are unreadable: surface the failure instead
         # of fabricating a simulated season over them.
         _mode = "results"
-        sim_result = None
         boot_log_local = [{"step": "Select data mode", "status": "error", "elapsed": 0.0,
                            "output": f"[error] {mode_reason}"}]
         return {"error": mode_reason, "boot": boot_log_local}
@@ -461,7 +421,6 @@ def compute_all() -> dict:
     from competitions.ucl.src.orchestrator import run_compute_all as _f
     result = _f(str(DATA_DIR), bsd_api_key=BSD_API_KEY, team_aliases=_BSD_TEAM_ALIASES)
     boot_log_local = result.get("boot", [])
-    sim_result = None
     return result
 
 
@@ -549,7 +508,16 @@ def api_bracket():
 
 @ucl_app.get("/api/odds")
 def api_odds():
-    return JSONResponse({"odds": cache.get("odds", []), "mode": _mode})
+    return JSONResponse({
+        "odds": cache.get("odds", []),
+        "mode": _mode,
+        # Results mode serves deterministic achieved-outcome indicators
+        # (1.0/0.0), NOT model probabilities. Simulation runs surface their
+        # projections through /api/simulation with SIMULATED provenance.
+        "odds_semantics": (
+            "achieved_outcome_indicators" if _mode == "results"
+            else "monte_carlo_probabilities"),
+    })
 
 
 @ucl_app.get("/api/signals")
@@ -576,7 +544,7 @@ def api_simulate(req: dict = None):
     http_status, payload = service.start(
         competition_id="ucl",
         raw_count=raw_count,
-        default_count=10000,
+        default_count=5000,
         seed=body.get("seed"),
         runner=_ucl_sim_runner,
         eligibility_fn=eligibility,
@@ -634,7 +602,7 @@ def _ucl_sim_runner(progress_cb, count: int, seed):
     Deliberately does NOT flip the global _mode: canonical cache data stays
     factual ("results"); simulation provenance lives in simulation_meta.
     """
-    global boot_log_local, sim_result
+    global boot_log_local
     boot_log_local = []
     cached_elo = cache.get("elo_ratings") or None
     result = _run_mc_simulation_pipeline(
@@ -648,8 +616,7 @@ def _ucl_sim_runner(progress_cb, count: int, seed):
 
 def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
     """Cache/snapshot side effects. Returns the public task summary."""
-    global boot_log_local, sim_result, _mode, sim_cache
-    sim_result = None
+    global boot_log_local, _mode, sim_cache
     result["boot"] = boot_log_local
     meta_block = result.get("_meta") or {}
     sim_cache = result
@@ -683,24 +650,58 @@ def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
             "count": result.get("n_iterations")}
 
 
-@ucl_app.post("/api/mode")
-def api_set_mode(req: dict = None):
-    global _mode
-    body = req or {}
-    mode = str(body.get("mode", "simulate")).lower()
-    if mode not in ("simulate", "live"):
-        return JSONResponse({"error": f"invalid mode: {mode}. Must be simulate or live"})
-    _mode = mode
-    if mode == "live":
-        api_key = body.get("api_key")
-        if api_key:
-            cache["_bsd_api_key"] = api_key
-    return JSONResponse({"status": "ok", "mode": _mode})
+@ucl_app.post("/api/reset")
+def api_reset():
+    global cache, _mode
+    try:
+        cache = compute_all()
+        return JSONResponse({"status": "ok", "mode": _mode})
+    except Exception as e:
+        return JSONResponse({"status": "error", "error": str(e)})
 
 
-@ucl_app.get("/api/mode")
-def api_get_mode():
-    return JSONResponse({"mode": _mode})
+@ucl_app.post("/api/refresh")
+def api_refresh():
+    global cache, _mode
+    from web.startup import is_snapshot_mode
+    if is_snapshot_mode():
+        return JSONResponse({"status": "skipped",
+                             "reason": "snapshot mode selected at startup"})
+    try:
+        _fetch_live_data()
+        cache = compute_all()
+        return JSONResponse({"status": "ok", "mode": _mode, "refreshed": True})
+    except Exception as e:
+        return JSONResponse({"status": "error", "error": str(e)})
+
+
+def _ucl_calibration_runner(progress_cb, count, seed):
+    from competitions.ucl.src.pipeline import run_calibration_task
+    return run_calibration_task(str(DATA_DIR), progress_cb=progress_cb)
+
+
+def _store_ucl_calibration_result(result, count, seed) -> dict:
+    if result.get("status") != "ok":
+        raise SimulationContractError(result.get("error", "calibration failed"))
+    return {"weights": result.get("weights"),
+            "n_matches": result.get("n_matches")}
+
+
+@ucl_app.post("/api/calibrate")
+def api_calibrate(req: dict = None):
+    http_status, payload = service.start(
+        competition_id="ucl",
+        raw_count=100,
+        default_count=100,
+        seed=None,
+        runner=_ucl_calibration_runner,
+        eligibility_fn=lambda: (True, None, ""),
+        on_result=_store_ucl_calibration_result,
+        extra_ack={"kind": "calibration"},
+    )
+    payload.pop("count", None)
+    payload.pop("requested_count", None)
+    return JSONResponse(payload, status_code=http_status)
 
 
 @ucl_app.post("/api/reset")
@@ -728,61 +729,13 @@ def api_refresh():
         return JSONResponse({"status": "error", "error": str(e)})
 
 
-def _run_calibration_task(task_id: str, replay_data: str | None = None):
-    """Background calibration: run run_calibration and save weights."""
-    try:
-        t0 = time.time()
-        with sim_lock:
-            active_simulations[task_id] = {
-                "status": "running", "progress": 0, "stage": "Loading replay data...",
-                "t0": t0, "elapsed": 0, "total_iterations": 100,
-            }
-
-        def _progress(pct, stage):
-            with sim_lock:
-                s = active_simulations.get(task_id)
-                if s:
-                    s["progress"] = pct
-                    s["stage"] = stage
-                    s["elapsed"] = time.time() - t0
-
-        result = _run_calibration_task_pipeline(
-            str(DATA_DIR), replay_data=replay_data, progress_cb=_progress,
-        )
-
-        with sim_lock:
-            s = active_simulations.get(task_id)
-            if s:
-                s["status"] = "complete"
-                s["progress"] = 100
-                s["elapsed"] = time.time() - t0
-                s["result"] = {
-                    "status": "ok",
-                    "n_matches": result.get("n_matches", 0),
-                    "weights": result.get("weights", {}),
-                    "per_signal": result.get("per_signal", {}),
-                }
-    except Exception as e:
-        with sim_lock:
-            s = active_simulations.get(task_id)
-            if s:
-                s["status"] = "error"
-                s["error"] = str(e)
-                s["elapsed"] = time.time() - t0
-
-
-@ucl_app.post("/api/calibrate")
-def api_calibrate(req: dict = None):
-    body = req or {}
-    replay_data = body.get("replay_data")
-    task_id = str(uuid.uuid4())
-    t = threading.Thread(target=_run_calibration_task, args=(task_id, replay_data), daemon=True)
-    t.start()
-    return JSONResponse({"task_id": task_id, "status": "started"})
-
-
 @ucl_app.get("/api/validation")
 def api_validation():
+    """Pure-Elo validation against the real results ledger.
+
+    (Exchange 5 cleanup: the simulated-result branch was unreachable —
+    ``sim_result`` was permanently None — so only the factual path remains.)
+    """
     try:
         results = _load_results()
         if not results:
@@ -793,39 +746,35 @@ def api_validation():
             team_names = list({m["team_a"] for m in results} | {m["team_b"] for m in results})
             elo_ratings = fetch_team_elos(team_names) or {}
 
-        sim_result_obj = sim_result
-        if sim_result_obj:
-            validation = run_validation(sim_result_obj, results, elo_ratings)
-        else:
-            from football_core.evaluation import compute_metrics
-            from football_core.elo import expected_score
-            predictions: list[float] = []
-            actuals: list[float] = []
-            for m in results:
-                ta, tb = m["team_a"], m["team_b"]
-                elo_a = elo_ratings.get(ta, 1500)
-                elo_b = elo_ratings.get(tb, 1500)
-                pred = expected_score(elo_a, elo_b)
-                if m.get("winner") == ta:
-                    actual = 1.0
-                elif m.get("winner") == tb:
-                    actual = 0.0
-                else:
-                    actual = 0.5
-                predictions.append(pred)
-                actuals.append(actual)
-            metrics = compute_metrics(predictions, actuals)
-            validation = {
-                "validated_at": datetime.now(timezone.utc).isoformat(),
-                "n_matches_fetched": len(results),
-                "n_matches_matched": len(predictions),
-                "prediction_metrics": {
-                    "brier": round(metrics["brier"], 6),
-                    "log_loss": round(metrics["log_loss"], 6),
-                    "accuracy": round(metrics["accuracy"], 6),
-                    "n": metrics["n"],
-                },
-            }
+        from football_core.evaluation import compute_metrics
+        from football_core.elo import expected_score
+        predictions: list[float] = []
+        actuals: list[float] = []
+        for m in results:
+            ta, tb = m["team_a"], m["team_b"]
+            elo_a = elo_ratings.get(ta, 1500)
+            elo_b = elo_ratings.get(tb, 1500)
+            pred = expected_score(elo_a, elo_b)
+            if m.get("winner") == ta:
+                actual = 1.0
+            elif m.get("winner") == tb:
+                actual = 0.0
+            else:
+                actual = 0.5
+            predictions.append(pred)
+            actuals.append(actual)
+        metrics = compute_metrics(predictions, actuals)
+        validation = {
+            "validated_at": datetime.now(timezone.utc).isoformat(),
+            "n_matches_fetched": len(results),
+            "n_matches_matched": len(predictions),
+            "prediction_metrics": {
+                "brier": round(metrics["brier"], 6),
+                "log_loss": round(metrics["log_loss"], 6),
+                "accuracy": round(metrics["accuracy"], 6),
+                "n": metrics["n"],
+            },
+        }
 
         return JSONResponse({
             "validation": validation,

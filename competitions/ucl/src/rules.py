@@ -1,4 +1,4 @@
-"""UCL TournamentRules adapter for the generic simulation engine.
+"""UCL SimulationRules adapter for the generic simulation engine.
 
 The competition brain owns everything format-specific here: the 36-team
 Swiss league phase, UEFA tiebreaking (via compute_swiss_standings), Top-8 /

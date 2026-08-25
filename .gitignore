@@ -102,3 +102,6 @@ competitions/ucl/data/live/
 
 # Private interview study guide (local only, never commit)
 study_guide/
+
+# Calibration output (regeneratable runtime artifact)
+competitions/ucl/config/

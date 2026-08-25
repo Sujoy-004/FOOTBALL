@@ -32,11 +32,6 @@ def load_json(data_dir, name: str) -> dict:
         return dict(json.load(f))
 
 
-def load_json_list(data_dir, name: str) -> list:
-    with open(data_dir / name, encoding="utf-8") as f:
-        return list(json.load(f))
-
-
 def get_data_provider(bsd_api_key: str, football_data_org_key: str, bsd_league_id: int):
     """Single provider-selection factory for both competitions.
 

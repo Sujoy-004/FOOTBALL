@@ -1,4 +1,4 @@
-import json, os, time, random, uuid
+import json, os, uuid
 import logging
 from pathlib import Path
 from datetime import datetime, timezone
@@ -6,7 +6,6 @@ import threading
 
 import fastapi
 from fastapi.responses import JSONResponse
-import uvicorn
 
 from dotenv import load_dotenv
 
@@ -19,10 +18,13 @@ from competitions.worldcup.src.groups import (
     compute_standings, rank_third_placed,
 )
 
-from competitions.worldcup.src.insight import compute_team_signal_strengths, compute_ko_signal_probs, compute_match_insight, compute_form_trend, compute_head_to_head, compute_match_outcome
+from competitions.worldcup.src.insight import compute_ko_signal_probs, compute_match_insight
 from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
-from web.common import ts, boot_step, load_json
-from web.simulation_service import SimulationTaskService, build_simulation_meta
+from web.common import boot_step, load_json
+from web.simulation_service import (
+    SimulationTaskService, build_simulation_meta,
+)
+from football_core.simulation import SimulationContractError
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -36,10 +38,6 @@ DATA_DIR = constants.DATA_DIR
 cache: dict = {}
 sim_cache: dict = {}
 boot_log: list[dict] = []
-# Legacy registry kept only for the calibration task; simulations use the
-# shared SimulationTaskService below.
-active_simulations: dict[str, dict] = {}
-sim_lock = threading.Lock()
 service = SimulationTaskService()
 
 
@@ -224,52 +222,10 @@ def build_knockout_tree() -> dict:
     return _pipeline_build(DATA_DIR)
 
 
-def compute_group_standings(groups, teams, played_groups):
-    groups_data = groups.get("groups", groups)
-    elo_ratings = {n: d["elo"] for n, d in teams.items()}
-    rng = random.Random(0)
-    lambdas = precompute_matchup_lambdas(groups_data, elo_ratings, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
-    results = simulate_group_matches(
-        groups_data, teams, elo_ratings, rng,
-        fair_play=False, matchup_lambdas=lambdas,
-        played_groups=played_groups or {},
-        base_rate=constants.EXPECTED_GOALS_BASE_RATE,
-    )
-    standings = compute_standings(results, elo_ratings)
-    third = rank_third_placed(standings)
-    return standings, third
-
-
-def compute_signal_briers_from_predictions(
-    engine_predictions: list,
-    all_matches: list[dict],
-    played: dict,
-    played_groups: dict,
-) -> dict[str, dict]:
-    """Compute per-signal Brier/log-loss/accuracy from engine predictions.
-
-    Uses zip() to associate each BlendedPrediction with its match fixture
-    (since BlendedPrediction has no match_id field).
-
-    Returns: {signal_name: {"brier": ..., "log_loss": ..., "accuracy": ..., "n": ...}}
-    """
-    from competitions.worldcup.src.evaluation import compute_signal_briers_from_predictions as _eval
-    return _eval(engine_predictions, all_matches, played, played_groups)
-
-
 def compute_signal_eval(teams, played, played_groups, engine_predictions, all_matches):
     """Evaluate signals from engine predictions — no ledger dependency."""
     from competitions.worldcup.src.evaluation import compute_signal_eval as _eval
     return _eval(teams, played, played_groups, engine_predictions, all_matches)
-
-
-def _build_eval_history_from_predictions(predictions, all_matches, played, played_groups):
-    """Build eval history from BlendedPrediction list + match fixtures.
-
-    Uses zip() since BlendedPrediction has no match_id field.
-    """
-    from competitions.worldcup.src.evaluation import _build_eval_history_from_predictions as _helper
-    return _helper(predictions, all_matches, played, played_groups)
 
 
 def compute_real_standings(groups_data: dict, played_groups: dict) -> list[dict]:
@@ -458,7 +414,6 @@ def api_data():
         "refresh": _current_refresh_report(),
         "teams": cache.get("teams", []),
         "n_teams": cache.get("n_teams", 0),
-        "total_iterations": cache.get("total_iterations", 0),
         "n_played": cache.get("n_played", 0),
         "phase": cache.get("phase", {}),
         "simulation": _simulation_state_block(),
@@ -834,62 +789,39 @@ def api_what_if(req: dict = None):
     })
 
 
-def _run_calibration_task(task_id: str):
-    """Background calibration: delegates to pipeline, keeps active_simulations management."""
-    try:
-        t0 = time.time()
-        with sim_lock:
-            active_simulations[task_id] = {
-                "status": "running", "progress": 0, "stage": "Loading data...",
-                "t0": t0, "elapsed": 0, "total_iterations": 100,
-            }
+def _run_calibration_runner(progress_cb, count, seed):
+    from competitions.worldcup.src.pipeline import run_calibration_compute
+    return run_calibration_compute(
+        DATA_DIR,
+        bsd_api_key=BSD_API_KEY,
+        football_data_org_key=FOOTBALL_DATA_ORG_KEY,
+        progress_cb=progress_cb,
+    )
 
-        def _progress(pct, stage):
-            with sim_lock:
-                s = active_simulations.get(task_id)
-                if s:
-                    s["progress"] = pct
-                    s["stage"] = stage
-                    s["elapsed"] = time.time() - t0
 
-        from competitions.worldcup.src.pipeline import run_calibration_compute
-
-        result = run_calibration_compute(
-            DATA_DIR,
-            bsd_api_key=BSD_API_KEY,
-            football_data_org_key=FOOTBALL_DATA_ORG_KEY,
-            progress_cb=_progress,
-        )
-
-        _progress(100, "Complete")
-        with sim_lock:
-            s = active_simulations.get(task_id)
-            if s:
-                blend_params = result.get("blend_params")
-                s["status"] = "complete"
-                s["progress"] = 100
-                s["elapsed"] = time.time() - t0
-                s["result"] = {
-                    "status": "calibrated" if blend_params else "failed",
-                    "weights": (blend_params or {}).get("weights"),
-                    "calibration_params": result.get("calibration_params"),
-                    "n_signals_calibrated": result.get("n_signals_calibrated", 0),
-                }
-    except Exception as e:
-        with sim_lock:
-            s = active_simulations.get(task_id)
-            if s:
-                s["status"] = "error"
-                s["error"] = str(e)
-                s["elapsed"] = time.time() - t0
+def _store_calibration_result(result, count, seed) -> dict:
+    blend_params = result.get("blend_params")
+    if not blend_params:
+        raise SimulationContractError(
+            "insufficient labeled history to fit weights")
+    return {"weights": (blend_params or {}).get("weights")}
 
 
 @wc_app.post("/api/calibrate")
 def api_calibrate(req: dict = None):
-    task_id = str(uuid.uuid4())
-    t = threading.Thread(target=_run_calibration_task, args=(task_id,), daemon=True)
-    t.start()
-    return JSONResponse({"task_id": task_id, "status": "started"})
+    http_status, payload = service.start(
+        competition_id="worldcup",
+        raw_count=100,
+        default_count=100,
+        seed=None,
+        runner=_run_calibration_runner,
+        eligibility_fn=lambda: (True, None, ""),
+        on_result=_store_calibration_result,
+        extra_ack={"kind": "calibration"},
+    )
+    payload.pop("count", None)
+    payload.pop("requested_count", None)
+    return JSONResponse(payload, status_code=http_status)
 
 
 @wc_app.get("/api/simulation/progress/{task_id}")

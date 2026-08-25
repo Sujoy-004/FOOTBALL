@@ -50,12 +50,20 @@ def build_blend_params(engine_predictions: list, all_matches: list[dict], engine
 
     This is the single blending path: EnsembleEngine blended probabilities
     become per-match win probabilities for the Monte Carlo simulation.
+
+    Exchange 5 correctness fix: entries without a REAL team pairing are
+    excluded. Knockout bracket slots carry no teams on disk, so blending
+    them produced one constant, matchup-blind probability for every KO tie
+    (systematically favouring team_b and inverting strength-based rankings).
+    Unresolved slots now fall through to the matchup-aware Elo fallback in
+    ``football_core.knockout._get_blended_prob``.
     """
     match_probs: dict[str, float] = {}
     for bp, m in zip(engine_predictions, all_matches):
         mid = m.get("match_id", "")
-        if mid:
-            match_probs[mid] = bp.home_prob
+        if not (mid and m.get("team_a") and m.get("team_b")):
+            continue
+        match_probs[mid] = bp.home_prob
     return {
         "match_probs": match_probs,
         "blend_weights": dict(engine.weights),
@@ -524,7 +532,7 @@ def simulate_from_match(
     for mid in downstream_ids:
         probs: dict[str, list[dict]] = {}
         for team_name, pdata in sim_result.items():
-            for stage in ("champion", "final", "sf", "qf", "r16", "r32"):
+            for stage in ("champion", "final", "sf", "qf"):
                 prob = pdata.get(stage, 0)
                 if prob > 0.001:
                     probs.setdefault(stage, []).append(
@@ -553,7 +561,7 @@ def simulate_from_match(
     for team_name, pdata in sim_result.items():
         target_probs[team_name] = {
             stage: pdata.get(stage, 0)
-            for stage in ("champion", "final", "sf", "qf", "r16", "r32")
+            for stage in ("champion", "final", "sf", "qf")
         }
     top_target = sorted(
         target_probs.items(),

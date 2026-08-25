@@ -32,10 +32,6 @@ from football_core.knockout import (
     _get_blended_prob,
 )
 
-ROUND_ORDER = ["R16", "QF", "SF", "FINAL"]
-ROUND_KEYS = {"QF": "qf", "SF": "sf", "FINAL": "final"}
-
-
 def _simulate_r32_resolved(
     r32_matchups: dict[str, dict],
     played: dict[str, dict],

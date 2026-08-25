@@ -172,3 +172,37 @@ def test_live_mode_still_reaches_provider(monkeypatch):
         assert calls["n"] >= 1
     finally:
         startup._last_decision = None
+
+
+def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch):
+    """Exchange 5: snapshot mode must not touch ClubElo either.
+
+    The deterministic compute used to call fetch_team_elos unconditionally,
+    making a live HTTP request during 'zero network' snapshot boots while
+    the provider-level counter looked clean.
+    """
+    import web.startup as startup
+    startup._last_decision = startup.StartupDecision("snapshot", "")
+    import competitions.ucl.src.elo_fetcher as ucl_ef
+    import football_core.elo_fetcher as core_ef
+
+    calls = {"clubelo": 0, "urlopen": 0}
+
+    def _no_clubelo(*a, **k):
+        calls["clubelo"] += 1
+        raise AssertionError("ClubElo fetched during snapshot boot")
+
+    real_urlopen = core_ef.urllib.request.urlopen
+
+    def _counting_urlopen(*a, **k):
+        calls["urlopen"] += 1
+        return real_urlopen(*a, **k)
+
+    monkeypatch.setattr(ucl_ef, "fetch_team_elos", _no_clubelo)
+    monkeypatch.setattr(core_ef.urllib.request, "urlopen", _counting_urlopen)
+
+    from competitions.ucl.src.orchestrator import run_deterministic_compute
+    result = run_deterministic_compute(str(UCL_DATA), bsd_api_key="")
+    assert "error" not in result, result.get("error")
+    assert len(result.get("standings", [])) == 36
+    assert calls == {"clubelo": 0, "urlopen": 0}, calls

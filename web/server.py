@@ -40,8 +40,7 @@ class _NoCacheASGI:
 
         await self.app(scope, receive, send_wrapper)
 
-from web.wc_app import wc_app
-from web.ucl_app import ucl_app
+from web.competitions import REGISTRY
 
 
 HERE = Path(__file__).parent
@@ -67,10 +66,13 @@ async def lifespan(app: fastapi.FastAPI):
 
     if not is_snapshot_mode():
         _ucl._fetch_live_data()
+    # Route through compute_all so every on-disk state gets the truthful
+    # boot: real results -> results view; no/partial results -> honest
+    # simulation-available view (never an empty cache).
     try:
-        _ucl.cache = _ucl.deterministic_compute()
+        _ucl.cache = _ucl.compute_all()
     except Exception as e:
-        logger.error("[UCL] deterministic_compute failed: %s", e)
+        logger.error("[UCL] compute_all failed: %s", e)
         _ucl.cache = {}
     yield
 
@@ -84,8 +86,11 @@ def landing():
     return HTMLResponse(html)
 
 
-app.mount("/worldcup", wc_app)
-app.mount("/ucl", ucl_app)
+# Competition mounts come from the registry: the single place to read to
+# see which competitions exist. A new competition registers an adapter
+# here and is mounted automatically.
+for _adapter in REGISTRY.list():
+    app.mount(_adapter.mount_prefix, _adapter.subapp)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 

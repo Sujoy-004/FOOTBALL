@@ -56,3 +56,15 @@ python -m competitions.worldcup.benchmarks.benchmark_simulation
 
 Reports wall-clock time of the full production path (ensemble + simulation) at
 1K/10K/50K/100K iterations, best-of-3.
+
+
+## Tests and local match data
+
+`python -m pytest` runs the full suite. A minority of integration tests
+additionally assert served payloads against real match-result files
+(`results.json`, `played.json`, `played_groups.json`, signal caches) that
+are intentionally not committed — they are produced by a live refresh or
+copied from an existing checkout. On a pristine clone those specific tests
+fail with missing-file errors while everything else passes; boot and
+simulation still work out of the box in snapshot mode (verified: both
+competitions render, simulations run, zero provider calls).
