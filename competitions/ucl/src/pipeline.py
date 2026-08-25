@@ -564,8 +564,10 @@ def run_mc_simulation(
     if progress_cb:
 
         def _mc_progress(current, total):
-            pct = 10 + (current / total) * 75
-            progress_cb(pct, current)
+            # Exchange 5 doc-sync fix: report (iteration, total_iterations)
+            # directly - the old (pct, current) form made the progress
+            # "iteration" field show percentages instead of real counts.
+            progress_cb(current, total)
     else:
         _mc_progress = None
 

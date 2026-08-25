@@ -14,6 +14,8 @@ Copy `.env.example` to `.env` and fill in:
 
 - `FOOTBALL_DATA_ORG_KEY` — free key from football-data.org (recommended)
 - `BSD_API_KEY` — optional alternative provider
+- `DATA_PROVIDER` — `bsd` or `football-data` to pin the provider (auto-detects when unset)
+- `BSD_API_KEY` — optional alternative provider
 
 Without keys, the dashboard runs on committed seed data; every external
 dependency degrades gracefully and the UI shows which signals are unavailable.

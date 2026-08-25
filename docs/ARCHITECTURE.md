@@ -82,8 +82,8 @@ Lifecycle states exposed by both competitions: `not_requested`,
 - `web/simulation_service.py` — one task registry/thread lifecycle for all
   simulations and calibrations, plus the shared status vocabulary and
   completed-run metadata block.
-- `web/wc_app.py`, `web/ucl_app.py` — thin adapters over each brain's
-  compute functions.
+- `web/wc_app.py`, `web/ucl_app.py` — HTTP + presentation-compute adapters
+  over each brain's compute functions (format rules stay in the brains).
 
 ## Signals
 
@@ -110,8 +110,12 @@ Fitting uses one method only: inverse multiclass log-loss
 (`method`, `source`, `n_matches`) and refuse to fit below the per-signal
 sample threshold.
 
-**Current status:** insufficient labeled history exists, so the runtime runs
-on the uniform fallback. No validated-weight claims are made.
+**Current status:** World Cup ships and runs the uniform fallback. UCL fits
+calibrated inverse-log-loss weights from its results history at runtime when
+`competitions/ucl/config/signal_weights.json` is present (gitignored runtime
+output of `POST /ucl/api/calibrate`; regenerate it any time). Out of the box
+both competitions start uniform. No *validated accuracy* claims are made —
+only that the fitting procedure and its provenance exist.
 
 ## Reproducibility & performance
 
@@ -120,11 +124,13 @@ and returns it in the run metadata, so any run can be replayed exactly.
 Identical code + data + seed + count ⇒ identical aggregates. UCL runs add
 bootstrap/Wilson confidence intervals on championship probabilities.
 
-Measured on a mid-range laptop (single thread): World Cup ~5.7 s and UCL
-~9.3 s at the 10,000/5,000 default run counts respectively; WC sustains
-~1,500 iterations/s and has been executed end-to-end at the full maximum of
-1,000,000 runs (~11 minutes). Higher counts remain available for deeper
-runs.
+Measured on a mid-range laptop (single thread): World Cup ~5.7 s at 10,000
+runs (~26 s at its 50,000 default preset) and UCL ~9.3 s engine time at its
+5,000 default (~12 s served including polling). WC sustains ~1,500
+iterations/s and has been executed end-to-end at the full maximum of
+1,000,000 runs (~11 minutes); that 1M datapoint predates the shipped
+benchmark harness, which caps at 100K. Higher counts remain available for
+deeper runs.
 
 ## Known limitations
 

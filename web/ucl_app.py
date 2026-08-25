@@ -605,10 +605,19 @@ def _ucl_sim_runner(progress_cb, count: int, seed):
     global boot_log_local
     boot_log_local = []
     cached_elo = cache.get("elo_ratings") or None
+
+    def _normalized_progress(value: int, total: int, stage: str = "") -> None:
+        # Pre-MC stages report (percent, 100); the MC loop reports
+        # (iteration, total_iterations). Map both onto the run count.
+        if total == 100:
+            progress_cb(int(value / 100 * count), count, stage)
+        else:
+            progress_cb(value, total, stage)
+
     result = _run_mc_simulation_pipeline(
         str(DATA_DIR), n_iterations=count, seed=seed,
         weights=None, show_ci="auto", bsd_api_key=BSD_API_KEY,
-        team_aliases=_BSD_TEAM_ALIASES, progress_cb=progress_cb,
+        team_aliases=_BSD_TEAM_ALIASES, progress_cb=_normalized_progress,
         elo_ratings_override=cached_elo,
     )
     return result
@@ -620,6 +629,7 @@ def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
     result["boot"] = boot_log_local
     meta_block = result.get("_meta") or {}
     sim_cache = result
+    sim_cache["status"] = "completed"
     sim_cache["simulation_meta"] = build_simulation_meta(
         requested_count=count,
         actual_count=result.get("n_iterations"),
@@ -702,31 +712,6 @@ def api_calibrate(req: dict = None):
     payload.pop("count", None)
     payload.pop("requested_count", None)
     return JSONResponse(payload, status_code=http_status)
-
-
-@ucl_app.post("/api/reset")
-def api_reset():
-    global cache, _mode
-    try:
-        cache = compute_all()
-        return JSONResponse({"status": "ok", "mode": _mode})
-    except Exception as e:
-        return JSONResponse({"status": "error", "error": str(e)})
-
-
-@ucl_app.post("/api/refresh")
-def api_refresh():
-    global cache, _mode
-    from web.startup import is_snapshot_mode
-    if is_snapshot_mode():
-        return JSONResponse({"status": "skipped",
-                             "reason": "snapshot mode selected at startup"})
-    try:
-        _fetch_live_data()
-        cache = compute_all()
-        return JSONResponse({"status": "ok", "mode": _mode, "refreshed": True})
-    except Exception as e:
-        return JSONResponse({"status": "error", "error": str(e)})
 
 
 @ucl_app.get("/api/validation")
