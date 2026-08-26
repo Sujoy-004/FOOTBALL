@@ -323,7 +323,7 @@ function _mapWcMatch(m, simById) {
   else if (!m.team_a && !m.team_b) status = "tbd";
   else status = "scheduled";
 
-  const canSimulate = !m.played && !!m.team_a;
+  const canWhatIf = !!(m.team_a && m.team_b);
 
   return {
     id: m.match_id,
@@ -342,7 +342,7 @@ function _mapWcMatch(m, simById) {
       ? { line: null, probA: simM.prob_a }
       : null,
     clickable: true,
-    _canSimulate: canSimulate,
+    _canWhatIf: canWhatIf,
   };
 }
 
@@ -445,9 +445,9 @@ function renderBracket() {
     onMatch: m => openMatchModal(m.id),
     winnerLabel: m => (m.winner ? _esc(m.winner) + " advances" : null),
     cardExtrasHtml: m => {
-      if (!m._canSimulate) return "";
+      if (!m._canWhatIf) return "";
       const safeMid = String(m.id).replace(/[^A-Za-z0-9_.:-]/g, "");
-      return '<div class="m-sim-btn" onclick="event.stopPropagation();window.__simulateMatch(\'' + safeMid + '\')">&#9654; Simulate</div>';
+      return '<div class="m-sim-btn" onclick="event.stopPropagation();window.__openWhatIf(\'' + safeMid + '\')">&#9654; What-If</div>';
     },
   });
 }
@@ -460,138 +460,17 @@ function renderMatchRow(m) {
   return '<div class="md-row"><span class="md-team">' + m.team_a + '</span><span class="md-score">' + scoreStr + '</span><span class="md-team">' + m.team_b + '</span><span class="md-date">' + status + '</span></div>';
 }
 
-// ── Match Simulation from bracket ──
-let simMatchId = null;
-
+// ── Bracket controls ──
+// Tournament simulation (whole-competition Monte Carlo) stays a separate,
+// truthfully labeled control. The per-card button is a MATCH-level What-If
+// (see openMatchModal / __sendWhatIf) — the two concepts are never merged.
 window.__simulateAllRemaining = function() {
-  simMatchId = '__all__';
-  showMatchSimPopup('Simulate All Remaining Matches');
+  showSimPopup();
 };
 
-window.__simulateMatch = function(matchId) {
-  simMatchId = matchId;
-  showMatchSimPopup('Simulate Match ' + matchId);
+window.__openWhatIf = function(matchId) {
+  openMatchModal(matchId);
 };
-
-function showMatchSimPopup(title) {
-  let overlay = document.getElementById('matchSimOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'matchSimOverlay';
-    overlay.className = 'sim-popup-overlay';
-    overlay.innerHTML = `
-      <div class="sim-popup" style="max-width:400px">
-        <h3 id="matchSimTitle">Simulate Match</h3>
-        <p>Number of Monte Carlo iterations:</p>
-        <div class="sim-presets">
-          <button data-iters="5000">5K</button>
-          <button data-iters="10000" class="active">10K</button>
-          <button data-iters="50000">50K</button>
-        </div>
-        <input type="number" id="matchSimIters" value="10000" min="1" max="1000000"><input type="number" id="matchSimSeed" placeholder="seed (auto)" style="width:110px;margin-left:6px;background:#0d2430;color:#F6DBC0;border:1px solid rgba(21,61,76,.4);border-radius:4px;padding:4px 6px;font-size:11px">
-        <div class="sim-actions">
-          <button id="matchSimCancelBtn">Cancel</button>
-          <button id="matchSimStartBtn">&#9654; Start</button>
-        </div>
-        <div id="matchSimProgress" class="progress-bar-wrap" style="display:none;margin-top:10px">
-          <div class="progress-bar-fill" id="matchSimProgressFill" style="width:0%"></div>
-        </div>
-        <div id="matchSimResult" style="display:none;margin-top:10px;font-size:11px"></div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-
-    overlay.querySelectorAll('.sim-presets button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        overlay.querySelectorAll('.sim-presets button').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('matchSimIters').value = btn.dataset.iters;
-      });
-    });
-    document.getElementById('matchSimCancelBtn').addEventListener('click', () => overlay.classList.remove('show'));
-    document.getElementById('matchSimStartBtn').addEventListener('click', startMatchSim);
-    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('show'); });
-  }
-  document.getElementById('matchSimTitle').textContent = title;
-  document.getElementById('matchSimResult').style.display = 'none';
-  overlay.classList.add('show');
-}
-
-async function startMatchSim() {
-  const itersRaw = document.getElementById('matchSimIters').value;
-  const iters = parseInt(itersRaw);
-  const seedInput = document.getElementById('matchSimSeed');
-  const seedVal = (seedInput && seedInput.value.trim() !== '') ? parseInt(seedInput.value) : null;
-  const startBtn = document.getElementById('matchSimStartBtn');
-  const cancelBtn = document.getElementById('matchSimCancelBtn');
-  const progressWrap = document.getElementById('matchSimProgress');
-  const progressFill = document.getElementById('matchSimProgressFill');
-  const progressLbl = document.getElementById('matchSimProgressLbl');
-  const resultDiv = document.getElementById('matchSimResult');
-
-  if (!Number.isFinite(iters) || iters < 1 || iters > 1000000) {
-    resultDiv.textContent = 'Simulation count must be between 1 and 1,000,000.';
-    resultDiv.style.display = 'block';
-    return;
-  }
-
-  startBtn.disabled = true;
-  cancelBtn.style.display = 'none';
-  progressWrap.style.display = 'block';
-  progressFill.style.width = '0%';
-  if (progressLbl) { progressLbl.textContent = 'Starting simulation...'; progressLbl.style.display = 'block'; }
-  resultDiv.style.display = 'none';
-
-  try {
-    // Full tournament simulation via the shared contract.
-    const resp = await (await fetch(API + '/simulate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(seedVal != null ? { iterations: iters, seed: seedVal } : { iterations: iters })
-    })).json();
-    if (!resp.task_id) {
-      // not_needed / validation_error / failed: show the honest reason.
-      resultDiv.textContent = resp.message || resp.error ||
-        ('Simulation unavailable: ' + resp.status);
-      resultDiv.style.display = 'block';
-      startBtn.disabled = false;
-      cancelBtn.style.display = '';
-      progressWrap.style.display = 'none';
-      return;
-    }
-    const taskId = resp.task_id;
-    await new Promise((resolve, reject) => {
-      const poll = setInterval(async () => {
-        try {
-          const p = await (await fetch(API + '/simulation/progress/' + taskId)).json();
-          if (p.error && p.status === 'not_found') { clearInterval(poll); reject(new Error(p.error)); return; }
-          if (p.status === 'completed') { clearInterval(poll); resolve(); return; }
-          if (p.status === 'failed') { clearInterval(poll); reject(new Error(p.error || 'simulation failed')); return; }
-          progressFill.style.width = (p.progress || 0) + '%';
-          if (progressLbl) {
-            let label = p.stage || 'Simulating...';
-            if (p.total_iterations > 0) label += '  ' + (p.iteration || 0).toLocaleString() + '/' + p.total_iterations.toLocaleString();
-            label += '  (' + Math.round(p.progress || 0) + '%)';
-            progressLbl.textContent = label;
-          }
-        } catch (e) { clearInterval(poll); reject(e); }
-      }, 200);
-    });
-    await loadAll();
-    try {
-      const simResp = await fetch(API + '/simulation').then(r => r.json());
-      appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
-      appState.simMeta = simResp.simulation_meta || null;
-    } catch { appState.simBracket = null; appState.simMeta = null; }
-    renderBracket();
-    document.getElementById('matchSimOverlay').classList.remove('show');
-  } catch (e) {
-    resultDiv.textContent = 'Error: ' + (e.message || 'unknown');
-    resultDiv.style.display = 'block';
-    startBtn.disabled = false;
-    cancelBtn.style.display = '';
-    progressWrap.style.display = 'none';
-  }
-}
 
 
 // ── Match Insight Modal ──
@@ -664,17 +543,17 @@ async function openMatchModal(mid) {
     <div class="insight-box">${insight.insight || "No insight available."}</div>
   `;
 
-  bottom.innerHTML = `
-    <div class="sec-title warn">What-If Scenario</div>
-    <div class="whatif-input-wrap">
-      <input type="number" id="whatifDelta" value="50" step="10" style="width:90px">
-      <button onclick="window.__sendWhatIf('${mid}','${ta}','${tb}')">&#9654;</button>
-    </div>
-    <div class="whatif-controls">
-      <label>Elo boost for ${ta} (opponent lowered equally):</label>
-    </div>
-    <div class="whatif-result" id="whatifResult"></div>
-  `;
+  bottom.innerHTML =
+    '<div class="sec-title warn">Match What-If</div>' +
+    '<div class="whatif-controls">' +
+    '<label>Elo boost for ' + _esc(ta) + ' (opponent lowered equally):</label>' +
+    '<input type="number" id="whatifDelta" value="50" step="10" min="-600" max="600" style="width:80px;background:#0d2430;color:#F6DBC0;border:1px solid rgba(21,61,76,.4);border-radius:4px;padding:4px 6px;font-size:11px">' +
+    '<button class="status-btn" id="whatifRun">&#9654; Run What-If</button>' +
+    '</div>' +
+    '<div class="dim" style="padding:2px 0;font-size:10px">Re-evaluates this match only via the ensemble blend. Factual history unchanged.</div>' +
+    '<div class="whatif-result" id="whatifResult"></div>';
+  const runBtn = document.getElementById("whatifRun");
+  if (runBtn) runBtn.addEventListener("click", () => window.__sendWhatIf(mid, ta, tb));
 
   // Charts
   [ta, tb].forEach(team => {
@@ -725,33 +604,50 @@ async function openMatchModal(mid) {
   }
 }
 
-// ── What-If handler (exposed on window for onclick) ──
+// ── Match What-If handler (exposed on window for the modal) ──
+// True match/tie-level What-If: POST /worldcup/api/match/what-if re-evaluates
+// the single-match ensemble blend with a hypothetical Elo adjustment. This is
+// NOT the tournament Monte Carlo — that lives only in "Simulate All Remaining
+// Matches" / the Simulate Tournament popup.
 window.__sendWhatIf = async function (mid, ta, tb) {
   const deltaInput = document.getElementById("whatifDelta");
-  const eloDelta = parseInt(deltaInput.value) || 50;
   const resultDiv = document.getElementById("whatifResult");
+  if (!deltaInput || !resultDiv) return;
+  let eloDelta = parseInt(deltaInput.value, 10);
+  if (!Number.isFinite(eloDelta)) eloDelta = 50;
+  eloDelta = Math.max(-600, Math.min(600, eloDelta));
+  const runBtn = document.getElementById("whatifRun");
+  if (runBtn) runBtn.disabled = true;
   resultDiv.style.display = "block";
-  resultDiv.innerHTML = '<div style="color:#15565B;font-size:11px">Running seeded counterfactual...</div>';
+  resultDiv.innerHTML = '<div style="color:#15565B;font-size:11px">Running match what-if...</div>';
   try {
-    const resp = await (await fetch(API + "/what-if", {
+    const resp = await (await fetch(API + "/match/what-if", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ match_id: mid, elo_delta: eloDelta })
     })).json();
     if (resp.error) { resultDiv.innerHTML = '<div style="color:#ff6b6b">' + resp.error + "</div>"; return; }
-    const row = (name, e) => {
+    const row = (name) => {
       const t = resp.teams[name] || {};
       const d = t.delta || 0;
       const cls = d >= 0 ? "wir-diff-pos" : "wir-diff-neg";
-      return '<tr><td>' + name + ' (Elo ' + e + ')</td><td class="num">' + ((t.baseline||0)*100).toFixed(1) + '%</td><td class="num">' + ((t.adjusted||0)*100).toFixed(1) + '%</td><td class="num ' + cls + '">' + (d>=0?"+":"") + (d*100).toFixed(1) + '%</td></tr>';
+      return '<tr><td>' + _esc(name) + '</td><td class="num">' + ((t.baseline||0)*100).toFixed(1) + '%</td><td class="num">' + ((t.adjusted||0)*100).toFixed(1) + '%</td><td class="num ' + cls + '">' + (d>=0?"+":"") + (d*100).toFixed(1) + ' pp</td></tr>';
     };
-    let html = '<div class="wir-head">Champion probability: baseline vs adjusted</div><table class="odds-table" style="width:100%"><tr><th>Team</th><th>Baseline</th><th>Adjusted</th><th>Delta</th></tr>';
-    html += row(ta, (resp.elo_changes||{})[ta] || "?");
-    html += row(tb, (resp.elo_changes||{})[tb] || "?");
+    let html = '<div class="wir-head">WHAT-IF (SIMULATED) - win probability for this match, baseline vs adjusted</div>';
+    html += '<table class="wi-table"><tr><th>Team</th><th>Baseline</th><th>Adjusted</th><th>Delta (pp)</th></tr>';
+    html += row(ta);
+    html += row(tb);
     html += "</table>";
-    html += '<div class="wir-meta">Seeded Monte Carlo (seed 42), ' + (resp.iterations||0).toLocaleString() + ' iterations.</div>';
+    const ob = resp.outcome_baseline || {}, oa = resp.outcome_adjusted || {};
+    if (typeof ob.draw === "number") {
+      html += '<div class="wir-meta">Draw probability: baseline ' + (ob.draw*100).toFixed(1) + '% &rarr; adjusted ' + ((oa.draw||0)*100).toFixed(1) + '%.</div>';
+    }
+    html += '<div class="wir-meta">SIMULATED - deterministic ensemble blend, Elo ' + (eloDelta >= 0 ? "+" : "") + eloDelta + ' / ' + (-eloDelta) + '. No tournament simulation ran. Factual history unchanged.</div>';
     resultDiv.innerHTML = html;
   } catch (e) {
     resultDiv.innerHTML = '<div style="color:#ff6b6b">Error: ' + e.message + "</div>";
+  } finally {
+    const b2 = document.getElementById("whatifRun");
+    if (b2) b2.disabled = false;
   }
 };
 

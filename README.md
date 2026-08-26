@@ -162,6 +162,26 @@ python -m pytest        # run the test suite
 Without API keys the server runs in snapshot mode on committed seed data;
 both dashboards render, simulations work, and no network call is made.
 
+## Fresh checkout (bootstrap)
+
+The repo commits **seed data only** — no runtime stores. On a fresh clone:
+
+```bash
+# 1. Materialize the UCL runtime stores from tracked bootstraps
+python -m competitions.ucl.backfill        # writes knockout_results.json (KO history)
+python -m competitions.ucl.backfill --league  # writes results.json (league results)
+```
+
+The bootstrap files in `competitions/ucl/data/bootstrap/` are tracked:
+- `2025_26_knockout_results.json` — v1 historical aggregates (git 7cbc0f6)
+- `league_results_2025_26.json` — full 144-match league ledger
+
+Runtime stores (`results.json`, `knockout_results.json`, `snapshot.json`,
+and future `seasons/` directories) are **gitignored** — they are generated
+artifacts, not source of truth. Tests that need complete stores use
+`tests/ucl_bootstrap.make_ucl_runtime_dir(tmp_path)` or the
+`ucl_runtime_dir` pytest fixture in `competitions/ucl/tests/conftest.py`.
+
 ## Testing
 
 Current suite: **904 collected — 899 passed, 4 failed, 1 skipped**. The 4

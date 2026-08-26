@@ -82,6 +82,7 @@ stores on the second run (no file rewrite, no ``meta.updated_at`` bump).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -98,6 +99,18 @@ from football_core.fetcher import (
     note_no_target,
     note_unmatchable,
     summarize_ingestion,
+)
+from competitions.ucl.src.seasons import (
+    LOCAL_HISTORICAL_SEASON,
+    derive_fixture_id,
+    empty_fixtures_document,
+    empty_results_document,
+    normalize_season_token,
+    read_season_fixtures,
+    read_season_results,
+    season_dir,
+    write_season_fixtures,
+    write_season_results,
 )
 
 logger = logging.getLogger(__name__)
@@ -936,3 +949,348 @@ def ingest_ucl_events(
         },
     ]
     return report
+
+
+# ── multi-season ingestion ────────────────────────────────────────────────────
+
+
+def _normalize_season_for_store(season: Any) -> str | None:
+    """Normalize a season token to the canonical display id (e.g., '2025/26').
+
+    Returns None for empty/unparseable input.
+    """
+    return normalize_season_token(season)
+
+
+def _is_historical_season(season: str | None) -> bool:
+    """Check if the season is the local historical 2025/26 season."""
+    return season == LOCAL_HISTORICAL_SEASON
+
+
+def _make_fixture_lookup_from_doc(doc: dict) -> dict[tuple[str, str], str]:
+    """Build (home, away) -> match_id lookup from a fixtures document."""
+    lookup: dict[tuple[str, str], str] = {}
+    for md in doc.get("fixtures", []):
+        pair = (md["team_a"], md["team_b"])
+        lookup[pair] = md["match_id"]
+        lookup[(md["team_b"], md["team_a"])] = md["match_id"]
+    return lookup
+
+
+def _load_league_rows_from_doc(doc: dict) -> list[dict]:
+    """Extract league rows from a results document."""
+    return doc.get("matches", []) if isinstance(doc, dict) else []
+
+
+def _atomic_write_json_local(data: Any, path: Path) -> None:
+    """Write *data* to *path* atomically (utf-8, indent=2, ensure_ascii=False)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=str(path.parent), prefix=path.stem + ".", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, str(path))
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _upsert_season_fixtures(
+    data_dir: Path,
+    season: str,
+    scheduled_events: list[dict],
+    provider_name: str,
+) -> tuple[int, int, int]:
+    """Create/update fixtures.json for a season from SCHEDULED/timed events.
+
+    Returns (fixtures_added, fixtures_updated, total_fixtures).
+    """
+    from competitions.ucl.src.seasons import SEASON_STORE_SCHEMA
+
+    sd = season_dir(data_dir, season)
+    sd.mkdir(parents=True, exist_ok=True)
+    fx_path = sd / "fixtures.json"
+
+    # Load existing
+    existing = None
+    if fx_path.exists():
+        try:
+            existing = json.loads(fx_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            existing = None
+
+    if existing is None or not isinstance(existing, dict):
+        doc = empty_fixtures_document(season)
+        doc["meta"] = {"provider": provider_name}
+    else:
+        doc = existing
+        if doc.get("meta", {}).get("provider") is None:
+            doc["meta"] = {"provider": provider_name}
+
+    # Build lookup of existing fixtures by match_id
+    existing_by_id = {fx.get("match_id"): fx for fx in doc.get("fixtures", [])}
+    fixtures_added = 0
+    fixtures_updated = 0
+
+    for ev in scheduled_events:
+        home = ev.get("home_team", "").strip()
+        away = ev.get("away_team", "").strip()
+        event_date = ev.get("event_date", "")
+        match_id = ev.get("match_id", "").strip()
+
+        if not home or not away:
+            continue
+
+        # Determine stable fixture id
+        if match_id:
+            fid = match_id
+        else:
+            fid = derive_fixture_id(home, away, event_date)
+
+        # Check if fixture exists
+        existing_fx = existing_by_id.get(fid)
+        fx_entry = {
+            "match_id": fid,
+            "team_a": home,
+            "team_b": away,
+            "event_date": event_date,
+            "stage": ev.get("stage", "LEAGUE_STAGE"),
+            "status": ev.get("status", "scheduled"),
+        }
+        if existing_fx:
+            # Update mutable fields
+            changed = False
+            for k, v in fx_entry.items():
+                if existing_fx.get(k) != v:
+                    existing_fx[k] = v
+                    changed = True
+            if changed:
+                fixtures_updated += 1
+        else:
+            doc["fixtures"].append(fx_entry)
+            existing_by_id[fid] = fx_entry
+            fixtures_added += 1
+
+    # Update availability counts
+    doc["availability"] = {
+        "fixtures_count": len(doc["fixtures"]),
+        "results_count": doc["availability"].get("results_count", 0),
+        "partial": True,  # providers never declare a catalog complete
+    }
+
+    _atomic_write_json_local(doc, fx_path)
+    return fixtures_added, fixtures_updated, len(doc["fixtures"])
+
+
+def _upsert_season_results(
+    data_dir: Path,
+    season: str,
+    finished_events: list[dict],
+    provider_name: str,
+) -> tuple[int, int, int]:
+    """Append finished events into season's results.json, attaching to known fixtures.
+
+    Returns (results_added, results_updated, skipped_no_target).
+    """
+    sd = season_dir(data_dir, season)
+    sd.mkdir(parents=True, exist_ok=True)
+    res_path = sd / "results.json"
+
+    # Load existing fixtures for this season (for match_id lookup)
+    fx_doc = read_season_fixtures(data_dir, season)
+    fx_lookup = _make_fixture_lookup_from_doc(fx_doc) if fx_doc else {}
+
+    # Load existing results
+    res_doc = read_season_results(data_dir, season)
+    if res_doc is None or not isinstance(res_doc, dict):
+        res_doc = empty_results_document(season)
+        res_doc["meta"] = {"provider": provider_name}
+    else:
+        if res_doc.get("meta", {}).get("provider") is None:
+            res_doc["meta"] = {"provider": provider_name}
+
+    existing_matches = res_doc.get("matches", [])
+    existing_by_id = {m.get("match_id"): m for m in existing_matches}
+
+    results_added = 0
+    results_updated = 0
+    skipped_no_target = 0
+
+    for ev in finished_events:
+        home = ev.get("home_team", "").strip()
+        away = ev.get("away_team", "").strip()
+        if not home or not away:
+            continue
+
+        match_id = ev.get("match_id", "").strip()
+        fid = None
+
+        # Match by source id first
+        if match_id and match_id in existing_by_id:
+            fid = match_id
+        elif match_id and match_id in fx_lookup:
+            fid = match_id
+        else:
+            # Fallback: match by (home, away) pair within this season's fixtures
+            fid = fx_lookup.get((home, away)) or fx_lookup.get((away, home))
+
+        if fid is None:
+            skipped_no_target += 1
+            logger.warning(
+                "[UCL] Season %s: finished event %s vs %s skipped_no_target (no fixture match)",
+                season, home, away
+            )
+            continue
+
+        home_score = int(ev.get("home_score") or 0)
+        away_score = int(ev.get("away_score") or 0)
+
+        entry = {
+            "match_id": fid,
+            "team_a": home,
+            "team_b": away,
+            "home_score": home_score,
+            "away_score": away_score,
+        }
+
+        if fid in existing_by_id:
+            ex = existing_by_id[fid]
+            if ex.get("home_score") != home_score or ex.get("away_score") != away_score:
+                ex["home_score"] = home_score
+                ex["away_score"] = away_score
+                results_updated += 1
+        else:
+            existing_matches.append(entry)
+            existing_by_id[fid] = entry
+            results_added += 1
+
+    res_doc["matches"] = existing_matches
+    _atomic_write_json_local(res_doc, res_path)
+    return results_added, results_updated, skipped_no_target
+
+
+def ingest_ucl_events_multi_season(
+    events: list[dict],
+    data_dir: str | Path,
+    provider_name: str,
+) -> dict:
+    """Ingest UCL events grouped by season into per-season stores.
+
+    - Events with season == "2025/26" (local historical) route to legacy
+      data/results.json + data/knockout_results.json (EXACTLY current behavior).
+    - Events with a DIFFERENT season route to data/seasons/<id>/
+      (fixtures.json + results.json). Historical 2025/26 is NEVER written
+      under data/seasons/.
+    - Idempotent: double ingestion produces zero diffs.
+    - Unknown-season events never mutate another season's files.
+
+    Returns a summary dict with per-season stats and a combined report.
+    """
+    dp = Path(data_dir) if isinstance(data_dir, str) else data_dir
+    stats = new_ingestion_stats()
+
+    # Group events by normalized season
+    by_season: dict[str | None, list[dict]] = {}
+    for event in events or []:
+        season_raw = event.get("season")
+        season = _normalize_season_for_store(season_raw)
+        by_season.setdefault(season, []).append(event)
+
+    per_season_summary: dict[str, dict] = {}
+    total_skipped_no_target = 0
+    written_files: list[str] = []
+
+    for season, season_events in by_season.items():
+        # Partition into scheduled (status != finished) and finished
+        scheduled: list[dict] = []
+        finished: list[dict] = []
+        for ev in season_events:
+            count_finished(stats)
+            stats["normalized"] += 1
+            if ev.get("status") == "finished":
+                finished.append(ev)
+            else:
+                scheduled.append(ev)
+
+        if _is_historical_season(season):
+            # Route to legacy ingest (EXACTLY current behavior)
+            # We need to call the original ingest logic for the historical season
+            from competitions.ucl.src.ingest import ingest_ucl_events as legacy_ingest
+            report = legacy_ingest(season_events, dp, provider_name)
+            per_season_summary[LOCAL_HISTORICAL_SEASON] = {
+                "legacy": True,
+                "report": report.to_dict(),
+                "fixtures_count": 0,  # legacy uses root fixtures.json
+                "results_count": report.finished["ingested"],
+                "skipped_no_target": report.finished["skipped_no_target"],
+            }
+            written_files.extend(report.written_files)
+        else:
+            # New season: route to season store
+            season_display = season or "unknown"
+            # Create fixtures from:
+            # - All scheduled/timed events (with or without match_id)
+            # - Finished events that have a provider match_id
+            # Finished events without match_id don't create fixtures;
+            # they can only attach via (home,away) pair matching.
+            fixture_source_events = [
+                ev for ev in season_events
+                if ev.get("status") != "finished" or ev.get("match_id")
+            ]
+            fx_added, fx_updated, fx_total = _upsert_season_fixtures(
+                dp, season_display, fixture_source_events, provider_name
+            )
+            res_added, res_updated, skipped = _upsert_season_results(
+                dp, season_display, finished, provider_name
+            )
+            total_skipped_no_target += skipped
+
+            # Record written files
+            fx_path = season_dir(dp, season_display) / "fixtures.json"
+            res_path = season_dir(dp, season_display) / "results.json"
+            if fx_added or fx_updated:
+                written_files.append(str(fx_path))
+            if res_added or res_updated:
+                written_files.append(str(res_path))
+
+            per_season_summary[season_display] = {
+                "legacy": False,
+                "fixtures_added": fx_added,
+                "fixtures_updated": fx_updated,
+                "fixtures_total": fx_total,
+                "results_added": res_added,
+                "results_updated": res_updated,
+                "skipped_no_target": skipped,
+            }
+
+    # Build combined report
+    combined_report = IngestReport(
+        provider=provider_name or "unknown", attempted=True, success=True, error=None
+    )
+    combined_report.finished = {
+        "received": stats["finished_received"],
+        "normalized": stats["normalized"],
+        "ingested": sum(
+            s.get("results_added", 0) + s.get("results_updated", 0)
+            + (s.get("report", {}).get("finished", {}).get("ingested", 0) if s.get("legacy") else 0)
+            for s in per_season_summary.values()
+        ),
+        "skipped_unmatchable": stats["skipped_unmatchable"],
+        "skipped_no_target": total_skipped_no_target
+            + sum(s.get("report", {}).get("finished", {}).get("skipped_no_target", 0) if s.get("legacy") else 0
+                  for s in per_season_summary.values()),
+    }
+    combined_report.last_success_at = datetime.now(timezone.utc).isoformat()
+    combined_report.written_files = written_files
+
+    return {
+        "per_season": per_season_summary,
+        "report": combined_report.to_dict(),
+    }

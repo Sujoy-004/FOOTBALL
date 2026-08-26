@@ -916,6 +916,49 @@ def sample_result():
 
 
 @pytest.fixture
+def ucl_runtime_dir(tmp_path_factory):
+    """Materialize a COMPLETE UCL runtime data dir from tracked bootstrap inputs.
+
+    Copies tracked files (fixtures.json + both bootstraps + aliases + templates)
+    into a temp directory so tests have guaranteed-complete stores without
+    relying on developer-private gitignored runtime files.
+
+    Returns the path to the temp data directory.
+    """
+    import shutil
+    repo_data = Path(__file__).resolve().parents[1] / "data"
+    runtime_dir = tmp_path_factory.mktemp("ucl_runtime") / "data"
+    runtime_dir.mkdir(parents=True)
+
+    # Copy tracked bootstrap files
+    shutil.copy(repo_data / "bootstrap" / "2025_26_knockout_results.json",
+                runtime_dir / "bootstrap" / "2025_26_knockout_results.json")
+    shutil.copy(repo_data / "bootstrap" / "league_results_2025_26.json",
+                runtime_dir / "bootstrap" / "league_results_2025_26.json")
+
+    # Copy fixtures and templates
+    shutil.copy(repo_data / "fixtures.json", runtime_dir / "fixtures.json")
+    shutil.copy(repo_data / "playoff_pairings.json", runtime_dir / "playoff_pairings.json")
+    shutil.copy(repo_data / "bracket_rules.json", runtime_dir / "bracket_rules.json")
+    shutil.copy(repo_data / "team_aliases.json", runtime_dir / "team_aliases.json")
+
+    # Initialize empty runtime stores (will be populated by backfill if needed)
+    (runtime_dir / "results.json").write_text('{"matches": []}', encoding="utf-8")
+    (runtime_dir / "knockout_results.json").write_text('{"matches": {}}', encoding="utf-8")
+
+    return runtime_dir
+
+
+@pytest.fixture
+def ucl_runtime_dir_with_backfill(ucl_runtime_dir):
+    """Like ucl_runtime_dir but with both KO and league stores backfilled."""
+    from competitions.ucl.backfill import run_backfill
+    run_backfill(ucl_runtime_dir, league=False)  # KO bootstrap
+    run_backfill(ucl_runtime_dir, league=True)   # league bootstrap
+    return ucl_runtime_dir
+
+
+@pytest.fixture
 def bsd_response_data():
     """Returns the BSD API snapshot response for offline unit tests."""
     fixtures_path = os.path.join(

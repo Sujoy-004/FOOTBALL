@@ -105,9 +105,14 @@ class TestInsightUnresolvedSlot:
 
         # Canonical skeleton: rules/pairings present so the bracket state can
         # build, but knockout_results.json absent -> every slot unresolved.
-        for f in ("fixtures.json", "team_aliases.json", "results.json",
+        for f in ("fixtures.json", "team_aliases.json", "bootstrap/league_results_2025_26.json",
                   "bracket_rules.json", "playoff_pairings.json"):
-            shutil.copy(UCL_DATA / f, tmp_path / f)
+            src = UCL_DATA / f
+            dst = tmp_path / f
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(src, dst)
+        # Also copy as results.json for the app
+        shutil.copy(UCL_DATA / "bootstrap" / "league_results_2025_26.json", tmp_path / "results.json")
         monkeypatch.setattr(app, "DATA_DIR", tmp_path)
 
         with TestClient(ucl_app) as client:

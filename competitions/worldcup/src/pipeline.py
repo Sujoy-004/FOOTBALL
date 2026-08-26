@@ -919,6 +919,99 @@ _PHASE_LABELS = {
 WC_GROUP_MATCH_TOTAL = 72
 WC_KNOCKOUT_MATCH_TOTAL = 32
 
+# Required decided winners per bracket node (R32..FINAL incl. third place).
+_WC_REQUIRED_KO_NODES = {
+    "R32": 16,
+    "R16": 8,
+    "QF": 4,
+    "SF": 2,
+    "TPP": 1,
+    "FINAL": 1,
+}
+_WC_NODE_UNDECIDED_DIAGNOSTICS = {
+    "R32": "wc.r32_undecided",
+    "R16": "wc.r16_undecided",
+    "QF": "wc.qf_undecided",
+    "SF": "wc.sf_undecided",
+    "TPP": "wc.tpp_undecided",
+    "FINAL": "wc.final_undecided",
+}
+
+
+def _wc_bracket_node_rounds(data_dir: Path) -> dict[str, list[str]]:
+    """match_id -> bracket-round map from bracket.json (never raises).
+
+    The only authoritative source for classifying knockout node ids into
+    R32/R16/... buckets; an empty dict means the structure is unknown.
+    """
+    try:
+        bracket_raw = json.loads(
+            (data_dir / "bracket.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return {}
+    mapping: dict[str, list[str]] = {}
+    if isinstance(bracket_raw, list):
+        for be in bracket_raw:
+            if (
+                isinstance(be, dict)
+                and be.get("match_id")
+                and be.get("round") in _WC_REQUIRED_KO_NODES
+            ):
+                mapping.setdefault(str(be["round"]), []).append(
+                    str(be["match_id"])
+                )
+    return mapping
+
+
+def _wc_completion_diagnostics(
+    n_group_matches: int,
+    ko_available: bool,
+    played_ko: dict,
+    node_rounds: dict[str, list[str]],
+) -> tuple[list[str], bool]:
+    """Brain-owned completion criteria + contradiction detection.
+
+    Returns ``(diagnostics, inconsistent)`` with stable ``wc.*`` strings.
+    ``inconsistent`` marks self-contradicting evidence — the FINAL winner
+    (the only possible champion) on file while any other criterion fails.
+    """
+    diagnostics: list[str] = []
+    if n_group_matches < WC_GROUP_MATCH_TOTAL:
+        diagnostics.append("wc.groups_incomplete")
+
+    if not ko_available:
+        diagnostics.append("wc.knockout_store_unavailable")
+    elif not node_rounds:
+        diagnostics.append("wc.ko_structure_unavailable")
+    else:
+        overfull = False
+        for round_name in ("R32", "R16", "QF", "SF", "TPP", "FINAL"):
+            node_ids = node_rounds.get(round_name) or []
+            required = _WC_REQUIRED_KO_NODES[round_name]
+            if len(node_ids) > required:
+                overfull = True
+            decided = sum(
+                1 for mid in node_ids
+                if isinstance(played_ko.get(mid), dict)
+                and played_ko[mid].get("winner")
+            )
+            if decided < required:
+                diagnostics.append(_WC_NODE_UNDECIDED_DIAGNOSTICS[round_name])
+        if overfull:
+            diagnostics.append("wc.ko_counts_exceed_bracket")
+
+    champion = None
+    final_entry = played_ko.get("FINAL")
+    if isinstance(final_entry, dict):
+        champion = final_entry.get("winner") or None
+    if champion is None:
+        diagnostics.append("wc.champion_missing")
+
+    structural_failure = any(d != "wc.champion_missing" for d in diagnostics)
+    inconsistent = champion is not None and structural_failure
+    return diagnostics, inconsistent
+
 
 def compute_competition_phase(data_dir: Path | None = None) -> dict:
     """Authoritative competition-phase report for the World Cup brain.
@@ -926,6 +1019,14 @@ def compute_competition_phase(data_dir: Path | None = None) -> dict:
     Derived from on-disk evidence only; frontends render this instead of
     inferring stage from array lengths. ``stores`` uses DataAvailability
     values so 'phase not reached' and 'data unavailable' stay distinct.
+
+    ``completed`` requires ALL of: every group match played AND every
+    bracket node R32..FINAL (+ TPP) carrying a winner AND a champion equal
+    to the FINAL winner (the champion is derived from that node). Otherwise
+    the phase stays below ``completed``; ``diagnostics`` lists each violated
+    criterion as a stable ``wc.*`` string and ``inconsistent`` flags
+    self-contradicting evidence (champion present while anything else
+    fails).
     """
     from football_core.domain import DataAvailability, load_json_store
     from src.constants import DATA_DIR
@@ -949,9 +1050,19 @@ def compute_competition_phase(data_dir: Path | None = None) -> dict:
         payload, _, _ = load_json_store(data_dir / "played.json")
         if isinstance(payload, dict):
             played_ko = payload
-    champion = (played_ko.get("FINAL", {}) or {}).get("winner") or None
+    node_rounds = _wc_bracket_node_rounds(data_dir)
+    diagnostics, inconsistent = _wc_completion_diagnostics(
+        n_group_matches,
+        ko_availability is DataAvailability.AVAILABLE,
+        played_ko,
+        node_rounds,
+    )
+    champion = None
+    final_entry = played_ko.get("FINAL")
+    if isinstance(final_entry, dict):
+        champion = final_entry.get("winner") or None
 
-    if champion:
+    if not diagnostics:
         phase = "completed"
     elif len(played_ko) > 0:
         phase = "knockout"
@@ -972,6 +1083,8 @@ def compute_competition_phase(data_dir: Path | None = None) -> dict:
             "group_results": pg_availability.value,
             "knockout_results": ko_availability.value,
         },
+        "diagnostics": diagnostics,
+        "inconsistent": inconsistent,
     }
 
 
@@ -1004,17 +1117,22 @@ def season_lifecycle(data_dir: Path | None = None, phase: dict | None = None) ->
     """Season-lifecycle view for the World Cup — same key contract as the UCL
     ``competitions.ucl.src.lifecycle.discover`` output.
 
-    Stage maps the authoritative ``compute_competition_phase`` report onto the
-    four lifecycle stages: completed -> completed; group_stage /
-    group_stage_complete / knockout -> active; not_started -> future.
+    Stage maps the authoritative ``compute_competition_phase`` report onto
+    the lifecycle stages: completed -> completed (all group matches played,
+    every bracket node R32..FINAL + TPP decided, champion == FINAL winner);
+    inconsistent when the evidence contradicts itself (champion present
+    while any structural criterion fails); group_stage / group_stage_complete
+    / knockout -> active; not_started -> future.
 
     ``progress`` reuses the exact counters computed by
     ``compute_competition_phase`` ({played: group + knockout results,
     total: 72 + 32}) when a phase report is available; it falls back to
     deriving them straight from played_groups.json + played.json otherwise.
-    ``historical`` lists seasons with completed evidence (this season only,
-    appended once the tournament is complete). Basis is always "derived".
-    Deterministic; no prints; no network.
+    ``diagnostics`` carries the brain's violated-criterion strings (``wc.*``)
+    for active/inconsistent stages and is ``[]`` for completed, future and
+    unknown stages. ``historical`` lists seasons with completed evidence
+    (this season only, appended once the tournament is complete). Basis is
+    always "derived". Deterministic; no prints; no network.
     """
     from football_core.domain import DataAvailability, load_json_store
     from src.constants import DATA_DIR
@@ -1023,10 +1141,23 @@ def season_lifecycle(data_dir: Path | None = None, phase: dict | None = None) ->
 
     if phase is None:
         phase = compute_competition_phase(dp)
-    phase_value = phase.get("phase") if isinstance(phase, dict) else None
+    report = phase if isinstance(phase, dict) else {}
+    phase_value = report.get("phase")
+    raw_diagnostics = report.get("diagnostics")
+    diagnostics = (
+        [str(d) for d in raw_diagnostics]
+        if isinstance(raw_diagnostics, list)
+        else []
+    )
 
     season = _wc_season_id()
-    stage = _LIFECYCLE_STAGE_MAP.get(phase_value, "unknown")
+    if bool(report.get("inconsistent")):
+        stage = "inconsistent"
+    else:
+        stage = _LIFECYCLE_STAGE_MAP.get(phase_value, "unknown")
+
+    if stage not in ("active", "inconsistent"):
+        diagnostics = []
 
     progress = None
     raw_progress = phase.get("progress") if isinstance(phase, dict) else None
@@ -1061,4 +1192,5 @@ def season_lifecycle(data_dir: Path | None = None, phase: dict | None = None) ->
         "provider_current_season": None,
         "season_mismatch": False,
         "label": f"{season} - {stage}",
+        "diagnostics": diagnostics,
     }

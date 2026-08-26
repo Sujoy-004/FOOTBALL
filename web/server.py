@@ -2,10 +2,26 @@
 
 Mounts competition sub-apps under /worldcup and /ucl.
 Serves the SPA shell from /static and the landing page at /.
+
+Boot policy (Exchange 4 v2): the lifespan performs ZERO provider calls.
+Caches are computed from validated on-disk stores only; acquisition is
+lazy and competition-scoped — each sub-app attempts its own fresh fetch
+at most once per process, on its first data-API request (see
+web.competitions.try_lazy_refresh). Explicit offline sessions
+(FOOTBALL_SNAPSHOT=1, or the --offline CLI flag) never attempt.
+
+Environment flags:
+    FOOTBALL_SNAPSHOT=1     explicit OFFLINE execution mode: acquisition
+                            wrappers self-gate, zero network all session.
+    FOOTBALL_PRELOAD_ALL=1  optional eager preload: the lifespan refreshes
+                            every registered competition via
+                            adapter.refresh() for warm-tab deployments
+                            (default unset = lazy).
 """
 
 import logging
 import mimetypes
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -40,7 +56,7 @@ class _NoCacheASGI:
 
         await self.app(scope, receive, send_wrapper)
 
-from web.competitions import REGISTRY
+from web.competitions import REGISTRY, consume_lazy_gate
 
 
 HERE = Path(__file__).parent
@@ -51,7 +67,8 @@ STATIC_DIR = HERE / "static"
 async def lifespan(app: fastapi.FastAPI):
     from web.startup import apply_session_overrides, run_startup_flow
 
-    # Interactive live-vs-snapshot decision (never prompts without a TTY).
+    # Startup decision (never prompts; normal modes are always
+    # fresh-first — see web.startup).
     decision = run_startup_flow()
     if decision.fdo_key:
         apply_session_overrides(decision.fdo_key)
@@ -59,19 +76,22 @@ async def lifespan(app: fastapi.FastAPI):
     import web.wc_app as _wc
     import web.ucl_app as _ucl
 
-    # Each app's fetch wrapper self-gates on explicit snapshot mode: calling
-    # them unconditionally records a truthful skipped/snapshot report (zero
-    # network in snapshot) or an acquisition attempt with stored-data
-    # fallback ("auto"). A failed attempt never deletes/overwrites stores.
-    _wc._fetch_live_data()
+    # Optional eager preload (FOOTBALL_PRELOAD_ALL=1): restore warm-tab
+    # behavior by refreshing every registered competition through its own
+    # scoped adapter hook. Default (unset): ZERO provider calls at boot.
+    if os.environ.get("FOOTBALL_PRELOAD_ALL", "").strip() == "1":
+        for _adapter in REGISTRY.list():
+            report = _adapter.refresh()  # never raises
+            consume_lazy_gate(_adapter.id)
+            logger.info("[boot] %s preload refresh: attempted=%s success=%s",
+                        _adapter.id, report.get("attempted"),
+                        report.get("success"))
+
+    # Caches are computed from validated disk stores. No wrapper fetches
+    # here: a crashing provider can no longer take down boot, and an
+    # unused tab never triggers another competition's provider.
     _wc.cache = _wc.compute_overview()
 
-    # Failure isolation: a crashing provider must never take down boot;
-    # the wrapper reports internally, this guards anything it lets through.
-    try:
-        _ucl._fetch_live_data()
-    except Exception as e:
-        logger.error("[UCL] live fetch failed: %s", e)
     # Route through compute_all so every on-disk state gets the truthful
     # boot: real results -> results view; no/partial results -> honest
     # simulation-available view (never an empty cache).
@@ -103,4 +123,18 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 asgi_app: ASGIApp = _NoCacheASGI(app)
 
 if __name__ == "__main__":
-    uvicorn.run("web.server:asgi_app", host="127.0.0.1", port=8080, reload=False)
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="python -m web.server",
+        description="FOOTBALL web server (port 8080)")
+    parser.add_argument(
+        "--offline", action="store_true",
+        help="Explicit OFFLINE execution mode: equivalent to "
+             "FOOTBALL_SNAPSHOT=1 — acquisition wrappers self-gate and "
+             "make zero network requests; stored data is served as-is.")
+    args = parser.parse_args()
+    if args.offline:
+        os.environ["FOOTBALL_SNAPSHOT"] = "1"
+    uvicorn.run("web.server:asgi_app", host="127.0.0.1", port=8080,
+                reload=False)

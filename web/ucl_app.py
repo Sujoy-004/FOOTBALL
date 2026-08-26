@@ -284,7 +284,9 @@ def compute_all() -> dict:
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     global cache
-    _fetch_live_data()
+    # Zero provider calls during boot (Exchange 4 v2): caches come from
+    # validated on-disk stores; acquisition is lazy and scoped to THIS
+    # competition's first data request (try_lazy_refresh in api_data).
     cache = compute_all()
     yield
 
@@ -303,6 +305,13 @@ async def _json_error_handler(request, exc):
 
 @ucl_app.get("/api/data")
 def api_data():
+    # Lazy scoped acquisition (Exchange 4 v2): at most ONE fresh attempt
+    # per process, on the first data request for THIS competition only.
+    # Explicit offline sessions never attempt (the gate records the
+    # wrapper's truthful snapshot-skipped report instead). Deferred import:
+    # web.competitions builds the registry by importing this module.
+    from web.competitions import try_lazy_refresh
+    try_lazy_refresh("ucl")
     n_unplayed, n_total = _match_counts()
     return JSONResponse({
         "refresh": _refresh_report,
@@ -359,7 +368,10 @@ def _competition_state() -> dict:
 def _lifecycle_view() -> dict:
     """Season-lifecycle view (competitions.ucl.src.lifecycle.discover)."""
     from competitions.ucl.src.lifecycle import discover
-    return discover(str(DATA_DIR))
+    from competitions.ucl.src.seasons import resolve_active_view
+    active_view = resolve_active_view(str(DATA_DIR))
+    provider_season = active_view.get("current_season")
+    return discover(str(DATA_DIR), provider_season=provider_season)
 
 
 def _simulation_bracket_state() -> dict | None:

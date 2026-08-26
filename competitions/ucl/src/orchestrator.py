@@ -546,6 +546,76 @@ _PHASE_LABELS = {
     "completed": "Completed",
 }
 
+_TOTAL_LEAGUE_MATCHES = 144
+_REQUIRED_KO_TIES = (("playoff", 8), ("R16", 8), ("QF", 4), ("SF", 2))
+_KO_UNDECIDED_DIAGNOSTICS = {
+    "playoff": "ucl.playoff_undecided",
+    "R16": "ucl.r16_undecided",
+    "QF": "ucl.qf_undecided",
+    "SF": "ucl.sf_undecided",
+}
+
+
+def _decided_ties(entries) -> int:
+    return sum(
+        1 for e in (entries or [])
+        if isinstance(e, dict) and e.get("winner")
+    )
+
+
+def _ucl_completion_diagnostics(
+    n_league: int,
+    ko_available: bool,
+    ko_matches: dict,
+) -> tuple[list[str], bool]:
+    """Brain-owned completion criteria + contradiction detection.
+
+    Returns ``(diagnostics, inconsistent)``. ``diagnostics`` lists every
+    violated completion criterion as a stable ``ucl.*`` string;
+    ``inconsistent`` marks self-contradicting evidence — a champion on file
+    while any structural criterion fails, or a champion differing from the
+    FINAL winner. A champion alone never implies completion.
+    """
+    diagnostics: list[str] = []
+    if n_league < _TOTAL_LEAGUE_MATCHES:
+        diagnostics.append("ucl.league_incomplete")
+
+    final_winner = None
+    if not ko_available:
+        diagnostics.append("ucl.knockout_store_unavailable")
+    else:
+        rounds = ko_matches.get("rounds") or {}
+        overfull = False
+        for name, required in _REQUIRED_KO_TIES:
+            entries = (
+                ko_matches.get(name) if name == "playoff"
+                else rounds.get(name)
+            ) or []
+            if len(entries) > required:
+                overfull = True
+            if _decided_ties(entries) < required:
+                diagnostics.append(_KO_UNDECIDED_DIAGNOSTICS[name])
+        if overfull:
+            diagnostics.append("ucl.ko_counts_exceed_bracket")
+        for entry in ko_matches.get("final") or []:
+            if isinstance(entry, dict) and entry.get("winner"):
+                final_winner = entry["winner"]
+                break
+        if final_winner is None:
+            diagnostics.append("ucl.final_undecided")
+
+    champion = ko_matches.get("champion") or None
+    if champion is None:
+        diagnostics.append("ucl.champion_missing")
+    elif final_winner is not None and champion != final_winner:
+        diagnostics.append("ucl.champion_final_mismatch")
+
+    structural_failure = any(d != "ucl.champion_missing" for d in diagnostics)
+    inconsistent = champion is not None and (
+        "ucl.champion_final_mismatch" in diagnostics or structural_failure
+    )
+    return diagnostics, inconsistent
+
 
 def compute_competition_phase(data_dir: str | Path) -> dict:
     """Authoritative competition-phase report for UCL (competition brain).
@@ -553,7 +623,18 @@ def compute_competition_phase(data_dir: str | Path) -> dict:
     Derived from on-disk evidence only; the frontend must render this instead
     of inferring stage from payload shapes. ``stores`` carries DataAvailability
     values so 'phase not reached' and 'data unavailable' stay distinguishable.
+
+    ``completed`` requires ALL of: the league fully played (144 scored
+    rows), playoff 8/8 + R16 8/8 + QF 4/4 + SF 2/2 decided winners, a
+    decided FINAL, and a champion equal to the FINAL winner. Otherwise the
+    phase stays below ``completed``; ``diagnostics`` lists each violated
+    criterion as a stable ``ucl.*`` string and ``inconsistent`` flags
+    self-contradicting evidence (champion present while anything else
+    fails). Legacy v1 knockout stores are tolerated via the ingest
+    normalizer.
     """
+    from competitions.ucl.src.ingest import upgrade_on_read
+
     results_path = Path(data_dir)
     _, league_availability, _ = load_json_store(results_path / "results.json")
     league_rows: list = []
@@ -568,24 +649,31 @@ def compute_competition_phase(data_dir: str | Path) -> dict:
     )
 
     _, ko_availability, _ = load_json_store(results_path / "knockout_results.json")
-    ko_state: dict = {}
+    ko_matches: dict = {}
     if ko_availability is DataAvailability.AVAILABLE:
         payload, _, _ = load_json_store(results_path / "knockout_results.json")
-        ko_state = payload.get("matches", {}) if isinstance(payload, dict) else {}
-        if not isinstance(ko_state, dict):
-            ko_state = {}
-    ko_rounds = ko_state.get("rounds", {}) or {}
-    n_playoff = len(ko_state.get("playoff", []) or [])
-    n_ko_matches = sum(len(v or []) for v in ko_rounds.values())
-    champion = ko_state.get("champion") or None
+        ko_matches = upgrade_on_read(payload).get("matches", {})
+        if not isinstance(ko_matches, dict):
+            ko_matches = {}
+    diagnostics, inconsistent = _ucl_completion_diagnostics(
+        n_league, ko_availability is DataAvailability.AVAILABLE, ko_matches,
+    )
 
-    if champion:
+    ko_rounds = ko_matches.get("rounds", {}) or {}
+    n_playoff = len(ko_matches.get("playoff", []) or [])
+    n_ko_matches = (
+        sum(len(ko_rounds.get(r) or []) for r in ("R16", "QF", "SF"))
+        + len(ko_matches.get("final") or [])
+    )
+    champion = ko_matches.get("champion") or None
+
+    if not diagnostics:
         phase = "completed"
     elif n_ko_matches > 0:
         phase = "knockout"
     elif n_playoff > 0:
         phase = "knockout_playoffs"
-    elif n_league >= 144:
+    elif n_league >= _TOTAL_LEAGUE_MATCHES:
         phase = "league_stage_complete"
     elif n_league > 0:
         phase = "league_stage"
@@ -596,11 +684,13 @@ def compute_competition_phase(data_dir: str | Path) -> dict:
         "phase": phase,
         "label": _PHASE_LABELS[phase],
         "champion": champion,
-        "progress": {"played": n_league, "total": 144},
+        "progress": {"played": n_league, "total": _TOTAL_LEAGUE_MATCHES},
         "stores": {
             "league_results": league_availability.value,
             "knockout_results": ko_availability.value,
         },
+        "diagnostics": diagnostics,
+        "inconsistent": inconsistent,
     }
 
 
@@ -658,18 +748,20 @@ def run_deterministic_compute(
     bsd_api_key: str = "",
     football_data_org_key: str = "",
     team_aliases: dict[str, str] | None = None,
+    provider_season: str | None = None,
 ) -> dict:
     """Deterministic computation from real results — pure logic, no web globals.
 
     Returns dict with keys: mode, teams, all_teams, standings, playoff,
     bracket_rounds, league_matchdays, odds, signals, elo_ratings, champion,
     boot, _results, _signal_engine, n_teams, n_iterations, n_total_matches,
-    seed, snapshot_date.
+    seed, snapshot_date, lifecycle.
     """
     from competitions.ucl.src.pipeline import (
         load_results, load_knockout_results, compute_deterministic_standings,
         build_deterministic_bracket, build_league_matchdays, compute_signal_eval,
     )
+    from competitions.ucl.src.lifecycle import discover
     from web.common import ts, boot_step
 
     boot: list[dict] = []
@@ -786,6 +878,7 @@ def run_deterministic_compute(
             "knockout_results": ko_availability.value,
         },
         "phase": compute_competition_phase(data_dir),
+        "lifecycle": discover(data_dir, provider_season=provider_season),
         "teams": top4,
         "all_teams": odds_display,
         "n_teams": len(standings),
@@ -813,14 +906,16 @@ def run_compute_all(
     seed: int = 42,
     n_iterations: int = 10000,
     team_aliases: dict[str, str] | None = None,
+    provider_season: str | None = None,
 ) -> dict:
     """Compute all results or run simulation — pure logic, no web globals.
 
     Returns dict with keys: mode, teams, all_teams, standings, playoff,
     bracket_rounds, league_matchdays, odds, signals, elo_ratings, champion,
     boot, _results, _signal_engine, n_teams, n_iterations, n_total_matches,
-    seed, snapshot_date, show_ci.
+    seed, snapshot_date, show_ci, lifecycle.
     """
+    from competitions.ucl.src.lifecycle import discover
     from web.common import ts, boot_step
 
     boot: list[dict] = []
@@ -952,6 +1047,7 @@ def run_compute_all(
             "simulated": True,
         },
         "phase": compute_competition_phase(data_dir),
+        "lifecycle": discover(data_dir, provider_season=provider_season),
         "teams": top4,
         "all_teams": odds_display,
         "n_teams": len(result.teams),

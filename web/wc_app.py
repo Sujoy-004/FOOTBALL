@@ -717,6 +717,94 @@ def api_match_insight(match_id: str = ""):
     return JSONResponse(insight)
 
 
+@wc_app.post("/api/match/what-if")
+def api_match_what_if(req: dict = None):
+    """Match/tie-level What-If: adjust one team's Elo by +-delta and re-evaluate
+    the single-match ensemble blend (base Elo + cache-backed refinement signals).
+
+    Deterministic single-match prediction path — NO tournament Monte Carlo,
+    no persisted state. Allowed regardless of season completion (hypothetical
+    analysis on resolved pairings; factual history is never modified).
+
+    Body: {"match_id": str, "elo_delta": int (default 50, applied +to team_a /
+    -to team_b, clamped to [-600, 600], non-zero)}
+    Returns baseline vs adjusted win probabilities for both teams.
+    """
+    if not req:
+        return JSONResponse({"error": "request body required"})
+    match_id = req.get("match_id", "")
+    if not match_id:
+        return JSONResponse({"error": "match_id required"})
+    try:
+        elo_delta = int(req.get("elo_delta", 50))
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "elo_delta must be an integer"})
+    if elo_delta == 0:
+        return JSONResponse({"error": "elo_delta must be non-zero"})
+    elo_delta = max(-600, min(600, elo_delta))
+
+    fb = cache.get("full_bracket", {})
+    match_data = None
+    for r, ms in fb.get("rounds", {}).items():
+        for m in ms:
+            if m["match_id"] == match_id:
+                match_data = m
+                break
+        if match_data:
+            break
+    if not match_data:
+        return JSONResponse({"error": "match not found in bracket"})
+    ta = match_data.get("team_a", "")
+    tb = match_data.get("team_b", "")
+    if not ta or not tb:
+        return JSONResponse({"error": "bracket slot unresolved"})
+
+    try:
+        from football_core.signal import PredictionContext
+        from competitions.worldcup.src.engine import build_engine_from_caches
+
+        teams_raw = load_json(DATA_DIR, "teams.json")
+        baseline_elos = {n: float(d.get("elo", 1500)) for n, d in teams_raw.items()}
+        adjusted_elos = dict(baseline_elos)
+        adjusted_elos[ta] = baseline_elos.get(ta, 1500.0) + elo_delta
+        adjusted_elos[tb] = max(100.0, baseline_elos.get(tb, 1500.0) - elo_delta)
+
+        engine = build_engine_from_caches()
+        fixture = {"team_a": ta, "team_b": tb, "match_id": match_id}
+
+        def _evaluate(elo_ratings):
+            ctx = PredictionContext(fixtures=[fixture], elo_ratings=elo_ratings)
+            return engine.evaluate(fixture, ctx)
+
+        base_bp = _evaluate(baseline_elos)
+        adj_bp = _evaluate(adjusted_elos)
+    except Exception as e:
+        return JSONResponse({"error": f"what-if evaluation failed: {e}"})
+
+    def _entry(base_p, adj_p):
+        return {"baseline": round(base_p, 4), "adjusted": round(adj_p, 4),
+                "delta": round(adj_p - base_p, 4)}
+
+    def _outcome(bp):
+        return {"a_win": round(bp.home_prob, 4),
+                "draw": round(bp.draw_prob, 4),
+                "b_win": round(bp.away_prob, 4)}
+
+    return JSONResponse({
+        "mode": "match",
+        "match_id": match_id,
+        "round": match_data.get("round"),
+        "teams": {ta: _entry(base_bp.home_prob, adj_bp.home_prob),
+                  tb: _entry(base_bp.away_prob, adj_bp.away_prob)},
+        "outcome_baseline": _outcome(base_bp),
+        "outcome_adjusted": _outcome(adj_bp),
+        "elo_changes": {ta: round(adjusted_elos[ta], 1),
+                        tb: round(adjusted_elos[tb], 1)},
+        "note": ("Deterministic single-match ensemble blend (Elo + refinement "
+                 "signals). No tournament Monte Carlo was run."),
+    })
+
+
 @wc_app.post("/api/what-if")
 def api_what_if(req: dict = None):
     """Structured counterfactual: adjust one team's Elo by +-delta, re-run seeded MC.

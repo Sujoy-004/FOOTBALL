@@ -98,6 +98,7 @@ competitions/ucl/data/results.json
 competitions/ucl/data/knockout_results.json
 competitions/ucl/data/replay_2025_26.json
 competitions/ucl/data/live/
+competitions/ucl/data/seasons/
 
 
 # Private interview study guide (local only, never commit)

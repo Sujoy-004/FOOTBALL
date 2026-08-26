@@ -2,10 +2,12 @@
 
 Locks down the startup decision contract:
 
-- default non-interactive startup decides "auto" (attempt each provider
-  now; failures fall back to the last validated on-disk stores);
-- explicit snapshot stays ZERO-network (menu [2], FOOTBALL_SNAPSHOT=1,
-  or a forced StartupDecision("snapshot"));
+- default startup decides "auto" (attempt each provider lazily per
+  competition; failures fall back to the last validated on-disk stores);
+- there is NO interactive prompt and NO choice that disables scraping in
+  normal mode (the old menu [1]/[2] was removed in Exchange 4 v2);
+- explicit snapshot stays ZERO-network (FOOTBALL_SNAPSHOT=1 or a forced
+  StartupDecision("snapshot"));
 - a failed provider attempt produces a truthful attempted/success/stale
   report and NEVER deletes or overwrites existing factual stores;
 - a succeeding provider refreshes the tmp data dir and reports the stage
@@ -79,19 +81,10 @@ def test_default_non_interactive_decides_auto(monkeypatch):
     """No TTY + no key => "auto": attempt providers, fall back on failure."""
     import web.startup as startup
 
-    def _no_prompt(prompt=""):
-        raise AssertionError("non-interactive flow must not prompt")
-
     # A falsy override must NOT force snapshot mode.
     monkeypatch.setenv("FOOTBALL_SNAPSHOT", "0")
 
-    d = startup.run_startup_flow(
-        input_fn=_no_prompt,
-        validate_fn=_no_prompt,
-        key_input_fn=_no_prompt,
-        interactive_fn=lambda: False,
-        echo=lambda s: None,
-    )
+    d = startup.run_startup_flow(echo=lambda s: None)
     assert isinstance(d, startup.StartupDecision)
     assert d.mode == "auto"
     assert d.fdo_key == ""
@@ -103,11 +96,7 @@ def test_usable_key_still_decides_live_configured(monkeypatch):
     import web.startup as startup
 
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "realkey123456")
-    d = startup.run_startup_flow(
-        input_fn=lambda p="": (_ for _ in ()).throw(AssertionError("prompted")),
-        interactive_fn=lambda: True,
-        echo=lambda s: None,
-    )
+    d = startup.run_startup_flow(echo=lambda s: None)
     assert d.mode == "live-configured"
     assert startup.is_snapshot_mode() is False
 
@@ -127,12 +116,8 @@ def test_football_snapshot_env_forces_zero_network(monkeypatch, raw):
     monkeypatch.setattr(web.common, "get_data_provider",
                         lambda b, f, l=None: prov)
 
-    # The override wins even when the flow would otherwise show the menu.
-    d = startup.run_startup_flow(
-        input_fn=lambda p="": (_ for _ in ()).throw(AssertionError("prompted")),
-        interactive_fn=lambda: True,
-        echo=lambda s: None,
-    )
+    # The override wins over every normal-mode path (there is no menu).
+    d = startup.run_startup_flow(echo=lambda s: None)
     assert d.mode == "snapshot"
     assert startup.is_snapshot_mode() is True
 
@@ -146,8 +131,9 @@ def test_football_snapshot_env_forces_zero_network(monkeypatch, raw):
     assert ucl_app._refresh_report["stale"] is True
 
 
-def test_explicit_interactive_snapshot_choice_is_zero_network(monkeypatch):
-    """Menu [2] is an explicit OFFLINE session: decision snapshot, no calls."""
+def test_forced_snapshot_decision_is_zero_network(monkeypatch):
+    """A forced StartupDecision("snapshot") is an explicit OFFLINE session:
+    wrappers self-gate and make zero provider calls."""
     import competitions.worldcup.src.pipeline as wc_pipeline
     import web.common
     import web.startup as startup
@@ -158,24 +144,29 @@ def test_explicit_interactive_snapshot_choice_is_zero_network(monkeypatch):
     monkeypatch.setattr(web.common, "get_data_provider",
                         lambda b, f, l=None: prov)
 
-    transcript: list[str] = []
-    d = startup.run_startup_flow(
-        input_fn=lambda prompt="": "2",
-        validate_fn=lambda k: (_ for _ in ()).throw(AssertionError("validated")),
-        key_input_fn=lambda p="": (_ for _ in ()).throw(AssertionError("key prompt")),
-        interactive_fn=lambda: True,
-        echo=transcript.append,
-    )
-
-    assert d.mode == "snapshot"
+    startup._last_decision = startup.StartupDecision("snapshot", "")
     assert startup.is_snapshot_mode() is True
 
     wc_pipeline.fetch_live_data("", "", WC_DATA)
     ucl_app._fetch_live_data()
     assert _CountingProvider.calls == 0
+
+
+def test_no_credentials_prints_banner_and_decides_auto(monkeypatch):
+    """Normal mode with no usable credential: short informational banner,
+    decision stays fresh-first ("auto"); no prompt can disable scraping."""
+    import web.startup as startup
+
+    transcript: list[str] = []
+    d = startup.run_startup_flow(echo=transcript.append)
+
     joined = "\n".join(transcript)
-    assert "[2] Work offline with existing snapshot data" in joined
-    assert "no scraping this session" in joined
+    assert d.mode == "auto"
+    assert startup.is_snapshot_mode() is False
+    assert ("acquisition will be attempted but no provider is configured"
+            in joined)
+    assert "stored data will be used until credentials are provided" in joined
+    assert "[1]" not in joined and "[2]" not in joined
 
 
 # ── 3. failing provider: truthful stale report, stores preserved ─────────

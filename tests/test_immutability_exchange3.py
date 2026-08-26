@@ -171,7 +171,8 @@ def test_ucl_all_played_league_matches_conditioned_exactly():
                           played_matches=pairs)
     # Real points per team derived directly from the ledger.
     real_pts: dict[str, int] = {}
-    rows = json.loads((UCL_DATA / "results.json").read_text("utf-8"))["matches"]
+    # Use the tracked league bootstrap instead of private runtime results.json
+    rows = json.loads((UCL_DATA / "bootstrap" / "league_results_2025_26.json").read_text("utf-8"))["matches"]
     for r in rows:
         hs, aw = r["home_score"], r["away_score"]
         ta, tb = r["team_a"], r["team_b"]

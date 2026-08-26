@@ -108,7 +108,8 @@ def test_ucl_empty_fetch_marks_stale(monkeypatch, caplog):
 
 def test_ucl_league_results_fully_ingested():
     """Available evidence: every completed league fixture is excluded from sampling."""
-    results = json.loads((UCL_DATA / "results.json").read_text(encoding="utf-8"))
+    # Use the tracked bootstrap file instead of private runtime results.json
+    results = json.loads((UCL_DATA / "bootstrap" / "league_results_2025_26.json").read_text(encoding="utf-8"))
     fixtures = json.loads((UCL_DATA / "fixtures.json").read_text(encoding="utf-8"))
     fx_ids = {m["match_id"] for md in fixtures["schedule"]["matchdays"] for m in md}
     got_ids = {m["match_id"] for m in results.get("matches", [])}

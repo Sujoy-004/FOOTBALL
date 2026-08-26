@@ -1,8 +1,10 @@
-"""Tests for competitions.ucl.src.lifecycle.discover (Exchange 3).
+"""Tests for competitions.ucl.src.lifecycle.discover (Exchange 3 → 4).
 
 Builds temporary data dirs from the REAL repo stores (fixtures.json,
 results.json, knockout_results.json) and mutates copies to cover each
 lifecycle stage. Evidence-based expectations only — no fabrication.
+
+Exchange 4 adds season-transition logic tests.
 """
 
 import json
@@ -10,7 +12,16 @@ from pathlib import Path
 
 import pytest
 
-from competitions.ucl.src.lifecycle import LIFECYCLE_CONTRACT, discover
+from competitions.ucl.src.lifecycle import LIFECYCLE_CONTRACT, discover, SUFFICIENT_FIXTURES_THRESHOLD, SUFFICIENT_RESULTS_THRESHOLD
+from competitions.ucl.src.seasons import (
+    LOCAL_HISTORICAL_SEASON,
+    empty_fixtures_document,
+    empty_results_document,
+    season_dir,
+    set_current_season,
+    write_season_fixtures,
+    write_season_results,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 REAL_DATA_DIR = REPO_ROOT / "competitions" / "ucl" / "data"
@@ -20,7 +31,7 @@ TOTAL_LEAGUE = 144
 
 CONTRACT_KEYS = {
     "season", "stage", "progress", "historical", "basis",
-    "provider_current_season", "season_mismatch", "label",
+    "provider_current_season", "season_mismatch", "label", "diagnostics",
 }
 
 EXPECTED_COMPLETED = {
@@ -32,6 +43,7 @@ EXPECTED_COMPLETED = {
     "provider_current_season": None,
     "season_mismatch": False,
     "label": f"{SEASON} - completed",
+    "diagnostics": [],
 }
 
 
@@ -77,6 +89,187 @@ def _completed_dir(tmp_path: Path) -> Path:
         tmp_path, results_rows=_real_rows(), knockout=_real_knockout())
 
 
+def _add_provider_season_store(
+    data_dir: Path,
+    provider_season: str,
+    fixtures_count: int = 0,
+    results_count: int = 0,
+) -> None:
+    """Add a provider season store under data/seasons/<season_id>/ with given counts."""
+    sd = season_dir(data_dir, provider_season)
+    sd.mkdir(parents=True, exist_ok=True)
+
+    fx_doc = empty_fixtures_document(provider_season)
+    fx_doc["fixtures"] = [{"match_id": f"gen-{i:04d}"} for i in range(fixtures_count)]
+    fx_doc["availability"]["fixtures_count"] = fixtures_count
+    fx_doc["availability"]["partial"] = fixtures_count < TOTAL_LEAGUE
+    write_season_fixtures(data_dir, provider_season, fx_doc)
+
+    res_doc = empty_results_document(provider_season)
+    res_doc["matches"] = [
+        {"match_id": f"gen-{i:04d}", "home_score": 1, "away_score": 0}
+        for i in range(results_count)
+    ]
+    write_season_results(data_dir, provider_season, res_doc)
+
+
+class TestSeasonTransition:
+    """Exchange 4: Provider season transition logic tests."""
+
+    def test_provider_season_newer_sufficient_fixtures_switches(self, tmp_path):
+        """Provider season newer + fixtures >= 100 -> switch to provider, basis='provider'."""
+        data_dir = _completed_dir(tmp_path)
+        provider_season = "2026/27"
+        _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+
+        assert result["season"] == provider_season
+        assert result["basis"] == "provider"
+        assert result["season_mismatch"] is True
+        assert result["provider_current_season"] == provider_season
+        assert "provider_season_insufficient_data" not in result["diagnostics"]
+        assert "provider_season_not_in_store" not in result["diagnostics"]
+
+    def test_provider_season_newer_sufficient_results_switches(self, tmp_path):
+        """Provider season newer + results >= 50 -> switch to provider, basis='provider'."""
+        data_dir = _completed_dir(tmp_path)
+        provider_season = "2026/27"
+        _add_provider_season_store(data_dir, provider_season, fixtures_count=0, results_count=50)
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+
+        assert result["season"] == provider_season
+        assert result["basis"] == "provider"
+        assert result["season_mismatch"] is True
+
+    def test_provider_season_insufficient_data_keeps_local(self, tmp_path):
+        """Provider season newer but fixtures < 100 AND results < 50 -> keep local, diagnostic added."""
+        data_dir = _completed_dir(tmp_path)
+        provider_season = "2026/27"
+        _add_provider_season_store(data_dir, provider_season, fixtures_count=50, results_count=20)
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+
+        assert result["season"] == SEASON
+        assert result["basis"] == "derived"
+        assert result["season_mismatch"] is True
+        assert result["provider_current_season"] == provider_season
+        assert "provider_season_insufficient_data" in result["diagnostics"]
+
+    def test_provider_season_not_in_store_keeps_local(self, tmp_path):
+        """Provider season not in store at all -> keep local, diagnostic added."""
+        data_dir = _completed_dir(tmp_path)
+        provider_season = "2026/27"
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+
+        assert result["season"] == SEASON
+        assert result["basis"] == "derived"
+        assert result["season_mismatch"] is True
+        assert "provider_season_not_in_store" in result["diagnostics"]
+
+    def test_provider_season_older_no_mismatch(self, tmp_path):
+        """Provider season same as local -> no mismatch, basis derived."""
+        data_dir = _completed_dir(tmp_path)
+        result = discover(data_dir, provider_season=SEASON)
+
+        assert result["season"] == SEASON
+        assert result["basis"] == "derived"
+        assert result["season_mismatch"] is False
+        assert result["provider_current_season"] is None
+
+    def test_no_provider_hint_derived_behavior(self, tmp_path):
+        """No provider_season arg -> derived behavior unchanged."""
+        data_dir = _completed_dir(tmp_path)
+        result = discover(data_dir)
+
+        assert result["season"] == SEASON
+        assert result["basis"] == "derived"
+        assert result["season_mismatch"] is False
+        assert result["provider_current_season"] is None
+        assert result["stage"] == "completed"
+
+    def test_threshold_constants_documented(self):
+        """Threshold constants are defined and have expected values."""
+        assert SUFFICIENT_FIXTURES_THRESHOLD == 100
+        assert SUFFICIENT_RESULTS_THRESHOLD == 50
+
+    def test_provider_season_fixtures_99_results_49_insufficient(self, tmp_path):
+        """Fixtures=99 (<100) AND results=49 (<50) -> insufficient, keep local."""
+        data_dir = _completed_dir(tmp_path)
+        provider_season = "2026/27"
+        _add_provider_season_store(data_dir, provider_season, fixtures_count=99, results_count=49)
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+
+        assert result["season"] == SEASON
+        assert result["basis"] == "derived"
+        assert result["season_mismatch"] is True
+        assert "provider_season_insufficient_data" in result["diagnostics"]
+
+    def test_provider_season_fixtures_100_results_0_sufficient(self, tmp_path):
+        """Fixtures=100 (>=100) AND results=0 -> sufficient, switch."""
+        data_dir = _completed_dir(tmp_path)
+        provider_season = "2026/27"
+        _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+
+        assert result["season"] == provider_season
+        assert result["basis"] == "provider"
+
+    def test_provider_season_fixtures_0_results_50_sufficient(self, tmp_path):
+        """Fixtures=0 AND results=50 (>=50) -> sufficient, switch."""
+        data_dir = _completed_dir(tmp_path)
+        provider_season = "2026/27"
+        _add_provider_season_store(data_dir, provider_season, fixtures_count=0, results_count=50)
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+
+        assert result["season"] == provider_season
+        assert result["basis"] == "provider"
+
+
+class TestProviderSeasonWithDifferentLocalStages:
+    """Transition logic with various local season stages."""
+
+    def test_local_active_provider_sufficient_switches(self, tmp_path):
+        """Local season active, provider sufficient -> switch season label."""
+        data_dir = _make_data_dir(tmp_path, results_rows=_real_rows()[:60])
+        provider_season = "2026/27"
+        _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+
+        # Season label switches to provider, but stage/progress still from local evidence
+        assert result["season"] == provider_season
+        assert result["basis"] == "provider"
+        assert result["stage"] == "active"  # Local evidence drives stage
+        assert result["progress"]["played"] == 60  # Local progress
+
+    def test_local_future_provider_sufficient_switches(self, tmp_path):
+        """Local season future, provider sufficient -> switch season label."""
+        data_dir = _make_data_dir(tmp_path)
+        provider_season = "2026/27"
+        _add_provider_season_store(data_dir, provider_season, fixtures_count=144, results_count=144)
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+
+        assert result["season"] == provider_season
+        assert result["basis"] == "provider"
+        assert result["stage"] == "future"  # Local evidence: no results
+
+
 class TestStageClassification:
     def test_completed_full_results_and_v2_knockout_store(self, tmp_path):
         """Full league results + champion on file => completed."""
@@ -95,6 +288,7 @@ class TestStageClassification:
             "provider_current_season": None,
             "season_mismatch": False,
             "label": f"{SEASON} - active",
+            "diagnostics": ["ucl.league_incomplete", "ucl.knockout_store_unavailable", "ucl.champion_missing"],
         }
 
     def test_active_league_complete_but_knockout_empty(self, tmp_path):
@@ -123,6 +317,7 @@ class TestStageClassification:
             "provider_current_season": None,
             "season_mismatch": False,
             "label": f"{SEASON} - future",
+            "diagnostics": [],
         }
 
     def test_future_via_config_declaration_without_fixtures(self, tmp_path):
@@ -142,14 +337,34 @@ class TestStageClassification:
 
 class TestProviderSeason:
     def test_mismatch_reported_not_hidden(self, tmp_path):
-        """Provider on a newer season => mismatch flagged, basis 'provider'."""
-        result = discover(_completed_dir(tmp_path), provider_season="2026/27")
-        assert result["provider_current_season"] == "2026/27"
+        """Provider on a newer season WITH sufficient store data => switch, basis 'provider'."""
+        data_dir = _completed_dir(tmp_path)
+        provider_season = "2026/27"
+        # Add provider season store with sufficient data
+        _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
+        set_current_season(data_dir, provider_season, basis="provider")
+
+        result = discover(data_dir, provider_season=provider_season)
+        assert result["provider_current_season"] == provider_season
         assert result["season_mismatch"] is True
         assert result["basis"] == "provider"
+        # Season switches to provider
+        assert result["season"] == provider_season
         # Local evidence still drives stage/progress — never fabricated.
         assert result["stage"] == "completed"
+
+    def test_mismatch_no_store_keeps_local(self, tmp_path):
+        """Provider on a newer season WITHOUT store data => keep local, basis derived, diagnostic."""
+        data_dir = _completed_dir(tmp_path)
+        provider_season = "2026/27"
+        # No provider season store added
+
+        result = discover(data_dir, provider_season=provider_season)
+        assert result["provider_current_season"] == provider_season
+        assert result["season_mismatch"] is True
+        assert result["basis"] == "derived"
         assert result["season"] == SEASON
+        assert "provider_season_not_in_store" in result["diagnostics"]
 
     def test_matching_provider_season_is_no_mismatch(self, tmp_path):
         result = discover(_completed_dir(tmp_path), provider_season=SEASON)

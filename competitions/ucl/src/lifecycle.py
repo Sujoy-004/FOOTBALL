@@ -1,4 +1,4 @@
-"""Season-lifecycle discovery for UCL (Exchange 3).
+"""Season-lifecycle discovery for UCL (Exchange 3 → 4).
 
 Answers one question honestly and fully offline: where in its life cycle is
 the LOCALLY tracked season? The view classifies the local season purely from
@@ -8,6 +8,11 @@ stage without evidence, or touches the network.
 
 The web layer may hand in the provider's live season id; when it differs from
 the local season the view reports the mismatch instead of hiding it.
+
+Exchange 4 adds season-transition logic: if the provider season is newer AND
+the season store has sufficient data for it (fixtures >= 100 OR results >= 50),
+switch to that season as the active view. Otherwise keep the local season and
+surface the mismatch with a diagnostic.
 """
 
 from __future__ import annotations
@@ -28,12 +33,19 @@ LIFECYCLE_CONTRACT = (
     "provider_current_season",
     "season_mismatch",
     "label",
+    "diagnostics",
 )
 
+# Thresholds for "sufficient data" to transition to a provider season.
+# Fixtures: 100 out of 144 league matches (~69% coverage).
+# Results: 50 scored matches (arbitrary but meaningful progress marker).
+SUFFICIENT_FIXTURES_THRESHOLD = 100
+SUFFICIENT_RESULTS_THRESHOLD = 50
+
 # compute_competition_phase vocabulary -> lifecycle stages. Evidence-based:
-# "league_stage_complete" only occurs when the knockout store carries zero
-# usable evidence (missing/empty/unavailable), i.e. the season cannot be
-# finished yet — that is "active", never "completed".
+# "completed" only occurs when every completion criterion holds (full league,
+# decided playoff/R16/QF/SF/FINAL, champion == FINAL winner); a champion on
+# file alone never implies it.
 _PHASE_TO_STAGE = {
     "completed": "completed",
     "league_stage": "active",
@@ -139,8 +151,13 @@ def discover(
     Stage classification is purely evidence-based, via the authoritative
     ``compute_competition_phase`` report:
 
-    - ``completed``: phase == "completed" (all league matches played AND a
-      champion is on file in the knockout store);
+    - ``completed``: phase == "completed" (league fully played, playoff
+      8/8, R16 8/8, QF 4/4, SF 2/2 and FINAL decided, champion equal to the
+      FINAL winner);
+    - ``inconsistent``: the evidence contradicts itself — a champion on
+      file while any structural criterion fails (league unplayed, FINAL or
+      earlier rounds undecided, knockout store unusable), or a champion
+      differing from the FINAL winner;
     - ``active``: some league matches played but not all, OR the league is
       complete while the knockout store is missing/empty/unavailable, OR
       knockout play has begun;
@@ -153,11 +170,24 @@ def discover(
     completion influences the stage through the phase report but is never
     folded into these counters — no double counting.
 
+    ``diagnostics`` carries the brain's violated-criterion strings
+    (``ucl.*``) for active/inconsistent stages; it is ``[]`` for clean
+    (completed) seasons and for future/unknown ones where no criterion can
+    be violated yet.
+
     ``provider_season`` (optional, handed in by the web layer from live
-    metadata): when provided AND different from the local season id it is
-    reported under ``provider_current_season`` with ``season_mismatch`` true
-    and basis "provider". The platform surfaces the mismatch honestly; this
-    function never attempts to fetch the provider season's data.
+    metadata): when provided AND different from the local season id:
+    - If the season store has sufficient data for that provider season
+      (fixtures >= 100 OR results >= 50) AND no diagnostics indicate
+      inconsistency, return it as the active season with ``"basis": "provider"``,
+      ``"season_mismatch": true``.
+    - If provider season exists but store has insufficient data (fixtures < 100
+      AND results < 50), **do not switch** — keep last valid season, set
+      ``"season_mismatch": true``, ``"basis": "derived"``, add diagnostic
+      ``"provider_season_insufficient_data"``.
+    - If provider season store has diagnostics (inconsistent), do not switch,
+      keep old, flag mismatch.
+    - If no provider_season or no mismatch → existing derived behavior.
 
     Deterministic; no prints; no network.
     """
@@ -170,13 +200,22 @@ def discover(
         from competitions.ucl.src.orchestrator import compute_competition_phase
 
         phase = compute_competition_phase(dp)
-    phase_value = phase.get("phase") if isinstance(phase, dict) else None
+    report = phase if isinstance(phase, dict) else {}
+    phase_value = report.get("phase")
+    raw_diagnostics = report.get("diagnostics")
+    diagnostics = (
+        [str(d) for d in raw_diagnostics]
+        if isinstance(raw_diagnostics, list)
+        else []
+    )
 
     season = _local_season_id()
     basis = "config" if config_entries else "derived"
     declared_ids = {entry["id"] for entry in (config_entries or [])}
 
-    if phase_value in _PHASE_TO_STAGE:
+    if bool(report.get("inconsistent")):
+        stage = "inconsistent"
+    elif phase_value in _PHASE_TO_STAGE:
         stage = _PHASE_TO_STAGE[phase_value]
     elif phase_value == "not_started":
         stage = (
@@ -186,6 +225,9 @@ def discover(
         )
     else:
         stage = "unknown"
+
+    if stage not in ("active", "inconsistent"):
+        diagnostics = []
 
     historical = sorted(
         {
@@ -200,10 +242,49 @@ def discover(
 
     provider_current: Optional[str] = None
     season_mismatch = False
+
+    # Season transition logic (Exchange 4)
     if provider_season is not None and str(provider_season) != season:
         provider_current = str(provider_season)
         season_mismatch = True
-        basis = "provider"
+
+        # Check if provider season has sufficient data in the season store
+        from competitions.ucl.src.seasons import resolve_active_view
+
+        active_view = resolve_active_view(dp)
+        provider_season_dir_id = active_view["seasons"].get(
+            provider_current.replace("/", "_")
+        ) or active_view["seasons"].get(provider_current)
+
+        if provider_season_dir_id:
+            fixtures_count = provider_season_dir_id.get("fixtures_count", 0)
+            results_count = provider_season_dir_id.get("results_count", 0)
+
+            sufficient_data = (
+                fixtures_count >= SUFFICIENT_FIXTURES_THRESHOLD
+                or results_count >= SUFFICIENT_RESULTS_THRESHOLD
+            )
+
+            if sufficient_data:
+                # Switch to provider season
+                season = provider_current
+                basis = "provider"
+            else:
+                # Keep local season, add diagnostic
+                diagnostics.append("provider_season_insufficient_data")
+                basis = "derived"
+        else:
+            # Provider season not in store at all
+            diagnostics.append("provider_season_not_in_store")
+            basis = "derived"
+    elif provider_season is not None and str(provider_season) == season:
+        # Provider season matches local - no mismatch
+        provider_current = None
+        season_mismatch = False
+    else:
+        # No provider season hint
+        provider_current = None
+        season_mismatch = False
 
     return {
         "season": season,
@@ -214,4 +295,5 @@ def discover(
         "provider_current_season": provider_current,
         "season_mismatch": season_mismatch,
         "label": f"{season} - {stage}",
+        "diagnostics": diagnostics,
     }

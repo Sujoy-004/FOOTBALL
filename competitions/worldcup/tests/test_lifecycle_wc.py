@@ -28,6 +28,7 @@ from src.pipeline import compute_competition_phase, season_lifecycle  # noqa: E4
 LIFECYCLE_CONTRACT = {
     "season", "stage", "progress", "historical", "basis",
     "provider_current_season", "season_mismatch", "label",
+    "diagnostics",
 }
 
 
@@ -44,6 +45,7 @@ class TestRealDataCompleted:
             "provider_current_season": None,
             "season_mismatch": False,
             "label": "2026 - completed",
+            "diagnostics": [],
         }
 
     def test_phase_report_agrees_on_completed(self):

@@ -153,6 +153,10 @@ class FootballDataOrgProvider:
             "group_name": group,
             "round_number": matchday,
             "stage": raw.get("stage", ""),
+            "season": raw.get("season", {}).get("startDate", "")[:4] + "/" + raw.get("season", {}).get("endDate", "")[2:4]
+                if raw.get("season") and raw.get("season", {}).get("startDate") and raw.get("season", {}).get("endDate")
+                else "",
+            "match_id": str(raw.get("id", "")) if raw.get("id") is not None else "",
         }
 
         # Derive winner from score.winner or fall back to score comparison

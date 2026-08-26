@@ -2,7 +2,7 @@
 
 Purely explicit one-shot command; NEVER invoked by server startup::
 
-    python -m competitions.ucl.backfill [--data-dir PATH]
+    python -m competitions.ucl.backfill [--data-dir PATH] [--league]
 
 Reads ``bootstrap/2025_26_knockout_results.json`` (v1 historical aggregates
 extracted byte-identical from git 7cbc0f6) from the data dir and writes
@@ -20,6 +20,10 @@ extracted byte-identical from git 7cbc0f6) from the data dir and writes
   the penalty-decided final;
 - champion PSG and ``meta.backfilled_from = "bootstrap/
   2025_26_knockout_results.json (git 7cbc0f6)"``.
+
+Optional ``--league`` flag restores ``data/results.json`` from the tracked
+``bootstrap/league_results_2025_26.json`` with the same atomic/provenance
+discipline. Default remains KO-only so existing behavior/tests hold.
 
 Validates counts (8/8/4/2/1 + champion) before writing; refuses partial
 writes (single atomic replace, nothing touched on validation failure).
@@ -260,12 +264,57 @@ def _convert_bootstrap(bootstrap: dict, pairings: dict, rules: dict) -> dict:
     }
 
 
-def run_backfill(data_dir: str | Path) -> dict:
+def run_backfill_league(data_dir: str | Path) -> dict:
+    """Restore league results.json from tracked bootstrap file.
+
+    Reads ``bootstrap/league_results_2025_26.json`` and writes ``results.json``
+    atomically with provenance metadata. Byte-identical to the working-tree
+    results.json — this is the same factual seed data category as the KO
+    bootstrap.
+    """
+    dp = Path(data_dir) if isinstance(data_dir, str) else data_dir
+    bootstrap_path = dp / "bootstrap" / "league_results_2025_26.json"
+    if not bootstrap_path.exists():
+        raise BackfillError(f"league bootstrap file not found: {bootstrap_path}")
+    try:
+        bootstrap = json.loads(bootstrap_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+        raise BackfillError(f"league bootstrap file unreadable: {exc}") from exc
+
+    # Validate structure
+    if not isinstance(bootstrap, dict) or "matches" not in bootstrap:
+        raise BackfillError("league bootstrap malformed: missing 'matches' key")
+    matches = bootstrap["matches"]
+    if not isinstance(matches, list):
+        raise BackfillError("league bootstrap 'matches' must be a list")
+
+    # Add provenance meta
+    document = {
+        "matches": matches,
+        "meta": {
+            "provider": None,
+            "backfilled_from": "bootstrap/league_results_2025_26.json (git tracked)",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+
+    results_path = dp / "results.json"
+    _atomic_write_json(document, results_path)
+    return document
+
+
+def run_backfill(data_dir: str | Path, *, league: bool = False) -> dict:
     """Convert + validate + atomically write. Returns the v2 document.
 
     Raises BackfillError (or OSError) without touching the target file when
     validation fails.
+
+    If league=True, restores results.json from league bootstrap instead of
+    knockout_results.json from KO bootstrap.
     """
+    if league:
+        return run_backfill_league(data_dir)
+
     dp = Path(data_dir) if isinstance(data_dir, str) else data_dir
     bootstrap_path = dp / "bootstrap" / "2025_26_knockout_results.json"
     if not bootstrap_path.exists():
@@ -307,30 +356,39 @@ def main(argv: list[str] | None = None) -> int:
     default_data_dir = Path(__file__).resolve().parent / "data"
     parser = argparse.ArgumentParser(
         prog="python -m competitions.ucl.backfill",
-        description="Offline backfill of 2025/26 UCL knockout history into store v2.",
+        description="Offline backfill of 2025/26 UCL knockout history into store v2. Use --league to restore league results.",
     )
     parser.add_argument(
         "--data-dir", default=str(default_data_dir),
         help=f"UCL data directory (default: {default_data_dir})",
     )
+    parser.add_argument(
+        "--league", action="store_true",
+        help="Restore data/results.json from tracked league bootstrap (default: KO-only)",
+    )
     args = parser.parse_args(argv)
 
     print(f"[ucl-backfill] data dir: {args.data_dir}")
     try:
-        document = run_backfill(args.data_dir)
+        document = run_backfill(args.data_dir, league=args.league)
     except (BackfillError, OSError) as exc:
         print(f"[ucl-backfill] FAILED: {exc}")
         return 1
 
-    matches = document["matches"]
-    print("[ucl-backfill] wrote knockout_results.json (schema 2)")
-    print(f"  playoff : {len(matches['playoff'])} ties")
-    print(f"  R16     : {len(matches['rounds']['R16'])} ties")
-    print(f"  QF      : {len(matches['rounds']['QF'])} ties")
-    print(f"  SF      : {len(matches['rounds']['SF'])} ties")
-    print(f"  final   : {len(matches['final'])} match")
-    print(f"  champion: {matches['champion']}")
-    print(f"  provenance: manual (all); backfilled_from: {document['meta']['backfilled_from']}")
+    if args.league:
+        print("[ucl-backfill] wrote results.json (league bootstrap)")
+        print(f"  matches: {len(document['matches'])}")
+        print(f"  provenance: manual; backfilled_from: {document['meta']['backfilled_from']}")
+    else:
+        matches = document["matches"]
+        print("[ucl-backfill] wrote knockout_results.json (schema 2)")
+        print(f"  playoff : {len(matches['playoff'])} ties")
+        print(f"  R16     : {len(matches['rounds']['R16'])} ties")
+        print(f"  QF      : {len(matches['rounds']['QF'])} ties")
+        print(f"  SF      : {len(matches['rounds']['SF'])} ties")
+        print(f"  final   : {len(matches['final'])} match")
+        print(f"  champion: {matches['champion']}")
+        print(f"  provenance: manual (all); backfilled_from: {document['meta']['backfilled_from']}")
     return 0
 
 

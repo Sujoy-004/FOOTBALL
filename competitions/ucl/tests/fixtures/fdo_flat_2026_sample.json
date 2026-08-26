@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1001,
+    "homeTeam": {"name": "Real Madrid"},
+    "awayTeam": {"name": "Barcelona"},
+    "score": {"fullTime": {"home": 2, "away": 1}, "duration": "REGULAR"},
+    "status": "FINISHED",
+    "utcDate": "2026-09-15T19:00:00Z",
+    "stage": "LEAGUE_STAGE",
+    "matchday": 1,
+    "group": null,
+    "season": {"startDate": "2026-07-01", "endDate": "2027-06-30"}
+  },
+  {
+    "id": 1002,
+    "homeTeam": {"name": "Bayern Munich"},
+    "awayTeam": {"name": "Paris Saint-Germain"},
+    "score": {"fullTime": {"home": 1, "away": 1}, "duration": "REGULAR"},
+    "status": "FINISHED",
+    "utcDate": "2026-09-16T19:00:00Z",
+    "stage": "LEAGUE_STAGE",
+    "matchday": 1,
+    "group": null,
+    "season": {"startDate": "2026-07-01", "endDate": "2027-06-30"}
+  },
+  {
+    "id": 1003,
+    "homeTeam": {"name": "Manchester City"},
+    "awayTeam": {"name": "Inter Milan"},
+    "score": null,
+    "status": "TIMED",
+    "utcDate": "2026-09-17T19:00:00Z",
+    "stage": "LEAGUE_STAGE",
+    "matchday": 1,
+    "group": null,
+    "season": {"startDate": "2026-07-01", "endDate": "2027-06-30"}
+  },
+  {
+    "id": 1004,
+    "homeTeam": {"name": "Arsenal"},
+    "awayTeam": {"name": "Borussia Dortmund"},
+    "score": null,
+    "status": "TIMED",
+    "utcDate": "2026-10-01T19:00:00Z",
+    "stage": "LEAGUE_STAGE",
+    "matchday": 2,
+    "group": null,
+    "season": {"startDate": "2026-07-01", "endDate": "2027-06-30"}
+  },
+  {
+    "id": 1005,
+    "homeTeam": {"name": "Atletico Madrid"},
+    "awayTeam": {"name": "RB Leipzig"},
+    "score": null,
+    "status": "SCHEDULED",
+    "utcDate": "2026-10-02T19:00:00Z",
+    "stage": "LEAGUE_STAGE",
+    "matchday": 2,
+    "group": null,
+    "season": {"startDate": "2026-07-01", "endDate": "2027-06-30"}
+  },
+  {
+    "id": 1006,
+    "homeTeam": {"name": "Benfica"},
+    "awayTeam": {"name": "Club Brugge"},
+    "score": null,
+    "status": "SCHEDULED",
+    "utcDate": "2026-10-03T19:00:00Z",
+    "stage": "LEAGUE_STAGE",
+    "matchday": 2,
+    "group": null,
+    "season": {"startDate": "2026-07-01", "endDate": "2027-06-30"}
+  }
+]

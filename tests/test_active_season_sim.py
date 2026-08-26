@@ -43,8 +43,9 @@ def active_season_dir(tmp_path):
     snapshot = tmp_path / "snapshot.json"
     if snapshot.exists():
         snapshot.unlink()
+    # Use the tracked league bootstrap instead of private runtime results.json
     payload = json.loads(
-        (UCL_DATA / "results.json").read_text(encoding="utf-8"))
+        (UCL_DATA / "bootstrap" / "league_results_2025_26.json").read_text(encoding="utf-8"))
     rows = payload["matches"] if isinstance(payload, dict) else payload
     assert len(rows) >= PLAYED_ROWS
     truncated = rows[:PLAYED_ROWS]
