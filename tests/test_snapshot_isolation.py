@@ -45,6 +45,10 @@ class _CountingProvider:
 def snapshot_env(monkeypatch):
     """Force startup decision to snapshot + counting provider."""
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
+    # Explicit snapshot must stay zero-network even though the server
+    # lifespan re-runs run_startup_flow (non-interactive => "auto" by
+    # default): the env override pins the decision to snapshot.
+    monkeypatch.setenv("FOOTBALL_SNAPSHOT", "1")
     prov = _CountingProvider()
     _CountingProvider.calls = 0
     import web.common

@@ -364,7 +364,9 @@ function renderBracket() {
   let html = '';
 
   const nUnplayed = (appState.data && appState.data.n_unplayed != null) ? appState.data.n_unplayed : null;
-    if (nUnplayed === 0) {
+  const seasonComplete = nUnplayed === 0
+    || !!(appState.data && appState.data.phase && appState.data.phase.completed);
+    if (seasonComplete) {
       html += '<div class="dim" style="text-align:right;margin-bottom:8px;font-size:11px">All competition results are already known from real match data. Simulation is not needed.</div>';
     } else {
       html += '<div style="text-align:right;margin-bottom:8px"><button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining Matches</button></div>';
@@ -376,8 +378,10 @@ function renderBracket() {
     html += '<div class="chart-section" style="border:1px solid rgba(142,68,173,.5)">'
       + '<div class="title">SIMULATION &middot; ' + (m.count || 0).toLocaleString() + ' RUNS'
       + ' &middot; seed ' + (m.seed != null ? m.seed : 'auto') + '</div>'
-      + '<div class="dim" style="font-size:11px;padding:2px 8px">Projected outcomes are model output - real played results above are unchanged.</div></div>';
-  } else if (nUnplayed !== 0) {
+      + '<div class="dim" style="font-size:11px;padding:2px 8px">Projected probability (aggregate over '
+      +   (m.count || 0).toLocaleString() + ' runs) - real played results above are unchanged.</div>'
+      + '<div class="dim" style="font-size:11px;padding:2px 8px">Knockout card annotations show one example simulated bracket (sampled run).</div></div>';
+  } else if (!seasonComplete) {
     html += '<div class="dim" style="padding:2px 4px;font-size:11px;margin-bottom:6px">Unplayed matches are shown as scheduled. Run a simulation to project their outcomes.</div>';
   }
 

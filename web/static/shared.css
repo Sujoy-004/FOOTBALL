@@ -776,3 +776,33 @@ body {
 .competition-worldcup .acq-updated { color: #8C6E63; }
 .competition-worldcup .acq-detail { color: #FFF2DF88; }
 .competition-worldcup .acq-stage { border-top-color: rgba(140,110,99,0.25); }
+
+/* ── Match/Tie Intelligence modal (Exchange 3, additive) ── */
+.intel-sec { margin-top: 10px; }
+.intel-note { font-size: 10px; font-style: italic; color: #F6DBC088; padding: 2px 0; }
+.prov-chip {
+  display: inline-block; font-size: 8px; letter-spacing: 1px;
+  padding: 1px 6px; border-radius: 3px; border: 1px solid;
+  vertical-align: middle; margin-left: 8px; font-weight: normal;
+}
+.prov-real { color: #168777; border-color: rgba(22,135,119,0.5); background: rgba(22,135,119,0.10); }
+.prov-manual { color: #e6a817; border-color: rgba(230,168,23,0.5); background: rgba(230,168,23,0.08); }
+.prov-sim { color: #8E44AD; border-color: rgba(142,68,173,0.5); background: rgba(142,68,173,0.12); }
+.prov-snap { color: #15565B; border-color: rgba(21,86,91,0.5); background: rgba(21,86,91,0.12); }
+.wi-table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 4px 0; }
+.wi-table th { color: #16A085; text-align: left; padding: 3px 8px; border-bottom: 1px solid #153D4C; font-size: 10px; font-weight: normal; }
+.wi-table td { padding: 3px 8px; border-bottom: 1px solid #153D4C; }
+.wi-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.outcome-stack-bar {
+  display: flex; height: 14px; border-radius: 2px; overflow: hidden;
+  background: #153D4C; margin: 6px 0 2px;
+}
+.outcome-stack-seg { height: 100%; min-width: 1px; }
+.outcome-stack-lbl { display: flex; justify-content: space-between; gap: 6px; font-size: 9px; color: #15565B; padding-top: 2px; }
+
+/* WC earth-tone alignment for intelligence modal bits */
+.competition-worldcup .prov-real { color: #C4955A; border-color: rgba(196,149,90,0.5); background: rgba(196,149,90,0.10); }
+.competition-worldcup .prov-manual { color: #D3A376; border-color: rgba(211,163,118,0.5); background: rgba(211,163,118,0.10); }
+.competition-worldcup .wi-table th { color: #D3A376; border-bottom-color: #8C6E63; }
+.competition-worldcup .wi-table td { border-bottom-color: #8C6E6344; }
+.competition-worldcup .intel-note { color: #FFF2DF88; }

@@ -59,13 +59,19 @@ async def lifespan(app: fastapi.FastAPI):
     import web.wc_app as _wc
     import web.ucl_app as _ucl
 
-    # Each app's fetch wrapper self-gates on snapshot mode: calling it
-    # unconditionally records a truthful skipped/snapshot report (zero
-    # network in snapshot) instead of leaving the refresh ledger empty.
+    # Each app's fetch wrapper self-gates on explicit snapshot mode: calling
+    # them unconditionally records a truthful skipped/snapshot report (zero
+    # network in snapshot) or an acquisition attempt with stored-data
+    # fallback ("auto"). A failed attempt never deletes/overwrites stores.
     _wc._fetch_live_data()
     _wc.cache = _wc.compute_overview()
 
-    _ucl._fetch_live_data()
+    # Failure isolation: a crashing provider must never take down boot;
+    # the wrapper reports internally, this guards anything it lets through.
+    try:
+        _ucl._fetch_live_data()
+    except Exception as e:
+        logger.error("[UCL] live fetch failed: %s", e)
     # Route through compute_all so every on-disk state gets the truthful
     # boot: real results -> results view; no/partial results -> honest
     # simulation-available view (never an empty cache).

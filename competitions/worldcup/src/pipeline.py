@@ -252,7 +252,13 @@ def fetch_live_data(
                 encoding="utf-8",
             )
     except Exception as e:
-        logger.warning("fetch_live_data: match fetch failed: %s", e)
+        # Acquisition-truth fix: a RAISING provider must surface as a failed
+        # refresh, never fall through to a success-shaped report with
+        # silently skipped matches. Stores already written stay untouched;
+        # everything after this point is skipped.
+        reason = f"match fetch failed: {e.__class__.__name__}: {e}"
+        logger.warning("fetch_live_data: %s", reason)
+        return _fail(reason, type(provider).__name__)
 
     # 2. Fetch and cache signal predictors
     #    BSD-dependent signals degrade gracefully (Phase 4) when BSD_API_KEY
@@ -966,4 +972,93 @@ def compute_competition_phase(data_dir: Path | None = None) -> dict:
             "group_results": pg_availability.value,
             "knockout_results": ko_availability.value,
         },
+    }
+
+
+# ── Season lifecycle (Exchange 3 truth contract) ─────────────────────────
+
+_LIFECYCLE_STAGE_MAP = {
+    "completed": "completed",
+    "knockout": "active",
+    "group_stage_complete": "active",
+    "group_stage": "active",
+    "not_started": "future",
+}
+
+
+def _wc_season_id() -> str:
+    """Derive the tracked World Cup season id from constants (no network).
+
+    The year is extracted from the league catalog name for
+    ``DEFAULT_LEAGUE_ID`` ("World Cup 2026" -> "2026"); ``WC_START_DATE`` is
+    the documented fallback. No hardcoded eternal season.
+    """
+    name = constants.LEAGUES.get(constants.DEFAULT_LEAGUE_ID, "")
+    digits = "".join(ch for ch in name if ch.isdigit())
+    if len(digits) == 4:
+        return digits
+    return str(constants.WC_START_DATE[:4])
+
+
+def season_lifecycle(data_dir: Path | None = None, phase: dict | None = None) -> dict:
+    """Season-lifecycle view for the World Cup — same key contract as the UCL
+    ``competitions.ucl.src.lifecycle.discover`` output.
+
+    Stage maps the authoritative ``compute_competition_phase`` report onto the
+    four lifecycle stages: completed -> completed; group_stage /
+    group_stage_complete / knockout -> active; not_started -> future.
+
+    ``progress`` reuses the exact counters computed by
+    ``compute_competition_phase`` ({played: group + knockout results,
+    total: 72 + 32}) when a phase report is available; it falls back to
+    deriving them straight from played_groups.json + played.json otherwise.
+    ``historical`` lists seasons with completed evidence (this season only,
+    appended once the tournament is complete). Basis is always "derived".
+    Deterministic; no prints; no network.
+    """
+    from football_core.domain import DataAvailability, load_json_store
+    from src.constants import DATA_DIR
+
+    dp = Path(data_dir) if data_dir is not None else DATA_DIR
+
+    if phase is None:
+        phase = compute_competition_phase(dp)
+    phase_value = phase.get("phase") if isinstance(phase, dict) else None
+
+    season = _wc_season_id()
+    stage = _LIFECYCLE_STAGE_MAP.get(phase_value, "unknown")
+
+    progress = None
+    raw_progress = phase.get("progress") if isinstance(phase, dict) else None
+    if isinstance(raw_progress, dict) and "played" in raw_progress and "total" in raw_progress:
+        progress = {"played": int(raw_progress["played"]), "total": int(raw_progress["total"])}
+    if progress is None:
+        n_group = 0
+        pg_payload, pg_availability, _ = load_json_store(dp / "played_groups.json")
+        if pg_availability is DataAvailability.AVAILABLE and isinstance(pg_payload, dict):
+            n_group = sum(
+                1 for m in pg_payload.values()
+                if isinstance(m, dict)
+                and m.get("home_score") is not None and m.get("away_score") is not None
+            )
+        n_ko = 0
+        ko_payload, ko_availability, _ = load_json_store(dp / "played.json")
+        if ko_availability is DataAvailability.AVAILABLE and isinstance(ko_payload, dict):
+            n_ko = len(ko_payload)
+        progress = {
+            "played": n_group + n_ko,
+            "total": WC_GROUP_MATCH_TOTAL + WC_KNOCKOUT_MATCH_TOTAL,
+        }
+
+    historical = [season] if stage == "completed" else []
+
+    return {
+        "season": season,
+        "stage": stage,
+        "progress": progress,
+        "historical": historical,
+        "basis": "derived",
+        "provider_current_season": None,
+        "season_mismatch": False,
+        "label": f"{season} - {stage}",
     }

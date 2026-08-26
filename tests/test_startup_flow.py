@@ -19,6 +19,7 @@ SECRET = "entered-secret-key-abc123"
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
+    monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
 
 
 def test_configured_key_no_prompt(monkeypatch, capsys):
@@ -119,18 +120,23 @@ def test_invalid_key_exit_option(capsys):
     assert exc.value.code == 0
 
 
-def test_non_interactive_falls_back_to_snapshot():
+def test_non_interactive_defaults_to_auto_acquisition():
+    """No TTY: the default policy is ATTEMPT fresh acquisition ("auto"),
+    not silent snapshot. Provider failures later fall back to stored data
+    with truthful stale reports; snapshot requires an explicit choice."""
     def _input(_prompt=""):
         raise AssertionError("must not prompt in non-interactive mode")
 
     def _validate(_k):
-        raise AssertionError("must not attempt live validation in snapshot mode")
+        raise AssertionError("must not attempt live validation in non-interactive mode")
 
     d = run_startup_flow(input_fn=_input,
                          validate_fn=_validate,
                          interactive_fn=lambda: False)
-    assert d.mode == "snapshot"
+    assert d.mode == "auto"
     assert d.fdo_key == ""
+    from web.startup import is_snapshot_mode
+    assert is_snapshot_mode() is False
 
 
 def test_apply_session_overrides_updates_process(monkeypatch):

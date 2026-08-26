@@ -3,6 +3,7 @@ import {
   destroyModalCharts, modalCharts,
   updateStatusBar, competitions, showSimPopup,
   buildTable, safeJson, renderBracketTree, renderAcquisitionPanel,
+  openIntelModal,
 } from "./shared.js";
 
 const API = "/ucl/api";
@@ -102,6 +103,29 @@ function updateStatus() {
 
 // ── Overview ─────────────────────────────────────────────────────────
 
+// Render the completed-run projections block: meta line + aggregate label
+// + top-5 table. Shared by the live and completed-season overview paths so
+// both carry the same Monte Carlo-aggregate wording.
+function _uclProjectionBlock() {
+  const m = appState.simMeta || {};
+  const runs = appState.simRunCount || 0;
+  let h = '<div class="dim" style="padding:2px 8px;font-size:11px;color:#8E44AD">'
+    + 'SIMULATION &middot; ' + runs.toLocaleString()
+    + ' RUNS' + (m.seed != null ? ' &middot; seed ' + m.seed : '')
+    + ' - projected probabilities, not real results.</div>';
+  h += '<div class="dim" style="padding:2px 8px;font-size:11px">'
+    + 'Projected champion probability - Monte Carlo aggregate over '
+    + runs.toLocaleString() + ' runs</div>';
+  h += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion %</th></tr>';
+  appState.simProjections.slice(0, 5).forEach(function(o, i) {
+    const pct = ((o.champion_prob || 0) * 100).toFixed(1);
+    h += '<tr><td class="num">' + (i + 1) + '</td><td>' + o.team
+      + '</td><td class="num">' + pct + '%</td></tr>';
+  });
+  h += '</table>';
+  return h;
+}
+
 async function renderOverview() {
   const tab = document.getElementById("tab-overview");
   if (!tab) return;
@@ -115,6 +139,9 @@ async function renderOverview() {
   // Authoritative competition phase from the backend (never inferred here).
   const phase = d.phase || {};
   const stage = phase.label || "Unknown";
+  const simState = d.simulation || {};
+  const availability = simState.availability || "available";
+  const requestState = simState.request_state || "not_requested";
 
   // Stat cards: Teams / Matches Played / Stage  (WC-style hierarchy)
   let html = '<div class="stats-row">';
@@ -123,6 +150,10 @@ async function renderOverview() {
   html += '<div class="stat-card"><div class="val" style="font-size:.75em">' + stage + '</div><div class="lbl">Stage</div></div>';
   html += '<div class="stat-card"><div class="val">' + nActive + ' / ' + sigOrder.length + '</div><div class="lbl">Signals Available</div></div>';
   if (d.snapshot_date) html += '<div class="stat-card"><div class="val" style="font-size:.8em">' + d.snapshot_date + '</div><div class="lbl">Season</div></div>';
+  if (availability !== "not_needed" && d.n_played != null && d.n_unplayed != null) {
+    html += '<div class="stat-card"><div class="val">' + d.n_played + '</div><div class="lbl">REAL MATCHES</div></div>';
+    html += '<div class="stat-card"><div class="val">' + d.n_unplayed + '</div><div class="lbl">UPCOMING</div></div>';
+  }
   html += '</div>';
 
   // Current leaders (compact top-8 preview)
@@ -158,15 +189,16 @@ async function renderOverview() {
   // ── Simulation section (Exchange 4 shared product contract) ──────
   // Driven by the backend's availability/request-state block; the UI never
   // infers eligibility and never fabricates outcomes for undecided stages.
-  const simState = d.simulation || {};
-  const availability = simState.availability || "available";
-  const requestState = simState.request_state || "not_requested";
   html += '<div class="chart-section"><div class="title">Simulation</div>';
 
   if (availability === "not_needed") {
+    if (requestState === "completed" && appState.simProjections
+        && appState.simProjections.length) {
+      html += _uclProjectionBlock();
+    }
     html += '<div class="dim" style="padding:4px 8px;font-size:12px">'
-      + 'All competition results are already known from real match data. '
-      + 'Simulation is not needed.</div>';
+      + 'Season completed - results are factual. Per-match What-If '
+      + 'available via bracket.</div>';
   } else if (requestState === "running") {
     html += '<div class="dim" style="padding:4px 8px;font-size:12px">'
       + 'A simulation is currently running. Reload in a moment to see its '
@@ -174,18 +206,7 @@ async function renderOverview() {
   } else {
     if (requestState === "completed" && appState.simProjections
         && appState.simProjections.length) {
-      const m = appState.simMeta || {};
-      html += '<div class="dim" style="padding:2px 8px;font-size:11px;color:#8E44AD">'
-        + 'SIMULATION &middot; ' + (appState.simRunCount || 0).toLocaleString()
-        + ' RUNS' + (m.seed != null ? ' &middot; seed ' + m.seed : '')
-        + ' - projected probabilities, not real results.</div>';
-      html += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion %</th></tr>';
-      appState.simProjections.slice(0, 5).forEach(function(o, i) {
-        const pct = ((o.champion_prob || 0) * 100).toFixed(1);
-        html += '<tr><td class="num">' + (i + 1) + '</td><td>' + o.team
-          + '</td><td class="num">' + pct + '%</td></tr>';
-      });
-      html += '</table>';
+      html += _uclProjectionBlock();
     } else if (requestState === "failed") {
       html += '<div class="dim" style="padding:4px 8px;font-size:12px;color:#ff6b6b">'
         + 'The last simulation failed. No projected probabilities exist.</div>';
@@ -194,6 +215,10 @@ async function renderOverview() {
         + 'No simulation has been run in this session, so no projected '
         + 'probabilities exist.</div>';
     }
+
+    html += '<div class="dim" style="padding:2px 8px;font-size:11px">'
+      + 'Current season: ' + (d.n_played || 0) + ' matches played, '
+      + (d.n_unplayed != null ? d.n_unplayed : "?") + ' remaining</div>';
 
     // Control card: user chooses whether/how to simulate.
     html += '<div style="padding:6px 8px">';
@@ -243,10 +268,14 @@ function _buildAcquisition(d) {
     source = "Snapshot";
   } else {
     mode = "live";
-    source = refresh.provider || "LIVE";
     if (attempted && !succeeded) {
+      // Fresh acquisition failed: rendering fell back to the last valid
+      // snapshot. Say so explicitly instead of masquerading as LIVE.
       stale = true;
       error = refresh.error || "live refresh failed";
+      source = "FALLBACK";
+    } else {
+      source = refresh.provider || "LIVE";
     }
   }
 
@@ -558,6 +587,7 @@ function _renderUclKo() {
   if (simActive) {
     pre += '<div style="margin:12px 0 4px;padding:4px 8px;font-size:11px;color:#8E44AD">'
       + "SIMULATION &middot; projected knockout path"
+      + (sawSim ? " &middot; example simulated bracket (one sampled run)" : "")
       + (appState.simRunCount ? " &middot; " + appState.simRunCount.toLocaleString() + " runs" : "")
       + (metaM.seed != null ? " &middot; seed " + metaM.seed : "")
       + " &middot; not real results</div>";
@@ -700,26 +730,316 @@ function _withSimOverlay(m, sm) {
   return out;
 }
 
-// Lightweight tie popup: two-legged ties have no single-match insight
-// endpoint, so show the adapter-built breakdown instead of the match modal.
-function openTiePopup(m) {
+// Rich tie/match intelligence modal. Opens the shared modal shell
+// immediately with teams/stage/id, then hydrates from
+// /ucl/api/match/insight (frozen wave-2 contract) and renders result,
+// signals, distribution, form, h2h, insight and What-If controls inside it.
+async function openTiePopup(m) {
+  const tieId = m.id || "";
+  if (!tieId) return;
   destroyModalCharts();
-  document.getElementById("modalTitle").innerHTML =
-    '<span style="color:#16A085">' + _esc(m.teamA || "TBD") + "</span>"
-    + ' <span style="color:#15565B;font-weight:normal">vs</span> '
-    + '<span style="color:#e67e22">' + _esc(m.teamB || "TBD") + "</span>";
-  document.getElementById("modalSub").textContent =
-    (m._stageLabel ? m._stageLabel + " - " : "") + m.id;
-  let body = "";
-  if (m.resultLine) {
-    body += '<div class="stat-card" style="margin:4px 0"><div class="val">'
-      + _esc(m.resultLine) + '</div><div class="lbl">Result</div></div>';
+  openIntelModal({
+    titleHtml:
+      '<span style="color:#16A085">' + _esc(m.teamA || "TBD") + "</span>"
+      + ' <span style="color:#15565B;font-weight:normal">vs</span> '
+      + '<span style="color:#e67e22">' + _esc(m.teamB || "TBD") + "</span>",
+    sub: (m._stageLabel ? m._stageLabel + " - " : "") + tieId,
+    bodyHtml: '<div class="dim" style="padding:8px 4px;font-size:12px">'
+      + "Loading intelligence...</div>",
+  });
+
+  let ins;
+  try {
+    ins = await safeJson(API + "/match/insight?match_id="
+      + encodeURIComponent(tieId));
+  } catch (e) {
+    _setModalBody('<div style="color:#ff6b6b;font-size:12px">'
+      + "Failed to load tie intelligence: " + _esc(e.message) + "</div>");
+    return;
   }
-  if (m.detailHtml) body += '<div class="insight-box">' + m.detailHtml + "</div>";
-  body += '<div class="dim" style="padding:6px 4px;font-size:11px">'
-    + "Per-match signal insights are available for individual fixtures via the League Phase rows.</div>";
-  document.getElementById("modalBody").innerHTML = body;
-  document.getElementById("modalOverlay").classList.add("show");
+  if (ins.error) {
+    const unresolved = String(ins.error).indexOf("teams not set") !== -1;
+    _setModalBody('<div class="dim" style="padding:8px 4px;font-size:12px">'
+      + (unresolved
+        ? "Slot unresolved - intelligence unavailable."
+        : _esc(ins.error))
+      + "</div>");
+    return;
+  }
+  _renderTieIntelligence(ins, m);
+}
+
+function _setModalBody(html) {
+  const el = document.getElementById("modalBody");
+  if (el) el.innerHTML = html;
+}
+
+function _provenanceChip(ins, cardProv) {
+  const raw = cardProv === "simulated" ? "simulated" : (ins.provenance || "official");
+  const p = String(raw).toLowerCase();
+  let token = "REAL", cls = "prov-real";
+  if (p === "manual") { token = "MANUAL"; cls = "prov-manual"; }
+  else if (p === "simulated") { token = "SIMULATION"; cls = "prov-sim"; }
+  else if (p === "snapshot") { token = "SNAPSHOT"; cls = "prov-snap"; }
+  return '<span class="prov-chip ' + cls + '">' + token + "</span>";
+}
+
+function _enDashScore(h, a) {
+  return _esc(h != null ? h : "-") + "\u2013" + _esc(a != null ? a : "-");
+}
+
+function _tieResultHtml(ins) {
+  let h = '<div class="sec-title">Result</div>';
+  const agg = ins.aggregate;
+  const legs = Array.isArray(ins.legs) ? ins.legs : [];
+  const hasAgg = !!(agg && agg.a != null && agg.b != null);
+  const row = function(lbl, left, mid, right, strong) {
+    return "<tr" + (strong ? ' style="font-weight:bold"' : "")
+      + "><td>" + lbl + '</td><td style="text-align:right">' + left
+      + '</td><td class="num">' + mid + "</td><td>" + right + "</td></tr>";
+  };
+  const etRow = function() {
+    if (ins.et && ins.et.played) h += row("ET", "", _enDashScore(ins.et.a, ins.et.b), "");
+  };
+  const pensRow = function() {
+    if (ins.pens && ins.pens.played) h += row("PENS", "", _esc(ins.pens.score || "?"), "");
+  };
+  if (ins.kind === "tie") {
+    h += '<table class="wi-table">';
+    if (legs.length >= 2) {
+      legs.forEach(function(l) {
+        h += row("LEG " + (l.leg != null ? l.leg : "?"), _esc(l.home || "?"),
+          _enDashScore(l.home_score, l.away_score), _esc(l.away || "?"));
+      });
+    }
+    if (hasAgg) {
+      h += row("AGGREGATE", _esc(ins.teams.a), _enDashScore(agg.a, agg.b),
+        _esc(ins.teams.b), true);
+    }
+    etRow();
+    pensRow();
+    h += "</table>";
+    if (!legs.length && hasAgg && ins.availability_note) {
+      h += '<div class="intel-note">' + _esc(ins.availability_note) + "</div>";
+    }
+  } else {
+    const sc = ins.score || {};
+    h += '<table class="wi-table">';
+    h += row("SCORE", _esc(ins.teams.a), _enDashScore(sc.home, sc.away), _esc(ins.teams.b));
+    etRow();
+    pensRow();
+    h += "</table>";
+  }
+  if (ins.winner) {
+    h += '<div style="padding:4px 8px;font-size:12px;color:#16A085;font-weight:bold">'
+      + "WINNER: " + _esc(ins.winner) + "</div>";
+  }
+  return h;
+}
+
+function _tiePredictionHtml(ins) {
+  const bpAvailable = ins.prob_available === true
+    && typeof ins.blended_prob === "number";
+  let h = '<div class="sec-title">Blended Prediction</div>';
+  h += bpAvailable
+    ? '<div class="stat-card" style="margin:4px 0"><div class="val">'
+      + Math.round(ins.blended_prob * 100) + '%</div><div class="lbl">'
+      + _esc(ins.teams.a) + ' win</div></div>'
+    : '<div class="dim" style="padding:6px 4px;font-size:12px">'
+      + "Prediction unavailable"
+      + (ins.prob_reason ? " (" + _esc(ins.prob_reason) + ")" : "") + ".</div>";
+  return h;
+}
+
+function _tieDistributionHtml(ins) {
+  let h = '<div class="sec-title">Outcome Distribution</div>';
+  const o = ins.outcome_distribution;
+  if (!o || typeof o.a_win !== "number" || typeof o.draw !== "number"
+      || typeof o.b_win !== "number") {
+    return h + '<div class="dim" style="padding:4px;font-size:11px">'
+      + "Outcome distribution unavailable without a blended prediction.</div>";
+  }
+  const total = o.a_win + o.draw + o.b_win;
+  if (!(total > 0)) {
+    return h + '<div class="dim" style="padding:4px;font-size:11px">'
+      + "Outcome distribution unavailable.</div>";
+  }
+  const seg = function(v, color) {
+    return '<div class="outcome-stack-seg" style="width:'
+      + ((v / total) * 100).toFixed(2) + "%;background:" + color + '"></div>';
+  };
+  h += '<div class="outcome-stack-bar">'
+    + seg(o.a_win, "#16A085") + seg(o.draw, "#156F69") + seg(o.b_win, "#153D4C")
+    + "</div>";
+  h += '<div class="outcome-stack-lbl"><span>' + _esc(ins.teams.a) + " "
+    + Math.round((o.a_win / total) * 100) + "%</span><span>Draw "
+    + Math.round((o.draw / total) * 100) + "%</span><span>"
+    + Math.round((o.b_win / total) * 100) + "% " + _esc(ins.teams.b)
+    + "</span></div>";
+  return h;
+}
+
+function _tieFormHtml(ins) {
+  const ft = ins.form_trends || {};
+  let h = '<div class="sec-title">Form Trend</div>';
+  const rows = [];
+  [ins.teams.a, ins.teams.b].forEach(function(team) {
+    const tr = ft[team];
+    if (!Array.isArray(tr) || !tr.length) return;
+    const cells = tr.map(function(r) {
+      const res = r && r.result;
+      if (res === "W") return '<span class="dot-green">W</span>';
+      if (res === "L") return '<span class="dot-red">L</span>';
+      return "D";
+    }).join(" ");
+    rows.push("<tr><td>" + _esc(team) + "</td><td>" + cells + "</td></tr>");
+  });
+  if (!rows.length) {
+    return h + '<div class="dim" style="padding:4px;font-size:11px">'
+      + "No recent-form data.</div>";
+  }
+  return h + '<table class="wi-table">' + rows.join("") + "</table>";
+}
+
+function _tieRightColumnHtml(ins) {
+  const sigs = ins.signals || {};
+  const keys = Object.keys(sigs);
+  let h = '<div class="sec-title">Signal Breakdown</div>';
+  h += '<table class="insight-table"><tr><th>Signal</th><th>Prob</th><th>Weight</th></tr>';
+  if (!keys.length) {
+    h += '<tr><td colspan="3" style="color:#15565B">No signal data for this tie.</td></tr>';
+  } else {
+    keys.forEach(function(sk) {
+      const sd = sigs[sk];
+      if (!sd) return;
+      h += "<tr><td>" + _esc(sd.label || sk) + '</td><td class="num">'
+        + Math.round((sd.probability != null ? sd.probability : 0) * 100)
+        + '%</td><td class="num">'
+        + ((sd.weight != null ? sd.weight : 0) * 100).toFixed(1) + "%</td></tr>";
+    });
+  }
+  h += "</table>";
+  const h2h = ins.head_to_head;
+  if (h2h && typeof h2h.total === "number" && h2h.total > 0) {
+    h += '<div class="sec-title">Head-to-Head</div>'
+      + '<div style="padding:4px 2px;font-size:11px">'
+      + _esc(ins.teams.a) + " " + (h2h.a_wins || 0) + " wins &middot; "
+      + (h2h.draws || 0) + " draws &middot; " + (h2h.b_wins || 0) + " wins "
+      + _esc(ins.teams.b) + " (" + h2h.total + " played)</div>";
+  }
+  h += '<div class="sec-title">Match Insight</div><div class="insight-box">'
+    + (ins.insight || "No insight available.") + "</div>";
+  return h;
+}
+
+function _tieWhatIfHtml(ta) {
+  return '<div class="sec-title warn">What-If Scenario</div>'
+    + '<div class="whatif-controls">'
+    + '<label>Elo boost for ' + _esc(ta) + ':</label>'
+    + '<input type="number" id="tieWiDelta" value="50" step="10" min="-600"'
+    + ' max="600" style="width:80px;background:#0d2430;color:#F6DBC0;'
+    + 'border:1px solid rgba(21,61,76,.4);border-radius:4px;padding:4px 6px;'
+    + 'font-size:11px">'
+    + '<select id="tieWiIters" style="background:#0d2430;color:#F6DBC0;'
+    + 'border:1px solid rgba(21,61,76,.4);border-radius:4px;padding:4px;'
+    + 'font-size:11px">'
+    + '<option value="1000">1,000</option>'
+    + '<option value="5000" selected>5,000</option>'
+    + '<option value="10000">10,000</option></select>'
+    + '<button class="status-btn" id="tieWiRun">&#9654; Run What-If</button>'
+    + "</div>"
+    + '<div class="whatif-result" id="tieWiResult" style="display:none"></div>'
+    + '<div class="dim" style="padding:2px 0;font-size:10px">'
+    + "Adjusts Elo for both teams and re-runs a seeded Monte Carlo. "
+    + "Factual history is never modified.</div>";
+}
+
+async function _runTieWhatIf(tieId, ta, tb) {
+  const deltaInput = document.getElementById("tieWiDelta");
+  const itersSel = document.getElementById("tieWiIters");
+  const btn = document.getElementById("tieWiRun");
+  const resultDiv = document.getElementById("tieWiResult");
+  if (!deltaInput || !resultDiv) return;
+  let eloDelta = parseInt(deltaInput.value, 10);
+  if (!Number.isFinite(eloDelta)) eloDelta = 50;
+  eloDelta = Math.max(-600, Math.min(600, eloDelta));
+  const iterations = parseInt(itersSel ? itersSel.value : "5000", 10) || 5000;
+  if (btn) btn.disabled = true;
+  resultDiv.style.display = "block";
+  resultDiv.innerHTML = '<div style="color:#15565B;font-size:11px">'
+    + "Running seeded counterfactual...</div>";
+  try {
+    const resp = await safeJson(API + "/what-if", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        match_id: tieId, elo_delta: eloDelta, iterations: iterations,
+      }),
+    });
+    if (resp.error) {
+      resultDiv.innerHTML = '<div style="color:#ff6b6b;font-size:11px">'
+        + _esc(resp.error) + "</div>";
+      return;
+    }
+    const teamsResp = resp.teams || {};
+    const rowFn = function(name) {
+      const e = teamsResp[name] || {};
+      const dlt = e.delta || 0;
+      const cls = dlt >= 0 ? "wir-diff-pos" : "wir-diff-neg";
+      return "<tr><td>" + _esc(name) + '</td><td class="num">'
+        + ((e.baseline || 0) * 100).toFixed(1) + '%</td><td class="num">'
+        + ((e.adjusted || 0) * 100).toFixed(1) + '%</td><td class="num '
+        + cls + '">' + (dlt >= 0 ? "+" : "") + (dlt * 100).toFixed(1)
+        + " pp</td></tr>";
+    };
+    let html = '<div class="wir-head">WHAT-IF (SIMULATED) - champion '
+      + "probability, baseline vs adjusted</div>";
+    html += '<table class="wi-table"><tr><th>Team</th><th>Baseline</th>'
+      + "<th>Adjusted</th><th>Delta (pp)</th></tr>"
+      + rowFn(ta) + rowFn(tb) + "</table>";
+    html += '<div class="wir-meta">Factual history unchanged.</div>';
+    resultDiv.innerHTML = html;
+  } catch (e) {
+    resultDiv.innerHTML = '<div style="color:#ff6b6b;font-size:11px">Error: '
+      + _esc(e.message) + "</div>";
+  } finally {
+    const b2 = document.getElementById("tieWiRun");
+    if (b2) b2.disabled = false;
+  }
+}
+
+function _renderTieIntelligence(ins, m) {
+  const ta = ins.teams.a, tb = ins.teams.b;
+  const titleEl = document.getElementById("modalTitle");
+  if (titleEl) {
+    titleEl.innerHTML =
+      '<span style="color:#16A085">' + _esc(ta || "TBD") + "</span>"
+      + ' <span style="color:#15565B;font-weight:normal">vs</span> '
+      + '<span style="color:#e67e22">' + _esc(tb || "TBD") + "</span>"
+      + _provenanceChip(ins, m.provenance);
+  }
+  const subParts = [];
+  if (m._stageLabel) subParts.push(m._stageLabel);
+  if (ins.round && subParts.indexOf(ins.round) === -1) subParts.push(ins.round);
+  subParts.push(ins.kind === "tie" ? "TIE" : "MATCH");
+  subParts.push(ins.match_id || m.id || "");
+  const subEl = document.getElementById("modalSub");
+  if (subEl) subEl.textContent = subParts.filter(Boolean).join(" - ");
+
+  const leftHtml = _tieResultHtml(ins) + _tiePredictionHtml(ins)
+    + _tieDistributionHtml(ins) + _tieFormHtml(ins);
+  const rightHtml = _tieRightColumnHtml(ins);
+  _setModalBody(
+    '<div class="mb-wrap"><div class="mb-col">' + leftHtml + "</div>"
+    + '<div class="mb-col">' + rightHtml + "</div></div>"
+    + _tieWhatIfHtml(ta));
+
+  const runBtn = document.getElementById("tieWiRun");
+  if (runBtn) {
+    runBtn.addEventListener("click", function() {
+      _runTieWhatIf(ins.match_id || m.id, ta, tb);
+    });
+  }
 }
 
 // ES modules create no globals, so inline onclick attributes cannot reach

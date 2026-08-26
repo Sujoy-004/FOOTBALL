@@ -315,6 +315,7 @@ def api_data():
         "mode": _mode,
         "availability": cache.get("availability", {}),
         "phase": cache.get("phase", {}),
+        "lifecycle": _lifecycle_view(),
         "simulation": _simulation_state_block(),
         "n_unplayed": n_unplayed,
         "n_played": n_total - n_unplayed,
@@ -355,6 +356,12 @@ def _competition_state() -> dict:
     return build_competition_state(str(DATA_DIR), mode="results")
 
 
+def _lifecycle_view() -> dict:
+    """Season-lifecycle view (competitions.ucl.src.lifecycle.discover)."""
+    from competitions.ucl.src.lifecycle import discover
+    return discover(str(DATA_DIR))
+
+
 def _simulation_bracket_state() -> dict | None:
     """Simulated bracket in the same structural shape as the factual one."""
     sim_payload = sim_cache.get("sim_state_payload")
@@ -380,6 +387,8 @@ def api_bracket():
     payload["league_matchdays"] = (
         payload.get("stages", {}).get("league", {}).get("matchdays")
         or cache.get("league_matchdays", {}))
+    # Same lifecycle view as /api/data (cheap reuse, one discover call each).
+    payload["lifecycle"] = _lifecycle_view()
     return JSONResponse(payload)
 
 
@@ -459,7 +468,15 @@ def simulation_eligibility() -> tuple[bool, Optional[str], str]:
 
 
 def _simulation_state_block() -> dict:
-    """Shared product contract: availability + request lifecycle."""
+    """Shared product contract: availability + request lifecycle.
+
+    Completed-season honesty (Exchange 3): while the factual season still
+    has undecided outcomes the season-wide simulation controls are offered
+    ("available"); once every outcome is decided on disk they flip to
+    "not_needed" and any run is labeled what-if. Server-side eligibility
+    keeps allowing runs either way — per-tie what-if flows and legacy
+    sessions depend on it; only the exposed availability flag changes.
+    """
     undecided = _season_outcome_undecided()
     sim_status = sim_cache.get("status", "not_requested")
     request_state = {
@@ -467,13 +484,20 @@ def _simulation_state_block() -> dict:
         "completed": "completed",
         "failed": "failed",
     }.get(sim_status, "not_requested")
+    if not undecided:
+        return {
+            "availability": "not_needed",
+            "reason": None,
+            "request_state": request_state,
+            # A decided factual season makes every run an explicit alternate-
+            # history analysis; the UI must label it accordingly.
+            "what_if": True,
+        }
     return {
         "availability": "available",
         "reason": None,
         "request_state": request_state,
-        # A decided factual season makes every run an explicit alternate-
-        # history analysis; the UI must label it accordingly.
-        "what_if": not undecided,
+        "what_if": False,
     }
 
 
@@ -708,12 +732,17 @@ def _ucl_insight_text(ta: str, tb: str, signals: dict, form_trends: dict, h2h: d
     return _ucl_insight_text_pipeline(ta, tb, signals, form_trends, h2h, outcome, eval_data)
 
 
+_AGGREGATE_ONLY_NOTE = (
+    "Aggregate-only historical record; per-leg scores not available.")
+
+
 @ucl_app.get("/api/match/insight")
-def api_match_insight(match_id: str = ""):
+def api_match_insight(match_id: str = "", context: str = ""):
     if not match_id:
         return JSONResponse({"error": "match_id parameter required"})
     match_data = _find_state_match(match_id)
     match_round = (match_data or {}).get("round", "")
+    from_state = match_data is not None
 
     # League-phase fallback: search results.json when not found in bracket
     if not match_data:
@@ -729,6 +758,63 @@ def api_match_insight(match_id: str = ""):
     tb = match_data.get("team_b", "")
     if not ta or not tb:
         return JSONResponse({"error": "match teams not set"})
+
+    # ── Frozen wave-3 tie/match enrichment (additive) ────────────────────
+    # Knockout nodes carry their real provenance and per-leg detail; the
+    # FINAL is a single match, every other knockout round is a two-legged
+    # tie. League rows keep the plain "match" shape.
+    if from_state:
+        kind = "match" if match_round == "FINAL" else "tie"
+        legs = match_data.get("legs") or None
+        if kind == "match":
+            sc = match_data.get("score") or {}
+            home, away = sc.get("home"), sc.get("away")
+            aggregate = (
+                {"a": int(home), "b": int(away)}
+                if home is not None and away is not None else None)
+        else:
+            agg_a = match_data.get("aggregate_a")
+            agg_b = match_data.get("aggregate_b")
+            aggregate = (
+                {"a": int(agg_a), "b": int(agg_b)}
+                if agg_a is not None and agg_b is not None else None)
+        raw_pen_score = match_data.get("penalty_score")
+        pens = {
+            "played": bool(match_data.get("penalties_played")),
+            "winner": match_data.get("penalty_winner") or None,
+            "score": str(raw_pen_score) if raw_pen_score else None,
+        }
+        et = {
+            "played": bool(match_data.get("et_played")),
+            "a": int(match_data.get("et_a") or 0),
+            "b": int(match_data.get("et_b") or 0),
+        }
+        provenance = match_data.get("provenance") or "official"
+    else:
+        kind = "match"
+        legs = None
+        aggregate = None
+        pens = None
+        et = None
+        # League rows: reuse whatever canonical classification the row
+        # carries; results-ledger rows are official by domain rule.
+        provenance = match_data.get("provenance") or "official"
+
+    availability_note = (
+        _AGGREGATE_ONLY_NOTE
+        if kind == "tie" and legs is None and aggregate is not None
+        else None)
+
+    teams_resolved = bool(ta and tb)
+    what_if = {
+        "eligible": teams_resolved,
+        "reason": None if teams_resolved else "slot_unresolved",
+    }
+
+    # Simulated-context guard: a SIM-overlaid card asks for the same payload
+    # with simulated provenance; no backend state changes.
+    if context == "simulated":
+        provenance = "simulated"
 
     # Truthful match state (Exchange 2): league-phase rows carry scores but no
     # winner key, so derive played-ness from the canonical evidence instead of
@@ -795,11 +881,18 @@ def api_match_insight(match_id: str = ""):
         "match_id": match_id,
         "round": match_data.get("round"),
         "teams": {"a": ta, "b": tb},
+        "kind": kind,
+        "legs": legs,
+        "aggregate": aggregate,
+        "pens": pens,
+        "et": et,
+        "availability_note": availability_note,
+        "what_if": what_if,
         "played": played_flag,
         "score": score,
         "winner": winner or None,
         "match_status": "played" if played_flag else "scheduled",
-        "provenance": "official",
+        "provenance": provenance,
         "signals": signals_with_weights,
         "blended_prob": blended_prob,
         "prob_available": prob_available,
@@ -854,14 +947,24 @@ def api_what_if(req: dict = None):
     fixtures_path = str(DATA_DIR / "fixtures.json")
     provider = RepoFixtureProvider(fixtures_path=fixtures_path).load()
     team_names = [t.name for t in provider.teams]
-    elo_ratings = fetch_team_elos(team_names)
-    if not elo_ratings:
-        elo_ratings = {}
+
+    def _coefficient_elos() -> dict:
         coefficients = {t.name: t.coefficient for t in provider.teams}
         max_coeff = max(coefficients.values()) if coefficients else 100
-        for t in team_names:
-            c = coefficients.get(t, 50)
-            elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
+        return {t: 1400.0 + (coefficients.get(t, 50) / max_coeff) * 400.0
+                for t in team_names}
+
+    # Elo resolution mirrors the season runner: reuse the boot-time ratings
+    # when present; only reach for ClubElo as a live fallback, and degrade
+    # to coefficient-derived ratings offline instead of failing the request.
+    elo_ratings = cache.get("elo_ratings") or {}
+    if not elo_ratings:
+        try:
+            elo_ratings = fetch_team_elos(team_names) or {}
+        except Exception:
+            elo_ratings = {}
+    if not elo_ratings:
+        elo_ratings = _coefficient_elos()
 
     baseline_elos = dict(elo_ratings)
     # Real played league matches are immutable facts in both scenarios.

@@ -298,6 +298,26 @@ function destroyModalCharts() {
   modalCharts = {};
 }
 
+// ── Intelligence modal opener (thin shared wrapper) ──────────────────
+// Fills the standard competition modal shell (#modalOverlay/#modalTitle/
+// #modalSub/#modalBody) with caller-supplied content and shows it. No
+// redesign: same ids/classes and close wiring installed by loadCompetition.
+function openIntelModal(opts) {
+  const overlay = document.getElementById("modalOverlay");
+  if (!overlay) return null;
+  const o = opts || {};
+  const titleEl = document.getElementById("modalTitle");
+  const subEl = document.getElementById("modalSub");
+  const bodyEl = document.getElementById("modalBody");
+  if (titleEl && o.titleHtml != null) titleEl.innerHTML = o.titleHtml;
+  if (subEl) subEl.textContent = o.sub != null ? String(o.sub) : "";
+  if (bodyEl && o.bodyHtml != null) bodyEl.innerHTML = o.bodyHtml;
+  overlay.classList.add("show");
+  const modal = overlay.querySelector(".modal");
+  if (modal) modal.scrollTop = 0;
+  return overlay;
+}
+
 // ── Bracket connector helpers (shared between wc.js and ucl.js) ──
 // Connectors are computed purely from the rendered DOM: each .match-card
 // carries data-mid plus a JSON-encoded data-parents array. No module-level
@@ -670,5 +690,6 @@ export {
   updateStatusBar,
   createSimPopup,
   showSimPopup,
+  openIntelModal,
   safeJson,
 };

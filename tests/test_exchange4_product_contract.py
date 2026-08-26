@@ -22,6 +22,9 @@ UCL_DATA = ROOT / "competitions" / "ucl" / "data"
 @pytest.fixture
 def snapshot_mode(monkeypatch):
     import web.startup as startup
+    # Pin snapshot through the server lifespan too (it re-runs the startup
+    # flow, which now defaults to "auto" without a TTY): zero network.
+    monkeypatch.setenv("FOOTBALL_SNAPSHOT", "1")
     startup._last_decision = startup.StartupDecision("snapshot", "")
     yield
     startup._last_decision = None
@@ -78,8 +81,12 @@ class TestCompetitionRegistry:
         assert wc["reason"] == "no_unplayed_matches"
         assert wc["request_state"] == "not_requested"
         ucl = REGISTRY.get("ucl").simulation()
-        # Current dataset: league complete but KO undecided -> projectable.
-        assert ucl["availability"] == "available"
+        # Exchange 3 availability flip: the tracked UCL season is COMPLETED
+        # on disk (champion on file), so season-wide controls are honestly
+        # "not_needed"; runs stay server-side eligible as labeled what-if.
+        # (Era-proof undecided-season coverage lives in
+        # test_ucl_availability_available_when_ko_undecided below.)
+        assert ucl["availability"] == "not_needed"
 
     def test_server_mounts_come_from_registry(self, snapshot_mode):
         from web.server import app as server_app

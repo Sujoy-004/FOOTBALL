@@ -341,6 +341,14 @@ def compute_overview() -> dict:
     # Authoritative competition phase (competition brain owns derivation).
     from competitions.worldcup.src.pipeline import compute_competition_phase
     data["phase"] = boot_step("Competition Phase", lambda: compute_competition_phase(DATA_DIR), boot_log)
+    # Season-lifecycle view (same key contract as the UCL discover output),
+    # reusing the phase report just computed instead of re-deriving it.
+    try:
+        from competitions.worldcup.src.pipeline import season_lifecycle
+        phase_report = data["phase"] if isinstance(data["phase"], dict) else None
+        data["lifecycle"] = season_lifecycle(DATA_DIR, phase=phase_report)
+    except Exception:
+        data["lifecycle"] = {}
     # Freshness from the persisted refresh report (survives cache rebuilds).
     try:
         lr = json.loads(
@@ -462,6 +470,7 @@ def api_overview():
 
         "has_simulation": has_sim,
         "n_unplayed": unplayed_match_count(),
+        "lifecycle": cache.get("lifecycle", {}),
     })
 
 

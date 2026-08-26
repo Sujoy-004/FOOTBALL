@@ -1,16 +1,31 @@
-"""Interactive startup flow: choose live API access or snapshot data.
+"""Startup data-acquisition decision flow.
 
-Runs once at server startup (inside the FastAPI lifespan) and answers a
-single question: can we attempt live access with configured credentials?
+Runs once at server startup (inside the FastAPI lifespan) and decides how
+this session acquires competition data.
+
+Policy: fresh acquisition FIRST, validated snapshot FALLBACK.
 
 Decision flow:
-    usable FOOTBALL_DATA_ORG_KEY configured?
-        ├─ yes ─▶ live mode (no prompt)
+    FOOTBALL_SNAPSHOT=1 set?
+        ├─ yes ─▶ snapshot (explicit offline session, zero network)
         └─ no
-           interactive TTY?
-            ├─ yes ─▶ menu: [1] enter key (validated live, session-only)
-            │              [2] snapshot (skips refresh, marked stale)
-            └─ no  ─▶ snapshot (never blocks)
+           usable FOOTBALL_DATA_ORG_KEY configured?
+            ├─ yes ─▶ live-configured (no prompt)
+            └─ no
+               interactive TTY?
+                ├─ yes ─▶ menu: [1] enter key (validated live, session-only)
+                │           [2] offline snapshot (no scraping this session)
+                └─ no  ─▶ auto: attempt each provider now; successes refresh
+                           state, failures fall back to the last validated
+                           on-disk stores with truthful stale/error reports.
+                           Never blocks, never prompts.
+
+"snapshot" mode is EXPLICIT only: menu choice [2], the FOOTBALL_SNAPSHOT
+override, or a forced StartupDecision("snapshot") (tests). In snapshot mode
+the fetch wrappers self-gate and make ZERO network requests. Every other
+decision kind ("auto", "live-configured", "live-entered") lets the wrappers
+attempt acquisition; failed attempts never delete or overwrite existing
+factual stores.
 
 Entered keys live in session memory only; nothing is persisted.
 """
@@ -22,17 +37,35 @@ import os
 import sys
 from typing import Callable, NamedTuple
 
+SNAPSHOT_ENV_VAR = "FOOTBALL_SNAPSHOT"
+
+_FALSY_ENV_VALUES = ("", "0", "false", "no", "off")
+
 
 class StartupDecision(NamedTuple):
-    mode: str          # "live-configured" | "live-entered" | "snapshot"
-    fdo_key: str       # session key to propagate ("" for snapshot)
+    mode: str          # "live-configured" | "live-entered" | "auto" | "snapshot"
+    fdo_key: str       # session key to propagate ("" for auto/snapshot)
 
 
 _last_decision: StartupDecision | None = None
 
 
+def _env_snapshot_forced() -> bool:
+    """True when FOOTBALL_SNAPSHOT explicitly requests an offline session."""
+    raw = os.environ.get(SNAPSHOT_ENV_VAR, "")
+    return raw.strip().lower() not in _FALSY_ENV_VALUES
+
+
 def is_snapshot_mode() -> bool:
-    """True once startup chose snapshot mode (unset => live semantics)."""
+    """True ONLY for explicit offline-snapshot sessions.
+
+    Snapshot semantics require an explicit choice: interactive menu [2],
+    the FOOTBALL_SNAPSHOT env override, or a forced decision of kind
+    "snapshot" (tests). The default "auto" decision attempts fresh
+    acquisition and therefore is NOT snapshot mode.
+    """
+    if _env_snapshot_forced():
+        return True
     return _last_decision is not None and _last_decision.mode == "snapshot"
 
 
@@ -100,6 +133,14 @@ def run_startup_flow(
         global _last_decision
         _last_decision = StartupDecision(mode, key)
         return _last_decision
+
+    # Explicit offline override wins over everything else this session
+    # (documented in .env.example): zero scraping regardless of keys/TTY.
+    if _env_snapshot_forced():
+        echo(f"{SNAPSHOT_ENV_VAR} is set — working offline with existing "
+             "snapshot data (no scraping this session).")
+        return _decide("snapshot", "")
+
     existing = os.getenv("FOOTBALL_DATA_ORG_KEY", "")
 
     # Case A — usable key already configured: no prompt.
@@ -108,11 +149,14 @@ def run_startup_flow(
         echo("Starting server...")
         return _decide("live-configured", existing)
 
-    # Case B — no key: prompt only in an interactive terminal.
+    # Case B — no key, no TTY: default policy is to ATTEMPT fresh
+    # acquisition now ("auto"); provider failures fall back to the last
+    # validated on-disk stores with a truthful stale/error report.
     if not interactive_fn():
         echo("No valid live API key configured (non-interactive) — "
-             "using existing snapshot data.")
-        return _decide("snapshot", "")
+             "attempting fresh acquisition; failures fall back to "
+             "existing stored data.")
+        return _decide("auto", "")
 
     echo("")
     echo("FOOTBALL Data Mode")
@@ -123,12 +167,13 @@ def run_startup_flow(
 
     while True:
         echo("[1] Enter an API key and refresh live data")
-        echo("[2] Continue using existing snapshot data")
+        echo("[2] Work offline with existing snapshot data "
+             "(no scraping this session)")
         choice = (input_fn("Choose [1/2]: ") or "").strip()
 
         if choice == "2":
-            echo("Starting with existing snapshot data.")
-            echo("Live refresh was skipped by user.")
+            echo("Working offline: using existing snapshot data; "
+                 "no scraping this session.")
             return _decide("snapshot", "")
 
         if choice != "1":
@@ -154,8 +199,8 @@ def run_startup_flow(
                 if sub == "1":
                     break                      # retry key entry
                 if sub == "2":
-                    echo("Starting with existing snapshot data.")
-                    echo("Live refresh was skipped by user.")
+                    echo("Working offline: using existing snapshot data; "
+                         "no scraping this session.")
                     return _decide("snapshot", "")
                 if sub == "3":
                     raise SystemExit(0)

@@ -50,6 +50,15 @@ CompetitionRegistry ── FastAPI shell ── dashboard
 
 ## Data acquisition & competition ingestors (Exchange 6)
 
+Acquisition policy (Exchange 3): fresh-first, snapshot-fallback. Every
+normal `python -m web.server` startup attempts each selected competition's
+provider/ingestor before rendering; a failed attempt falls back to the last
+validated on-disk stores and the UI says FALLBACK with the error. Explicit
+offline execution (`FOOTBALL_SNAPSHOT=1`, interactive menu choice [2],
+tests forcing the snapshot decision) performs zero network. Placeholder
+credentials select no provider at all. A failed scrape never mutates
+factual stores.
+
 Transport selection is shared (`web/common.get_data_provider`: BSD or
 football-data.org, chosen by keys/`DATA_PROVIDER`); everything after the raw
 events is competition-owned. Each brain exposes one authoritative ingestor —
@@ -129,6 +138,20 @@ user explicitly requests a simulation. Simulated output is labeled as such
 and lives in separate stores (`sim_cache`, `snapshot.json`) — it can never
 overwrite canonical data. Missing required data is reported unavailable;
 it is never represented as 0.0 or fabricated fixtures.
+
+Season lifecycle (Exchange 3) is discovered per competition, never
+hardcoded: each brain derives `stage` (completed / active / future /
+unknown), progress and historical seasons from on-disk evidence (UCL:
+`src/lifecycle.py::discover`; WC: `season_lifecycle`), optionally
+cross-checked against a provider-declared current season (mismatch is
+surfaced, never silently adopted). Lifecycle drives UX: completed seasons
+render facts only — no season-wide Monte Carlo controls; per-match/tie
+What-If remains available through Match Intelligence and is always labeled
+SIMULATED with the factual history unchanged. Active seasons expose
+"X played / Y remaining" and simulate only unresolved matches. Overview
+probability tables are labeled "Monte Carlo aggregate over N runs"; any
+sampled realization shown in a bracket is labeled "example simulated
+bracket (one sampled run)".
 
 Lifecycle states exposed by both competitions: `not_requested`,
 `running`, `completed`, `not_needed`, `unavailable`, `failed`,
