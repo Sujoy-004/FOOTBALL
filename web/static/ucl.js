@@ -6,7 +6,7 @@ import {
 } from "./shared.js";
 
 const API = "/ucl/api";
-const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, simProjections: null, simMeta: null, simRunCount: 0 };
+const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, simProjections: null, simMeta: null, simRunCount: 0, simBracketRounds: null, simPlayoff: null };
 
 const sigLabels = {
   refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form",
@@ -34,6 +34,17 @@ async function loadAll() {
     appState.bracket = br;
     appState.odds = o.odds || [];
     appState.signals = sig.signals || {};
+
+    // Session persistence: a run completed against this server process
+    // must survive page reloads and hash navigation. The backend keeps
+    // completed results in its session store; hydrate from it so the UI
+    // reflects reality instead of claiming no simulation was ever run.
+    if (d.simulation && d.simulation.request_state === "completed"
+        && !(appState.simProjections && appState.simProjections.length)) {
+      try {
+        _applySimulationPayload(await safeJson(API + "/simulation"), 0);
+      } catch (e) { console.error("simulation hydration failed:", e); }
+    }
   } catch (e) {
     console.error("loadAll API fetch failed:", e);
     const tab = document.getElementById("tab-overview");
@@ -231,6 +242,15 @@ function bindSimulationControls() {
   if (startBtn) startBtn.addEventListener("click", startUclSimulation);
 }
 
+function _applySimulationPayload(sim, fallbackRuns) {
+  appState.simProjections = (sim.odds || []).slice()
+    .sort(function(a, b) { return (b.champion_prob || 0) - (a.champion_prob || 0); });
+  appState.simMeta = sim.simulation_meta || {};
+  appState.simRunCount = (sim.simulation_meta && sim.simulation_meta.count) || fallbackRuns || 0;
+  appState.simBracketRounds = sim.bracket_rounds || null;
+  appState.simPlayoff = sim.playoff || null;
+}
+
 async function startUclSimulation() {
   if (_uclSimPolling) return;
   const runs = _selectedRuns();
@@ -276,11 +296,13 @@ async function startUclSimulation() {
       }, 250);
     });
     const sim = await safeJson(API + "/simulation");
-    appState.simProjections = (sim.odds || []).slice()
-      .sort(function(a, b) { return (b.champion_prob || 0) - (a.champion_prob || 0); });
-    appState.simMeta = sim.simulation_meta || {};
-    appState.simRunCount = (sim.simulation_meta && sim.simulation_meta.count) || runs;
+    _applySimulationPayload(sim, runs);
+    // The overview gate reads request_state from appState.data, which was
+    // fetched before this run existed. Refetch so the just-completed run is
+    // visible instead of being masked by the stale boot-time state.
+    appState.data = await safeJson(API + "/data");
     renderOverview();
+    renderBracket();
   } catch (e) {
     if (lbl) lbl.textContent = "Error: " + (e.message || "unknown");
   } finally {
@@ -444,14 +466,74 @@ async function renderBracket() {
   });
 
   if (!anyKoData) {
-    // Distinguish "stage not reached / undecided" from genuinely missing data.
+    // Truth model: absence of knockout data in the snapshot is NOT proof
+    // the stage was never played. Only a genuinely unreadable store may
+    // speak about readability; otherwise report plain unavailability.
     const koStore = (appState.data && appState.data.phase
       && appState.data.phase.stores
       && appState.data.phase.stores.knockout_results) || "missing";
-    const msg = koStore === "unavailable"
-      ? "Knockout data exists but could not be read."
-      : "No knockout results yet - the knockout stage has not been played.";
-    koSection += '<div class="dim" style="padding:8px;font-size:11px">' + msg + '</div>';
+    koSection += '<div class="dim" style="padding:8px;font-size:11px">'
+      + (koStore === "unavailable"
+        ? "Knockout data exists but could not be read."
+        : "Knockout results unavailable in current snapshot.")
+      + '</div>';
+
+    // Simulation overlay: when a completed run projected the unresolved
+    // knockout path, surface it clearly marked as SIMULATION. Factual
+    // wording above stays untouched; real results (anyKoData) always win.
+    const simLive = appState.data && appState.data.simulation
+      && appState.data.simulation.request_state === "completed";
+    const simRounds = simLive ? (appState.simBracketRounds || {}) : {};
+    const simTies = simLive ? (appState.simPlayoff || []) : [];
+    const metaM = appState.simMeta || {};
+    let anySimKo = false;
+    const _simHeader = function() {
+      if (anySimKo) return;
+      anySimKo = true;
+      koSection += '<div style="margin:12px 0 4px;padding:4px 8px;font-size:11px;color:#8E44AD">'
+        + 'SIMULATION &middot; projected knockout path'
+        + (appState.simRunCount ? ' &middot; ' + appState.simRunCount.toLocaleString() + ' runs' : '')
+        + (metaM.seed != null ? ' &middot; seed ' + metaM.seed : '')
+        + ' &middot; not real results</div>';
+    };
+    if (simTies.length) {
+      _simHeader();
+      koSection += '<div style="margin:10px 0 4px"><strong style="color:#8E44AD;font-size:12px">Knockout Playoffs</strong></div>';
+      koSection += '<div class="ko-round-cards">';
+      simTies.forEach(function(t) {
+        const ta = t.team_a || "?"; const tb = t.team_b || "?";
+        const aggStr = t.aggregate_a !== undefined
+          ? (t.aggregate_a + " - " + t.aggregate_b) : "TBD";
+        const winner = t.winner || "";
+        koSection += '<div class="ko-match-card" style="border-color:#8E44AD">'
+          + '<div class="ko-round-tag">Playoff &middot; SIM</div>'
+          + '<div class="ko-teams"><span>' + ta + '</span><span class="ko-vs">vs</span><span>' + tb + '</span></div>'
+          + '<div class="ko-score">' + aggStr + '</div>'
+          + (winner ? '<div class="ko-winner">Winner: ' + winner + '</div>' : '')
+          + '</div>';
+      });
+      koSection += '</div>';
+    }
+    roundMeta.forEach(function(rm) {
+      const ms = simRounds[rm.key] || [];
+      if (!ms.length) return;
+      _simHeader();
+      koSection += '<div style="margin:10px 0 4px"><strong style="color:#8E44AD;font-size:12px">' + rm.label + '</strong></div>';
+      koSection += '<div class="ko-round-cards">';
+      ms.forEach(function(sm) {
+        const ta = sm.team_a || "?"; const tb = sm.team_b || "?";
+        const agg = sm.aggregate_a !== undefined ? (sm.aggregate_a + " - " + sm.aggregate_b) :
+                     (sm.home_score !== undefined ? (sm.home_score + "-" + sm.away_score) : "TBD");
+        const winner = sm.winner || "";
+        koSection += '<div class="ko-match-card" style="border-color:#8E44AD">'
+          + '<div class="ko-round-tag">' + rm.label + ' &middot; SIM</div>'
+          + '<div class="ko-teams"><span>' + ta + '</span><span class="ko-vs">vs</span><span>' + tb + '</span></div>'
+          + '<div class="ko-score">' + agg + '</div>'
+          + (winner ? '<div class="ko-winner">Winner: ' + winner + '</div>' : '')
+          + '</div>';
+      });
+      koSection += '</div>';
+    });
   }
   koSection += '</div>';
   html += koSection;
