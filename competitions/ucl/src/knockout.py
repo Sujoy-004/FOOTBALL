@@ -532,14 +532,20 @@ def simulate_knockout_tree(
                 stage[loser] = "FINAL"
                 stage[winner] = "CHAMPION"
 
-            # Build round entry
+            # Build round entry — self-contained identity so consumers never
+            # need the matchups list to know which round/quarter a match
+            # belongs to or which bracket slots fed it.
             round_entry = {
                 "match_id": match["match_id"],
+                "round": round_name,
+                "quarter": match.get("quarter"),
                 "team_a": team_a,
                 "team_b": team_b,
                 "winner": winner,
                 "result": result,
             }
+            if match.get("source_matches"):
+                round_entry["source_matches"] = list(match["source_matches"])
             round_results.append(round_entry)
 
         # Promote winners to next round stage label
@@ -557,6 +563,29 @@ def simulate_knockout_tree(
 
     # ── 3. Determine champion ─────────────────────────────────────────────
     champion = winner_progression.get("final_01")
+
+    # ── 4. Resolve team slots on the returned matchups ────────────────────
+    # QF/SF/FINAL matchup dicts are built with null teams (slots resolve
+    # only through winner_progression during traversal). Fill them at
+    # return time so the returned per-round structures carry resolved team
+    # names for every completed match. Safe across MC iterations: these
+    # dicts are freshly constructed per call inside build_r16_bracket, so
+    # no shared template object is mutated.
+    for match in updated_matchups:
+        winner = winner_progression.get(match["match_id"])
+        if winner is None:
+            continue
+        match["winner"] = winner
+        match["resolved"] = True
+        if match.get("team_a") is None or match.get("team_b") is None:
+            sources = match.get("source_matches") or []
+            names = [
+                winner_progression[src]
+                for src in sources
+                if src in winner_progression
+            ]
+            if len(sources) == 2 and len(names) == 2:
+                match["team_a"], match["team_b"] = names
 
     return {
         "matchups": updated_matchups,

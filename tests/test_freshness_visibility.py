@@ -20,6 +20,18 @@ WC_DATA = ROOT / "competitions" / "worldcup" / "data"
 UCL_DATA = ROOT / "competitions" / "ucl" / "data"
 
 
+@pytest.fixture(autouse=True)
+def isolated_refresh_ledger(tmp_path, monkeypatch):
+    """Redirect freshness-ledger writes away from the production file."""
+    import competitions.worldcup.src.pipeline as wc_pipeline
+    import web.ucl_app as ucl_app
+    monkeypatch.setattr(wc_pipeline, "_last_refresh_report_path",
+                        lambda: tmp_path / "last_refresh.json")
+    monkeypatch.setattr(ucl_app, "_refresh_report_path",
+                        lambda: tmp_path / "last_refresh.json")
+    yield
+
+
 class _DeadProvider:
     """Provider stub that authenticates/fetches like a broken endpoint."""
     last_error = "HTTP 400: Your API token is invalid."

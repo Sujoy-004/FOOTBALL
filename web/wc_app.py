@@ -195,7 +195,8 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
             "signals": sigs,
         }
 
-    rounds_order = ["R32", "R16", "QF", "SF", "TPP", "FINAL"]
+    from competitions.worldcup.src.pipeline import bracket_stage_order
+    rounds_order = bracket_stage_order()
     rounds_data = {r: [] for r in rounds_order}
     for data in resolved.values():
         r = data["round"]
@@ -499,9 +500,13 @@ def api_bracket_full():
 
 @wc_app.get("/api/bracket/data")
 def api_bracket_data():
+    from competitions.worldcup.src.pipeline import (
+        bracket_stage_labels, bracket_stage_order)
     return JSONResponse({
         "chronological_rounds": build_chronological_matches().get("rounds", []),
         "knockout_tree": build_knockout_tree(),
+        "stage_order": bracket_stage_order(),
+        "stage_labels": bracket_stage_labels(),
     })
 
 

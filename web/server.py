@@ -49,7 +49,7 @@ STATIC_DIR = HERE / "static"
 
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
-    from web.startup import apply_session_overrides, is_snapshot_mode, run_startup_flow
+    from web.startup import apply_session_overrides, run_startup_flow
 
     # Interactive live-vs-snapshot decision (never prompts without a TTY).
     decision = run_startup_flow()
@@ -59,13 +59,13 @@ async def lifespan(app: fastapi.FastAPI):
     import web.wc_app as _wc
     import web.ucl_app as _ucl
 
-    # Explicit snapshot mode: ZERO live provider/API requests this session.
-    if not is_snapshot_mode():
-        _wc._fetch_live_data()
+    # Each app's fetch wrapper self-gates on snapshot mode: calling it
+    # unconditionally records a truthful skipped/snapshot report (zero
+    # network in snapshot) instead of leaving the refresh ledger empty.
+    _wc._fetch_live_data()
     _wc.cache = _wc.compute_overview()
 
-    if not is_snapshot_mode():
-        _ucl._fetch_live_data()
+    _ucl._fetch_live_data()
     # Route through compute_all so every on-disk state gets the truthful
     # boot: real results -> results view; no/partial results -> honest
     # simulation-available view (never an empty cache).

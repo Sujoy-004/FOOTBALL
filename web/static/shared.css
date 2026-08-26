@@ -717,3 +717,62 @@ body {
 .competition-worldcup .m-sim-btn { color: #D3A376; }
 .competition-worldcup .m-sim-btn:hover { color: #FFE0B2; }
 .competition-worldcup .chart-row .cname { color: #FFF2DF; }
+
+/* ── Shared bracket extras (Exchange 2) ── */
+.match-card.mc-played { border-left: 3px solid #168777; }
+.match-card.mc-upcoming { border-left: 3px solid #15565B; }
+.match-card.mc-tbd { border-left: 3px solid #140C30; opacity: 0.5; }
+.match-card .badge-sim,
+.match-card .badge-manual {
+  position: absolute; top: 2px; right: 4px; font-size: 8px; letter-spacing: 0.5px;
+  padding: 0 4px; border-radius: 3px; line-height: 1.5;
+}
+.match-card .badge-sim { color: #8E44AD; border: 1px solid rgba(142,68,173,0.45); background: rgba(142,68,173,0.12); }
+.match-card .badge-manual { color: #15565B; border: 1px solid rgba(21,86,91,0.45); background: rgba(21,86,91,0.12); }
+.m-sim-line { font-size: 9px; color: #8E44AD; text-align: center; line-height: 1.2; margin-top: 1px; }
+.tie-detail { margin-top: 3px; font-size: 9px; color: #F6DBC088; line-height: 1.5; }
+.champ-banner {
+  border: 1px solid rgba(22,160,133,0.5); background: rgba(22,160,133,0.08);
+  color: #16A085; font-weight: bold; font-size: 12px; letter-spacing: 0.5px;
+  border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;
+}
+.champ-banner-sim { color: #8E44AD; border-color: rgba(142,68,173,0.5); background: rgba(142,68,173,0.08); }
+
+/* Acquisition status panel */
+.acq-panel {
+  border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 8px 10px;
+  background: rgba(20,12,48,0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  font-size: 11px;
+}
+.acq-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.acq-comp { color: #F6DBC0; font-weight: bold; letter-spacing: 0.5px; }
+.acq-src { padding: 0 6px; border-radius: 3px; font-size: 9px; letter-spacing: 0.5px; border: 1px solid; }
+.acq-src-live { color: #168777; border-color: rgba(22,135,119,0.45); background: rgba(22,135,119,0.10); }
+.acq-src-snap { color: #e6a817; border-color: rgba(230,168,23,0.45); background: rgba(230,168,23,0.08); }
+.acq-src-stale { border-style: dashed; }
+.acq-updated { color: #15565B; font-size: 10px; margin-bottom: 4px; }
+.acq-error-line { color: #ff6b6b; font-size: 10px; margin-bottom: 4px; }
+.acq-stage { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; border-top: 1px solid rgba(21,61,76,0.25); }
+.acq-glyph { width: 26px; flex-shrink: 0; font-weight: bold; letter-spacing: 0.5px; }
+.acq-ok .acq-glyph { color: #168777; }
+.acq-pend .acq-glyph { color: #e6a817; }
+.acq-err .acq-glyph { color: #ff6b6b; }
+.acq-unav .acq-glyph { color: #15565B; }
+.acq-label { flex: 1; color: #F6DBC0; }
+.acq-count { color: #16A085; font-variant-numeric: tabular-nums; }
+.acq-detail { color: #F6DBC088; font-size: 10px; text-align: right; }
+.acq-err .acq-detail { color: #ff6b6b; }
+
+/* WC earth-tone theme for shared bracket extras + acquisition panel */
+.competition-worldcup .tie-detail { color: #FFF2DF88; }
+.competition-worldcup .badge-sim { color: #B07CC6; border-color: rgba(176,124,198,0.45); background: rgba(176,124,198,0.10); }
+.competition-worldcup .badge-manual { color: #C4955A; border-color: rgba(196,149,90,0.45); background: rgba(196,149,90,0.10); }
+.competition-worldcup .m-sim-line { color: #B07CC6; }
+.competition-worldcup .acq-panel { background: rgba(62,37,34,0.55); border-color: rgba(140,110,99,0.3); }
+.competition-worldcup .acq-comp { color: #FFF2DF; }
+.competition-worldcup .acq-src-live { color: #C4955A; border-color: rgba(196,149,90,0.45); background: rgba(196,149,90,0.10); }
+.competition-worldcup .acq-label { color: #FFF2DF; }
+.competition-worldcup .acq-count { color: #D3A376; }
+.competition-worldcup .acq-updated { color: #8C6E63; }
+.competition-worldcup .acq-detail { color: #FFF2DF88; }
+.competition-worldcup .acq-stage { border-top-color: rgba(140,110,99,0.25); }

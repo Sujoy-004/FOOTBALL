@@ -1,6 +1,7 @@
 """Fetch and process live match results from BSD API — generic pipeline."""
 
 import logging
+from dataclasses import dataclass, field
 
 from football_core.data_providers.bsd_provider import BSDDataProvider
 
@@ -129,4 +130,56 @@ def find_group_match(
         if {match["team_a"], match["team_b"]} == {home_norm, away_norm}:
             return match["match_id"]
     return None
+
+
+# ── IngestReport — competition-agnostic ingestion outcome ───────────────────
+
+
+def _zero_finished_counters() -> dict:
+    return {
+        "received": 0,
+        "normalized": 0,
+        "ingested": 0,
+        "skipped_unmatchable": 0,
+        "skipped_no_target": 0,
+    }
+
+
+@dataclass
+class IngestReport:
+    """Structured outcome of one ingestion run (truth-ingestion contract).
+
+    Competition-agnostic by design: no sport- or competition-specific
+    vocabulary appears here. Invariant for ``finished`` counters:
+    ``received == normalized == ingested + skipped_unmatchable +
+    skipped_no_target`` (``ingested`` ⊆ ``normalized``).
+
+    ``stages`` entries are plain dicts shaped ``{key, label, state, count,
+    detail}`` with ``state`` limited to ``ok | pending | error |
+    unavailable``.
+    """
+
+    provider: str
+    attempted: bool
+    success: bool
+    error: str | None
+    stale: bool = False
+    last_success_at: str | None = None
+    finished: dict = field(default_factory=_zero_finished_counters)
+    stages: list = field(default_factory=list)
+    written_files: list = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        """JSON-safe plain-dict form of the report."""
+        return {
+            "provider": self.provider,
+            "attempted": self.attempted,
+            "success": self.success,
+            "error": self.error,
+            "stale": self.stale,
+            "last_success_at": self.last_success_at,
+            "finished": dict(self.finished),
+            "stages": [dict(stage) for stage in self.stages],
+            "written_files": list(self.written_files),
+        }
 

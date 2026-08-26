@@ -1,12 +1,18 @@
 // ═══ UCL 2025/26 Module ═══
 import {
-  destroyModalCharts, modalCharts, drawBracketConnectors,
+  destroyModalCharts, modalCharts,
   updateStatusBar, competitions, showSimPopup,
-  buildTable, safeJson,
+  buildTable, safeJson, renderBracketTree, renderAcquisitionPanel,
 } from "./shared.js";
 
 const API = "/ucl/api";
-const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, simProjections: null, simMeta: null, simRunCount: 0, simBracketRounds: null, simPlayoff: null };
+const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, simProjections: null, simMeta: null, simRunCount: 0, simBracket: null, simChampion: null };
+
+function _esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 
 const sigLabels = {
   refined_elo: "Refined Elo", market_odds: "Market Odds", rolling_form: "Rolling Form",
@@ -211,10 +217,82 @@ async function renderOverview() {
   }
   html += '</div>';
 
+  // ── Data acquisition status (truthful snapshot/live/stale report) ──
+  html += '<div class="chart-section"><div class="title">Data Acquisition</div>';
+  html += '<div id="uclAcqPanel"></div>';
   html += '</div>';
 
   tab.innerHTML = html;
   bindSimulationControls();
+  renderAcquisitionPanel(document.getElementById("uclAcqPanel"), _buildAcquisition(d));
+}
+
+// Build the truthful acquisition object from /api/data (+ phase stores).
+function _buildAcquisition(d) {
+  const refresh = d.refresh || {};
+  const phase = d.phase || {};
+  const stores = phase.stores || {};
+  const availability = d.availability || {};
+  const attempted = refresh.attempted === true;
+  const succeeded = refresh.success === true;
+  const snapshotMode = !!refresh.skipped_reason;
+
+  let mode, source, error = null, stale = false;
+  if (snapshotMode) {
+    mode = "snapshot";
+    source = "Snapshot";
+  } else {
+    mode = "live";
+    source = refresh.provider || "LIVE";
+    if (attempted && !succeeded) {
+      stale = true;
+      error = refresh.error || "live refresh failed";
+    }
+  }
+
+  // DataAvailability store value -> checklist state ('ok' only when the
+  // backend reports the store as available; everything else is unavailable).
+  const storeState = function(v) { return v === "available" ? "ok" : "unavailable"; };
+  const koStore = stores.knockout_results || availability.knockout_results;
+
+  const stages = [
+    {
+      key: "teams", label: "Teams",
+      state: d.n_teams ? "ok" : "unavailable",
+      count: d.n_teams != null ? d.n_teams : null,
+    },
+    {
+      key: "league", label: "League results",
+      state: (!attempted || succeeded) ? "ok" : "error",
+      count: refresh.n_matches != null ? refresh.n_matches : null,
+      detail: (attempted && !succeeded) ? (refresh.error || "refresh failed") : undefined,
+    },
+    {
+      key: "playoff", label: "Knockout Playoffs",
+      state: storeState(stores.playoff || koStore),
+      count: null,
+    },
+    {
+      key: "knockout", label: "Knockout results",
+      state: storeState(koStore),
+      count: null,
+    },
+    {
+      key: "champion", label: "Champion",
+      state: phase.champion ? "ok" : (koStore === "available" ? "pending" : "unavailable"),
+      count: null,
+    },
+  ];
+
+  return {
+    competition: "UCL 2025/26",
+    mode,
+    source,
+    updatedAt: refresh.last_refresh || null,
+    error,
+    stale,
+    stages,
+  };
 }
 
 // ── Simulation controls (shared product contract) ────────────────────
@@ -247,8 +325,9 @@ function _applySimulationPayload(sim, fallbackRuns) {
     .sort(function(a, b) { return (b.champion_prob || 0) - (a.champion_prob || 0); });
   appState.simMeta = sim.simulation_meta || {};
   appState.simRunCount = (sim.simulation_meta && sim.simulation_meta.count) || fallbackRuns || 0;
-  appState.simBracketRounds = sim.bracket_rounds || null;
-  appState.simPlayoff = sim.playoff || null;
+  // Canonical bracket-shaped projection payload (stages keyed like /api/bracket).
+  appState.simBracket = sim.bracket || null;
+  appState.simChampion = sim.champion || null;
 }
 
 async function startUclSimulation() {
@@ -348,12 +427,17 @@ async function renderBracket() {
   const br = appState.bracket;
   if (!br) { tab.innerHTML = "<p>No bracket data.</p>"; return; }
 
-  const playoff = br.playoff || [];
-  const rounds = br.bracket_rounds || {};
-  const lmd = br.league_matchdays || {};
+  const stages = br.stages || {};
+  const lmd = (stages.league && stages.league.matchdays) || br.league_matchdays || {};
   const lmdKeys = Object.keys(lmd).sort();
 
   let html = "";
+
+  // Champion banner: only for a real champion on file in results mode.
+  const availability = br.availability || (appState.data && appState.data.availability) || {};
+  if (br.mode === "results" && br.champion && availability.knockout_results === "available") {
+    html += '<div class="champ-banner">Champion: ' + _esc(br.champion) + "</div>";
+  }
 
   // ── Section 1: League Phase (interactive matchday accordion) ──
   if (lmdKeys.length) {
@@ -396,150 +480,246 @@ async function renderBracket() {
     html += mdHtml + '</div></div>';
   }
 
-  // ── Section 2: Knockout Playoffs ──
-  if (playoff.length) {
-    html += '<div class="chart-section"><div class="title">Knockout Playoffs</div><div class="playoff-grid">';
-    playoff.forEach(function(t) {
-      const aggStr = t.aggregate_a + "-" + t.aggregate_b;
-      let detail = aggStr + " agg";
-      if (t.et_played) detail += " (ET)";
-      if (t.penalties_played) detail += " (pens)";
-      html += '<div class="playoff-card match-clickable" data-match-id="' + (t.match_id || "") + '"'
-        + ' data-team-a="' + (t.team_a || "") + '" data-team-b="' + (t.team_b || "") + '"'
-        + ' style="cursor:pointer">'
-        + '<div class="p-title">Tie ' + t.tie_num + '</div>'
-        + '<div class="p-teams"><span class="p-team">' + (t.team_a || "?") + '</span><span class="p-score">' + aggStr + '</span><span class="p-team">' + (t.team_b || "?") + '</span></div>'
-        + '<div class="p-detail">' + detail + "</div></div>";
-    });
-    html += "</div></div>";
-  } else {
-    // Data-derived qualification view: positions 9-24 from final standings.
-    html += '<div class="chart-section"><div class="title">Knockout Playoffs</div>';
-    const st = appState.standings || [];
-    const qual = st.filter(function(r) { return r.zone === "playoff"; });
-    if (qual.length) {
-      html += '<div class="dim" style="padding:4px 8px;font-size:11px;color:#15565B">'
-        + 'Playoff results unavailable in current snapshot. Qualified teams (positions 9-24):</div>';
-      html += '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px">';
-      qual.forEach(function(r) {
-        html += '<span class="zone-badge playoff">' + r.position + '. ' + r.team + '</span>';
-      });
-      html += '</div>';
-    } else {
-      html += '<div class="dim" style="padding:8px;color:#15565B;font-size:11px">Playoff results unavailable in current snapshot.</div>';
-    }
-    html += '</div>';
-  }
-
-  // ── Section 3: Knockout Rounds (R16 -> QF -> SF -> Final) ──
-  const roundMeta = [
-    { key: "R16", label: "Round of 16" },
-    { key: "QF", label: "Quarter-Finals" },
-    { key: "SF", label: "Semi-Finals" },
-    { key: "FINAL", label: "Final" },
-  ];
-
-  let koSection = '<div class="chart-section"><div class="title">Knockout Stage</div>';
-  let anyKoData = false;
-
-  roundMeta.forEach(function(rm) {
-    const ms = rounds[rm.key] || [];
-    if (!ms.length) return;
-    anyKoData = true;
-    koSection += '<div style="margin:10px 0 4px"><strong style="color:#16A085;font-size:12px">' + rm.label + '</strong></div>';
-    koSection += '<div class="ko-round-cards">';
-    ms.forEach(function(m) {
-      const ta = m.team_a || "?"; const tb = m.team_b || "?";
-      const agg = m.aggregate_a !== undefined ? (m.aggregate_a + " - " + m.aggregate_b) :
-                   (m.home_score !== undefined ? (m.home_score + "-" + m.away_score) : "TBD");
-      const winner = m.winner || "";
-      koSection += '<div class="ko-match-card match-clickable"'
-        + ' data-match-id="' + (m.match_id || "") + '"'
-        + ' data-team-a="' + ta + '" data-team-b="' + tb + '">'
-        + '<div class="ko-round-tag">' + rm.label + '</div>'
-        + '<div class="ko-teams"><span>' + ta + '</span><span class="ko-vs">vs</span><span>' + tb + '</span></div>'
-        + '<div class="ko-score">' + agg + '</div>'
-        + (winner ? '<div class="ko-winner">Winner: ' + winner + '</div>' : '')
-        + '</div>';
-    });
-    koSection += '</div>';
-  });
-
-  if (!anyKoData) {
-    // Truth model: absence of knockout data in the snapshot is NOT proof
-    // the stage was never played. Only a genuinely unreadable store may
-    // speak about readability; otherwise report plain unavailability.
-    const koStore = (appState.data && appState.data.phase
-      && appState.data.phase.stores
-      && appState.data.phase.stores.knockout_results) || "missing";
-    koSection += '<div class="dim" style="padding:8px;font-size:11px">'
-      + (koStore === "unavailable"
-        ? "Knockout data exists but could not be read."
-        : "Knockout results unavailable in current snapshot.")
-      + '</div>';
-
-    // Simulation overlay: when a completed run projected the unresolved
-    // knockout path, surface it clearly marked as SIMULATION. Factual
-    // wording above stays untouched; real results (anyKoData) always win.
-    const simLive = appState.data && appState.data.simulation
-      && appState.data.simulation.request_state === "completed";
-    const simRounds = simLive ? (appState.simBracketRounds || {}) : {};
-    const simTies = simLive ? (appState.simPlayoff || []) : [];
-    const metaM = appState.simMeta || {};
-    let anySimKo = false;
-    const _simHeader = function() {
-      if (anySimKo) return;
-      anySimKo = true;
-      koSection += '<div style="margin:12px 0 4px;padding:4px 8px;font-size:11px;color:#8E44AD">'
-        + 'SIMULATION &middot; projected knockout path'
-        + (appState.simRunCount ? ' &middot; ' + appState.simRunCount.toLocaleString() + ' runs' : '')
-        + (metaM.seed != null ? ' &middot; seed ' + metaM.seed : '')
-        + ' &middot; not real results</div>';
-    };
-    if (simTies.length) {
-      _simHeader();
-      koSection += '<div style="margin:10px 0 4px"><strong style="color:#8E44AD;font-size:12px">Knockout Playoffs</strong></div>';
-      koSection += '<div class="ko-round-cards">';
-      simTies.forEach(function(t) {
-        const ta = t.team_a || "?"; const tb = t.team_b || "?";
-        const aggStr = t.aggregate_a !== undefined
-          ? (t.aggregate_a + " - " + t.aggregate_b) : "TBD";
-        const winner = t.winner || "";
-        koSection += '<div class="ko-match-card" style="border-color:#8E44AD">'
-          + '<div class="ko-round-tag">Playoff &middot; SIM</div>'
-          + '<div class="ko-teams"><span>' + ta + '</span><span class="ko-vs">vs</span><span>' + tb + '</span></div>'
-          + '<div class="ko-score">' + aggStr + '</div>'
-          + (winner ? '<div class="ko-winner">Winner: ' + winner + '</div>' : '')
-          + '</div>';
-      });
-      koSection += '</div>';
-    }
-    roundMeta.forEach(function(rm) {
-      const ms = simRounds[rm.key] || [];
-      if (!ms.length) return;
-      _simHeader();
-      koSection += '<div style="margin:10px 0 4px"><strong style="color:#8E44AD;font-size:12px">' + rm.label + '</strong></div>';
-      koSection += '<div class="ko-round-cards">';
-      ms.forEach(function(sm) {
-        const ta = sm.team_a || "?"; const tb = sm.team_b || "?";
-        const agg = sm.aggregate_a !== undefined ? (sm.aggregate_a + " - " + sm.aggregate_b) :
-                     (sm.home_score !== undefined ? (sm.home_score + "-" + sm.away_score) : "TBD");
-        const winner = sm.winner || "";
-        koSection += '<div class="ko-match-card" style="border-color:#8E44AD">'
-          + '<div class="ko-round-tag">' + rm.label + ' &middot; SIM</div>'
-          + '<div class="ko-teams"><span>' + ta + '</span><span class="ko-vs">vs</span><span>' + tb + '</span></div>'
-          + '<div class="ko-score">' + agg + '</div>'
-          + (winner ? '<div class="ko-winner">Winner: ' + winner + '</div>' : '')
-          + '</div>';
-      });
-      koSection += '</div>';
-    });
-  }
-  koSection += '</div>';
-  html += koSection;
+  // ── Section 2: Knockout (shared bracket renderer) ──
+  html += '<div class="chart-section"><div class="title">Knockout Stage</div>';
+  html += '<div id="uclKoHost"></div>';
+  html += "</div>";
 
   tab.innerHTML = html;
   bindMatchClicks(tab);
+  _renderUclKo();
+}
+
+function _renderUclKo() {
+  const host = document.getElementById("uclKoHost");
+  if (!host) return;
+  const br = appState.bracket || {};
+  const stages = br.stages || {};
+  const d = appState.data || {};
+
+  // Simulation projection payload shares the canonical stages shape under
+  // sim.bracket; merge by match id below (REAL DATA ALWAYS WINS).
+  const simActive = !!(d.simulation && d.simulation.request_state === "completed"
+    && appState.simBracket && appState.simBracket.stages);
+  const simStages = simActive ? appState.simBracket.stages : {};
+  const metaM = appState.simMeta || {};
+
+  const simById = {};
+  Object.keys(simStages).forEach(function(k) {
+    ((simStages[k] || {}).matches || []).forEach(function(t) {
+      if (t && t.id) simById[t.id] = t;
+    });
+  });
+
+  let sawSim = false;
+  const order = br.stage_order || ["league", "playoff", "R16", "QF", "SF", "FINAL"];
+  const outStages = order
+    .filter(function(k) { return k !== "league" && stages[k]; })
+    .map(function(key) {
+      const src = stages[key];
+      const realMatches = Array.isArray(src.matches) ? src.matches : [];
+      const merged = [];
+      const presentIds = {};
+      realMatches.forEach(function(t) {
+        const tid = t ? (t.id || t.match_id) : null;
+        if (!tid) return;
+        presentIds[tid] = true;
+        const m = _tieToMatch(t, src.label);
+        if (!_isFactual(t) && simById[tid]) {
+          merged.push(_withSimOverlay(m, simById[tid]));
+          sawSim = true;
+        } else {
+          merged.push(m);
+        }
+      });
+      // Simulation-only ties for slots the real payload does not define.
+      ((simStages[key] || {}).matches || []).forEach(function(sm) {
+        if (sm && sm.id && !presentIds[sm.id]) {
+          merged.push(_tieToMatch(sm, src.label));
+          sawSim = true;
+        }
+      });
+      return {
+        id: key,
+        label: src.label || key,
+        layout: src.layout || (key === "playoff" ? "list" : "tree"),
+        matches: merged,
+      };
+    });
+
+  const totalCards = outStages.reduce(function(n, s) { return n + s.matches.length; }, 0);
+
+  let pre = "";
+
+  // Simulation provenance note + projected champion: shown whenever a
+  // completed run exists in this session (alternate-history analysis),
+  // even when every knockout slot is already factual and no SIM card is
+  // overlaid. Real facts always take precedence in the tree itself.
+  if (simActive) {
+    pre += '<div style="margin:12px 0 4px;padding:4px 8px;font-size:11px;color:#8E44AD">'
+      + "SIMULATION &middot; projected knockout path"
+      + (appState.simRunCount ? " &middot; " + appState.simRunCount.toLocaleString() + " runs" : "")
+      + (metaM.seed != null ? " &middot; seed " + metaM.seed : "")
+      + " &middot; not real results</div>";
+    if (appState.simChampion) {
+      pre += '<div class="champ-banner champ-banner-sim">Projected champion: '
+        + _esc(appState.simChampion) + " (SIMULATED)</div>";
+    }
+  }
+
+  // Truth model: absence of knockout data in the snapshot is NOT proof the
+  // stage was never played. Only a genuinely unreadable store may speak
+  // about readability; otherwise report plain unavailability.
+  if (!totalCards) {
+    const koStore = (d.phase && d.phase.stores && d.phase.stores.knockout_results) || "missing";
+    pre += '<div class="dim" style="padding:8px;font-size:11px">'
+      + (koStore === "unavailable"
+        ? "Knockout data exists but could not be read."
+        : "Knockout results unavailable in current snapshot.")
+      + "</div>";
+  }
+
+  // Playoff fallback: when no tie cards exist for that stage, surface the
+  // data-derived qualification view (positions 9-24 from final standings).
+  const playoffStage = outStages.filter(function(s) { return s.id === "playoff"; })[0];
+  if (playoffStage && !playoffStage.matches.length) {
+    const st = appState.standings || [];
+    const qual = st.filter(function(r) { return r.zone === "playoff"; });
+    if (qual.length) {
+      pre += '<div class="dim" style="padding:4px 8px;font-size:11px;color:#15565B">'
+        + "Playoff results unavailable in current snapshot. Qualified teams (positions 9-24):</div>";
+      pre += '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px">';
+      qual.forEach(function(r) {
+        pre += '<span class="zone-badge playoff">' + r.position + ". " + _esc(r.team) + "</span>";
+      });
+      pre += "</div>";
+    } else {
+      pre += '<div class="dim" style="padding:8px;color:#15565B;font-size:11px">Playoff results unavailable in current snapshot.</div>';
+    }
+  }
+
+  host.innerHTML = pre + '<div id="uclKoTree"></div>';
+  if (totalCards) {
+    renderBracketTree(document.getElementById("uclKoTree"), { stages: outStages }, {
+      cardThemeClass: "",
+      simLabel: "SIM",
+      onMatch: function(m) { openTiePopup(m); },
+    });
+  }
+}
+
+// A real tie is factual once decided; only then does the simulation overlay
+// stay off (REAL DATA ALWAYS WINS).
+function _isFactual(t) {
+  return t.status === "played" || !!t.winner;
+}
+
+// Map a canonical TIE onto the shared renderer's match shape. True leg order
+// is preserved: no winner-first reordering anywhere.
+function _tieToMatch(t, stageLabel) {
+  const legs = Array.isArray(t.legs) ? t.legs : [];
+  const played = t.status === "played" || !!t.winner;
+  const hasAgg = t.aggregate_a != null && t.aggregate_b != null;
+  const teamsKnown = !!(t.team_a && t.team_b);
+  const detailParts = [];
+  let resultLine = null;
+
+  const appendOutcomeNotes = function() {
+    if (t.et_played) detailParts.push("(ET)");
+    if (t.penalties_played) {
+      if (t.penalty_a != null && t.penalty_b != null) detailParts.push("PENS " + t.penalty_a + "-" + t.penalty_b);
+      else if (t.penalty_score) detailParts.push("PENS " + t.penalty_score);
+    }
+    if (t.winner) detailParts.push("WINNER " + t.winner);
+  };
+
+  if (!legs.length && t.score && t.score.home != null) {
+    // Final-style single match.
+    resultLine = t.score.home + "-" + t.score.away;
+    appendOutcomeNotes();
+  } else if (legs.length >= 2) {
+    resultLine = hasAgg ? ("AGG " + t.aggregate_a + "-" + t.aggregate_b) : null;
+    legs.forEach(function(l) {
+      detailParts.push("LEG " + (l.leg != null ? l.leg : "?")
+        + "  " + (l.home || "?") + " "
+        + (l.home_score != null ? l.home_score : "-") + "-"
+        + (l.away_score != null ? l.away_score : "-") + " "
+        + (l.away || "?"));
+    });
+    if (hasAgg) {
+      let aggLine = "AGGREGATE " + (t.team_a || "?") + " " + t.aggregate_a + "-" + t.aggregate_b + " " + (t.team_b || "?");
+      if (t.et_played) aggLine += " (ET)";
+      detailParts.push(aggLine);
+    }
+    if (t.penalties_played) {
+      if (t.penalty_a != null && t.penalty_b != null) detailParts.push("PENS " + t.penalty_a + "-" + t.penalty_b);
+      else if (t.penalty_score) detailParts.push("PENS " + t.penalty_score);
+    }
+    if (t.winner) detailParts.push("WINNER " + t.winner);
+  } else if (legs.length === 1) {
+    const l = legs[0];
+    resultLine = l.home_score != null ? (l.home_score + "-" + l.away_score) : null;
+    appendOutcomeNotes();
+  } else if (hasAgg && played) {
+    resultLine = "AGG " + t.aggregate_a + "-" + t.aggregate_b;
+    appendOutcomeNotes();
+  }
+
+  let status;
+  if (played) status = "played";
+  else if (t.status === "scheduled" || t.status === "unavailable" || t.status === "tbd") status = t.status;
+  else status = teamsKnown ? "scheduled" : "tbd";
+
+  const id = t.id || t.match_id || "";
+  return {
+    id,
+    parents: (Array.isArray(t.source_matches) && t.source_matches.length)
+      ? t.source_matches.slice() : null,
+    teamA: t.team_a || null,
+    teamB: t.team_b || null,
+    status,
+    provenance: t.provenance || "official",
+    winner: t.winner || null,
+    resultLine: resultLine != null ? resultLine : (teamsKnown ? "vs" : "?-?"),
+    // Adapter owns every HTML fragment it emits; escape all dynamic text.
+    detailHtml: detailParts.map(function(p) { return _esc(p); }).join("<br>"),
+    sim: null,
+    clickable: teamsKnown,
+    _stageLabel: stageLabel || "",
+  };
+}
+
+// Attach the simulation annotation for an undecided real slot.
+function _withSimOverlay(m, sm) {
+  const out = Object.assign({}, m);
+  const hasAgg = sm.aggregate_a != null && sm.aggregate_b != null;
+  const probA = typeof sm.prob_a === "number" ? sm.prob_a : undefined;
+  const line = hasAgg ? ("SIM " + sm.aggregate_a + "-" + sm.aggregate_b) : null;
+  if (line == null && probA == null) return out;
+  out.sim = { line, probA };
+  return out;
+}
+
+// Lightweight tie popup: two-legged ties have no single-match insight
+// endpoint, so show the adapter-built breakdown instead of the match modal.
+function openTiePopup(m) {
+  destroyModalCharts();
+  document.getElementById("modalTitle").innerHTML =
+    '<span style="color:#16A085">' + _esc(m.teamA || "TBD") + "</span>"
+    + ' <span style="color:#15565B;font-weight:normal">vs</span> '
+    + '<span style="color:#e67e22">' + _esc(m.teamB || "TBD") + "</span>";
+  document.getElementById("modalSub").textContent =
+    (m._stageLabel ? m._stageLabel + " - " : "") + m.id;
+  let body = "";
+  if (m.resultLine) {
+    body += '<div class="stat-card" style="margin:4px 0"><div class="val">'
+      + _esc(m.resultLine) + '</div><div class="lbl">Result</div></div>';
+  }
+  if (m.detailHtml) body += '<div class="insight-box">' + m.detailHtml + "</div>";
+  body += '<div class="dim" style="padding:6px 4px;font-size:11px">'
+    + "Per-match signal insights are available for individual fixtures via the League Phase rows.</div>";
+  document.getElementById("modalBody").innerHTML = body;
+  document.getElementById("modalOverlay").classList.add("show");
 }
 
 // ES modules create no globals, so inline onclick attributes cannot reach

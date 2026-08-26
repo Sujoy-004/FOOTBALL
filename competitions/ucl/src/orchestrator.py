@@ -15,7 +15,7 @@ import logging
 import os
 import random
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,6 +28,212 @@ from competitions.ucl.result import SimulationResult
 from competitions.ucl.src.calibrate import _EmptyResultProvider
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SimulationResultWithState(SimulationResult):
+    """SimulationResult plus the canonical sim-state payload.
+
+    The extra ``sim_state_payload`` field carries the clean Monte Carlo
+    bracket snapshot shaped exactly for
+    :func:`competitions.ucl.src.state.build_competition_state` with
+    ``mode="simulation"``. Subclassing keeps every existing attribute
+    consumer (report.py, web/ucl_app.py what-if) working unchanged.
+    """
+
+    sim_state_payload: dict = field(default_factory=dict)
+
+
+def _top_champion_probs(teams: dict[str, dict]) -> dict[str, float]:
+    """Champion-probability counts for the UI projected-champion banner.
+
+    Only teams with a nonzero probability are kept; ordering is
+    deterministic (probability descending, then team name) so the payload
+    serialises identically across runs with the same seed.
+    """
+    probs = {
+        name: td.get("champion_prob", 0.0)
+        for name, td in (teams or {}).items()
+        if td.get("champion_prob")
+    }
+    return {name: probs[name] for name in sorted(probs, key=lambda n: (-probs[n], n))}
+
+
+def _tie_legs(tie: dict) -> list[dict] | None:
+    """Normalise a two-legged tie result into canonical leg rows.
+
+    Each row reports the ACTUAL host of that leg first: the engine plays
+    leg 1 with ``team_a`` at home and leg 2 with ``team_b`` at home
+    (D-03/D-05), while its raw ``leg2`` dict repeats the leg-1 ordering.
+    No winner-based reordering happens anywhere.
+    """
+    legs = []
+    for idx in (1, 2):
+        leg = tie.get(f"leg{idx}")
+        if not isinstance(leg, dict):
+            continue
+        if idx == 1:
+            home, away = leg.get("team_a"), leg.get("team_b")
+            home_score, away_score = leg.get("score_a"), leg.get("score_b")
+        else:
+            home, away = leg.get("team_b"), leg.get("team_a")
+            home_score, away_score = leg.get("score_b"), leg.get("score_a")
+        legs.append({
+            "leg": idx,
+            "home": home,
+            "away": away,
+            "home_score": home_score,
+            "away_score": away_score,
+        })
+    return legs or None
+
+
+def _winner_first_tie_fields(tie: dict, winner: str | None) -> dict:
+    """Re-map aggregate/ET/penalty scores onto a winner-first basis.
+
+    Engine results score from team_a's perspective (leg-1 host); display
+    ties present winner as team_a, so per-side numbers swap whenever the
+    leg-1 host lost.
+    """
+    agg_a, agg_b = tie.get("aggregate_a", 0), tie.get("aggregate_b", 0)
+    full_a, full_b = tie.get("agg_a_full"), tie.get("agg_b_full")
+    et_a, et_b = tie.get("et_a", 0), tie.get("et_b", 0)
+    pen_a, pen_b = tie.get("penalty_a", 0), tie.get("penalty_b", 0)
+    engine_team_a = (tie.get("leg1") or {}).get("team_a")
+    if winner is not None and engine_team_a is not None and winner != engine_team_a:
+        agg_a, agg_b = agg_b, agg_a
+        full_a, full_b = full_b, full_a
+        et_a, et_b = et_b, et_a
+        pen_a, pen_b = pen_b, pen_a
+    return {
+        "aggregate_a": agg_a,
+        "aggregate_b": agg_b,
+        "agg_a_full": full_a if full_a is not None else agg_a,
+        "agg_b_full": full_b if full_b is not None else agg_b,
+        "et_played": bool(tie.get("et_played")),
+        "et_a": et_a,
+        "et_b": et_b,
+        "penalties_played": bool(tie.get("penalties_played")),
+        "penalty_a": pen_a,
+        "penalty_b": pen_b,
+    }
+
+
+def _sim_playoff_entries(
+    playoff_ties: dict[int, dict],
+    playoff_winners: dict[int, str],
+) -> list[dict]:
+    """Flat playoff-tie entries keyed by ``tie_num`` (state.py contract)."""
+    entries = []
+    for tie_num in sorted(playoff_ties):
+        tie = playoff_ties[tie_num]
+        winner = playoff_winners.get(tie_num, tie.get("winner"))
+        loser = tie.get("loser")
+        entry = {
+            "tie_num": tie_num,
+            "team_a": winner,
+            "team_b": loser,
+            "winner": winner,
+            "loser": loser,
+        }
+        entry.update(_winner_first_tie_fields(tie, winner))
+        entry["legs"] = _tie_legs(tie)
+        entries.append(entry)
+    return entries
+
+
+def _sim_bracket_entry(match: dict) -> dict:
+    """One knockout-round entry in the state.py bracket contract.
+
+    Identity fields live at top level; the raw engine result blob rides
+    under ``result`` (state flattens it). The blob is copied so the
+    engine-owned dicts are never mutated, and penalty attribution is made
+    explicit for coherent ``played_pens`` status downstream.
+    """
+    result_blob = dict(match.get("result") or {})
+    winner = match.get("winner")
+    if result_blob.get("penalties_played") and winner:
+        result_blob.setdefault("penalty_winner", winner)
+    entry = {
+        "match_id": match["match_id"],
+        "round": match.get("round"),
+        "quarter": match.get("quarter"),
+        "team_a": match.get("team_a"),
+        "team_b": match.get("team_b"),
+        "winner": winner,
+        "source_matches": match.get("source_matches"),
+        # Explicit canonical legs (true per-leg hosts) so state never has
+        # to re-derive them from the raw engine blob.
+        "legs": _tie_legs(result_blob),
+        "result": result_blob,
+    }
+    return entry
+
+
+def _sim_final_entry(match: dict) -> dict:
+    """Single-match FINAL entry (state.py ``_build_final_node`` shape)."""
+    blob = match.get("result") or {}
+    winner = match.get("winner")
+    penalties_played = bool(blob.get("penalties_played"))
+    pen_a, pen_b = blob.get("penalty_a", 0), blob.get("penalty_b", 0)
+    return {
+        "match_id": match["match_id"],
+        "round": "FINAL",
+        "team_a": match.get("team_a"),
+        "team_b": match.get("team_b"),
+        "winner": winner,
+        "score": {"home": blob.get("score_a"), "away": blob.get("score_b")},
+        "et_played": bool(blob.get("et_played")),
+        "et_a": blob.get("et_a", 0),
+        "et_b": blob.get("et_b", 0),
+        "penalties_played": penalties_played,
+        "penalty_winner": winner if penalties_played else None,
+        "penalty_score": f"{pen_a}-{pen_b}" if penalties_played else None,
+        "source_matches": match.get("source_matches"),
+    }
+
+
+def build_sim_state_payload(
+    playoff_ties: dict[int, dict],
+    playoff_winners: dict[int, str],
+    bracket_rounds: dict[str, list[dict]],
+    champion_probs: dict[str, float] | None = None,
+) -> dict:
+    """Assemble the clean simulation payload for the canonical state layer.
+
+    Shaped EXACTLY for
+    :func:`competitions.ucl.src.state.build_competition_state` with
+    ``mode="simulation"``:
+
+    - ``playoff``: list of flat per-tie entries (``tie_num``, teams,
+      legs, aggregates, ET/penalty detail, winner);
+    - ``playoff_winners``: ``{tie_number: winning team}``;
+    - ``bracket_rounds``: ``{R16|QF|SF|FINAL: [entries]}`` with stable
+      ``match_id`` values (from bracket_rules.json), resolved team names
+      for every completed match, leg-level ``result`` blobs, and
+      ``source_matches`` on QF..FINAL;
+    - ``champion_probs``: optional champion-probability passthrough.
+
+    Deterministic: same inputs produce an identical JSON serialisation.
+    """
+    rounds_out: dict[str, list[dict]] = {}
+    for round_name in ("R16", "QF", "SF", "FINAL"):
+        matches = bracket_rounds.get(round_name) or []
+        if round_name == "FINAL":
+            rounds_out[round_name] = [_sim_final_entry(m) for m in matches]
+        else:
+            rounds_out[round_name] = [_sim_bracket_entry(m) for m in matches]
+    payload = {
+        "playoff_winners": {
+            tie_num: playoff_winners[tie_num]
+            for tie_num in sorted(playoff_winners)
+        },
+        "playoff": _sim_playoff_entries(playoff_ties, playoff_winners),
+        "bracket_rounds": rounds_out,
+    }
+    if champion_probs:
+        payload["champion_probs"] = dict(champion_probs)
+    return payload
 
 
 def _resolve_elo_ratings(team_names: list[str]) -> dict[str, float]:
@@ -189,7 +395,14 @@ def build_simulation_result(
     tree_result = simulate_knockout_tree(bracket, elo_ratings, rng)
     stages = track_knockout_stages(standings, tree_result)
 
-    return SimulationResult(
+    sim_state_payload = build_sim_state_payload(
+        playoff_result["ties"],
+        playoff_result["winners"],
+        tree_result["rounds"],
+        champion_probs=_top_champion_probs(mc_result["teams"]),
+    )
+
+    return SimulationResultWithState(
         snapshot_date=mc_result["snapshot_date"],
         n_iterations=mc_result["n_iterations"],
         seed=mc_result["seed"],
@@ -200,6 +413,7 @@ def build_simulation_result(
         bracket_rounds=tree_result["rounds"],
         bracket_champion=tree_result["champion"],
         stages=stages,
+        sim_state_payload=sim_state_payload,
     )
 
 
@@ -664,41 +878,12 @@ def run_compute_all(
 
     engine = _step("Build signal engine", lambda: build_signal_engine(elo_ratings))
 
-    bracket_rules_path = os.path.join(data_dir, "bracket_rules.json")
-    bracket_rules = {}
-    try:
-        bracket_rules = json.loads(Path(bracket_rules_path).read_text(encoding="utf-8"))
-    except Exception:
-        pass
-
-    source_map = {}
-    for m in bracket_rules.get("matches", []):
-        if m.get("source_matches"):
-            source_map[m["match_id"]] = m["source_matches"]
-
-    enriched_bracket = {}
-    for round_name, matches in result.bracket_rounds.items():
-        enriched_bracket[round_name] = []
-        for m in matches:
-            entry = dict(m)
-            if m["match_id"] in source_map:
-                entry["source_matches"] = source_map[m["match_id"]]
-            enriched_bracket[round_name].append(entry)
-
-    playoff_display = []
-    for tie_num in sorted(result.playoff_ties):
-        tie = result.playoff_ties[tie_num]
-        winner = result.playoff_winners.get(tie_num, "?")
-        loser = tie.get("loser", "?")
-        playoff_display.append({
-            "tie_num": tie_num, "team_a": winner, "team_b": loser,
-            "winner": winner, "aggregate_a": tie.get("aggregate_a", 0),
-            "aggregate_b": tie.get("aggregate_b", 0),
-            "et_played": tie.get("et_played", False),
-            "penalties_played": tie.get("penalties_played", False),
-            "et_a": tie.get("et_a", 0), "et_b": tie.get("et_b", 0),
-            "penalty_a": tie.get("penalty_a", 0), "penalty_b": tie.get("penalty_b", 0),
-        })
+    # Exchange 2 unification: one clean payload (built inside
+    # build_simulation_result) feeds both the canonical state layer and
+    # the legacy display keys below — no duplicate enrichment here.
+    payload = result.sim_state_payload
+    playoff_display = payload["playoff"]
+    enriched_bracket = payload["bracket_rounds"]
 
     sorted_teams = sorted(result.teams.items(), key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]))
     odds_display = []
@@ -777,6 +962,7 @@ def run_compute_all(
         "standings": standings_display,
         "playoff": playoff_display,
         "bracket_rounds": enriched_bracket,
+        "sim_state_payload": payload,
         "odds": odds_display,
         "signals": signal_stats,
         "elo_ratings": elo_ratings,

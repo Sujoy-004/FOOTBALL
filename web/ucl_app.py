@@ -95,10 +95,20 @@ _mode: str = "results"
 service = SimulationTaskService()
 
 
+def _refresh_report_path() -> Path:
+    """Seam for tests: location of the shared freshness ledger."""
+    return Path(__file__).parent / "last_refresh.json"
+
+
 def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None,
                           n_matches: int | None = None, n_updated: int | None = None,
-                          finished: dict | None = None) -> dict:
-    """Record the UCL refresh outcome for the API surface + last_refresh.json."""
+                          finished: dict | None = None,
+                          stages: list | None = None) -> dict:
+    """Record the UCL refresh outcome for the API surface + last_refresh.json.
+
+    Single writer for the UCL entry: the ingestion itself never touches the
+    ledger, it only returns the structured IngestReport payload.
+    """
     global _refresh_report
     _refresh_report = {
         "provider": provider_name,
@@ -110,9 +120,10 @@ def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None
         **({"n_matches": n_matches} if n_matches is not None else {}),
         **({"n_updated": n_updated} if n_updated is not None else {}),
         **({"finished": finished} if finished is not None else {}),
+        **({"stages": stages} if stages is not None else {}),
     }
     try:
-        refresh_path = Path(__file__).parent / "last_refresh.json"
+        refresh_path = _refresh_report_path()
         refresh_data = {}
         if refresh_path.exists():
             try:
@@ -134,20 +145,24 @@ _refresh_report: dict = {}
 
 
 def _fetch_live_data() -> None:
+    """Delegate acquisition to the UCL brain's ingestor.
+
+    The web layer owns transport selection (shared get_data_provider) and
+    the freshness ledger (single writer below); every normalization,
+    skeleton-derivation and store-write decision lives in
+    competitions.ucl.src.ingest.
+    """
     import logging
     logger = logging.getLogger(__name__)
 
     from web.startup import is_snapshot_mode
     if is_snapshot_mode():
-        import logging as _logging
-        _logging.getLogger(__name__).warning(
-            "[UCL] snapshot mode - live refresh skipped")
+        logger.warning("[UCL] snapshot mode - live refresh skipped")
         boot_log_local.append({"step": "UCL live fetch", "status": "skip",
                                "elapsed": 0.0,
                                "output": f"[{ts()}] Snapshot mode - live refresh skipped"})
-        # Parity with WC (Exchange 4): record WHY no live fetch happened so
-        # the frontend can disclose snapshot data instead of silently
-        # looking live-fresh.
+        # Parity with WC: record WHY no live fetch happened so the frontend
+        # can disclose snapshot data instead of silently looking live-fresh.
         globals()["_refresh_report"] = {
             "provider": None, "attempted": False, "success": True,
             "stale": True,
@@ -156,6 +171,8 @@ def _fetch_live_data() -> None:
         return
 
     from web.common import get_data_provider
+    from competitions.ucl.src.pipeline import fetch_live_data as _brain_fetch
+
     provider = get_data_provider(BSD_API_KEY, FOOTBALL_DATA_ORG_KEY, UCL_LEAGUE_ID)
     if provider is None:
         logger.warning("[UCL] No data provider — skipping live fetch")
@@ -163,190 +180,30 @@ def _fetch_live_data() -> None:
         _store_refresh_report(False, "no data provider configured", None)
         return
 
-    raw = provider.fetch_matches(competition_id="CL")
-    if not raw:
-        err = getattr(provider, "last_error", None) or "provider returned 0 matches"
-        logger.warning("[UCL] Refresh failed: %s — UCL data may be STALE", err)
-        boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] Provider returned 0 matches ({err})"})
-        _store_refresh_report(False, err, type(provider).__name__)
-        return
-
-    logger.info("[UCL] Fetched %d raw matches from %s", len(raw), type(provider).__name__)
-
-    # Build alias lookup
-    from football_core.fetcher import _build_alias_lookup, normalize_team
-    aliases_path = DATA_DIR / "team_aliases.json"
-    aliases = json.loads(aliases_path.read_text(encoding="utf-8")) if aliases_path.exists() else {}
-    alias_lookup = _build_alias_lookup(aliases, bracket=[])
-
-    fixtures_path = DATA_DIR / "fixtures.json"
-    if not fixtures_path.exists():
-        logger.warning("[UCL] No fixtures.json — cannot process matches")
-        return
-    fixtures = json.loads(fixtures_path.read_text(encoding="utf-8"))
-    for team in fixtures.get("schedule", {}).get("teams", []):
-        alias_lookup[team["name"].strip().lower()] = team["name"]
-
-    # Build fixture lookup for league phase
-    fixture_lookup: dict[tuple[str, str], str] = {}
-    for md in fixtures.get("schedule", {}).get("matchdays", []):
-        for match in md:
-            pair = (match["team_a"], match["team_b"])
-            fixture_lookup[pair] = match["match_id"]
-            fixture_lookup[(match["team_b"], match["team_a"])] = match["match_id"]
-
-    KO_STAGE_MAP = {
-        "PLAYOFFS": "playoff",
-        "LAST_16": "R16",
-        "QUARTER_FINALS": "QF",
-        "SEMI_FINALS": "SF",
-        "FINAL": "FINAL",
-    }
-
-    results_path = DATA_DIR / "results.json"
-    existing_results = _load_results()
-    existing_by_id = {m["match_id"]: m for m in existing_results}
-
-    ko_path = DATA_DIR / "knockout_results.json"
-    knockout_raw = _load_knockout_results() or {}
-    knockout = {
-        "playoff": knockout_raw.get("playoff", []),
-        "rounds": knockout_raw.get("rounds", {"R16": [], "QF": [], "SF": [], "FINAL": []}),
-    }
-
-    ko_legs: dict[str, dict[frozenset, list[dict]]] = {s: {} for s in KO_STAGE_MAP}
-    n_new = 0
-    from football_core.fetcher import new_ingestion_stats, count_finished, note_unmatchable, note_no_target, summarize_ingestion
-    ucl_stats = new_ingestion_stats()
-
-    for event in raw:
-        status = (event.get("status") or "").lower()
-        if status != "finished":
-            continue
-        count_finished(ucl_stats)
-
-        home_name = event.get("home_team", "")
-        away_name = event.get("away_team", "")
-        home_norm = normalize_team(home_name, alias_lookup)
-        away_norm = normalize_team(away_name, alias_lookup)
-
-        if home_norm is None or away_norm is None:
-            note_unmatchable(ucl_stats, logger, home_name, away_name,
-                             (event.get("home_score"), event.get("away_score")))
-            continue
-        ucl_stats["normalized"] += 1
-
-        home_score = event.get("home_score") or 0
-        away_score = event.get("away_score") or 0
-        stage = event.get("stage", "")
-
-        if stage == "LEAGUE_STAGE":
-            match_id = fixture_lookup.get((home_norm, away_norm))
-            if match_id is None:
-                note_no_target(ucl_stats, logger, home_norm, away_norm)
-                continue
-            updated = False
-            if match_id in existing_by_id:
-                entry = existing_by_id[match_id]
-                if entry["home_score"] != home_score or entry["away_score"] != away_score:
-                    entry["home_score"] = home_score
-                    entry["away_score"] = away_score
-                    updated = True
-            else:
-                existing_results.append({
-                    "match_id": match_id, "team_a": home_norm, "team_b": away_norm,
-                    "home_score": home_score, "away_score": away_score,
-                })
-                updated = True
-            if updated:
-                n_new += 1
-                logger.info("[UCL] League %s: %s %d-%d %s", match_id, home_norm, home_score, away_score, away_norm)
-        elif stage in KO_STAGE_MAP:
-            ko_legs[stage].setdefault(frozenset([home_norm, away_norm]), []).append({
-                "home": home_norm, "away": away_norm,
-                "home_score": home_score, "away_score": away_score,
-            })
-
-    # Process knockout legs — aggregate per team pair
-    for api_stage, ties in ko_legs.items():
-        internal_round = KO_STAGE_MAP[api_stage]
-        for pair, legs in ties.items():
-            scores: dict[str, int] = {}
-            for leg in legs:
-                scores[leg["home"]] = scores.get(leg["home"], 0) + leg["home_score"]
-                scores[leg["away"]] = scores.get(leg["away"], 0) + leg["away_score"]
-
-            if internal_round == "playoff":
-                for entry in knockout["playoff"]:
-                    if {entry["team_a"], entry["team_b"]} == pair:
-                        agg_a = scores.get(entry["team_a"], 0)
-                        agg_b = scores.get(entry["team_b"], 0)
-                        w = entry["team_a"] if agg_a > agg_b else (entry["team_b"] if agg_b > agg_a else None)
-                        if entry.get("aggregate_a") != agg_a or entry.get("aggregate_b") != agg_b:
-                            entry["aggregate_a"] = agg_a
-                            entry["aggregate_b"] = agg_b
-                            entry["winner"] = w or entry.get("winner", "")
-                            n_new += 1
-                            logger.info("[UCL] Playoff %s vs %s: %d-%d", entry["team_a"], entry["team_b"], agg_a, agg_b)
-                        break
-            else:
-                for entry in knockout["rounds"].get(internal_round, []):
-                    if {entry["team_a"], entry["team_b"]} == pair:
-                        agg_a = scores.get(entry["team_a"], 0)
-                        agg_b = scores.get(entry["team_b"], 0)
-                        w = entry["team_a"] if agg_a > agg_b else (entry["team_b"] if agg_b > agg_a else None)
-                        if entry.get("score_a") != agg_a or entry.get("score_b") != agg_b:
-                            entry["score_a"] = agg_a
-                            entry["score_b"] = agg_b
-                            entry["winner"] = w or entry.get("winner", "")
-                            n_new += 1
-                            logger.info("[UCL] %s %s vs %s: %d-%d", internal_round, entry["team_a"], entry["team_b"], agg_a, agg_b)
-                        break
-
-    # Write updated files
-    if n_new > 0:
-        results_path.write_text(
-            json.dumps({"matches": existing_results}, indent=2, ensure_ascii=False), encoding="utf-8",
-        )
-        final_entries = knockout["rounds"].get("FINAL", [])
-        if final_entries and final_entries[0].get("winner"):
-            knockout_raw["champion"] = final_entries[0]["winner"]
-        ko_path.write_text(
-            json.dumps({"matches": knockout_raw}, indent=2, ensure_ascii=False), encoding="utf-8",
-        )
-        logger.info("[UCL] Updated %d matches — files saved", n_new)
-
-    # Update last_refresh.json
-    refresh_path = Path(__file__).parent / "last_refresh.json"
-    refresh_data = {}
-    if refresh_path.exists():
-        try:
-            refresh_data = json.loads(refresh_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    summarize_ingestion(ucl_stats, logger, "UCL")
-    provider_error = getattr(provider, "last_error", None)
-    refresh_data["ucl"] = {
-        "last_refresh": datetime.now(timezone.utc).isoformat(),
-        "mode": type(provider).__name__,
-        "ok": bool(raw),
-        "error": provider_error,
-        "stale": not bool(raw),
-        "n_matches": len(raw),
-        "n_updated": n_new,
-        "finished": ucl_stats,
-    }
-    refresh_path.write_text(
-        json.dumps(refresh_data, indent=2, ensure_ascii=False), encoding="utf-8",
+    summary = _brain_fetch(
+        str(DATA_DIR), BSD_API_KEY,
+        football_data_org_key=FOOTBALL_DATA_ORG_KEY,
+        ucl_league_id=UCL_LEAGUE_ID,
+        provider=provider,
     )
-
-    _store_refresh_report(True, None, type(provider).__name__,
-                          n_matches=len(raw), n_updated=n_new,
-                          finished=ucl_stats)
+    report = summary.get("report") or {}
+    ok = summary.get("status") == "ok"
+    provider_name = summary.get("provider_name") or type(provider).__name__
+    n_raw = int(summary.get("n_raw") or 0)
+    n_updated = int(summary.get("n_updated") or 0)
+    error = report.get("error") if not ok else getattr(provider, "last_error", None)
+    if not ok:
+        logger.warning("[UCL] Refresh failed: %s — UCL data may be STALE",
+                       error or "no ingestable matches")
+    _store_refresh_report(ok, error, provider_name,
+                          n_matches=n_raw, n_updated=n_updated,
+                          finished=report.get("finished"),
+                          stages=report.get("stages"))
     boot_log_local.append({
-        "step": "UCL live fetch", "status": "ok", "elapsed": 0.0,
-        "output": f"[{ts()}] {type(provider).__name__}: {len(raw)} raw matches, {n_new} updated",
+        "step": "UCL live fetch", "status": "ok" if ok else "skip", "elapsed": 0.0,
+        "output": f"[{ts()}] {provider_name}: {n_raw} raw matches, {n_updated} updated",
     })
+
 
 
 def _load_results() -> list[dict]:
@@ -474,7 +331,7 @@ def api_boot():
 
 @ucl_app.get("/api/simulation")
 def api_simulation():
-    return JSONResponse({
+    payload = {
         "odds": sim_cache.get("odds", []),
         "standings": sim_cache.get("standings", []),
         "signals": sim_cache.get("signals", {}),
@@ -485,9 +342,30 @@ def api_simulation():
         "snapshot_date": sim_cache.get("snapshot_date", ""),
         "status": sim_cache.get("status", "not_requested"),
         "simulation_meta": sim_cache.get("simulation_meta"),
-        "bracket_rounds": sim_cache.get("bracket_rounds"),
-        "playoff": sim_cache.get("playoff"),
-    })
+    }
+    bracket = _simulation_bracket_state()
+    if bracket is not None:
+        payload["bracket"] = bracket
+    return JSONResponse(payload)
+
+
+def _competition_state() -> dict:
+    """Authoritative factual competition state (built fresh from stores)."""
+    from competitions.ucl.src.state import build_competition_state
+    return build_competition_state(str(DATA_DIR), mode="results")
+
+
+def _simulation_bracket_state() -> dict | None:
+    """Simulated bracket in the same structural shape as the factual one."""
+    sim_payload = sim_cache.get("sim_state_payload")
+    if not sim_payload:
+        return None
+    from competitions.ucl.src.state import build_competition_state
+    try:
+        return build_competition_state(str(DATA_DIR), mode="simulation",
+                                       sim_payload=sim_payload)
+    except Exception:
+        return None
 
 
 @ucl_app.get("/api/standings")
@@ -497,13 +375,12 @@ def api_standings():
 
 @ucl_app.get("/api/bracket")
 def api_bracket():
-    return JSONResponse({
-        "playoff": cache.get("playoff", []),
-        "bracket_rounds": cache.get("bracket_rounds", {}),
-        "league_matchdays": cache.get("league_matchdays", {}),
-        "champion": cache.get("champion"),
-        "mode": _mode,
-    })
+    payload = dict(_competition_state())
+    # Compatibility alias for older consumers of the league matchday rows.
+    payload["league_matchdays"] = (
+        payload.get("stages", {}).get("league", {}).get("matchdays")
+        or cache.get("league_matchdays", {}))
+    return JSONResponse(payload)
 
 
 @ucl_app.get("/api/odds")
@@ -535,11 +412,11 @@ def api_simulate(req: dict = None):
         raw_count = body.get("n_iterations")
 
     def eligibility():
-        if _season_outcome_undecided():
-            return True, None, ""
-        return False, "no_outstanding_outcomes", (
-            "Every match has a real result and the season outcome is "
-            "decided - nothing to simulate.")
+        # Completed factual seasons remain simulatable as an explicit
+        # alternate-history analysis; _simulation_state_block exposes the
+        # what_if flag so the UI labels it truthfully. Simulation results
+        # never overwrite factual stores.
+        return True, None, ""
 
     http_status, payload = service.start(
         competition_id="ucl",
@@ -550,7 +427,8 @@ def api_simulate(req: dict = None):
         eligibility_fn=eligibility,
         on_result=_store_ucl_sim_result,
         options={"weights": weights, "show_ci": show_ci},
-        extra_ack={"mode": "simulation", "n_unplayed": _unplayed_match_count()},
+        extra_ack={"mode": "simulation", "n_unplayed": _unplayed_match_count(),
+                   "what_if": not _season_outcome_undecided()},
     )
     return JSONResponse(payload, status_code=http_status)
 
@@ -572,17 +450,17 @@ def _season_outcome_undecided() -> bool:
 
 
 def simulation_eligibility() -> tuple[bool, Optional[str], str]:
-    """Shared eligibility truth (adapter + handler both use this)."""
-    if _season_outcome_undecided():
-        return True, None, ""
-    return False, "no_outstanding_outcomes", (
-        "Every match has a real result and the season outcome is decided "
-        "- nothing to simulate.")
+    """Shared eligibility truth (adapter + handler both use this).
+
+    Simulation is always offered; completed seasons are served as clearly
+    labeled what-if analysis rather than being blocked.
+    """
+    return True, None, ""
 
 
 def _simulation_state_block() -> dict:
     """Shared product contract: availability + request lifecycle."""
-    eligible, reason, _msg = simulation_eligibility()
+    undecided = _season_outcome_undecided()
     sim_status = sim_cache.get("status", "not_requested")
     request_state = {
         "running": "running",
@@ -590,9 +468,12 @@ def _simulation_state_block() -> dict:
         "failed": "failed",
     }.get(sim_status, "not_requested")
     return {
-        "availability": "available" if eligible else "not_needed",
-        "reason": reason,
+        "availability": "available",
+        "reason": None,
         "request_state": request_state,
+        # A decided factual season makes every run an explicit alternate-
+        # history analysis; the UI must label it accordingly.
+        "what_if": not undecided,
     }
 
 
@@ -637,7 +518,6 @@ def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
         provenance_extra=meta_block.get("provenance") or {},
         engine_version=meta_block.get("engine_version"),
     )
-    snapshot_path = DATA_DIR / "snapshot.json"
     snapshot_data = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "mode": result.get("mode", "simulation"),
@@ -647,11 +527,19 @@ def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
         "n_teams": result.get("n_teams", 0),
         "champion": result.get("champion"),
         "snapshot_date": result.get("snapshot_date", ""),
+        # Everything below is SIMULATED content; factual stores are never
+        # touched by a run.
+        "provenance": "simulated",
+        "simulation_meta": sim_cache["simulation_meta"],
         "odds": result.get("odds", []),
         "standings": result.get("standings", []),
         "signals": result.get("signals", {}),
         "elo_ratings": result.get("elo_ratings", {}),
     }
+    bracket = _simulation_bracket_state()
+    if bracket is not None:
+        snapshot_data["bracket"] = bracket
+    snapshot_path = DATA_DIR / "snapshot.json"
     snapshot_path.write_text(
         json.dumps(snapshot_data, indent=2, default=str, ensure_ascii=False),
         encoding="utf-8",
@@ -789,6 +677,21 @@ def api_simulation_progress(task_id: str):
 # ── Match insight helpers ──
 
 
+def _find_state_match(match_id: str) -> dict | None:
+    """Locate a knockout tie/match by canonical id in the competition state."""
+    stages = _competition_state().get("stages", {})
+    for key in ("playoff", "R16", "QF", "SF", "FINAL"):
+        for m in stages.get(key, {}).get("matches", []):
+            if m.get("id") == match_id:
+                out = dict(m)
+                out["round"] = key
+                if out.get("score") is None and out.get("aggregate_a") is not None:
+                    out["score"] = {"home": out["aggregate_a"],
+                                    "away": out.get("aggregate_b")}
+                return out
+    return None
+
+
 def _ucl_form_trend(team: str, results: list[dict]) -> list[dict]:
     return _ucl_form_trend_pipeline(team, results)
 
@@ -809,17 +712,8 @@ def _ucl_insight_text(ta: str, tb: str, signals: dict, form_trends: dict, h2h: d
 def api_match_insight(match_id: str = ""):
     if not match_id:
         return JSONResponse({"error": "match_id parameter required"})
-    br = cache.get("bracket_rounds", {})
-    match_data = None
-    match_round = ""
-    for r, matches in br.items():
-        for m in matches:
-            if m["match_id"] == match_id:
-                match_data = m
-                match_round = r
-                break
-        if match_data:
-            break
+    match_data = _find_state_match(match_id)
+    match_round = (match_data or {}).get("round", "")
 
     # League-phase fallback: search results.json when not found in bracket
     if not match_data:
@@ -940,15 +834,7 @@ def api_what_if(req: dict = None):
         return JSONResponse({"error": "elo_delta must be non-zero"})
     elo_delta = max(-600, min(600, elo_delta))
 
-    br = cache.get("bracket_rounds", {})
-    match_data = None
-    for r, matches in br.items():
-        for m in matches:
-            if m["match_id"] == match_id:
-                match_data = m
-                break
-        if match_data:
-            break
+    match_data = _find_state_match(match_id)
 
     # League-phase fallback: mirror the insight handler so counterfactuals
     # work for every clickable match, not only knockout ties.

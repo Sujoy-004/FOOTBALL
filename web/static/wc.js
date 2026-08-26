@@ -1,6 +1,6 @@
 // ── World Cup 2026 Module ──
 import {
-  buildTable, destroyModalCharts, modalCharts, drawBracketConnectors,
+  buildTable, destroyModalCharts, modalCharts, renderBracketTree,
   updateStatusBar, competitions,
 } from "./shared.js";
 
@@ -291,7 +291,61 @@ function renderOverviewSignals(signals) {
   return html + '</table>';
 }
 
-// ── Bracket (Phase 3: group accordion + knockout tree) ──
+// ── Bracket (Phase 3: group accordion + knockout tree via shared renderer) ──
+
+function _esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// Map a knockout_tree node onto the shared renderer's match shape.
+function _mapWcMatch(m, simById) {
+  const isPlayed = !!(m.played || m.winner);
+  const simM = (!isPlayed && simById[m.match_id]) ? simById[m.match_id] : null;
+
+  // Score string: real result > sim projection (marked) > placeholder.
+  let resultLine;
+  if (m.score) {
+    resultLine = m.score.home + "-" + m.score.away;
+  } else if (m.winner) {
+    // Real result with unrecorded scorelines: show the fact (winner)
+    // without inventing a numeric score.
+    resultLine = "—";
+  } else if (simM && simM.predicted_score) {
+    resultLine = "SIM " + simM.predicted_score.home + "-" + simM.predicted_score.away;
+  } else {
+    resultLine = "?-?";
+  }
+
+  let status;
+  if (isPlayed) status = "played";
+  else if (!m.team_a && !m.team_b) status = "tbd";
+  else status = "scheduled";
+
+  const canSimulate = !m.played && !!m.team_a;
+
+  return {
+    id: m.match_id,
+    parents: (Array.isArray(m.source_matches) && m.source_matches.length)
+      ? m.source_matches.slice() : null,
+    teamA: m.team_a || null,
+    teamB: m.team_b || null,
+    status,
+    provenance: m.provenance || "official",
+    winner: m.winner || null,
+    resultLine,
+    detailHtml: m.round === "TPP"
+      ? _esc("Third-place play-off: losers of the two semi-finals.")
+      : null,
+    sim: (simM && simM.prob_a != null)
+      ? { line: null, probA: simM.prob_a }
+      : null,
+    clickable: true,
+    _canSimulate: canSimulate,
+  };
+}
+
 function renderBracket() {
   const tab = document.getElementById("tab-bracket");
   if (!tab) return;
@@ -303,14 +357,9 @@ function renderBracket() {
 
   const rounds = bd.chronological_rounds || [];
   const koTree = bd.knockout_tree || {};
-  window.__bracketData = koTree;
 
   // Split into group rounds and KO rounds
   const groupRounds = rounds.filter(r => r.round_type === 'group');
-  const koRounds = rounds.filter(r => r.round_type !== 'group');
-
-  const koTreeRounds = ['R32', 'R16', 'QF', 'SF', 'TPP', 'FINAL'];
-  const koRoundLabels = { R32: 'Round of 32', R16: 'Round of 16', QF: 'Quarter-Finals', SF: 'Semi-Finals', TPP: 'Third Place', FINAL: 'Final' };
 
   let html = '';
 
@@ -347,17 +396,16 @@ function renderBracket() {
   });
   html += '</div></div>';
 
-  // Section 2: Knockout Tree (UCL-style)
+  // Section 2: Knockout Tree (shared renderer host)
   html += '<div class="chart-section"><div class="title">Knockout Stage</div>';
-  html += '<div class="bracket-wrap"><div class="bracket-grid" id="bracketGrid"></div><svg class="bracket-svg" id="bracketSvg"></svg></div></div>';
+  html += '<div id="koTreeHost"></div></div>';
 
   tab.innerHTML = html;
 
-  // Build the knockout tree from koTree data
-  const grid = document.getElementById('bracketGrid');
-  if (!grid) return;
+  const host = document.getElementById('koTreeHost');
+  if (!host) return;
 
-  // Build sim match lookup if sim bracket data exists
+  // Sim match lookup for the unplayed-match projection overlay
   const simById = {};
   if (appState.simBracket && appState.simBracket.rounds) {
     for (const [, ms] of Object.entries(appState.simBracket.rounds)) {
@@ -365,107 +413,39 @@ function renderBracket() {
     }
   }
 
-  // Flatten all KO matches into byId
-  const byId = {};
-  for (const [, ms] of Object.entries(koTree)) for (const m of ms) byId[m.match_id] = m;
+  // Stage order and col-head labels preserved exactly from the previous
+  // tree build; TPP stays between SF and FINAL as its own list column so
+  // connector semantics are unchanged (SF -> TPP drawn; FINAL has no direct
+  // incoming lines from SF, matching prior behaviour).
+  const stageDefs = [
+    { key: 'R32', label: 'Round of 32', layout: 'tree' },
+    { key: 'R16', label: 'Round of 16', layout: 'tree' },
+    { key: 'QF', label: 'Quarter-Finals', layout: 'tree' },
+    { key: 'SF', label: 'Semi-Finals', layout: 'tree' },
+    { key: 'TPP', label: 'Third Place', layout: 'list' },
+    { key: 'FINAL', label: 'Final', layout: 'tree' },
+  ];
+  const bracketState = {
+    stages: stageDefs.map(d => ({
+      id: d.key,
+      label: d.label,
+      layout: d.layout,
+      matches: (koTree[d.key] || []).map(m => _mapWcMatch(m, simById)),
+    })),
+  };
 
-  function getLeafOrder(mid) {
-    const m = byId[mid];
-    if (!m || !m.source_matches) return [mid];
-    return [...getLeafOrder(m.source_matches[0]), ...getLeafOrder(m.source_matches[1])];
-  }
-
-  const leafOrder = [];
-  const leafMatches = koTree.R32 || [];
-  for (const m of leafMatches) leafOrder.push(m.match_id);
-  const leafIdx = {};
-  leafOrder.forEach((id, i) => leafIdx[id] = i);
-
-  function getRowRange(mid) {
-    const m = byId[mid];
-    if (!m) return { start: 0, end: leafOrder.length };
-    if (['FINAL', 'TPP'].includes(m.round)) return { start: 0, end: leafOrder.length };
-    if (!m.source_matches) return { start: leafIdx[mid] || 0, end: (leafIdx[mid] || 0) + 1 };
-    const leaves = getLeafOrder(mid);
-    if (!leaves.length) return { start: 0, end: 2 };
-    return { start: leafIdx[leaves[0]] || 0, end: (leafIdx[leaves[leaves.length - 1]] || 0) + 1 };
-  }
-
-  const ROW_UNIT = 28;
-  const roundOrder = ['R32', 'R16', 'QF', 'SF', 'TPP', 'FINAL'];
-  roundOrder.forEach((r, ri) => {
-    const col = document.createElement('div');
-    col.className = 'bracket-col';
-    col.style.flex = String(1 + (ri === roundOrder.length - 1 ? 0.5 : 0));
-    col.innerHTML = '<div class="col-head">' + (koRoundLabels[r] || r) + '</div>';
-
-    const ms = (koTree[r] || []).slice().sort((a, b) => getRowRange(a.match_id).start - getRowRange(b.match_id).start);
-    let lastEnd = 0;
-    ms.forEach(m => {
-      const rr = getRowRange(m.match_id);
-      const gap = rr.start - lastEnd;
-      if (gap > 0) {
-        const sp = document.createElement('div');
-        sp.className = 'match-slot';
-        sp.style.minHeight = (gap * ROW_UNIT) + 'px';
-        col.appendChild(sp);
-      }
-      lastEnd = rr.end;
-
-      const slot = document.createElement('div');
-      slot.className = 'match-slot';
-      slot.style.minHeight = Math.max((rr.end - rr.start) * ROW_UNIT, 40) + 'px';
-
-      const ta = m.team_a || 'TBD';
-      const tb = m.team_b || 'TBD';
-      const isPlayed = m.played || !!m.winner;
-      const isTbd = (!m.team_a && !m.team_b) || (!m.played && !m.winner);
-
-      // Determine score string: real > sim predicted > placeholder
-      let scoreStr, simWinnerHtml = "", simProbHtml = "";
-      const simM = (!isPlayed && simById[m.match_id]) ? simById[m.match_id] : null;
-      if (m.score) {
-        scoreStr = m.score.home + '-' + m.score.away;
-      } else if (m.winner) {
-        // Real result with unrecorded scorelines: show the fact (winner)
-        // without inventing a numeric score.
-        scoreStr = '—';
-      } else if (simM && simM.predicted_score) {
-        scoreStr = 'SIM ' + simM.predicted_score.home + '-' + simM.predicted_score.away;
-      } else {
-        scoreStr = '?-?';
-      }
-      if (simM && simM.predicted_score) {
-        // Projection overlay only when the simulation actually produced a
-        // probability; never substitute a default 50%.
-        if (simM.prob_a != null) {
-          const pct = Math.round(simM.prob_a * 100);
-          simProbHtml = '<div class="m-prob" style="font-size:9px;color:#8E44AD;text-align:center;line-height:1.2">SIM ' + pct + '% / ' + (100 - pct) + '%</div>';
-        }
-      }
-
-      const cardClass = isTbd ? 'tbd' : isPlayed ? 'played' : 'upcoming';
-
-      let cardHtml = '<div class="match-card ' + cardClass + '" data-mid="' + m.match_id + '">' +
-        '<div class="m-teams"><span class="m-team ' + (m.winner === ta ? 'winner' : '') + '">' + ta + '</span>' +
-        '<span class="m-score">' + scoreStr + '</span>' +
-        '<span class="m-team ' + (m.winner === tb ? 'winner' : '') + '">' + tb + '</span></div>' +
-        (m.winner ? '<div class="m-winner-label">' + m.winner + ' advances</div>' : simProbHtml);
-
-      // Show Simulate button for unplayed matches
-      if (!m.played && m.team_a) {
-        cardHtml += '<div class="m-sim-btn" onclick="event.stopPropagation();window.__simulateMatch(\'' + m.match_id + '\')">&#9654; Simulate</div>';
-      }
-      cardHtml += '</div>';
-
-      slot.innerHTML = cardHtml;
-      slot.querySelector('.match-card').onclick = () => openMatchModal(m.match_id);
-      col.appendChild(slot);
-    });
-    grid.appendChild(col);
+  renderBracketTree(host, bracketState, {
+    cardThemeClass: "",
+    columnFlex: (_st, i, n) => String(i === n - 1 ? 1.5 : 1),
+    simLabel: "SIM",
+    onMatch: m => openMatchModal(m.id),
+    winnerLabel: m => (m.winner ? _esc(m.winner) + " advances" : null),
+    cardExtrasHtml: m => {
+      if (!m._canSimulate) return "";
+      const safeMid = String(m.id).replace(/[^A-Za-z0-9_.:-]/g, "");
+      return '<div class="m-sim-btn" onclick="event.stopPropagation();window.__simulateMatch(\'' + safeMid + '\')">&#9654; Simulate</div>';
+    },
   });
-
-  setTimeout(drawBracketConnectors, 50);
 }
 
 function renderMatchRow(m) {

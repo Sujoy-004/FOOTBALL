@@ -44,10 +44,70 @@ CompetitionRegistry ── FastAPI shell ── dashboard
 | `predictors/odds.py` | Market-odds ingestion from BSD event payloads (vig removal) |
 | `data_providers/` | BSD + football-data.org result/event providers (`fetch_matches` only) |
 | `evaluation.py` | Brier, log-loss, ECE, calibration curve, TRPS (numpy only here) |
-| `state.py` | Atomic JSON persistence helpers |
+| `state.py` | Atomic JSON persistence helpers; bracket DAG validation (`validate_bracket`) |
 | `provider.py` | Protocols: `DataProvider`, `FixtureProvider`, `MatchResultProvider`, `ResultHistoryProvider` |
+| `fetcher.py` | Alias normalization, ingestion-stat counters/invariant, `IngestReport` (competition-agnostic refresh report shape) |
 
-## Simulation contract (Exchange 3)
+## Data acquisition & competition ingestors (Exchange 6)
+
+Transport selection is shared (`web/common.get_data_provider`: BSD or
+football-data.org, chosen by keys/`DATA_PROVIDER`); everything after the raw
+events is competition-owned. Each brain exposes one authoritative ingestor —
+World Cup: `competitions/worldcup/src/pipeline.fetch_live_data`; UCL:
+`competitions/ucl/src/ingest.ingest_ucl_events` (wrapped by
+`pipeline.fetch_live_data`). The web layer never parses competition events;
+it selects the provider, hands it to the brain, and is the SINGLE writer of
+its freshness entry in `web/last_refresh.json` from the returned
+`IngestReport`.
+
+The UCL ingestor can CREATE knockout records, not only update them: with an
+empty store it derives tie skeletons deterministically from final Swiss
+standings + `playoff_pairings.json` + `bracket_rules.json`, persists
+individual legs plus ET/penalty detail, cascades winners into downstream
+slots via `source_matches`, and resolves the champion. It is idempotent and
+writes stores atomically. `competitions/ucl/backfill.py` is an explicit
+one-shot command that bootstraps the verified historical 2025/26 knockout
+dataset (tracked at `data/bootstrap/2025_26_knockout_results.json`,
+extracted byte-identically from git history; provenance `manual`) — it is
+never executed by server startup.
+
+Live feed status: football-data.org/BSD coverage of finished 2025/26 UCL
+knockout matches could NOT be verified (placeholder credentials); the
+provider interface is implemented against the documented API shapes and the
+historical bootstrap guarantees factual completeness offline.
+
+## CompetitionState & shared bracket contract
+
+Each brain emits one structural state object that both factual and simulated
+views share:
+
+```text
+CompetitionState = {competition, season, mode, phase, availability,
+                    champion, stage_order, stages}
+stage  = {id, label, layout: tree|list, matches|matchdays}
+UCL tie= {id (canonical, from bracket_rules.json), round, team_a/b,
+          legs[], aggregate_a/b, et_*, penalties_*, winner,
+          status (MatchStatus), provenance (ResultProvenance),
+          slot_sources, source_matches}
+```
+
+- UCL builder: `competitions/ucl/src/state.py::build_competition_state`
+  (`mode="results"` reads canonical stores; `mode="simulation"` flattens a
+  simulation payload onto the identical shape with `provenance="simulated"`).
+- WC serves its validated DAG skeleton ⊕ results overlay per node with
+  status/provenance and declares `stage_order`/`stage_labels`.
+- Structural integrity is checked by `football_core.state.validate_bracket`
+  (unique ids, resolvable parent refs, acyclic).
+
+Frontend: `shared.js::renderBracketTree(container, bracketState, adapter)`
+is the single generic renderer (columns, leaf-order spacers, SVG connectors
+via parameterized `drawBracketConnectors`, SIM/MAN provenance badges). It
+contains no competition vocabulary — labels, ordering, two-leg formatting
+and click behavior come from thin per-app adapters (`wc.js`, `ucl.js`). UCL
+two-legged ties render LEG 1 / LEG 2 / AGGREGATE (+ET/PENS notes); the
+playoff stage stays a list layout ahead of the R16→FINAL tree.
+
+## Simulation contract
 
 - The user chooses whether to simulate and how many runs (1 .. 1,000,000;
   validated, never clamped).

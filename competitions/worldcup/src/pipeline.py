@@ -45,6 +45,32 @@ logger = logging.getLogger(__name__)
 SURVIVING_SIGNALS = ("elo", "market_odds", "rolling_form", "squad_value", "rest_days")
 
 
+def _last_refresh_report_path() -> Path:
+    """Shared freshness ledger at <repo>/web/last_refresh.json.
+
+    Derived from this module's location (not cwd) so tests can redirect it
+    by monkeypatching this function instead of changing directories.
+    """
+    return Path(__file__).resolve().parents[3] / "web" / "last_refresh.json"
+
+
+def bracket_stage_order() -> list[str]:
+    """Canonical knockout stage order for WC bracket payloads."""
+    return ["R32", "R16", "QF", "SF", "TPP", "FINAL"]
+
+
+def bracket_stage_labels() -> dict[str, str]:
+    """Display labels keyed by knockout stage code."""
+    return {
+        "R32": "Round of 32",
+        "R16": "Round of 16",
+        "QF": "Quarter-finals",
+        "SF": "Semi-finals",
+        "TPP": "Third-place play-off",
+        "FINAL": "Final",
+    }
+
+
 def build_blend_params(engine_predictions: list, all_matches: list[dict], engine) -> dict:
     """Build the simulation blend payload from canonical EnsembleEngine output.
 
@@ -87,8 +113,7 @@ def fetch_live_data(
     """
     from football_core.fetcher import new_ingestion_stats
 
-    repo_root = Path(__file__).resolve().parents[3]
-    last_refresh_path = repo_root / "web" / "last_refresh.json"
+    last_refresh_path = _last_refresh_report_path()
 
     def _read_prev() -> dict:
         try:
@@ -144,7 +169,15 @@ def fetch_live_data(
         )
     except Exception as e:
         logger.warning("fetch_live_data: failed to load data files: %s", e)
-        return
+        return {
+            "provider": None,
+            "attempted": False,
+            "success": False,
+            "error": f"failed to load data files: {e}",
+            "stale": True,
+            "skipped_reason": "local competition data files unreadable",
+            "finished": new_ingestion_stats(),
+        }
 
     # 1. Fetch and process match results via provider
     group_stats = new_ingestion_stats()
@@ -348,7 +381,7 @@ def build_chronological_matches(data_dir: Path) -> dict:
         "TPP": "tpp",
         "FINAL": "final",
     }
-    ko_rounds_order = ["R32", "R16", "QF", "SF", "TPP", "FINAL"]
+    ko_rounds_order = bracket_stage_order()
     for round_name in ko_rounds_order:
         matches = []
         for be in bracket_raw:

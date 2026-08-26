@@ -14,6 +14,24 @@ WC_DATA = ROOT / "competitions" / "worldcup" / "data"
 UCL_DATA = ROOT / "competitions" / "ucl" / "data"
 
 
+@pytest.fixture(autouse=True)
+def isolated_refresh_ledger(tmp_path, monkeypatch):
+    """Keep every refresh-ledger write inside the test sandbox.
+
+    The pipelines persist freshness reports next to the web layer; without
+    this redirect, test runs overwrite the production
+    web/last_refresh.json (the historical 'LiveProv'/'_DeadProvider'
+    artifacts).
+    """
+    import competitions.worldcup.src.pipeline as wc_pipeline
+    import web.ucl_app as ucl_app
+    monkeypatch.setattr(wc_pipeline, "_last_refresh_report_path",
+                        lambda: tmp_path / "last_refresh.json")
+    monkeypatch.setattr(ucl_app, "_refresh_report_path",
+                        lambda: tmp_path / "last_refresh.json")
+    yield
+
+
 class _CountingProvider:
     last_error = None
     calls = 0

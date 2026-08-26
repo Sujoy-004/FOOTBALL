@@ -123,12 +123,21 @@ class TestSharedContractStates:
             assert data["simulation"]["request_state"] == "not_requested"
             assert data["simulation"]["availability"] == "not_needed"
 
-    def test_ucl_availability_available_when_ko_undecided(self, snapshot_mode):
+    def test_ucl_availability_available_when_ko_undecided(
+            self, snapshot_mode, tmp_path, monkeypatch):
+        """League complete + knockout store absent -> outcomes undecided,
+        simulation stays available. Isolated data dir so this holds whether
+        or not the real dataset carries backfilled knockout history."""
+        import web.ucl_app as app
         from web.ucl_app import ucl_app
+        for f in ("fixtures.json", "team_aliases.json", "results.json"):
+            shutil.copy(UCL_DATA / f, tmp_path / f)
+        monkeypatch.setattr(app, "DATA_DIR", tmp_path)
         with TestClient(ucl_app) as client:
             data = client.get("/api/data").json()
             assert data["simulation"]["availability"] == "available"
             assert data["phase"]["phase"] == "league_stage_complete"
+            assert data["simulation"].get("what_if") is False
 
     def test_ucl_completed_run_exposes_shared_meta(
             self, snapshot_mode, tmp_path, monkeypatch):

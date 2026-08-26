@@ -16,7 +16,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from competitions.ucl.src.orchestrator import build_simulation_result, build_signal_engine
+from competitions.ucl.src.orchestrator import (
+    _top_champion_probs,
+    build_sim_state_payload,
+    build_signal_engine,
+    build_simulation_result,
+)
 from football_core.signal import PredictionContext
 
 logger = logging.getLogger(__name__)
@@ -226,29 +231,57 @@ def fetch_live_data(
     football_data_org_key: str = "",
     ucl_league_id: int = 7,
     team_aliases_data: dict | None = None,
+    provider=None,
 ) -> dict:
-    """Fetch live match data from the configured provider.
+    """Fetch live match data from the configured provider and ingest it.
 
-    Returns a dict with keys: ``status`` (ok/skip/error), ``n_raw``,
-    ``n_updated``, ``provider_name``.
+    Exchange 2 delegation: all persistence logic (league upsert keyed by
+    fixture ``match_id``, knockout store v2 maintenance, skeleton
+    derivation, slot cascades, champion resolution) lives in
+    :mod:`competitions.ucl.src.ingest`. This wrapper only selects the
+    provider, normalizes finished events against the alias table, and hands
+    them to :func:`competitions.ucl.src.ingest.ingest_ucl_events`.
+
+    Returns a superset of the legacy refresh dict — ``status`` (ok/skip),
+    ``n_raw``, ``n_updated``, ``provider_name`` — plus ``report`` holding
+    the structured :class:`~football_core.fetcher.IngestReport` payload.
     """
-    provider = _select_provider(bsd_api_key, football_data_org_key, ucl_league_id)
+    from football_core.fetcher import (
+        IngestReport,
+        _build_alias_lookup,
+        count_finished,
+        new_ingestion_stats,
+        note_unmatchable,
+        normalize_team,
+    )
+    from competitions.ucl.src.ingest import EVENT_PASSTHROUGH_FIELDS, ingest_ucl_events
+
+    # The web layer owns transport selection (web.common.get_data_provider)
+    # and may pass a pre-selected provider; offline/backfill callers fall
+    # back to the local key-based selection.
+    if provider is None:
+        provider = _select_provider(bsd_api_key, football_data_org_key, ucl_league_id)
     if provider is None:
         logger.warning("[UCL] No data provider — skipping live fetch")
-        return {"status": "skip", "n_raw": 0, "n_updated": 0, "provider_name": "none"}
+        report = IngestReport(provider="none", attempted=False, success=True, error=None, stale=True)
+        return {"status": "skip", "n_raw": 0, "n_updated": 0,
+                "provider_name": "none", "report": report.to_dict()}
 
+    provider_label = type(provider).__name__
     raw = provider.fetch_matches(competition_id="CL")
     if not raw:
-        logger.warning("[UCL] No matches returned from provider")
-        return {"status": "skip", "n_raw": 0, "n_updated": 0, "provider_name": type(provider).__name__}
+        err = getattr(provider, "last_error", None) or "provider returned 0 matches"
+        logger.warning("[UCL] No matches returned from provider: %s", err)
+        report = IngestReport(provider=provider_label, attempted=True, success=False,
+                              error=err, stale=True)
+        return {"status": "skip", "n_raw": 0, "n_updated": 0,
+                "provider_name": provider_label, "report": report.to_dict()}
 
-    logger.info("[UCL] Fetched %d raw matches from %s", len(raw), type(provider).__name__)
+    logger.info("[UCL] Fetched %d raw matches from %s", len(raw), provider_label)
 
     data_dir_path = Path(data_dir) if isinstance(data_dir, str) else data_dir
 
     # Build alias lookup
-    from football_core.fetcher import _build_alias_lookup, normalize_team
-
     if team_aliases_data:
         aliases = team_aliases_data
     else:
@@ -259,45 +292,23 @@ def fetch_live_data(
     fixtures_path = data_dir_path / "fixtures.json"
     if not fixtures_path.exists():
         logger.warning("[UCL] No fixtures.json — cannot process matches")
-        return {"status": "skip", "n_raw": len(raw), "n_updated": 0, "provider_name": type(provider).__name__}
+        report = IngestReport(provider=provider_label, attempted=True, success=False,
+                              error="fixtures.json missing", stale=True)
+        return {"status": "skip", "n_raw": len(raw), "n_updated": 0,
+                "provider_name": provider_label, "report": report.to_dict()}
     fixtures = json.loads(fixtures_path.read_text(encoding="utf-8"))
     for team in fixtures.get("schedule", {}).get("teams", []):
         alias_lookup[team["name"].strip().lower()] = team["name"]
 
-    # Build fixture lookup for league phase
-    fixture_lookup: dict[tuple[str, str], str] = {}
-    for md in fixtures.get("schedule", {}).get("matchdays", []):
-        for match in md:
-            pair = (match["team_a"], match["team_b"])
-            fixture_lookup[pair] = match["match_id"]
-            fixture_lookup[(match["team_b"], match["team_a"])] = match["match_id"]
-
-    KO_STAGE_MAP = {
-        "PLAYOFFS": "playoff",
-        "LAST_16": "R16",
-        "QUARTER_FINALS": "QF",
-        "SEMI_FINALS": "SF",
-        "FINAL": "FINAL",
-    }
-
-    results_path = data_dir_path / "results.json"
-    existing_results = load_results(data_dir_path)
-    existing_by_id = {m["match_id"]: m for m in existing_results}
-
-    ko_path = data_dir_path / "knockout_results.json"
-    knockout_raw = load_knockout_results(data_dir_path) or {}
-    knockout = {
-        "playoff": knockout_raw.get("playoff", []),
-        "rounds": knockout_raw.get("rounds", {"R16": [], "QF": [], "SF": [], "FINAL": []}),
-    }
-
-    ko_legs: dict[str, dict[frozenset, list[dict]]] = {s: {} for s in KO_STAGE_MAP}
-    n_new = 0
-
+    # Normalize finished events into the flat form ingest_ucl_events expects.
+    norm_stats = new_ingestion_stats()
+    normalized_events: list[dict] = []
+    n_unmatchable = 0
     for event in raw:
         status = (event.get("status") or "").lower()
         if status != "finished":
             continue
+        count_finished(norm_stats)
 
         home_name = event.get("home_team", "")
         away_name = event.get("away_team", "")
@@ -305,94 +316,49 @@ def fetch_live_data(
         away_norm = normalize_team(away_name, alias_lookup)
 
         if home_norm is None or away_norm is None:
-            logger.debug("[UCL] Unmatchable teams: %r vs %r", home_name, away_name)
+            note_unmatchable(norm_stats, logger, home_name, away_name,
+                             (event.get("home_score"), event.get("away_score")))
+            n_unmatchable += 1
             continue
+        norm_stats["normalized"] += 1
 
-        home_score = event.get("home_score") or 0
-        away_score = event.get("away_score") or 0
-        stage = event.get("stage", "")
+        ev = {
+            "home_team": home_norm,
+            "away_team": away_norm,
+            "home_score": event.get("home_score") or 0,
+            "away_score": event.get("away_score") or 0,
+            "status": "finished",
+            "stage": event.get("stage", ""),
+        }
+        for field_name in EVENT_PASSTHROUGH_FIELDS:
+            if field_name in event:
+                ev[field_name] = event[field_name]
+        normalized_events.append(ev)
 
-        if stage == "LEAGUE_STAGE":
-            match_id = fixture_lookup.get((home_norm, away_norm))
-            if match_id is None:
-                logger.debug("[UCL] No league fixture for %s vs %s", home_norm, away_norm)
-                continue
-            updated = False
-            if match_id in existing_by_id:
-                entry = existing_by_id[match_id]
-                if entry["home_score"] != home_score or entry["away_score"] != away_score:
-                    entry["home_score"] = home_score
-                    entry["away_score"] = away_score
-                    updated = True
-            else:
-                existing_results.append({
-                    "match_id": match_id, "team_a": home_norm, "team_b": away_norm,
-                    "home_score": home_score, "away_score": away_score,
-                })
-                updated = True
-            if updated:
-                n_new += 1
-                logger.info("[UCL] League %s: %s %d-%d %s", match_id, home_norm, home_score, away_score, away_norm)
-        elif stage in KO_STAGE_MAP:
-            ko_legs[stage].setdefault(frozenset([home_norm, away_norm]), []).append({
-                "home": home_norm, "away": away_norm,
-                "home_score": home_score, "away_score": away_score,
-            })
+    report = ingest_ucl_events(normalized_events, data_dir_path, provider_label)
 
-    # Process knockout legs — aggregate per team pair
-    for api_stage, ties in ko_legs.items():
-        internal_round = KO_STAGE_MAP[api_stage]
-        for pair, legs in ties.items():
-            scores: dict[str, int] = {}
-            for leg in legs:
-                scores[leg["home"]] = scores.get(leg["home"], 0) + leg["home_score"]
-                scores[leg["away"]] = scores.get(leg["away"], 0) + leg["away_score"]
+    # Fold normalization-side skips back in so the global invariant holds:
+    # received == normalized == ingested + skipped_unmatchable + skipped_no_target.
+    merged_finished = dict(report.finished)
+    merged_finished["received"] = merged_finished.get("received", 0) + n_unmatchable
+    merged_finished["normalized"] = merged_finished.get("normalized", 0) + n_unmatchable
+    merged_finished["skipped_unmatchable"] = (
+        merged_finished.get("skipped_unmatchable", 0) + n_unmatchable
+    )
+    report.finished = merged_finished
 
-            if internal_round == "playoff":
-                for entry in knockout["playoff"]:
-                    if {entry["team_a"], entry["team_b"]} == pair:
-                        agg_a = scores.get(entry["team_a"], 0)
-                        agg_b = scores.get(entry["team_b"], 0)
-                        w = entry["team_a"] if agg_a > agg_b else (entry["team_b"] if agg_b > agg_a else None)
-                        if entry.get("aggregate_a") != agg_a or entry.get("aggregate_b") != agg_b:
-                            entry["aggregate_a"] = agg_a
-                            entry["aggregate_b"] = agg_b
-                            entry["winner"] = w or entry.get("winner", "")
-                            n_new += 1
-                            logger.info("[UCL] Playoff %s vs %s: %d-%d", entry["team_a"], entry["team_b"], agg_a, agg_b)
-                        break
-            else:
-                for entry in knockout["rounds"].get(internal_round, []):
-                    if {entry["team_a"], entry["team_b"]} == pair:
-                        agg_a = scores.get(entry["team_a"], 0)
-                        agg_b = scores.get(entry["team_b"], 0)
-                        w = entry["team_a"] if agg_a > agg_b else (entry["team_b"] if agg_b > agg_a else None)
-                        if entry.get("score_a") != agg_a or entry.get("score_b") != agg_b:
-                            entry["score_a"] = agg_a
-                            entry["score_b"] = agg_b
-                            entry["winner"] = w or entry.get("winner", "")
-                            n_new += 1
-                            logger.info("[UCL] %s %s vs %s: %d-%d", internal_round, entry["team_a"], entry["team_b"], agg_a, agg_b)
-                        break
-
-    # Write updated files
-    if n_new > 0:
-        results_path.write_text(
-            json.dumps({"matches": existing_results}, indent=2, ensure_ascii=False), encoding="utf-8",
-        )
-        final_entries = knockout["rounds"].get("FINAL", [])
-        if final_entries and final_entries[0].get("winner"):
-            knockout_raw["champion"] = final_entries[0]["winner"]
-        ko_path.write_text(
-            json.dumps({"matches": knockout_raw}, indent=2, ensure_ascii=False), encoding="utf-8",
-        )
-        logger.info("[UCL] Updated %d matches — files saved", n_new)
+    n_updated = sum(
+        stage.get("count", 0) for stage in report.stages
+        if stage.get("key") in ("league", "playoff", "knockout")
+    )
+    logger.info("[UCL] Updated %d matches — files saved", n_updated)
 
     return {
         "status": "ok",
         "n_raw": len(raw),
-        "n_updated": n_new,
-        "provider_name": type(provider).__name__,
+        "n_updated": n_updated,
+        "provider_name": provider_label,
+        "report": report.to_dict(),
     }
 
 
@@ -522,8 +488,8 @@ def run_mc_simulation(
       returned in the payload for reproducibility.
 
     Returns a dict with keys: mode, teams, all_teams, n_teams, n_iterations,
-    seed, snapshot_date, champion, standings, playoff, bracket_rounds, odds,
-    signals, elo_ratings, calibration, show_ci.
+    seed, snapshot_date, champion, standings, playoff, bracket_rounds,
+    sim_state_payload, odds, signals, elo_ratings, calibration, show_ci.
     Does NOT write to disk, global cache, or ``boot_log_local``.
     """
     dp = Path(data_dir) if isinstance(data_dir, str) else data_dir
@@ -577,40 +543,17 @@ def run_mc_simulation(
 
     engine = build_signal_engine(elo_ratings, weights_override=weights)
 
-    bracket_rules_path = dp / "bracket_rules.json"
-    bracket_rules = {}
-    try:
-        bracket_rules = json.loads(bracket_rules_path.read_text(encoding="utf-8"))
-    except Exception:
-        pass
-    source_map = {}
-    for m in bracket_rules.get("matches", []):
-        if m.get("source_matches"):
-            source_map[m["match_id"]] = m["source_matches"]
-
-    enriched_bracket = {}
-    for round_name, matches in result.bracket_rounds.items():
-        enriched_bracket[round_name] = []
-        for m in matches:
-            entry = dict(m)
-            if m["match_id"] in source_map:
-                entry["source_matches"] = source_map[m["match_id"]]
-            enriched_bracket[round_name].append(entry)
-
-    playoff_display = []
-    for tie_num in sorted(result.playoff_ties):
-        tie = result.playoff_ties[tie_num]
-        winner = result.playoff_winners.get(tie_num, "?")
-        loser = tie.get("loser", "?")
-        playoff_display.append({
-            "tie_num": tie_num, "team_a": winner, "team_b": loser,
-            "winner": winner, "aggregate_a": tie.get("aggregate_a", 0),
-            "aggregate_b": tie.get("aggregate_b", 0),
-            "et_played": tie.get("et_played", False),
-            "penalties_played": tie.get("penalties_played", False),
-            "et_a": tie.get("et_a", 0), "et_b": tie.get("et_b", 0),
-            "penalty_a": tie.get("penalty_a", 0), "penalty_b": tie.get("penalty_b", 0),
-        })
+    # Exchange 2 unification: the clean state payload is assembled once
+    # (shared with orchestrator.run_compute_all) and feeds both the
+    # canonical state layer and the legacy display keys below.
+    sim_state_payload = build_sim_state_payload(
+        result.playoff_ties,
+        result.playoff_winners,
+        result.bracket_rounds,
+        champion_probs=_top_champion_probs(result.teams),
+    )
+    playoff_display = sim_state_payload["playoff"]
+    enriched_bracket = sim_state_payload["bracket_rounds"]
 
     sorted_teams = sorted(result.teams.items(), key=lambda x: (-x[1].get("champion_prob", 0.0), x[0]))
     odds_display = []
@@ -683,6 +626,7 @@ def run_mc_simulation(
         "seed": result.seed, "snapshot_date": result.snapshot_date,
         "champion": result.bracket_champion, "standings": standings_display,
         "playoff": playoff_display, "bracket_rounds": enriched_bracket,
+        "sim_state_payload": sim_state_payload,
         "odds": odds_display, "signals": signal_stats, "elo_ratings": elo_ratings,
         "show_ci": show_ci,
         "_meta": {

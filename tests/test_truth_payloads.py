@@ -57,10 +57,16 @@ class TestUCLTruthPayloads:
         from web.ucl_app import ucl_app
         with TestClient(ucl_app) as client:
             data = client.get("/api/data").json()
-            # Authoritative phase replaces client-side stage inference
+            # Authoritative phase replaces client-side stage inference; the
+            # exact value follows whatever the on-disk knockout evidence is
+            # (backfilled history vs empty store), so assert consistency
+            # rather than pinning one dataset era.
             phase = data.get("phase", {})
-            assert phase.get("phase") == "league_stage_complete"
-            assert phase.get("stores", {}).get("knockout_results") == "empty"
+            ko_store = phase.get("stores", {}).get("knockout_results")
+            if ko_store == "available":
+                assert phase.get("phase") in ("knockout", "completed")
+            else:
+                assert phase.get("phase") == "league_stage_complete"
 
             lmd = client.get("/api/bracket").json()["league_matchdays"]
             first_md = next(iter(lmd))
