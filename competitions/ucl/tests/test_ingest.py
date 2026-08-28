@@ -512,3 +512,220 @@ def test_pipeline_fetch_live_data_skip_paths(monkeypatch, tmp_path):
     rep = out["report"]
     assert rep["attempted"] is True and rep["success"] is False
     assert rep["stale"] is True and "invalid" in rep["error"]
+
+
+# ── Exchange 5: provider-data downgrade guards ────────────────────────────────
+
+
+def _make_decided_final_dir(tmp_path: Path) -> Path:
+    """Create a data dir with a fully-decided final (PSG won 4-3 on pens)."""
+    dp = _make_data_dir(tmp_path)
+    # Drive the full bracket to get SF winners into the final slot.
+    events = _league_events()
+    playoff_pairs = {
+        1: ("Club24", "Club09"), 2: ("Club23", "Club10"), 3: ("Club22", "Club11"),
+        4: ("Club21", "Club12"), 5: ("Club20", "Club13"), 6: ("Club19", "Club14"),
+        7: ("Club18", "Club15"), 8: ("Club17", "Club16"),
+    }
+    for tn, (unseeded, seeded) in playoff_pairs.items():
+        events.append(_ko_event("PLAYOFFS", unseeded, seeded, 2, 0))
+        events.append(_ko_event("PLAYOFFS", seeded, unseeded, 2, 1))
+    r16_pairs = {
+        "r16_01": ("Club01", "Club18"), "r16_02": ("Club02", "Club17"),
+        "r16_03": ("Club03", "Club20"), "r16_04": ("Club04", "Club19"),
+        "r16_05": ("Club05", "Club22"), "r16_06": ("Club06", "Club21"),
+        "r16_07": ("Club07", "Club24"), "r16_08": ("Club08", "Club23"),
+    }
+    for mid, (seed, challenger) in r16_pairs.items():
+        events.append(_ko_event("LAST_16", seed, challenger, 3, 0))
+        events.append(_ko_event("LAST_16", challenger, seed, 1, 2))
+    qf_pairs = {
+        "qf_01": ("Club01", "Club02"), "qf_02": ("Club03", "Club04"),
+        "qf_03": ("Club05", "Club06"), "qf_04": ("Club07", "Club08"),
+    }
+    for mid, (ta, tb) in qf_pairs.items():
+        events.append(_ko_event("QUARTER_FINALS", ta, tb, 2, 0))
+        events.append(_ko_event("QUARTER_FINALS", tb, ta, 1, 3))
+    sf_pairs = {"sf_01": ("Club01", "Club03"), "sf_02": ("Club05", "Club07")}
+    for mid, (ta, tb) in sf_pairs.items():
+        events.append(_ko_event("SEMI_FINALS", ta, tb, 2, 1))
+        events.append(_ko_event("SEMI_FINALS", tb, ta, 0, 2))
+    events.append(_ko_event("FINAL", "Club01", "Club05", 1, 1,
+                            duration="PENALTY_SHOOTOUT", shootout={"home": 4, "away": 3}))
+    ingest_ucl_events(events, dp, "SeedProvider")
+    return dp
+
+
+def test_incomplete_provider_does_not_clear_existing_winner(tmp_path):
+    """FDO returns final as 1-1 with no pen evidence — must not nullify PSG."""
+    dp = _make_decided_final_dir(tmp_path)
+
+    doc_before = load_knockout_store(dp)
+    fin_before = doc_before["matches"]["final"][0]
+    assert fin_before["winner"] == "Club01"
+    assert fin_before["penalties_played"] is True
+    assert fin_before["status"] == "played_pens"
+
+    # Incomplete provider data: same score but no penalty evidence.
+    incomplete_events = [
+        _ko_event("FINAL", "Club01", "Club05", 1, 1),
+    ]
+    report = ingest_ucl_events(incomplete_events, dp, "IncompleteProvider")
+
+    doc_after = load_knockout_store(dp)
+    fin_after = doc_after["matches"]["final"][0]
+    assert fin_after["winner"] == "Club01", "winner must not be nullified"
+    assert fin_after["penalties_played"] is True, "penalty evidence must be preserved"
+    assert fin_after["status"] == "played_pens", "status must not downgrade"
+    assert fin_after["penalty_score"] == "4-3", "penalty score must be preserved"
+
+
+def test_scheduled_provider_result_does_not_overwrite_completed(tmp_path):
+    """Provider returns status=scheduled for a completed final — no change."""
+    dp = _make_decided_final_dir(tmp_path)
+
+    before_bytes = (dp / "knockout_results.json").read_bytes()
+
+    scheduled_events = [
+        {"home_team": "Club01", "away_team": "Club05", "home_score": 0,
+         "away_score": 0, "status": "scheduled", "stage": "FINAL"},
+    ]
+    ingest_ucl_events(scheduled_events, dp, "ScheduledProvider")
+
+    after_bytes = (dp / "knockout_results.json").read_bytes()
+    assert after_bytes == before_bytes, "store must not be rewritten for scheduled data"
+
+
+def test_penalty_decided_result_remains_decided(tmp_path):
+    """Penalty shootout fields are preserved even when provider omits them."""
+    dp = _make_decided_final_dir(tmp_path)
+
+    # Provider sends the final with a score that matches but no pen evidence.
+    incomplete_events = [
+        _ko_event("FINAL", "Club01", "Club05", 2, 1),
+    ]
+    ingest_ucl_events(incomplete_events, dp, "PartialProvider")
+
+    doc = load_knockout_store(dp)
+    fin = doc["matches"]["final"][0]
+    assert fin["winner"] == "Club01"
+    assert fin["penalties_played"] is True, "penalty flag must not be cleared"
+    assert fin["penalty_score"] == "4-3", "penalty score must not be cleared"
+    assert fin["penalty_winner"] is not None, "penalty winner must not be cleared"
+
+
+def test_provider_cannot_add_legs_to_decided_aggregate_only_tie(tmp_path):
+    """QF tie decided without legs — provider legs must not be added."""
+    dp = _make_decided_final_dir(tmp_path)
+
+    # Now manually strip legs from a decided QF tie to simulate aggregate-only.
+    ko_path = dp / "knockout_results.json"
+    doc = json.loads(ko_path.read_text(encoding="utf-8"))
+    qf = doc["matches"]["rounds"]["QF"]
+    # qf_01: Club01 won 5-0 aggregate (legs=[2-0, 1-3 reversed order check...).
+    # Find the tie and strip legs.
+    for tie in qf:
+        if tie["match_id"] == "qf_01":
+            assert tie["winner"] == "Club01"
+            tie["legs"] = None
+            break
+    ko_path.write_text(json.dumps(doc, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # Verify precondition.
+    doc_before = load_knockout_store(dp)
+    qf_map = {m["match_id"]: m for m in doc_before["matches"]["rounds"]["QF"]}
+    assert qf_map["qf_01"]["legs"] is None, "precondition: tie is aggregate-only"
+    assert qf_map["qf_01"]["winner"] == "Club01"
+
+    # Provider sends per-leg events for the same tie.
+    leg_events = [
+        _ko_event("QUARTER_FINALS", "Club01", "Club02", 2, 0),
+        _ko_event("QUARTER_FINALS", "Club02", "Club01", 1, 3),
+    ]
+    ingest_ucl_events(leg_events, dp, "LegsProvider")
+
+    doc_after = load_knockout_store(dp)
+    qf_after = {m["match_id"]: m for m in doc_after["matches"]["rounds"]["QF"]}
+    tie_after = qf_after["qf_01"]
+    assert tie_after["legs"] is None, "legs must not be added to decided aggregate-only tie"
+    assert tie_after["winner"] == "Club01"
+    # Aggregates unchanged from original seeding (Club01 5-1 on aggregate).
+    assert tie_after["aggregate_a"] == 5
+    assert tie_after["aggregate_b"] == 1
+
+
+def test_genuinely_newer_result_can_update_undecided_entry(tmp_path):
+    """Undecided tie gets legs and winner from provider — should update."""
+    dp = _make_data_dir(tmp_path)
+    # Only one leg of playoff tie 7, drawn — tie remains undecided.
+    events = _league_events() + [
+        _ko_event("PLAYOFFS", "Club18", "Club15", 1, 1, event_date="2026-02-17"),
+    ]
+    ingest_ucl_events(events, dp, "SeedProvider")
+
+    # Tie 7 is undecided (one drawn leg, level aggregate).
+    doc_before = load_knockout_store(dp)
+    tie7 = next(t for t in doc_before["matches"]["playoff"] if t["tie_num"] == 7)
+    assert tie7["winner"] is None
+
+    # Now send both legs (second one decides it).
+    leg_events = [
+        _ko_event("PLAYOFFS", "Club18", "Club15", 1, 1, event_date="2026-02-17"),
+        _ko_event("PLAYOFFS", "Club15", "Club18", 0, 2, event_date="2026-02-24"),
+    ]
+    ingest_ucl_events(leg_events, dp, "OfficialProvider")
+
+    doc_after = load_knockout_store(dp)
+    tie7_after = next(t for t in doc_after["matches"]["playoff"] if t["tie_num"] == 7)
+    assert tie7_after["winner"] == "Club18"
+    assert tie7_after["legs"] is not None
+    assert len(tie7_after["legs"]) == 2
+    assert tie7_after["status"] == "played"
+    assert tie7_after["provenance"] == "official"
+
+
+def test_should_apply_update_guard_unit():
+    """Direct unit test of _should_apply_update logic."""
+    from competitions.ucl.src.ingest import _should_apply_update
+
+    # 1. Winner nullification blocked.
+    assert _should_apply_update(
+        {"winner": "PSG", "status": "played_pens"},
+        {"winner": None, "status": "scheduled"},
+    ) is False
+
+    # 2. Penalty evidence loss blocked.
+    assert _should_apply_update(
+        {"winner": "PSG", "penalties_played": True},
+        {"winner": "PSG", "penalties_played": False},
+    ) is False
+
+    # 3. Legs added to decided aggregate-only tie blocked.
+    assert _should_apply_update(
+        {"winner": "Arsenal", "legs": None},
+        {"winner": "Arsenal", "legs": [{"leg": 1}]},
+    ) is False
+
+    # 4. Enrichment of undecided entry allowed.
+    assert _should_apply_update(
+        {"winner": None, "legs": None},
+        {"winner": "Team", "legs": [{"leg": 1}]},
+    ) is True
+
+    # 5. Same winner, same penalty evidence — allowed.
+    assert _should_apply_update(
+        {"winner": "PSG", "penalties_played": True},
+        {"winner": "PSG", "penalties_played": True},
+    ) is True
+
+    # 6. Both undecided — allowed.
+    assert _should_apply_update(
+        {"winner": None},
+        {"winner": None},
+    ) is True
+
+    # 7. Legs already present, update with new legs — allowed.
+    assert _should_apply_update(
+        {"winner": "Team", "legs": [{"leg": 1}]},
+        {"winner": "Team", "legs": [{"leg": 1}, {"leg": 2}]},
+    ) is True

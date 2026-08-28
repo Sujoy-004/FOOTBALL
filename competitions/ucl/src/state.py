@@ -603,12 +603,17 @@ def _validate_graph(rules_matches: list, playoff_templates: list, emitted_nodes:
                     f"within the produced bracket state")
 
 
-def build_competition_state(data_dir, mode: str = MODE_RESULTS, sim_payload: Optional[dict] = None) -> dict:
+def build_competition_state(data_dir, mode: str = MODE_RESULTS, sim_payload: Optional[dict] = None, active_season: str | None = None) -> dict:
     """Build the canonical competition state document.
 
     mode="results" reads the on-disk stores factually; mode="simulation"
     consumes a sim_payload shaped like the Monte Carlo enrichment output and
     marks every knockout node with provenance "simulated".
+
+    Exchange 5: ``active_season`` — when a non-historical season is active,
+    results and fixtures are read from ``data/seasons/<id>/`` instead of the
+    root stores.  Structural files (bracket_rules, playoff_pairings) are
+    always read from root.
     """
     dp = Path(data_dir) if isinstance(data_dir, str) else data_dir
     if mode not in (MODE_RESULTS, MODE_SIMULATION):
@@ -621,11 +626,23 @@ def build_competition_state(data_dir, mode: str = MODE_RESULTS, sim_payload: Opt
     else:
         sim_payload = None
 
-    _, league_availability, _ = load_json_store(dp / "results.json")
-    _, fixtures_availability, _ = load_json_store(dp / "fixtures.json")
+    # Exchange 5: resolve the active data directory for results/fixtures.
+    from competitions.ucl.src.seasons import LOCAL_HISTORICAL_SEASON, season_dir
+    _active_dp = dp
+    _is_new_season = False
+    if active_season and active_season != LOCAL_HISTORICAL_SEASON:
+        candidate = season_dir(dp, active_season)
+        if candidate.is_dir():
+            _active_dp = candidate
+            _is_new_season = True
+
+    _, league_availability, _ = load_json_store(_active_dp / "results.json")
+    _, fixtures_availability, _ = load_json_store(_active_dp / "fixtures.json")
     ko_payload, ko_availability, _ = load_json_store(dp / "knockout_results.json")
 
-    phase = _competition_phase(dp)
+    # Exchange 5: phase computation uses the active data dir for results,
+    # but structural files from root.
+    phase = _competition_phase(_active_dp) if _is_new_season else _competition_phase(dp)
 
     rules_matches = _load_bracket_rules(dp)
     templates, source_map, quarters, round_slots = _round_templates(rules_matches)
@@ -636,7 +653,7 @@ def build_competition_state(data_dir, mode: str = MODE_RESULTS, sim_payload: Opt
     else:
         ko_store = _empty_ko_store()
 
-    stages: dict = {"league": _league_stage(dp, league_availability)}
+    stages: dict = {"league": _league_stage(_active_dp, league_availability) if _is_new_season else _league_stage(dp, league_availability)}
 
     if mode == MODE_RESULTS:
         default_provenance = "manual"
@@ -703,7 +720,7 @@ def build_competition_state(data_dir, mode: str = MODE_RESULTS, sim_payload: Opt
 
     state: dict = {
         "competition": "ucl",
-        "season": SEASON,
+        "season": active_season or SEASON,
         "mode": mode,
         "phase": phase,
         "availability": {

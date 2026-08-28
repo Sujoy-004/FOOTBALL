@@ -203,14 +203,48 @@ def _fetch_live_data() -> None:
         "step": "UCL live fetch", "status": "ok" if ok else "skip", "elapsed": 0.0,
         "output": f"[{ts()}] {provider_name}: {n_raw} raw matches, {n_updated} updated",
     })
+    # Exchange 5: if a new season was activated by the ingest, recompute
+    # the cache so the API serves fresh data immediately.
+    if ok:
+        _maybe_recompute_cache_after_ingest(summary)
 
+
+def _maybe_recompute_cache_after_ingest(summary: dict) -> None:
+    """Recompute cache if a new season was activated during ingest.
+
+    Exchange 5: after a successful multi-season ingest, the active season
+    may have changed (current.json updated).  Recompute the cache so
+    subsequent API calls serve the new season's data.
+    """
+    import logging as _logging
+    logger = _logging.getLogger(__name__)
+    per_season = summary.get("per_season") or {}
+    if not per_season:
+        return
+    try:
+        old_mode = _mode
+        old_cache_snapshot = cache.get("mode")
+        new_result = compute_all()
+        if new_result.get("error"):
+            logger.warning("[UCL] Cache recomputation failed: %s", new_result["error"])
+            return
+        globals()["cache"] = new_result
+        if new_result.get("mode") != old_mode:
+            globals()["_mode"] = new_result.get("mode", old_mode)
+            logger.info("[UCL] Cache recomputed: mode changed from %s to %s",
+                        old_mode, _mode)
+    except Exception as exc:
+        logger.warning("[UCL] Cache recomputation failed: %s", exc)
 
 
 def _load_results() -> list[dict]:
-    return _load_results_pipeline(DATA_DIR)
+    """Load results from the active season's data directory."""
+    from competitions.ucl.src.orchestrator import resolve_active_data_dir
+    return _load_results_pipeline(resolve_active_data_dir(DATA_DIR))
 
 
 def _load_knockout_results() -> dict | None:
+    """Load knockout results — always from root (structural file)."""
     return _load_knockout_results_pipeline(DATA_DIR)
 
 
@@ -220,8 +254,13 @@ def _unplayed_match_count() -> int:
 
 
 def _match_counts() -> tuple[int, int]:
-    """Return (unplayed, total) match counts from fixtures + results."""
-    fixtures_path = DATA_DIR / "fixtures.json"
+    """Return (unplayed, total) match counts from fixtures + results.
+
+    Exchange 5: reads fixtures from the active season's data directory.
+    """
+    from competitions.ucl.src.orchestrator import resolve_active_data_dir
+    active_dir = Path(resolve_active_data_dir(DATA_DIR))
+    fixtures_path = active_dir / "fixtures.json"
     if not fixtures_path.exists():
         return 0, 0
     fixtures = json.loads(fixtures_path.read_text(encoding="utf-8"))
@@ -360,9 +399,16 @@ def api_simulation():
 
 
 def _competition_state() -> dict:
-    """Authoritative factual competition state (built fresh from stores)."""
+    """Authoritative factual competition state (built fresh from stores).
+
+    Exchange 5: resolves the active season so the state builder reads
+    from the correct season-dir store.
+    """
     from competitions.ucl.src.state import build_competition_state
-    return build_competition_state(str(DATA_DIR), mode="results")
+    from competitions.ucl.src.seasons import get_current_season
+    current = get_current_season(DATA_DIR)
+    active_season = current.get("season") if current and isinstance(current, dict) else None
+    return build_competition_state(str(DATA_DIR), mode="results", active_season=active_season)
 
 
 def _lifecycle_view() -> dict:
@@ -380,9 +426,12 @@ def _simulation_bracket_state() -> dict | None:
     if not sim_payload:
         return None
     from competitions.ucl.src.state import build_competition_state
+    from competitions.ucl.src.seasons import get_current_season
     try:
+        current = get_current_season(DATA_DIR)
+        active_season = current.get("season") if current and isinstance(current, dict) else None
         return build_competition_state(str(DATA_DIR), mode="simulation",
-                                       sim_payload=sim_payload)
+                                       sim_payload=sim_payload, active_season=active_season)
     except Exception:
         return None
 
@@ -956,7 +1005,8 @@ def api_what_if(req: dict = None):
     if not ta or not tb:
         return JSONResponse({"error": "bracket slot unresolved"})
 
-    fixtures_path = str(DATA_DIR / "fixtures.json")
+    from competitions.ucl.src.orchestrator import resolve_active_data_dir
+    fixtures_path = str(Path(resolve_active_data_dir(DATA_DIR)) / "fixtures.json")
     provider = RepoFixtureProvider(fixtures_path=fixtures_path).load()
     team_names = [t.name for t in provider.teams]
 
@@ -980,7 +1030,8 @@ def api_what_if(req: dict = None):
 
     baseline_elos = dict(elo_ratings)
     # Real played league matches are immutable facts in both scenarios.
-    played_matches = _load_league_played_pairs(str(DATA_DIR))
+    from competitions.ucl.src.orchestrator import resolve_active_data_dir
+    played_matches = _load_league_played_pairs(resolve_active_data_dir(DATA_DIR))
     baseline = build_simulation_result(
         provider, baseline_elos, seed=42, n_iterations=n_iterations,
         played_matches=played_matches,

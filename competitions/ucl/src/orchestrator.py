@@ -697,6 +697,9 @@ def compute_competition_phase(data_dir: str | Path) -> dict:
 def resolve_compute_mode(data_dir: str | Path) -> tuple[str, str]:
     """Decide 'results' vs 'simulation' from on-disk evidence.
 
+    Exchange 5: checks season-dir stores first when an active season is set,
+    falling back to legacy root stores for 2025/26.
+
     Results mode requires a readable, non-empty ``results.json`` only.
     Knockout data is NOT required: its availability is reported separately
     so the UI can say "unavailable" instead of fabricating a whole season
@@ -706,7 +709,34 @@ def resolve_compute_mode(data_dir: str | Path) -> tuple[str, str]:
     Returns ``(mode, reason)`` where mode is ``results``, ``simulation``
     or ``error`` (results.json exists but cannot be read).
     """
-    payload, availability, detail = load_json_store(Path(data_dir) / "results.json")
+    dp = Path(data_dir)
+
+    # Exchange 5: check season-dir stores first when an active season is set.
+    from competitions.ucl.src.seasons import get_current_season, season_dir
+    current = get_current_season(dp)
+    active_season = None
+    if current and isinstance(current, dict):
+        active_season = current.get("season")
+    if active_season:
+        sd = season_dir(dp, active_season)
+        sd_results = sd / "results.json"
+        if sd_results.exists():
+            try:
+                payload = json.loads(sd_results.read_text(encoding="utf-8"))
+                matches = payload.get("matches", payload)
+                if isinstance(matches, list) and len(matches) >= 1:
+                    return "results", f"season {active_season}: {len(matches)} result(s)"
+            except Exception as exc:
+                return "error", f"season {active_season}: failed to read results.json: {exc}"
+        sd_fixtures = sd / "fixtures.json"
+        if sd_fixtures.exists():
+            return "results", f"season {active_season}: fixtures loaded, awaiting results"
+        # Season dir exists but is empty — still results mode (skeleton).
+        if sd.is_dir():
+            return "results", f"season {active_season}: season dir present, awaiting data"
+
+    # Legacy root-store path (unchanged for 2025/26).
+    payload, availability, detail = load_json_store(dp / "results.json")
     if availability is DataAvailability.AVAILABLE:
         return "results", "real results present"
     if availability is DataAvailability.EMPTY:
@@ -743,6 +773,29 @@ def _load_league_played_pairs(
     return pairs or None
 
 
+def resolve_active_data_dir(data_dir: str | Path) -> str:
+    """Resolve the data directory for the active season.
+
+    Exchange 5: returns the season-dir path when a non-historical season
+    is active in ``current.json``; otherwise returns the root data_dir
+    unchanged.
+    """
+    from competitions.ucl.src.seasons import (
+        LOCAL_HISTORICAL_SEASON,
+        get_current_season,
+        season_dir,
+    )
+    dp = Path(data_dir)
+    current = get_current_season(dp)
+    if current and isinstance(current, dict):
+        active_season = current.get("season")
+        if active_season and active_season != LOCAL_HISTORICAL_SEASON:
+            sd = season_dir(dp, active_season)
+            if sd.is_dir():
+                return str(sd)
+    return str(data_dir)
+
+
 def run_deterministic_compute(
     data_dir: str,
     bsd_api_key: str = "",
@@ -769,7 +822,10 @@ def run_deterministic_compute(
     def _step(name, fn):
         return boot_step(name, fn, boot)
 
-    results = _step("Load real results", lambda: load_results(data_dir))
+    # Exchange 5: resolve the active season's data directory for results/fixtures.
+    _active_data_dir = resolve_active_data_dir(data_dir)
+
+    results = _step("Load real results", lambda: load_results(_active_data_dir))
     if not results:
         return {"error": "results.json not found", "boot": boot}
 
@@ -794,7 +850,7 @@ def run_deterministic_compute(
 
     from competitions.ucl.src.provider import RepoFixtureProvider
 
-    fixtures_path = os.path.join(data_dir, "fixtures.json")
+    fixtures_path = os.path.join(_active_data_dir, "fixtures.json")
     provider = _step("Load fixtures", lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load())
     if not provider:
         return {"error": "fixtures load failed", "boot": boot}
@@ -923,7 +979,10 @@ def run_compute_all(
     def _step(name, fn):
         return boot_step(name, fn, boot)
 
-    results_path = os.path.join(data_dir, "results.json")
+    # Exchange 5: resolve the active season's data directory.
+    _active_data_dir = resolve_active_data_dir(data_dir)
+
+    results_path = os.path.join(_active_data_dir, "results.json")
 
     mode, mode_reason = resolve_compute_mode(data_dir)
 
@@ -940,7 +999,7 @@ def run_compute_all(
     from competitions.ucl.src.provider import RepoFixtureProvider
     from competitions.ucl.src.elo_fetcher import fetch_team_elos
 
-    fixtures_path = os.path.join(data_dir, "fixtures.json")
+    fixtures_path = os.path.join(_active_data_dir, "fixtures.json")
     provider = _step("Load fixtures", lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load())
     if not provider:
         return {"error": "fixtures load failed", "boot": boot}

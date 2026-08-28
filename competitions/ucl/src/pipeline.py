@@ -235,12 +235,14 @@ def fetch_live_data(
 ) -> dict:
     """Fetch live match data from the configured provider and ingest it.
 
-    Exchange 2 delegation: all persistence logic (league upsert keyed by
-    fixture ``match_id``, knockout store v2 maintenance, skeleton
-    derivation, slot cascades, champion resolution) lives in
-    :mod:`competitions.ucl.src.ingest`. This wrapper only selects the
-    provider, normalizes finished events against the alias table, and hands
-    them to :func:`competitions.ucl.src.ingest.ingest_ucl_events`.
+    Exchange 5: routes through the multi-season ingestion system so that
+    provider events with a non-historical season are stored under
+    ``data/seasons/<season>/`` instead of the root stores.  Historical
+    2025/26 events are routed to the legacy path exactly as before.
+
+    Both finished AND scheduled/timed events are preserved: finished events
+    create factual results; scheduled events populate season fixtures without
+    fabricated scores.
 
     Returns a superset of the legacy refresh dict — ``status`` (ok/skip),
     ``n_raw``, ``n_updated``, ``provider_name`` — plus ``report`` holding
@@ -254,7 +256,15 @@ def fetch_live_data(
         note_unmatchable,
         normalize_team,
     )
-    from competitions.ucl.src.ingest import EVENT_PASSTHROUGH_FIELDS, ingest_ucl_events
+    from competitions.ucl.src.ingest import (
+        EVENT_PASSTHROUGH_FIELDS,
+        ingest_ucl_events_multi_season,
+    )
+    from competitions.ucl.src.seasons import (
+        LOCAL_HISTORICAL_SEASON,
+        normalize_season_token,
+        set_current_season,
+    )
 
     # The web layer owns transport selection (web.common.get_data_provider)
     # and may pass a pre-selected provider; offline/backfill callers fall
@@ -281,7 +291,7 @@ def fetch_live_data(
 
     data_dir_path = Path(data_dir) if isinstance(data_dir, str) else data_dir
 
-    # Build alias lookup
+    # Build alias lookup from root fixtures + team_aliases
     if team_aliases_data:
         aliases = team_aliases_data
     else:
@@ -289,26 +299,27 @@ def fetch_live_data(
         aliases = json.loads(aliases_path.read_text(encoding="utf-8")) if aliases_path.exists() else {}
     alias_lookup = _build_alias_lookup(aliases, bracket=[])
 
-    fixtures_path = data_dir_path / "fixtures.json"
-    if not fixtures_path.exists():
-        logger.warning("[UCL] No fixtures.json — cannot process matches")
-        report = IngestReport(provider=provider_label, attempted=True, success=False,
-                              error="fixtures.json missing", stale=True)
-        return {"status": "skip", "n_raw": len(raw), "n_updated": 0,
-                "provider_name": provider_label, "report": report.to_dict()}
-    fixtures = json.loads(fixtures_path.read_text(encoding="utf-8"))
-    for team in fixtures.get("schedule", {}).get("teams", []):
-        alias_lookup[team["name"].strip().lower()] = team["name"]
+    # Exchange 5: root fixtures.json is optional — new seasons don't require it.
+    # The multi-season ingest creates season-dir fixtures dynamically.
+    root_fixtures_path = data_dir_path / "fixtures.json"
+    if root_fixtures_path.exists():
+        try:
+            fixtures = json.loads(root_fixtures_path.read_text(encoding="utf-8"))
+            for team in fixtures.get("schedule", {}).get("teams", []):
+                alias_lookup[team["name"].strip().lower()] = team["name"]
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            pass
 
-    # Normalize finished events into the flat form ingest_ucl_events expects.
+    # Normalize ALL events (finished + scheduled) — do not discard scheduled.
     norm_stats = new_ingestion_stats()
     normalized_events: list[dict] = []
     n_unmatchable = 0
     for event in raw:
         status = (event.get("status") or "").lower()
-        if status != "finished":
-            continue
-        count_finished(norm_stats)
+        is_finished = status == "finished"
+        if is_finished:
+            count_finished(norm_stats)
+        norm_stats["normalized"] += 1
 
         home_name = event.get("home_team", "")
         away_name = event.get("away_team", "")
@@ -320,25 +331,54 @@ def fetch_live_data(
                              (event.get("home_score"), event.get("away_score")))
             n_unmatchable += 1
             continue
-        norm_stats["normalized"] += 1
 
         ev = {
             "home_team": home_norm,
             "away_team": away_norm,
             "home_score": event.get("home_score") or 0,
             "away_score": event.get("away_score") or 0,
-            "status": "finished",
+            "status": "finished" if is_finished else (event.get("status") or "scheduled"),
             "stage": event.get("stage", ""),
         }
+        # Exchange 5: preserve season identity for multi-season routing.
+        # Events without provider season info default to the local historical
+        # season — BSD and other non-FDO providers never emit season.
+        season_raw = event.get("season", "")
+        ev["season"] = season_raw if season_raw else LOCAL_HISTORICAL_SEASON
+        # Preserve provider match_id for stable fixture identity.
+        match_id = event.get("match_id", "")
+        if match_id:
+            ev["match_id"] = str(match_id)
         for field_name in EVENT_PASSTHROUGH_FIELDS:
             if field_name in event:
                 ev[field_name] = event[field_name]
         normalized_events.append(ev)
 
-    report = ingest_ucl_events(normalized_events, data_dir_path, provider_label)
+    # Exchange 5: route through multi-season ingestion.
+    # For events with season == LOCAL_HISTORICAL_SEASON (or no season),
+    # the router delegates to the legacy path automatically.
+    result = ingest_ucl_events_multi_season(normalized_events, data_dir_path, provider_label)
+    report_dict = result.get("report", {})
+    per_season = result.get("per_season", {})
 
-    # Fold normalization-side skips back in so the global invariant holds:
-    # received == normalized == ingested + skipped_unmatchable + skipped_no_target.
+    # Extract the IngestReport from the multi-season result for compatibility.
+    from football_core.fetcher import IngestReport as _IR
+    if isinstance(report_dict, dict):
+        report = _IR(
+            provider=report_dict.get("provider", provider_label),
+            attempted=report_dict.get("attempted", True),
+            success=report_dict.get("success", True),
+            error=report_dict.get("error"),
+        )
+        report.stale = report_dict.get("stale", False)
+        report.last_success_at = report_dict.get("last_success_at")
+        report.finished = report_dict.get("finished", report.finished)
+        report.stages = report_dict.get("stages", [])
+        report.written_files = report_dict.get("written_files", [])
+    else:
+        report = _IR(provider=provider_label, attempted=True, success=True, error=None)
+
+    # Fold normalization-side skips back in so the global invariant holds.
     merged_finished = dict(report.finished)
     merged_finished["received"] = merged_finished.get("received", 0) + n_unmatchable
     merged_finished["normalized"] = merged_finished.get("normalized", 0) + n_unmatchable
@@ -347,10 +387,24 @@ def fetch_live_data(
     )
     report.finished = merged_finished
 
-    n_updated = sum(
-        stage.get("count", 0) for stage in report.stages
-        if stage.get("key") in ("league", "playoff", "knockout")
-    )
+    # Exchange 5: activate a newly-discovered season when it has sufficient data.
+    _maybe_activate_new_season(data_dir_path, per_season, provider_label)
+
+    # Exchange 5: compute n_updated from per_season data since the combined
+    # report may not have stages populated (multi-season function returns
+    # per-season stats instead of stage-level breakdowns).
+    n_updated = 0
+    for _sk, sv in per_season.items():
+        if not isinstance(sv, dict):
+            continue
+        if sv.get("legacy"):
+            # Legacy report has stages with counts.
+            leg_report = sv.get("report", {})
+            for stage in leg_report.get("stages", []):
+                if stage.get("key") in ("league", "playoff", "knockout"):
+                    n_updated += stage.get("count", 0)
+        else:
+            n_updated += sv.get("results_added", 0) + sv.get("results_updated", 0)
     logger.info("[UCL] Updated %d matches — files saved", n_updated)
 
     return {
@@ -359,7 +413,72 @@ def fetch_live_data(
         "n_updated": n_updated,
         "provider_name": provider_label,
         "report": report.to_dict(),
+        "per_season": per_season,
     }
+
+
+def _maybe_activate_new_season(
+    data_dir: Path,
+    per_season: dict,
+    provider_name: str,
+) -> None:
+    """Activate a newly-discovered season if it has sufficient data.
+
+    Checks each non-historical season in the ingest result.  If any season
+    has fixtures >= 100 OR results >= 50 and is not the current active
+    season, updates ``current.json`` atomically.
+
+    Does NOT downgrade a valid active season to one with less data.
+    """
+    from competitions.ucl.src.lifecycle import (
+        SUFFICIENT_FIXTURES_THRESHOLD,
+        SUFFICIENT_RESULTS_THRESHOLD,
+    )
+    from competitions.ucl.src.seasons import (
+        get_current_season,
+        read_season_fixtures,
+        read_season_results,
+        set_current_season,
+    )
+
+    for season_key, stats in per_season.items():
+        if not isinstance(stats, dict):
+            continue
+        if stats.get("legacy"):
+            continue
+
+        fx_total = stats.get("fixtures_total", 0)
+        res_total = stats.get("results_added", 0) + stats.get("results_updated", 0)
+
+        # Also check the season store for cumulative counts (not just this batch).
+        fx_doc = read_season_fixtures(data_dir, season_key)
+        res_doc = read_season_results(data_dir, season_key)
+        if isinstance(fx_doc, dict):
+            fx_total = max(fx_total, len(fx_doc.get("fixtures", [])))
+        if isinstance(res_doc, dict):
+            res_total = max(res_total, len(res_doc.get("matches", [])))
+
+        sufficient = (
+            fx_total >= SUFFICIENT_FIXTURES_THRESHOLD
+            or res_total >= SUFFICIENT_RESULTS_THRESHOLD
+        )
+        if not sufficient:
+            continue
+
+        current = get_current_season(data_dir)
+        current_season = None
+        if current and isinstance(current, dict):
+            current_season = current.get("season")
+
+        if current_season == season_key:
+            continue
+
+        logger.info(
+            "[UCL] Activating season %s (fixtures=%d, results=%d) — "
+            "previous active: %s",
+            season_key, fx_total, res_total, current_season,
+        )
+        set_current_season(data_dir, season_key, basis="provider", provider=provider_name)
 
 
 # ── 6 ─────────────────────────────────────────────────────────────────────

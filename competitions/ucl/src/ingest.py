@@ -537,6 +537,39 @@ def _capture_et_pens(leg: dict, home: str, away: str, et_totals: dict, pen_total
     return et_played, pens_evidence, pen_winner
 
 
+def _should_apply_update(entry: dict, proposed: dict) -> bool:
+    """Decide whether proposed state can overwrite entry without downgrading.
+
+    Provider data must never downgrade existing authoritative data:
+
+    1. A decided entry (winner non-null) must not become undecided.
+    2. A penalty-decided match must not lose its penalty evidence.
+    3. Structural legs must not be added to decided aggregate-only ties.
+    4. Status must not downgrade from played to scheduled.
+
+    Returns True when the update is safe to apply.
+    """
+    existing_winner = entry.get("winner")
+    new_winner = proposed.get("winner")
+
+    # 1. Never nullify an existing decision.
+    if existing_winner and not new_winner:
+        return False
+
+    # 2. Never lose penalty evidence on a penalty-decided match.
+    if entry.get("penalties_played") and entry.get("winner"):
+        if not proposed.get("penalties_played"):
+            return False
+
+    # 3. Never add structural legs to decided aggregate-only ties.
+    if (existing_winner
+            and entry.get("legs") is None
+            and proposed.get("legs") is not None):
+        return False
+
+    return True
+
+
 def _apply_legs(entry: dict, legs_raw: list[dict]) -> bool:
     """Persist each leg into *entry* and recompute everything derivable.
 
@@ -609,6 +642,10 @@ def _apply_legs(entry: dict, legs_raw: list[dict]) -> bool:
         "status": status,
         "provenance": provenance,
     }
+
+    if not _should_apply_update(entry, new_state):
+        return False
+
     changed = False
     for key, value in new_state.items():
         if entry.get(key) != value:
@@ -671,6 +708,10 @@ def _apply_final(entry: dict, events_raw: list[dict]) -> bool:
         "status": status,
         "provenance": provenance,
     }
+
+    if not _should_apply_update(entry, new_state):
+        return False
+
     changed = False
     for key, value in new_state.items():
         if entry.get(key) != value:
@@ -1284,11 +1325,20 @@ def ingest_ucl_events_multi_season(
         ),
         "skipped_unmatchable": stats["skipped_unmatchable"],
         "skipped_no_target": total_skipped_no_target
-            + sum(s.get("report", {}).get("finished", {}).get("skipped_no_target", 0) if s.get("legacy") else 0
+            + sum(s.get("report", {}).get("skipped_no_target", 0) if s.get("legacy") else 0
                   for s in per_season_summary.values()),
     }
     combined_report.last_success_at = datetime.now(timezone.utc).isoformat()
     combined_report.written_files = written_files
+
+    # Exchange 5: propagate stages from per-season reports (especially legacy)
+    # so downstream consumers (pipeline n_updated, test stage-checklist) work.
+    for _sk, sv in per_season_summary.items():
+        leg_report = sv.get("report", {})
+        if isinstance(leg_report, dict):
+            for stage in leg_report.get("stages", []):
+                if isinstance(stage, dict) and stage.get("key"):
+                    combined_report.stages.append(dict(stage))
 
     return {
         "per_season": per_season_summary,
