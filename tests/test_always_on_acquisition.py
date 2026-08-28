@@ -228,11 +228,16 @@ def test_auto_raising_provider_never_touches_stores(monkeypatch):
     before = {**_hash_json_dir(WC_DATA), **_hash_json_dir(UCL_DATA)}
 
     wc_pipeline.fetch_live_data("", "", WC_DATA)   # pipeline guards internally
-    with pytest.raises(RuntimeError):
-        ucl_app._fetch_live_data()                 # guarded at server lifespan
+    ucl_app._fetch_live_data()                     # web boundary records it STALE
 
     after = {**_hash_json_dir(WC_DATA), **_hash_json_dir(UCL_DATA)}
     assert after == before
+
+    rep_ucl = ucl_app._refresh_report
+    assert rep_ucl["attempted"] is True
+    assert rep_ucl["success"] is False
+    assert rep_ucl["stale"] is True
+    assert rep_ucl["error"]
 
 
 # ── 4. succeeding provider refreshes state (UCL, sandboxed DATA_DIR) ────

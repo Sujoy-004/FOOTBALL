@@ -180,12 +180,18 @@ def _fetch_live_data() -> None:
         _store_refresh_report(False, "no data provider configured", None)
         return
 
-    summary = _brain_fetch(
-        str(DATA_DIR), BSD_API_KEY,
-        football_data_org_key=FOOTBALL_DATA_ORG_KEY,
-        ucl_league_id=UCL_LEAGUE_ID,
-        provider=provider,
-    )
+    try:
+        summary = _brain_fetch(
+            str(DATA_DIR), BSD_API_KEY,
+            football_data_org_key=FOOTBALL_DATA_ORG_KEY,
+            ucl_league_id=UCL_LEAGUE_ID,
+            provider=provider,
+        )
+    except Exception as exc:  # never let a refresh crash the request path
+        logger.warning("[UCL] live fetch raised: %s — UCL data may be STALE", exc)
+        _store_refresh_report(False, f"{exc.__class__.__name__}: {exc}",
+                              type(provider).__name__)
+        return
     report = summary.get("report") or {}
     ok = summary.get("status") == "ok"
     provider_name = summary.get("provider_name") or type(provider).__name__
