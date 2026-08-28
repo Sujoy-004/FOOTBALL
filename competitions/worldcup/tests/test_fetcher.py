@@ -9,6 +9,7 @@ from src.fetcher import (
     _extract_ai_preview,
     build_historic_url,
     fetch_raw_matches,
+    process_group_matches,
     process_matches,
 )
 
@@ -293,3 +294,69 @@ def test_process_matches_no_stats():
     assert len(result) == 1
     assert "stats" not in result[0]
     assert "context" in result[0]
+
+
+# ─── FDO group_name regression tests ────────────────────────────────────
+
+
+def test_process_group_matches_skips_empty_group_name():
+    """Knockout events with empty group_name (FDO _map_group(None)) must be
+    skipped by the group processor, not produce 'unparseable group_name' warnings."""
+    from football_core.fetcher import new_ingestion_stats
+
+    knockout_match = {
+        "id": 90001, "status": "finished",
+        "home_team": "Argentina", "away_team": "Germany",
+        "home_score": 2, "away_score": 1,
+        "group_name": "",       # FDO _map_group(None) returns ""
+        "event_date": "2026-07-04T20:00:00Z",
+    }
+    group_match = {
+        "id": 90002, "status": "finished",
+        "home_team": "Argentina", "away_team": "Iran",
+        "home_score": 2, "away_score": 0,
+        "group_name": "Group A",
+        "round_number": 1,
+        "event_date": "2026-06-15T22:00:00Z",
+    }
+    groups = {
+        "groups": {
+            "A": {
+                "teams": ["Argentina", "Iran"],
+                "matches": [
+                    {"match_id": "A1", "team_a": "Argentina", "team_b": "Iran"},
+                ],
+            }
+        }
+    }
+    istats = new_ingestion_stats()
+    result = process_group_matches(
+        [knockout_match, group_match], {}, groups, SAMPLE_ALIASES,
+        set(), set(), ingestion_stats=istats,
+    )
+    # Group match ingested, knockout skipped — no warning about empty group_name
+    assert len(result) == 1
+    assert result[0]["match_id"] == "A1"
+    assert result[0]["winner"] == "Argentina"
+    # Knockout counted as skipped_no_target, not as an error
+    assert istats["skipped_no_target"] >= 1
+
+
+def test_process_group_matches_skips_none_group_name():
+    """Events with group_name=None (BSD-style knockout) must be skipped."""
+    from football_core.fetcher import new_ingestion_stats
+
+    knockout_match = {
+        "id": 90003, "status": "finished",
+        "home_team": "Argentina", "away_team": "Germany",
+        "home_score": 2, "away_score": 1,
+        "group_name": None,
+        "event_date": "2026-07-04T20:00:00Z",
+    }
+    istats = new_ingestion_stats()
+    result = process_group_matches(
+        [knockout_match], {}, {"groups": {}}, SAMPLE_ALIASES,
+        set(), set(), ingestion_stats=istats,
+    )
+    assert result == []
+    assert istats["skipped_no_target"] >= 1

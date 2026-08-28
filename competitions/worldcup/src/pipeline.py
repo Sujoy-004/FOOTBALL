@@ -183,7 +183,9 @@ def fetch_live_data(
     group_stats = new_ingestion_stats()
     ko_stats = new_ingestion_stats()
     try:
-        from src.fetcher import process_group_matches, process_matches
+        from src.fetcher import (
+            partition_events_by_stage, process_group_matches, process_matches,
+        )
 
         raw_matches = provider.fetch_matches(competition_id="WC")
         if not raw_matches:
@@ -193,22 +195,31 @@ def fetch_live_data(
                 reason += f" ({err})"
             return _fail(reason, type(provider).__name__)
 
+        # Stage-aware routing: partition provider events by stage before
+        # dispatching to the appropriate processor.  Events with a non-empty
+        # group_name are group-stage; the rest are knockout.  This prevents
+        # cross-stage routing that produced noisy "no matching fixture/slot"
+        # warnings and wasted work in each processor.
+        group_events, ko_events = partition_events_by_stage(raw_matches)
+
         played_groups_path = data_dir / "played_groups.json"
         played_groups = (
             json.loads(played_groups_path.read_text(encoding="utf-8"))
             if played_groups_path.exists()
             else {}
         )
-        played_group_ids = set(played_groups.keys())
+        grp_before = json.dumps(played_groups, sort_keys=True, ensure_ascii=False)
         new_grp = process_group_matches(
-            raw_matches, teams, groups, aliases, played_group_ids, set()
+            group_events, teams, groups, aliases, played_groups, set(),
+            ingestion_stats=group_stats,
         )
         for m in new_grp:
             played_groups[m["match_id"]] = m
-        played_groups_path.write_text(
-            json.dumps(played_groups, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        if json.dumps(played_groups, sort_keys=True, ensure_ascii=False) != grp_before:
+            played_groups_path.write_text(
+                json.dumps(played_groups, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
 
         annex_c = load_annex_c(data_dir)
         played_path = data_dir / "played.json"
@@ -238,19 +249,26 @@ def fetch_live_data(
                 for mid, st in slot_teams.items()
                 if st.get("team_a") and st.get("team_b")
             ]
-            played_ids = set(played.keys())
+            ko_before = json.dumps(played, sort_keys=True, ensure_ascii=False)
             new_ko = process_matches(
-                raw_matches, teams, resolved_bracket, aliases, played_ids,
+                ko_events, teams, resolved_bracket, aliases, played,
                 ingestion_stats=ko_stats,
             )
-            if not new_ko:
-                break
             for m in new_ko:
                 played[m["match_id"]] = m
-            played_path.write_text(
-                json.dumps(played, indent=2, ensure_ascii=False),
-                encoding="utf-8",
+            ko_changed = (
+                json.dumps(played, sort_keys=True, ensure_ascii=False) != ko_before
             )
+            if ko_changed:
+                played_path.write_text(
+                    json.dumps(played, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            # Stop only when nothing new AND nothing corrected: a score
+            # correction may change downstream knockout winners, so the
+            # bracket must be re-resolved once more when updates occurred.
+            if not new_ko and not ko_changed:
+                break
     except Exception as e:
         # Acquisition-truth fix: a RAISING provider must surface as a failed
         # refresh, never fall through to a success-shaped report with
