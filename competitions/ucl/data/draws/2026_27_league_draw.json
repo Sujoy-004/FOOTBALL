@@ -1,0 +1,291 @@
+{
+  "schema": 1,
+  "season": "2026/27",
+  "competition": "ucl",
+  "kind": "league_phase_draw",
+  "draw_date": "2026-08-27",
+  "retrieved_at": "2026-08-28",
+  "source": "https://en.wikipedia.org/wiki/2026%E2%80%9327_UEFA_Champions_League_league_phase",
+  "cross_checked_with": [
+    "https://www.uefa.com/uefachampionsleague/draws/2027/2002239"
+  ],
+  "notes": [
+    "The draw for the league-phase pairings was held in Monaco on 27 August 2026.",
+    "Official UEFA fixture list (matchday assignment + kick-off dates) is announced 29 August 2026;",
+    "therefore every match in this snapshot carries event_date/stage official_matchday as UNKNOWN (null).",
+    "Home/away assignment per pairing is authoritative from the draw.",
+    "clubelo_name is best-effort (display name) and only used in the multiplier path;",
+    "offline simulation falls back to coefficient-based Elo."
+  ],
+  "fixture_list_status": {
+    "announced": "2026-08-29",
+    "official_matchdays_known": false,
+    "official_event_dates_known": false
+  },
+  "matchday_date_windows": {
+    "MD1": "2026-09-08/2026-09-10",
+    "MD2": "2026-10-13/2026-10-14",
+    "MD3": "2026-10-20/2026-10-21",
+    "MD4": "2026-11-03/2026-11-04",
+    "MD5": "2026-11-24/2026-11-25",
+    "MD6": "2026-12-08/2026-12-09",
+    "MD7": "2027-01-19/2027-01-20",
+    "MD8": "2027-01-27"
+  },
+  "teams": [
+    {"name": "Paris Saint-Germain", "pot": 1, "coefficient": 132.0, "clubelo_name": "Paris Saint-Germain"},
+    {"name": "Bayern Munich", "pot": 1, "coefficient": 147.5, "clubelo_name": "Bayern Munich"},
+    {"name": "Real Madrid", "pot": 1, "coefficient": 144.5, "clubelo_name": "Real Madrid"},
+    {"name": "Liverpool", "pot": 1, "coefficient": 130.0, "clubelo_name": "Liverpool"},
+    {"name": "Inter Milan", "pot": 1, "coefficient": 127.0, "clubelo_name": "Inter Milan"},
+    {"name": "Manchester City", "pot": 1, "coefficient": 125.5, "clubelo_name": "Manchester City"},
+    {"name": "Arsenal", "pot": 1, "coefficient": 119.0, "clubelo_name": "Arsenal"},
+    {"name": "Barcelona", "pot": 1, "coefficient": 113.25, "clubelo_name": "Barcelona"},
+    {"name": "Atlético Madrid", "pot": 1, "coefficient": 104.75, "clubelo_name": "Atlético Madrid"},
+    {"name": "Borussia Dortmund", "pot": 2, "coefficient": 100.75, "clubelo_name": "Borussia Dortmund"},
+    {"name": "Roma", "pot": 2, "coefficient": 97.75, "clubelo_name": "Roma"},
+    {"name": "Sporting CP", "pot": 2, "coefficient": 84.0, "clubelo_name": "Sporting CP"},
+    {"name": "Aston Villa", "pot": 2, "coefficient": 83.0, "clubelo_name": "Aston Villa"},
+    {"name": "Porto", "pot": 2, "coefficient": 80.75, "clubelo_name": "Porto"},
+    {"name": "Manchester United", "pot": 2, "coefficient": 76.5, "clubelo_name": "Manchester United"},
+    {"name": "Club Brugge", "pot": 2, "coefficient": 75.25, "clubelo_name": "Club Brugge"},
+    {"name": "Real Betis", "pot": 2, "coefficient": 74.5, "clubelo_name": "Real Betis"},
+    {"name": "PSV Eindhoven", "pot": 2, "coefficient": 71.25, "clubelo_name": "PSV Eindhoven"},
+    {"name": "Feyenoord", "pot": 3, "coefficient": 71.0, "clubelo_name": "Feyenoord"},
+    {"name": "Lille", "pot": 3, "coefficient": 68.75, "clubelo_name": "Lille"},
+    {"name": "Bodø/Glimt", "pot": 3, "coefficient": 64.0, "clubelo_name": "Bodø/Glimt"},
+    {"name": "Napoli", "pot": 3, "coefficient": 63.0, "clubelo_name": "Napoli"},
+    {"name": "RB Leipzig", "pot": 3, "coefficient": 61.0, "clubelo_name": "RB Leipzig"},
+    {"name": "Villarreal", "pot": 3, "coefficient": 59.0, "clubelo_name": "Villarreal"},
+    {"name": "Fenerbahçe", "pot": 3, "coefficient": 57.75, "clubelo_name": "Fenerbahçe"},
+    {"name": "Shakhtar Donetsk", "pot": 3, "coefficient": 56.25, "clubelo_name": "Shakhtar Donetsk"},
+    {"name": "Galatasaray", "pot": 3, "coefficient": 53.5, "clubelo_name": "Galatasaray"},
+    {"name": "Slavia Prague", "pot": 4, "coefficient": 44.0, "clubelo_name": "Slavia Prague"},
+    {"name": "Slovan Bratislava", "pot": 4, "coefficient": 36.0, "clubelo_name": "Slovan Bratislava"},
+    {"name": "VfB Stuttgart", "pot": 4, "coefficient": 27.5, "clubelo_name": "VfB Stuttgart"},
+    {"name": "AEK Athens", "pot": 4, "coefficient": 24.0, "clubelo_name": "AEK Athens"},
+    {"name": "LASK", "pot": 4, "coefficient": 21.0, "clubelo_name": "LASK"},
+    {"name": "Como", "pot": 4, "coefficient": 19.989, "clubelo_name": "Como"},
+    {"name": "Lens", "pot": 4, "coefficient": 16.699, "clubelo_name": "Lens"},
+    {"name": "Viking", "pot": 4, "coefficient": 8.247, "clubelo_name": "Viking"},
+    {"name": "Sabah", "pot": 4, "coefficient": 6.0, "clubelo_name": "Sabah"}
+  ],
+  "opponents": [
+    {"team": "Paris Saint-Germain", "pot": 1, "opponents": [
+      {"name": "Barcelona", "pot": 1, "home": true}, {"name": "Manchester City", "pot": 1, "home": false},
+      {"name": "Roma", "pot": 2, "home": true}, {"name": "Aston Villa", "pot": 2, "home": false},
+      {"name": "Galatasaray", "pot": 3, "home": true}, {"name": "Villarreal", "pot": 3, "home": false},
+      {"name": "Slovan Bratislava", "pot": 4, "home": true}, {"name": "Como", "pot": 4, "home": false}
+    ]},
+    {"team": "Bayern Munich", "pot": 1, "opponents": [
+      {"name": "Arsenal", "pot": 1, "home": true}, {"name": "Atlético Madrid", "pot": 1, "home": false},
+      {"name": "Real Betis", "pot": 2, "home": true}, {"name": "Manchester United", "pot": 2, "home": false},
+      {"name": "Bodø/Glimt", "pot": 3, "home": true}, {"name": "Lille", "pot": 3, "home": false},
+      {"name": "Slavia Prague", "pot": 4, "home": true}, {"name": "Viking", "pot": 4, "home": false}
+    ]},
+    {"team": "Real Madrid", "pot": 1, "opponents": [
+      {"name": "Inter Milan", "pot": 1, "home": true}, {"name": "Arsenal", "pot": 1, "home": false},
+      {"name": "PSV Eindhoven", "pot": 2, "home": true}, {"name": "Roma", "pot": 2, "home": false},
+      {"name": "RB Leipzig", "pot": 3, "home": true}, {"name": "Shakhtar Donetsk", "pot": 3, "home": false},
+      {"name": "LASK", "pot": 4, "home": true}, {"name": "AEK Athens", "pot": 4, "home": false}
+    ]},
+    {"team": "Liverpool", "pot": 1, "opponents": [
+      {"name": "Atlético Madrid", "pot": 1, "home": true}, {"name": "Inter Milan", "pot": 1, "home": false},
+      {"name": "Porto", "pot": 2, "home": true}, {"name": "Club Brugge", "pot": 2, "home": false},
+      {"name": "Villarreal", "pot": 3, "home": true}, {"name": "Fenerbahçe", "pot": 3, "home": false},
+      {"name": "Lens", "pot": 4, "home": true}, {"name": "LASK", "pot": 4, "home": false}
+    ]},
+    {"team": "Inter Milan", "pot": 1, "opponents": [
+      {"name": "Liverpool", "pot": 1, "home": true}, {"name": "Real Madrid", "pot": 1, "home": false},
+      {"name": "Club Brugge", "pot": 2, "home": true}, {"name": "Borussia Dortmund", "pot": 2, "home": false},
+      {"name": "Shakhtar Donetsk", "pot": 3, "home": true}, {"name": "Feyenoord", "pot": 3, "home": false},
+      {"name": "VfB Stuttgart", "pot": 4, "home": true}, {"name": "Slovan Bratislava", "pot": 4, "home": false}
+    ]},
+    {"team": "Manchester City", "pot": 1, "opponents": [
+      {"name": "Paris Saint-Germain", "pot": 1, "home": true}, {"name": "Barcelona", "pot": 1, "home": false},
+      {"name": "Sporting CP", "pot": 2, "home": true}, {"name": "Porto", "pot": 2, "home": false},
+      {"name": "Napoli", "pot": 3, "home": true}, {"name": "RB Leipzig", "pot": 3, "home": false},
+      {"name": "AEK Athens", "pot": 4, "home": true}, {"name": "Lens", "pot": 4, "home": false}
+    ]},
+    {"team": "Arsenal", "pot": 1, "opponents": [
+      {"name": "Real Madrid", "pot": 1, "home": true}, {"name": "Bayern Munich", "pot": 1, "home": false},
+      {"name": "Borussia Dortmund", "pot": 2, "home": true}, {"name": "Real Betis", "pot": 2, "home": false},
+      {"name": "Lille", "pot": 3, "home": true}, {"name": "Napoli", "pot": 3, "home": false},
+      {"name": "Sabah", "pot": 4, "home": true}, {"name": "Slavia Prague", "pot": 4, "home": false}
+    ]},
+    {"team": "Barcelona", "pot": 1, "opponents": [
+      {"name": "Manchester City", "pot": 1, "home": true}, {"name": "Paris Saint-Germain", "pot": 1, "home": false},
+      {"name": "Aston Villa", "pot": 2, "home": true}, {"name": "Sporting CP", "pot": 2, "home": false},
+      {"name": "Feyenoord", "pot": 3, "home": true}, {"name": "Galatasaray", "pot": 3, "home": false},
+      {"name": "Como", "pot": 4, "home": true}, {"name": "Sabah", "pot": 4, "home": false}
+    ]},
+    {"team": "Atlético Madrid", "pot": 1, "opponents": [
+      {"name": "Bayern Munich", "pot": 1, "home": true}, {"name": "Liverpool", "pot": 1, "home": false},
+      {"name": "Manchester United", "pot": 2, "home": true}, {"name": "PSV Eindhoven", "pot": 2, "home": false},
+      {"name": "Fenerbahçe", "pot": 3, "home": true}, {"name": "Bodø/Glimt", "pot": 3, "home": false},
+      {"name": "Viking", "pot": 4, "home": true}, {"name": "VfB Stuttgart", "pot": 4, "home": false}
+    ]},
+    {"team": "Borussia Dortmund", "pot": 2, "opponents": [
+      {"name": "Inter Milan", "pot": 1, "home": true}, {"name": "Arsenal", "pot": 1, "home": false},
+      {"name": "Real Betis", "pot": 2, "home": true}, {"name": "Aston Villa", "pot": 2, "home": false},
+      {"name": "Villarreal", "pot": 3, "home": true}, {"name": "Bodø/Glimt", "pot": 3, "home": false},
+      {"name": "AEK Athens", "pot": 4, "home": true}, {"name": "Sabah", "pot": 4, "home": false}
+    ]},
+    {"team": "Roma", "pot": 2, "opponents": [
+      {"name": "Real Madrid", "pot": 1, "home": true}, {"name": "Paris Saint-Germain", "pot": 1, "home": false},
+      {"name": "Sporting CP", "pot": 2, "home": true}, {"name": "Manchester United", "pot": 2, "home": false},
+      {"name": "Lille", "pot": 3, "home": true}, {"name": "Fenerbahçe", "pot": 3, "home": false},
+      {"name": "Slovan Bratislava", "pot": 4, "home": true}, {"name": "AEK Athens", "pot": 4, "home": false}
+    ]},
+    {"team": "Sporting CP", "pot": 2, "opponents": [
+      {"name": "Barcelona", "pot": 1, "home": true}, {"name": "Manchester City", "pot": 1, "home": false},
+      {"name": "Manchester United", "pot": 2, "home": true}, {"name": "Roma", "pot": 2, "home": false},
+      {"name": "Galatasaray", "pot": 3, "home": true}, {"name": "Shakhtar Donetsk", "pot": 3, "home": false},
+      {"name": "LASK", "pot": 4, "home": true}, {"name": "Lens", "pot": 4, "home": false}
+    ]},
+    {"team": "Aston Villa", "pot": 2, "opponents": [
+      {"name": "Paris Saint-Germain", "pot": 1, "home": true}, {"name": "Barcelona", "pot": 1, "home": false},
+      {"name": "Borussia Dortmund", "pot": 2, "home": true}, {"name": "Club Brugge", "pot": 2, "home": false},
+      {"name": "Fenerbahçe", "pot": 3, "home": true}, {"name": "Galatasaray", "pot": 3, "home": false},
+      {"name": "Viking", "pot": 4, "home": true}, {"name": "Slavia Prague", "pot": 4, "home": false}
+    ]},
+    {"team": "Porto", "pot": 2, "opponents": [
+      {"name": "Manchester City", "pot": 1, "home": true}, {"name": "Liverpool", "pot": 1, "home": false},
+      {"name": "PSV Eindhoven", "pot": 2, "home": true}, {"name": "Real Betis", "pot": 2, "home": false},
+      {"name": "Napoli", "pot": 3, "home": true}, {"name": "Feyenoord", "pot": 3, "home": false},
+      {"name": "Slavia Prague", "pot": 4, "home": true}, {"name": "LASK", "pot": 4, "home": false}
+    ]},
+    {"team": "Manchester United", "pot": 2, "opponents": [
+      {"name": "Bayern Munich", "pot": 1, "home": true}, {"name": "Atlético Madrid", "pot": 1, "home": false},
+      {"name": "Roma", "pot": 2, "home": true}, {"name": "Sporting CP", "pot": 2, "home": false},
+      {"name": "RB Leipzig", "pot": 3, "home": true}, {"name": "Villarreal", "pot": 3, "home": false},
+      {"name": "Sabah", "pot": 4, "home": true}, {"name": "Como", "pot": 4, "home": false}
+    ]},
+    {"team": "Club Brugge", "pot": 2, "opponents": [
+      {"name": "Liverpool", "pot": 1, "home": true}, {"name": "Inter Milan", "pot": 1, "home": false},
+      {"name": "Aston Villa", "pot": 2, "home": true}, {"name": "PSV Eindhoven", "pot": 2, "home": false},
+      {"name": "Bodø/Glimt", "pot": 3, "home": true}, {"name": "Napoli", "pot": 3, "home": false},
+      {"name": "Lens", "pot": 4, "home": true}, {"name": "VfB Stuttgart", "pot": 4, "home": false}
+    ]},
+    {"team": "Real Betis", "pot": 2, "opponents": [
+      {"name": "Arsenal", "pot": 1, "home": true}, {"name": "Bayern Munich", "pot": 1, "home": false},
+      {"name": "Porto", "pot": 2, "home": true}, {"name": "Borussia Dortmund", "pot": 2, "home": false},
+      {"name": "Feyenoord", "pot": 3, "home": true}, {"name": "Lille", "pot": 3, "home": false},
+      {"name": "Como", "pot": 4, "home": true}, {"name": "Slovan Bratislava", "pot": 4, "home": false}
+    ]},
+    {"team": "PSV Eindhoven", "pot": 2, "opponents": [
+      {"name": "Atlético Madrid", "pot": 1, "home": true}, {"name": "Real Madrid", "pot": 1, "home": false},
+      {"name": "Club Brugge", "pot": 2, "home": true}, {"name": "Porto", "pot": 2, "home": false},
+      {"name": "Shakhtar Donetsk", "pot": 3, "home": true}, {"name": "RB Leipzig", "pot": 3, "home": false},
+      {"name": "VfB Stuttgart", "pot": 4, "home": true}, {"name": "Viking", "pot": 4, "home": false}
+    ]},
+    {"team": "Feyenoord", "pot": 3, "opponents": [
+      {"name": "Inter Milan", "pot": 1, "home": true}, {"name": "Barcelona", "pot": 1, "home": false},
+      {"name": "Porto", "pot": 2, "home": true}, {"name": "Real Betis", "pot": 2, "home": false},
+      {"name": "RB Leipzig", "pot": 3, "home": true}, {"name": "Galatasaray", "pot": 3, "home": false},
+      {"name": "Como", "pot": 4, "home": true}, {"name": "Viking", "pot": 4, "home": false}
+    ]},
+    {"team": "Lille", "pot": 3, "opponents": [
+      {"name": "Bayern Munich", "pot": 1, "home": true}, {"name": "Arsenal", "pot": 1, "home": false},
+      {"name": "Real Betis", "pot": 2, "home": true}, {"name": "Roma", "pot": 2, "home": false},
+      {"name": "Galatasaray", "pot": 3, "home": true}, {"name": "Bodø/Glimt", "pot": 3, "home": false},
+      {"name": "Slovan Bratislava", "pot": 4, "home": true}, {"name": "VfB Stuttgart", "pot": 4, "home": false}
+    ]},
+    {"team": "Bodø/Glimt", "pot": 3, "opponents": [
+      {"name": "Atlético Madrid", "pot": 1, "home": true}, {"name": "Bayern Munich", "pot": 1, "home": false},
+      {"name": "Borussia Dortmund", "pot": 2, "home": true}, {"name": "Club Brugge", "pot": 2, "home": false},
+      {"name": "Lille", "pot": 3, "home": true}, {"name": "Napoli", "pot": 3, "home": false},
+      {"name": "LASK", "pot": 4, "home": true}, {"name": "Lens", "pot": 4, "home": false}
+    ]},
+    {"team": "Napoli", "pot": 3, "opponents": [
+      {"name": "Arsenal", "pot": 1, "home": true}, {"name": "Manchester City", "pot": 1, "home": false},
+      {"name": "Club Brugge", "pot": 2, "home": true}, {"name": "Porto", "pot": 2, "home": false},
+      {"name": "Bodø/Glimt", "pot": 3, "home": true}, {"name": "Villarreal", "pot": 3, "home": false},
+      {"name": "Viking", "pot": 4, "home": true}, {"name": "Sabah", "pot": 4, "home": false}
+    ]},
+    {"team": "RB Leipzig", "pot": 3, "opponents": [
+      {"name": "Manchester City", "pot": 1, "home": true}, {"name": "Real Madrid", "pot": 1, "home": false},
+      {"name": "PSV Eindhoven", "pot": 2, "home": true}, {"name": "Manchester United", "pot": 2, "home": false},
+      {"name": "Shakhtar Donetsk", "pot": 3, "home": true}, {"name": "Feyenoord", "pot": 3, "home": false},
+      {"name": "Lens", "pot": 4, "home": true}, {"name": "Como", "pot": 4, "home": false}
+    ]},
+    {"team": "Villarreal", "pot": 3, "opponents": [
+      {"name": "Paris Saint-Germain", "pot": 1, "home": true}, {"name": "Liverpool", "pot": 1, "home": false},
+      {"name": "Manchester United", "pot": 2, "home": true}, {"name": "Borussia Dortmund", "pot": 2, "home": false},
+      {"name": "Napoli", "pot": 3, "home": true}, {"name": "Fenerbahçe", "pot": 3, "home": false},
+      {"name": "Sabah", "pot": 4, "home": true}, {"name": "Slavia Prague", "pot": 4, "home": false}
+    ]},
+    {"team": "Fenerbahçe", "pot": 3, "opponents": [
+      {"name": "Liverpool", "pot": 1, "home": true}, {"name": "Atlético Madrid", "pot": 1, "home": false},
+      {"name": "Roma", "pot": 2, "home": true}, {"name": "Aston Villa", "pot": 2, "home": false},
+      {"name": "Villarreal", "pot": 3, "home": true}, {"name": "Shakhtar Donetsk", "pot": 3, "home": false},
+      {"name": "Slavia Prague", "pot": 4, "home": true}, {"name": "LASK", "pot": 4, "home": false}
+    ]},
+    {"team": "Shakhtar Donetsk", "pot": 3, "opponents": [
+      {"name": "Real Madrid", "pot": 1, "home": true}, {"name": "Inter Milan", "pot": 1, "home": false},
+      {"name": "Sporting CP", "pot": 2, "home": true}, {"name": "PSV Eindhoven", "pot": 2, "home": false},
+      {"name": "Fenerbahçe", "pot": 3, "home": true}, {"name": "RB Leipzig", "pot": 3, "home": false},
+      {"name": "AEK Athens", "pot": 4, "home": true}, {"name": "Slovan Bratislava", "pot": 4, "home": false}
+    ]},
+    {"team": "Galatasaray", "pot": 3, "opponents": [
+      {"name": "Barcelona", "pot": 1, "home": true}, {"name": "Paris Saint-Germain", "pot": 1, "home": false},
+      {"name": "Aston Villa", "pot": 2, "home": true}, {"name": "Sporting CP", "pot": 2, "home": false},
+      {"name": "Feyenoord", "pot": 3, "home": true}, {"name": "Lille", "pot": 3, "home": false},
+      {"name": "VfB Stuttgart", "pot": 4, "home": true}, {"name": "AEK Athens", "pot": 4, "home": false}
+    ]},
+    {"team": "Slavia Prague", "pot": 4, "opponents": [
+      {"name": "Arsenal", "pot": 1, "home": true}, {"name": "Bayern Munich", "pot": 1, "home": false},
+      {"name": "Aston Villa", "pot": 2, "home": true}, {"name": "Porto", "pot": 2, "home": false},
+      {"name": "Villarreal", "pot": 3, "home": true}, {"name": "Fenerbahçe", "pot": 3, "home": false},
+      {"name": "Lens", "pot": 4, "home": true}, {"name": "Sabah", "pot": 4, "home": false}
+    ]},
+    {"team": "Slovan Bratislava", "pot": 4, "opponents": [
+      {"name": "Inter Milan", "pot": 1, "home": true}, {"name": "Paris Saint-Germain", "pot": 1, "home": false},
+      {"name": "Real Betis", "pot": 2, "home": true}, {"name": "Roma", "pot": 2, "home": false},
+      {"name": "Shakhtar Donetsk", "pot": 3, "home": true}, {"name": "Lille", "pot": 3, "home": false},
+      {"name": "VfB Stuttgart", "pot": 4, "home": true}, {"name": "LASK", "pot": 4, "home": false}
+    ]},
+    {"team": "VfB Stuttgart", "pot": 4, "opponents": [
+      {"name": "Atlético Madrid", "pot": 1, "home": true}, {"name": "Inter Milan", "pot": 1, "home": false},
+      {"name": "Club Brugge", "pot": 2, "home": true}, {"name": "PSV Eindhoven", "pot": 2, "home": false},
+      {"name": "Lille", "pot": 3, "home": true}, {"name": "Galatasaray", "pot": 3, "home": false},
+      {"name": "Viking", "pot": 4, "home": true}, {"name": "Slovan Bratislava", "pot": 4, "home": false}
+    ]},
+    {"team": "AEK Athens", "pot": 4, "opponents": [
+      {"name": "Real Madrid", "pot": 1, "home": true}, {"name": "Manchester City", "pot": 1, "home": false},
+      {"name": "Roma", "pot": 2, "home": true}, {"name": "Borussia Dortmund", "pot": 2, "home": false},
+      {"name": "Galatasaray", "pot": 3, "home": true}, {"name": "Shakhtar Donetsk", "pot": 3, "home": false},
+      {"name": "LASK", "pot": 4, "home": true}, {"name": "Como", "pot": 4, "home": false}
+    ]},
+    {"team": "LASK", "pot": 4, "opponents": [
+      {"name": "Liverpool", "pot": 1, "home": true}, {"name": "Real Madrid", "pot": 1, "home": false},
+      {"name": "Porto", "pot": 2, "home": true}, {"name": "Sporting CP", "pot": 2, "home": false},
+      {"name": "Fenerbahçe", "pot": 3, "home": true}, {"name": "Bodø/Glimt", "pot": 3, "home": false},
+      {"name": "Slovan Bratislava", "pot": 4, "home": true}, {"name": "AEK Athens", "pot": 4, "home": false}
+    ]},
+    {"team": "Como", "pot": 4, "opponents": [
+      {"name": "Paris Saint-Germain", "pot": 1, "home": true}, {"name": "Barcelona", "pot": 1, "home": false},
+      {"name": "Manchester United", "pot": 2, "home": true}, {"name": "Real Betis", "pot": 2, "home": false},
+      {"name": "RB Leipzig", "pot": 3, "home": true}, {"name": "Feyenoord", "pot": 3, "home": false},
+      {"name": "AEK Athens", "pot": 4, "home": true}, {"name": "Lens", "pot": 4, "home": false}
+    ]},
+    {"team": "Lens", "pot": 4, "opponents": [
+      {"name": "Manchester City", "pot": 1, "home": true}, {"name": "Liverpool", "pot": 1, "home": false},
+      {"name": "Sporting CP", "pot": 2, "home": true}, {"name": "Club Brugge", "pot": 2, "home": false},
+      {"name": "Bodø/Glimt", "pot": 3, "home": true}, {"name": "RB Leipzig", "pot": 3, "home": false},
+      {"name": "Como", "pot": 4, "home": true}, {"name": "Slavia Prague", "pot": 4, "home": false}
+    ]},
+    {"team": "Viking", "pot": 4, "opponents": [
+      {"name": "Bayern Munich", "pot": 1, "home": true}, {"name": "Atlético Madrid", "pot": 1, "home": false},
+      {"name": "PSV Eindhoven", "pot": 2, "home": true}, {"name": "Aston Villa", "pot": 2, "home": false},
+      {"name": "Feyenoord", "pot": 3, "home": true}, {"name": "Napoli", "pot": 3, "home": false},
+      {"name": "Sabah", "pot": 4, "home": true}, {"name": "VfB Stuttgart", "pot": 4, "home": false}
+    ]},
+    {"team": "Sabah", "pot": 4, "opponents": [
+      {"name": "Barcelona", "pot": 1, "home": true}, {"name": "Arsenal", "pot": 1, "home": false},
+      {"name": "Borussia Dortmund", "pot": 2, "home": true}, {"name": "Manchester United", "pot": 2, "home": false},
+      {"name": "Napoli", "pot": 3, "home": true}, {"name": "Villarreal", "pot": 3, "home": false},
+      {"name": "Slavia Prague", "pot": 4, "home": true}, {"name": "Viking", "pot": 4, "home": false}
+    ]}
+  ]
+}
