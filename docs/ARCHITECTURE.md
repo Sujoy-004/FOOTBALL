@@ -14,7 +14,8 @@ MonteCarloEngine (football_core)      ← validation · seeded RNG · N runs ·
         ↓                                aggregation · SIMULATED provenance
 SimulationRules (one adapter per competition brain)
         ↙                          ↘
-World Cup 2026                 UCL 2025/26
+World Cup 2026                 UCL 2026/27
+                              ↳ 2025/26 retained as historical
 12 groups + Annex-C + TPP     Swiss league + playoff + seeded R16
         ↘                          ↙
 CompetitionRegistry ── FastAPI shell ── dashboard
@@ -50,21 +51,22 @@ CompetitionRegistry ── FastAPI shell ── dashboard
 
 ## Data acquisition & competition ingestors (Exchange 6)
 
-Acquisition policy (Exchange 3): fresh-first, snapshot-fallback. Every
-normal `python -m web.server` startup attempts each selected competition's
-provider/ingestor before rendering; a failed attempt falls back to the last
-validated on-disk stores and the UI says FALLBACK with the error. Explicit
-offline execution (`FOOTBALL_SNAPSHOT=1`, interactive menu choice [2],
-tests forcing the snapshot decision) performs zero network. Placeholder
-credentials select no provider at all. A failed scrape never mutates
-factual stores.
+Acquisition policy: normal `python -m web.server` is fresh-first and
+competition-scoped, but provider calls are lazy — each competition attempts its
+own provider on its first data request (or through the optional eager preload).
+A failed attempt falls back to the last validated on-disk stores and the UI
+reports FALLBACK/stale state with the error. Explicit offline execution
+(`FOOTBALL_SNAPSHOT=1` or `python -m web.server --offline`) performs zero
+network calls. Placeholder credentials select no provider. A failed scrape
+never mutates factual stores.
 
 Transport selection is shared (`web/common.get_data_provider`: BSD or
-football-data.org, chosen by keys/`DATA_PROVIDER`); everything after the raw
-events is competition-owned. Each brain exposes one authoritative ingestor —
-World Cup: `competitions/worldcup/src/pipeline.fetch_live_data`; UCL:
-`competitions/ucl/src/ingest.ingest_ucl_events` (wrapped by
-`pipeline.fetch_live_data`). The web layer never parses competition events;
+football-data.org, chosen by keys/`DATA_PROVIDER`); everything after raw
+events is competition-owned. Each brain exposes its own authoritative ingest
+path — World Cup: `competitions/worldcup/src/pipeline.fetch_live_data`; UCL:
+`competitions/ucl/src/pipeline.fetch_live_data`, which routes new-season
+events through the multi-season store. The web layer never parses competition
+events;
 it selects the provider, hands it to the brain, and is the SINGLE writer of
 its freshness entry in `web/last_refresh.json` from the returned
 `IngestReport`.
@@ -143,8 +145,8 @@ Season lifecycle (Exchange 3) is discovered per competition, never
 hardcoded: each brain derives `stage` (completed / active / future /
 unknown), progress and historical seasons from on-disk evidence (UCL:
 `src/lifecycle.py::discover`; WC: `season_lifecycle`), optionally
-cross-checked against a provider-declared current season (mismatch is
-surfaced, never silently adopted). Lifecycle drives UX: completed seasons
+cross-checked against provider-declared seasons and explicit current-season
+pointers; a valid newer season can become active without overwriting history. Lifecycle drives UX: completed seasons
 render facts only — no season-wide Monte Carlo controls; per-match/tie
 What-If remains available through Match Intelligence and is always labeled
 SIMULATED with the factual history unchanged. Active seasons expose

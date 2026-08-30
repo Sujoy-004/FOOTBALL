@@ -2,8 +2,9 @@
 
 A shared football prediction and Monte Carlo simulation engine with
 competition-specific brains — currently World Cup 2026 and UEFA Champions
-League 2025/26 — where real played matches are immutable facts and every
-simulated number is explicitly labeled as simulated.
+League 2026/27 (the active default, draw-derived; the 2025/26 season remains
+selectable as completed history) — where real played matches are immutable
+facts and every simulated number is explicitly labeled as simulated.
 
 ## What it does
 
@@ -69,12 +70,11 @@ Implemented today:
 | Competition | Format | Dashboard |
 |---|---|---|
 | World Cup 2026 | 48 teams, 12 groups, Annex-C third-place routing, R32..FINAL + third-place playoff | `/worldcup` |
-| UEFA Champions League 2025/26 | 36-team Swiss league, playoff round, seeded R16 bracket | `/ucl` |
+| UEFA Champions League 2026/27 | 36-team Swiss league, draw-derived schedule pending/official enrichment, playoff round, seeded R16 bracket | `/ucl` |
 
 The registry/adapter boundary is designed so future competitions (for
-example a league format) plug in by adding one brain package and one
-registry entry — no changes to `football_core`. No other competition is
-implemented yet.
+example La Liga or Serie A) plug in by adding one competition brain and one
+registry entry — no changes to `football_core`.
 
 ## Prediction & signals
 
@@ -124,9 +124,8 @@ Simulation is always user-triggered. Nothing runs automatically.
 
 ## Data modes
 
-At startup the server offers live mode (requires a
-`FOOTBALL_DATA_ORG_KEY`; optional `BSD_API_KEY`, `DATA_PROVIDER=bsd|football-data`)
-or snapshot mode. Snapshot mode performs **zero** live requests — including
+Normal startup is fresh-first: the server attempts acquisition lazily per competition and falls back to the last validated stores on failure.
+`FOOTBALL_DATA_ORG_KEY` is the recommended provider credential; optional `BSD_API_KEY` and `DATA_PROVIDER=bsd|football-data` remain supported. Explicit snapshot/offline mode performs **zero** live requests — including
 Elo lookups, which fall back to UEFA-coefficient-derived ratings for UCL —
 and both dashboards disclose that stored data is being shown. A refresh
 endpoint re-ingests live results into the canonical stores without touching
@@ -154,13 +153,13 @@ pip install -r requirements.txt
 
 cp .env.example .env    # optional: add FOOTBALL_DATA_ORG_KEY for live mode
 
-python -m web.server    # http://127.0.0.1:8080  (choose [2] for snapshot)
+python -m web.server    # http://127.0.0.1:8080
+# explicit offline mode: python -m web.server --offline
 
 python -m pytest        # run the test suite
 ```
 
-Without API keys the server runs in snapshot mode on committed seed data;
-both dashboards render, simulations work, and no network call is made.
+Without API keys the server falls back to validated local data; both dashboards render. Use `--offline` (or `FOOTBALL_SNAPSHOT=1`) when you explicitly require zero network activity.
 
 ## Fresh checkout (bootstrap)
 
@@ -184,13 +183,12 @@ artifacts, not source of truth. Tests that need complete stores use
 
 ## Testing
 
-Current suite: **904 collected — 899 passed, 4 failed, 1 skipped**. The 4
-persistent failures are long-standing environment-dependent tests (one UCL
-replay-injection assertion and three WC fetcher tests that monkeypatch
-`requests.get` while the code uses a `requests.Session`) — they predate the
-architecture work and are tracked, not hidden. A minority of integration
-tests additionally require local match-result files produced by a live
-refresh; see `docs/GETTING-STARTED.md`.
+The current post-hardening suite passes cleanly: `python -m pytest
+--tb=short -q` reports **1197 passed / 1 skipped** (no failures). The single
+skipped test is an environment-dependent provider test exercising a graceful
+degradation path; a minority of integration tests additionally require
+local match-result files produced by a live refresh; see
+`docs/GETTING-STARTED.md`.
 
 ## Known limitations
 

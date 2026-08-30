@@ -39,9 +39,9 @@ python -m pytest tests            # cross-cutting regression tests
 
 ## Current baseline
 
-904 collected: 899 passed / 4 failed / 1 skipped. The four persistent
-failures are environment-dependent and tracked (one UCL replay-injection
-assertion; three WC fetcher tests that monkeypatch `requests.get` while the
-implementation uses a `requests.Session`). A minority of integration tests
-additionally need local match-result files produced by a live refresh - see
-GETTING-STARTED.
+As measured (`python -m pytest --tb=short -q`): **1197 passed / 1 skipped**
+(no failing tests). The one skipped test is an environment-dependent provider
+test that exercises a graceful-degradation path. A minority of integration
+tests additionally need local match-result files produced by a live refresh
+- see GETTING-STARTED. Run `python -m pytest` to re-measure the count
+yourself; it grows as the suite does.

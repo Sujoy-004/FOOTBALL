@@ -15,10 +15,10 @@ Copy `.env.example` to `.env` and fill in:
 - `FOOTBALL_DATA_ORG_KEY` — free key from football-data.org (recommended)
 - `BSD_API_KEY` — optional alternative provider
 - `DATA_PROVIDER` — `bsd` or `football-data` to pin the provider (auto-detects when unset)
-- `BSD_API_KEY` — optional alternative provider
 
-Without keys, the dashboard runs on committed seed data; every external
-dependency degrades gracefully and the UI shows which signals are unavailable.
+Without keys, the dashboard uses the last validated local data; every external dependency degrades gracefully and the UI shows the acquisition/freshness state. Use `python -m web.server --offline` for an explicitly network-free session.
+
+`.env.example` also documents the optional tuning knobs: `FOOTBALL_PRELOAD_ALL=1` (eager preload at boot instead of lazy on first request), `POLL_INTERVAL` (World Cup live-ingestion poll interval, default 60s), and `FOOTBALL_LIVE=1` (admit intentional live UCL CLI ingestion into the real data dir).
 
 ## 3. Run the dashboard
 
@@ -28,7 +28,7 @@ python -m web.server          # http://127.0.0.1:8080
 
 - `/worldcup` — WC 2026 dashboard (overview, standings, bracket, match insight,
   what-if, seeded simulation)
-- `/ucl` — UCL 2025/26 dashboard (league table, odds, bracket, what-if)
+- `/ucl` — UCL 2026/27 dashboard (future fixtures, standings when available, bracket, what-if) with 2025/26 selectable as historical data
 - `POST /worldcup/api/simulate` / `POST /ucl/api/simulate` — seeded Monte Carlo
   runs (async task + progress polling)
 
@@ -42,13 +42,13 @@ probabilities for both teams.
 
 ```bash
 curl -X POST http://127.0.0.1:8080/worldcup/api/calibrate
-curl -X POST http://127.0.0.1:8080/ucl/api/calibrate -H "Content-Type: application/json" \
-     -d '{"replay_data": "path/to/results.json"}'
+curl -X POST http://127.0.0.1:8080/ucl/api/calibrate
 ```
 
 Both fit ensemble weights by inverse log-loss on recorded outcomes and refuse
-to run below the per-signal sample threshold. Until then the runtime uses the
-documented uniform fallback.
+to run below the per-signal sample threshold. UCL fits against the current
+active season's result ledger. Until then the runtime uses the documented
+uniform fallback.
 
 ## 6. Benchmark
 
