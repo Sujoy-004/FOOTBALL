@@ -315,7 +315,7 @@ def build_default_registry() -> CompetitionRegistry:
 
     registry.register(CompetitionAdapter(
         id="ucl",
-        display_name="UEFA Champions League 2025/26",
+        display_name="UEFA Champions League",
         short="UCL",
         mount_prefix="/ucl",
         api_prefix="/ucl/api",

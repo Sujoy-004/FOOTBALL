@@ -1,4 +1,4 @@
-"""UCL 2025/26 — FastAPI sub-app mounted under /ucl."""
+"""UEFA Champions League — FastAPI sub-app mounted under /ucl."""
 
 from __future__ import annotations
 
@@ -36,6 +36,7 @@ from football_core.signal import PredictionContext
 from typing import Optional
 
 from web.common import ts
+from football_core.domain import load_json_store
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 BSD_API_KEY: str = os.environ.get("BSD_API_KEY", "")
@@ -102,8 +103,8 @@ def _refresh_report_path() -> Path:
 
 def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None,
                           n_matches: int | None = None, n_updated: int | None = None,
-                          finished: dict | None = None,
-                          stages: list | None = None) -> dict:
+                          finished: dict | None = None, stages: list | None = None,
+                          per_season: dict | None = None, active_season: str | None = None) -> dict:
     """Record the UCL refresh outcome for the API surface + last_refresh.json.
 
     Single writer for the UCL entry: the ingestion itself never touches the
@@ -121,6 +122,8 @@ def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None
         **({"n_updated": n_updated} if n_updated is not None else {}),
         **({"finished": finished} if finished is not None else {}),
         **({"stages": stages} if stages is not None else {}),
+        **({"per_season": per_season} if per_season is not None else {}),
+        **({"active_season": active_season} if active_season is not None else {}),
     }
     try:
         refresh_path = _refresh_report_path()
@@ -201,10 +204,19 @@ def _fetch_live_data() -> None:
     if not ok:
         logger.warning("[UCL] Refresh failed: %s — UCL data may be STALE",
                        error or "no ingestable matches")
+    from competitions.ucl.src.seasons import get_current_season
+    current_pointer = get_current_season(DATA_DIR)
+    active_season = (
+        current_pointer.get("season")
+        if isinstance(current_pointer, dict) and current_pointer.get("season")
+        else None
+    )
     _store_refresh_report(ok, error, provider_name,
                           n_matches=n_raw, n_updated=n_updated,
                           finished=report.get("finished"),
-                          stages=report.get("stages"))
+                          stages=report.get("stages"),
+                          per_season=summary.get("per_season"),
+                          active_season=active_season)
     boot_log_local.append({
         "step": "UCL live fetch", "status": "ok" if ok else "skip", "elapsed": 0.0,
         "output": f"[{ts()}] {provider_name}: {n_raw} raw matches, {n_updated} updated",
@@ -250,8 +262,9 @@ def _load_results() -> list[dict]:
 
 
 def _load_knockout_results() -> dict | None:
-    """Load knockout results — always from root (structural file)."""
-    return _load_knockout_results_pipeline(DATA_DIR)
+    """Load knockout results from the active season only."""
+    from competitions.ucl.src.orchestrator import resolve_active_data_dir
+    return _load_knockout_results_pipeline(resolve_active_data_dir(DATA_DIR))
 
 
 def _unplayed_match_count() -> int:
@@ -358,6 +371,7 @@ def api_data():
     from web.competitions import try_lazy_refresh
     try_lazy_refresh("ucl")
     n_unplayed, n_total = _match_counts()
+    lifecycle = _lifecycle_view()
     return JSONResponse({
         "refresh": _refresh_report,
         "teams": cache.get("teams", []),
@@ -369,11 +383,87 @@ def api_data():
         "mode": _mode,
         "availability": cache.get("availability", {}),
         "phase": cache.get("phase", {}),
-        "lifecycle": _lifecycle_view(),
+        "lifecycle": lifecycle,
+        "season": lifecycle.get("season"),
+        "n_total_fixtures": n_total,
         "simulation": _simulation_state_block(),
         "n_unplayed": n_unplayed,
         "n_played": n_total - n_unplayed,
     })
+
+
+@ucl_app.get("/api/seasons")
+def api_seasons():
+    from competitions.ucl.src.seasons import (
+        LOCAL_HISTORICAL_SEASON, get_current_season, list_seasons,
+        season_dir, set_current_season, read_season_fixtures, read_season_results,
+    )
+    current = get_current_season(DATA_DIR)
+    active = (current.get("season") if current else LOCAL_HISTORICAL_SEASON)
+    candidates = {LOCAL_HISTORICAL_SEASON}
+    for season_token in list_seasons(DATA_DIR):
+        candidates.add(season_token.replace("_", "/") if season_token.count("_") == 1 else season_token)
+    seasons = []
+    for season in sorted(candidates, reverse=True):
+        if season == LOCAL_HISTORICAL_SEASON:
+            fx, fx_avail, _ = load_json_store(DATA_DIR / "fixtures.json")
+            rs, rs_avail, _ = load_json_store(DATA_DIR / "results.json")
+        else:
+            fx = read_season_fixtures(DATA_DIR, season)
+            rs = read_season_results(DATA_DIR, season)
+        fixtures_count = len(fx.get("fixtures", [])) if isinstance(fx, dict) else 0
+        if season == LOCAL_HISTORICAL_SEASON and isinstance(fx, dict):
+            fixtures_count = len(
+                [m for md in fx.get("schedule", {}).get("matchdays", []) if isinstance(md, list) for m in md]
+            )
+        results_count = len(rs.get("matches", [])) if isinstance(rs, dict) else 0
+        seasons.append({
+            "season": season,
+            "active": season == active,
+            "historical": season == LOCAL_HISTORICAL_SEASON,
+            "fixtures": fixtures_count,
+            "results": results_count,
+        })
+    return JSONResponse({"active_season": active, "seasons": seasons})
+
+
+@ucl_app.post("/api/season")
+def api_set_season(req: dict = None):
+    from competitions.ucl.src.seasons import LOCAL_HISTORICAL_SEASON, get_current_season, list_seasons, season_dir, set_current_season
+    season = str((req or {}).get("season") or "").strip()
+    if not season:
+        return JSONResponse({"error": "season required"}, status_code=400)
+    previous = get_current_season(DATA_DIR)
+    valid = season == LOCAL_HISTORICAL_SEASON or season_dir(DATA_DIR, season).is_dir()
+    if not valid:
+        return JSONResponse({"error": "unknown season"}, status_code=404)
+    basis = "pointer_local" if season == LOCAL_HISTORICAL_SEASON else "draw"
+    pointer = set_current_season(DATA_DIR, season, basis=basis, provider=(None if season == LOCAL_HISTORICAL_SEASON else "ucl.draw.2026_27"))
+    global cache, sim_cache, _mode
+    try:
+        sim_cache = {}
+        cache = compute_all()
+    except Exception:
+        # Transactional rollback: the pointer was flipped above, but a
+        # downstream step (compute_all) failed — restore current.json to
+        # the previously-active season before the error surfaces.
+        try:
+            if previous is None:
+                (DATA_DIR / "current.json").unlink(missing_ok=True)
+            else:
+                set_current_season(
+                    DATA_DIR,
+                    previous.get("season"),
+                    basis=previous.get("basis"),
+                    provider=previous.get("provider"),
+                )
+        except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).error(
+                "[UCL] failed to restore seasons pointer after POST /api/season error",
+                exc_info=True)
+        raise
+    return JSONResponse({"status": "ok", "current": pointer, "mode": _mode})
 
 
 @ucl_app.get("/api/boot")

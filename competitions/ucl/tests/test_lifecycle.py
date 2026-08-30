@@ -121,8 +121,6 @@ class TestSeasonTransition:
         data_dir = _completed_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -137,8 +135,6 @@ class TestSeasonTransition:
         data_dir = _completed_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=0, results_count=50)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -150,8 +146,6 @@ class TestSeasonTransition:
         data_dir = _completed_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=50, results_count=20)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == SEASON
@@ -164,8 +158,6 @@ class TestSeasonTransition:
         """Provider season not in store at all -> keep local, diagnostic added."""
         data_dir = _completed_dir(tmp_path)
         provider_season = "2026/27"
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == SEASON
@@ -204,8 +196,6 @@ class TestSeasonTransition:
         data_dir = _completed_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=99, results_count=49)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == SEASON
@@ -218,8 +208,6 @@ class TestSeasonTransition:
         data_dir = _completed_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -230,8 +218,6 @@ class TestSeasonTransition:
         data_dir = _completed_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=0, results_count=50)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -246,28 +232,24 @@ class TestProviderSeasonWithDifferentLocalStages:
         data_dir = _make_data_dir(tmp_path, results_rows=_real_rows()[:60])
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
-        # Season label switches to provider, but stage/progress still from local evidence
+        # Once provider season is active, stage/progress are scoped to that season.
         assert result["season"] == provider_season
         assert result["basis"] == "provider"
-        assert result["stage"] == "active"  # Local evidence drives stage
-        assert result["progress"]["played"] == 60  # Local progress
+        assert result["stage"] == "future"
+        assert result["progress"]["played"] == 0
 
     def test_local_future_provider_sufficient_switches(self, tmp_path):
         """Local season future, provider sufficient -> switch season label."""
         data_dir = _make_data_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=144, results_count=144)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
         assert result["basis"] == "provider"
-        assert result["stage"] == "future"  # Local evidence: no results
+        assert result["stage"] == "active"
 
 
 class TestStageClassification:
@@ -324,8 +306,9 @@ class TestStageClassification:
         """No fixtures, but tracked config declares the season => future."""
         dst = _make_data_dir(
             tmp_path, fixtures=False,
-            seasons={"seasons": [{"id": SEASON, "status": "scheduled"}]})
-        assert discover(dst)["stage"] == "future"
+            seasons={"seasons": [{"id": "2026/27", "status": "scheduled"}]})
+        result = discover(dst)
+        assert result["stage"] == "unknown"
 
     def test_unknown_empty_data_dir(self, tmp_path):
         """Zero evidence in every store => unknown, zeroed progress."""
@@ -342,16 +325,13 @@ class TestProviderSeason:
         provider_season = "2026/27"
         # Add provider season store with sufficient data
         _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
         assert result["provider_current_season"] == provider_season
         assert result["season_mismatch"] is True
         assert result["basis"] == "provider"
         # Season switches to provider
         assert result["season"] == provider_season
-        # Local evidence still drives stage/progress — never fabricated.
-        assert result["stage"] == "completed"
+        assert result["stage"] == "future"
 
     def test_mismatch_no_store_keeps_local(self, tmp_path):
         """Provider on a newer season WITHOUT store data => keep local, basis derived, diagnostic."""

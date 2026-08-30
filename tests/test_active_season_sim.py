@@ -37,6 +37,9 @@ def active_season_dir(tmp_path):
     """Tmp DATA_DIR: real fixtures/rules, league ledger truncated to 60
     played rows, knockout_results.json deliberately ABSENT."""
     shutil.copytree(UCL_DATA, tmp_path, dirs_exist_ok=True)
+    # The test intentionally models a local 2025/26 mid-season snapshot.
+    # Do not inherit the repository's 2026/27 current-season pointer.
+    (tmp_path / "current.json").unlink(missing_ok=True)
     # Only the canonical stores are removed; rule/pairing files stay so the
     # canonical bracket layer can still render simulated trees.
     (tmp_path / "knockout_results.json").unlink()

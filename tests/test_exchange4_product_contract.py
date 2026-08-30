@@ -80,13 +80,20 @@ class TestCompetitionRegistry:
         assert wc["availability"] == "not_needed"
         assert wc["reason"] == "no_unplayed_matches"
         assert wc["request_state"] == "not_requested"
-        ucl = REGISTRY.get("ucl").simulation()
-        # Exchange 3 availability flip: the tracked UCL season is COMPLETED
-        # on disk (champion on file), so season-wide controls are honestly
-        # "not_needed"; runs stay server-side eligible as labeled what-if.
-        # (Era-proof undecided-season coverage lives in
-        # test_ucl_availability_available_when_ko_undecided below.)
-        assert ucl["availability"] == "not_needed"
+
+        # The shipped default UCL season is now the upcoming 2026/27 draw,
+        # so this legacy completed-season contract must explicitly select the
+        # historical 2025/26 view before asserting ``not_needed``.
+        from competitions.ucl.src.seasons import set_current_season
+        import web.ucl_app as ucl_app
+        set_current_season(UCL_DATA, "2025/26", basis="test")
+        try:
+            ucl_app.cache = ucl_app.compute_all()
+            ucl = REGISTRY.get("ucl").simulation()
+            assert ucl["availability"] == "not_needed"
+        finally:
+            set_current_season(UCL_DATA, "2026/27", basis="draw", provider="ucl.draw.2026_27")
+            ucl_app.cache = ucl_app.compute_all()
 
     def test_server_mounts_come_from_registry(self, snapshot_mode):
         from web.server import app as server_app

@@ -24,6 +24,7 @@ import logging
 import re
 import time
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 
@@ -178,6 +179,9 @@ class FootballDataOrgProvider:
     def fetch_matches(
         self,
         competition_id: str = "WC",
+        *,
+        season: int | str | None = None,
+        matchday: int | None = None,
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
         """Fetch matches for *competition_id* from football-data.org.
@@ -189,8 +193,21 @@ class FootballDataOrgProvider:
         ----------
         competition_id:
             Competition code (``"WC"``, ``"CL"``, etc.).
+        season:
+            Optional starting year of the requested season. Passing the
+            active season explicitly prevents a provider's current-season
+            default from silently serving the prior season during a season
+            transition.
+        matchday:
+            Optional matchday filter supported by the provider.
         """
-        url = f"{self.BASE_URL}/competitions/{competition_id}/matches"
+        params: dict[str, Any] = {}
+        if season is not None:
+            params["season"] = str(season)
+        if matchday is not None:
+            params["matchday"] = int(matchday)
+        query = f"?{urlencode(params)}" if params else ""
+        url = f"{self.BASE_URL}/competitions/{competition_id}/matches{query}"
         data = self._request(url)
         if data is None:
             return []

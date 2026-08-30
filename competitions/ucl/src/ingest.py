@@ -1043,6 +1043,17 @@ def _atomic_write_json_local(data: Any, path: Path) -> None:
         raise
 
 
+def _fixture_pair_key(home: str, away: str) -> tuple[str, str]:
+    """Canonical exact-match key for the (home, away) fixture relationship.
+
+    Exact, non-fuzzy identity: whitespace-free casefolded team names. Used to
+    attach an official dated fixture to the provisional record ALREADY stored
+    for that pairing — never to merge distinct matchups (home/away order is
+    kept, so ``A@B`` and ``B@A`` remain different fixtures).
+    """
+    return (home.strip().casefold(), away.strip().casefold())
+
+
 def _upsert_season_fixtures(
     data_dir: Path,
     season: str,
@@ -1052,6 +1063,15 @@ def _upsert_season_fixtures(
     """Create/update fixtures.json for a season from SCHEDULED/timed events.
 
     Returns (fixtures_added, fixtures_updated, total_fixtures).
+
+    Identity contract: a fixture is matched to an existing season record by
+    (1) the same ``match_id``, or (2) the exact authoritative (home, away)
+    relationship. A provisional drawn fixture (``event_date=None``) therefore
+    keeps its stable identity when the official dated fixture list is
+    ingested — an official event with a provider match_id UPDATES the existing
+    record in place (id, provenance and metadata preserved) instead of being
+    appended as a duplicate. Date-derived ids match the provisional ids
+    because :func:`derive_fixture_id` never includes the date.
     """
     from competitions.ucl.src.seasons import SEASON_STORE_SCHEMA
 
@@ -1075,8 +1095,17 @@ def _upsert_season_fixtures(
         if doc.get("meta", {}).get("provider") is None:
             doc["meta"] = {"provider": provider_name}
 
-    # Build lookup of existing fixtures by match_id
-    existing_by_id = {fx.get("match_id"): fx for fx in doc.get("fixtures", [])}
+    # Existing fixtures indexed by match_id AND by exact home/away pairing.
+    existing_by_id: dict[str, dict] = {}
+    existing_by_pair: dict[tuple[str, str], dict] = {}
+    for fx in doc.get("fixtures", []):
+        if not isinstance(fx, dict):
+            continue
+        mid = fx.get("match_id")
+        if mid:
+            existing_by_id[mid] = fx
+        existing_by_pair.setdefault(
+            _fixture_pair_key(fx.get("team_a", ""), fx.get("team_b", "")), fx)
     fixtures_added = 0
     fixtures_updated = 0
 
@@ -1095,28 +1124,45 @@ def _upsert_season_fixtures(
         else:
             fid = derive_fixture_id(home, away, event_date)
 
-        # Check if fixture exists
-        existing_fx = existing_by_id.get(fid)
-        fx_entry = {
-            "match_id": fid,
-            "team_a": home,
-            "team_b": away,
-            "event_date": event_date,
-            "stage": ev.get("stage", "LEAGUE_STAGE"),
-            "status": ev.get("status", "scheduled"),
-        }
-        if existing_fx:
-            # Update mutable fields
+        # Match identity: same stored id first, then the exact (home, away)
+        # relationship so an official event never duplicates the provisional
+        # draw fixture under a different provider id.
+        existing_fx = existing_by_id.get(fid) or \
+            existing_by_pair.get(_fixture_pair_key(home, away))
+
+        if existing_fx is not None:
+            # Update mutable fields ONLY; the fixture id, team identity and
+            # any existing metadata are preserved verbatim.
             changed = False
-            for k, v in fx_entry.items():
+            mutable = {
+                "event_date": event_date,
+                "stage": ev.get("stage", "LEAGUE_STAGE"),
+                "status": ev.get("status", "scheduled"),
+            }
+            if "official_matchday" in ev:
+                mutable["official_matchday"] = ev["official_matchday"]
+            for k, v in mutable.items():
                 if existing_fx.get(k) != v:
                     existing_fx[k] = v
                     changed = True
             if changed:
                 fixtures_updated += 1
+            if fid not in existing_by_id:
+                existing_by_id[fid] = existing_fx
         else:
+            fx_entry = {
+                "match_id": fid,
+                "team_a": home,
+                "team_b": away,
+                "event_date": event_date,
+                "stage": ev.get("stage", "LEAGUE_STAGE"),
+                "status": ev.get("status", "scheduled"),
+            }
+            if "official_matchday" in ev:
+                fx_entry["official_matchday"] = ev["official_matchday"]
             doc["fixtures"].append(fx_entry)
             existing_by_id[fid] = fx_entry
+            existing_by_pair[_fixture_pair_key(home, away)] = fx_entry
             fixtures_added += 1
 
     # Update availability counts

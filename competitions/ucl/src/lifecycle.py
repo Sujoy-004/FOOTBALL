@@ -194,12 +194,35 @@ def discover(
     dp = Path(data_dir)
     config_entries = _read_tracked_config(dp)
 
+    # The explicit current.json pointer is the active-view source of truth.
+    # The legacy root directory remains the canonical store only when the
+    # local historical season (2025/26) is active.
+    from competitions.ucl.src.seasons import (
+        LOCAL_HISTORICAL_SEASON,
+        get_current_season,
+        season_dir,
+    )
+    current = get_current_season(dp)
+    pointed_season = (
+        str(current.get("season")) if isinstance(current, dict) and current.get("season")
+        else None
+    )
+    active_candidate = pointed_season or LOCAL_HISTORICAL_SEASON
+    active_data_dir = (
+        season_dir(dp, active_candidate)
+        if active_candidate != LOCAL_HISTORICAL_SEASON
+        else dp
+    )
+    if not active_data_dir.is_dir():
+        active_data_dir = dp
+
+    phase_was_supplied = phase is not None
     if phase is None:
         # Imported lazily: orchestrator pulls the simulation stack, and a
         # module-level import here would create a circular dependency risk.
         from competitions.ucl.src.orchestrator import compute_competition_phase
 
-        phase = compute_competition_phase(dp)
+        phase = compute_competition_phase(active_data_dir)
     report = phase if isinstance(phase, dict) else {}
     phase_value = report.get("phase")
     raw_diagnostics = report.get("diagnostics")
@@ -209,8 +232,11 @@ def discover(
         else []
     )
 
-    season = _local_season_id()
-    basis = "config" if config_entries else "derived"
+    season = active_candidate
+    basis = (
+        str(current.get("basis")) if isinstance(current, dict) and current.get("basis")
+        else ("config" if config_entries else "derived")
+    )
     declared_ids = {entry["id"] for entry in (config_entries or [])}
 
     if bool(report.get("inconsistent")):
@@ -242,19 +268,21 @@ def discover(
 
     provider_current: Optional[str] = None
     season_mismatch = False
+    transition_diagnostics: list[str] = []
 
     # Season transition logic (Exchange 4)
     if provider_season is not None and str(provider_season) != season:
         provider_current = str(provider_season)
         season_mismatch = True
 
-        # Check if provider season has sufficient data in the season store
-        from competitions.ucl.src.seasons import resolve_active_view
+        # Check if provider season has sufficient data in its season store.
+        from competitions.ucl.src.seasons import resolve_active_view, read_season_fixtures, read_season_results
 
-        active_view = resolve_active_view(dp)
-        provider_season_dir_id = active_view["seasons"].get(
-            provider_current.replace("/", "_")
-        ) or active_view["seasons"].get(provider_current)
+        provider_view = resolve_active_view(dp)["seasons"]
+        provider_season_dir_id = (
+            provider_view.get(provider_current.replace("/", "_"))
+            or provider_view.get(provider_current)
+        )
 
         if provider_season_dir_id:
             fixtures_count = provider_season_dir_id.get("fixtures_count", 0)
@@ -271,11 +299,11 @@ def discover(
                 basis = "provider"
             else:
                 # Keep local season, add diagnostic
-                diagnostics.append("provider_season_insufficient_data")
+                transition_diagnostics.append("provider_season_insufficient_data")
                 basis = "derived"
         else:
             # Provider season not in store at all
-            diagnostics.append("provider_season_not_in_store")
+            transition_diagnostics.append("provider_season_not_in_store")
             basis = "derived"
     elif provider_season is not None and str(provider_season) == season:
         # Provider season matches local - no mismatch
@@ -286,10 +314,43 @@ def discover(
         provider_current = None
         season_mismatch = False
 
+    # Recompute lifecycle evidence from the season that will actually be
+    # presented. Provider-season transitions must never retain the previous
+    # season's stage/progress merely because discovery began from local data.
+    selected_data_dir = (
+        season_dir(dp, season) if season != LOCAL_HISTORICAL_SEASON else dp
+    )
+    if selected_data_dir.is_dir() and not phase_was_supplied:
+        from competitions.ucl.src.orchestrator import compute_competition_phase
+
+        selected_phase = compute_competition_phase(selected_data_dir)
+        selected_report = selected_phase if isinstance(selected_phase, dict) else {}
+        selected_raw_diagnostics = selected_report.get("diagnostics")
+        selected_diagnostics = (
+            [str(d) for d in selected_raw_diagnostics]
+            if isinstance(selected_raw_diagnostics, list) else []
+        )
+        selected_phase_value = selected_report.get("phase")
+        if bool(selected_report.get("inconsistent")):
+            stage = "inconsistent"
+        elif selected_phase_value in _PHASE_TO_STAGE:
+            stage = _PHASE_TO_STAGE[selected_phase_value]
+        elif selected_phase_value == "not_started":
+            stage = "future" if _fixtures_usable(selected_data_dir) else "unknown"
+        else:
+            stage = "unknown"
+        if stage not in ("active", "inconsistent"):
+            selected_diagnostics = []
+        diagnostics = selected_diagnostics
+
+    diagnostics.extend(d for d in transition_diagnostics if d not in diagnostics)
+
     return {
         "season": season,
         "stage": stage,
-        "progress": _league_progress(dp),
+        "progress": _league_progress(
+            season_dir(dp, season) if season != LOCAL_HISTORICAL_SEASON else dp
+        ),
         "historical": historical,
         "basis": basis,
         "provider_current_season": provider_current,

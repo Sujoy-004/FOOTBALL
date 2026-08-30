@@ -27,9 +27,17 @@ AGGREGATE_ONLY_NOTE = (
 
 
 @pytest.fixture
-def snapshot_mode(monkeypatch):
+def snapshot_mode(monkeypatch, tmp_path):
+    import shutil
     import web.startup as startup
+    import web.ucl_app as app
+    from competitions.ucl.src.seasons import set_current_season
     monkeypatch.setenv("FOOTBALL_SNAPSHOT", "1")
+    src = UCL_DATA
+    dst = tmp_path / "ucl_data"
+    shutil.copytree(src, dst)
+    set_current_season(dst, "2025/26", basis="pointer_local", provider=None)
+    monkeypatch.setattr(app, "DATA_DIR", dst)
     startup._last_decision = startup.StartupDecision("snapshot", "")
     yield
     startup._last_decision = None

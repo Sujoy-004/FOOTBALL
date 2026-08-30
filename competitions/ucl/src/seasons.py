@@ -24,8 +24,12 @@ Stable fixture ids (documented contract used by the ingest router):
 
 - ``<source id>`` verbatim when the provider supplies a match id;
 - otherwise ``gen-`` + first 16 hex chars of
-  ``sha256("ucl-season-fixture\\n{home}\\n{away}\\n{date}")`` — a
-  deterministic hash of teams + date, stable across ingestion runs.
+  ``sha256("ucl-season-fixture\\n{home}\\n{away}")`` — a deterministic
+  hash of the home/away relationship only. The date is DELIBERATELY
+  excluded so a provisional drawn fixture (``event_date=None``) keeps the
+  exact same identity when the official dated fixture list is ingested
+  later: the same real-world league matchup must never be duplicated
+  under a second derived id.
 
 :func:`resolve_active_view` is a PURE summarizer (no writes, no network):
 Agent B's lifecycle transitions consume it to decide whether the app still
@@ -293,8 +297,15 @@ def write_season_results(data_dir: str | Path, season: Any, document: dict) -> s
 
 
 def derive_fixture_id(home_team: str, away_team: str, event_date: str | None) -> str:
-    """Deterministic fallback fixture id (teams + date hash), see module doc."""
-    basis = f"ucl-season-fixture\n{home_team}\n{away_team}\n{event_date or ''}"
+    """Deterministic fallback fixture id (teams-only; event_date is ignored).
+
+    The event_date parameter is accepted for backward compatibility with
+    existing call sites but intentionally takes NO part in the hash: the
+    identity of a league-phase match is defined by the home/away
+    relationship, so the provisional draw (``event_date=None``) and the
+    official dated fixture for the same matchup produce the SAME id.
+    """
+    basis = f"ucl-season-fixture\n{home_team}\n{away_team}"
     digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()
     return f"gen-{digest[:16]}"
 

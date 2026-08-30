@@ -262,6 +262,7 @@ def fetch_live_data(
     )
     from competitions.ucl.src.seasons import (
         LOCAL_HISTORICAL_SEASON,
+        get_current_season,
         normalize_season_token,
         set_current_season,
     )
@@ -278,7 +279,40 @@ def fetch_live_data(
                 "provider_name": "none", "report": report.to_dict()}
 
     provider_label = type(provider).__name__
-    raw = provider.fetch_matches(competition_id="CL")
+
+    # When a non-historical season is explicitly active, request that season
+    # from providers that support a season filter (for example FDO). Without
+    # this, the provider may silently return its own default/current season,
+    # defeating the active-season boundary during transitions. BSD-compatible
+    # providers accept and ignore the keyword for protocol compatibility.
+    current = get_current_season(data_dir)
+    requested_season = None
+    if isinstance(current, dict) and current.get("season"):
+        normalized = normalize_season_token(current.get("season"))
+        if normalized and normalized != LOCAL_HISTORICAL_SEASON:
+            try:
+                requested_season = int(str(normalized).split("/", 1)[0])
+            except (TypeError, ValueError):
+                requested_season = None
+
+    if requested_season is not None:
+        import inspect
+        try:
+            fetch_sig = inspect.signature(provider.fetch_matches)
+            accepts_season = (
+                "season" in fetch_sig.parameters
+                or any(p.kind is inspect.Parameter.VAR_KEYWORD
+                       for p in fetch_sig.parameters.values())
+            )
+        except (TypeError, ValueError):
+            accepts_season = False
+    else:
+        accepts_season = False
+
+    if accepts_season:
+        raw = provider.fetch_matches(competition_id="CL", season=requested_season)
+    else:
+        raw = provider.fetch_matches(competition_id="CL")
     if not raw:
         err = getattr(provider, "last_error", None) or "provider returned 0 matches"
         logger.warning("[UCL] No matches returned from provider: %s", err)
@@ -612,6 +646,15 @@ def run_mc_simulation(
     Does NOT write to disk, global cache, or ``boot_log_local``.
     """
     dp = Path(data_dir) if isinstance(data_dir, str) else data_dir
+    from competitions.ucl.src.orchestrator import resolve_active_data_dir
+    dp = Path(resolve_active_data_dir(dp))
+    from competitions.ucl.src.seasons import LOCAL_HISTORICAL_SEASON, get_current_season
+    current = get_current_season(data_dir)
+    active_season = (
+        str(current.get("season"))
+        if isinstance(current, dict) and current.get("season")
+        else LOCAL_HISTORICAL_SEASON
+    )
     from competitions.ucl.src.provider import RepoFixtureProvider
 
     if progress_cb:
@@ -625,16 +668,22 @@ def run_mc_simulation(
     if elo_ratings_override:
         elo_ratings = dict(elo_ratings_override)
     else:
-        from competitions.ucl.src.elo_fetcher import fetch_team_elos
         team_names = [t.name for t in provider.teams]
-        elo_ratings = fetch_team_elos(team_names)
+        from web.startup import is_snapshot_mode
+        elo_ratings = {}
+        if not is_snapshot_mode():
+            try:
+                from competitions.ucl.src.elo_fetcher import fetch_team_elos
+                elo_ratings = fetch_team_elos(team_names) or {}
+            except Exception as exc:
+                logger.warning("UCL Elo fetch failed (%s); using coefficient fallback", exc)
         if not elo_ratings:
-            elo_ratings = {}
             coefficients = {t.name: t.coefficient for t in provider.teams}
             max_coeff = max(coefficients.values()) if coefficients else 100
-            for t in team_names:
-                c = coefficients.get(t, 50)
-                elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
+            elo_ratings = {
+                team: 1400.0 + (coefficients.get(team, 50) / max_coeff) * 400.0
+                for team in team_names
+            }
     if progress_cb:
         progress_cb(10, 100, "Resolving Elo ratings...")
 
@@ -656,7 +705,10 @@ def run_mc_simulation(
     else:
         _mc_progress = None
 
-    result = build_simulation_result(provider, elo_ratings, resolved_seed, n_iterations, played_matches=played_pairs, progress_cb=_mc_progress)
+    result = build_simulation_result(
+        provider, elo_ratings, resolved_seed, n_iterations,
+        played_matches=played_pairs, progress_cb=_mc_progress, season=active_season,
+    )
     if progress_cb:
         progress_cb(85, n_iterations)
 
@@ -743,6 +795,7 @@ def run_mc_simulation(
         "teams": top4, "all_teams": odds_display,
         "n_teams": len(result.teams), "n_iterations": result.n_iterations,
         "seed": result.seed, "snapshot_date": result.snapshot_date,
+        "season": active_season,
         "champion": result.bracket_champion, "standings": standings_display,
         "playoff": playoff_display, "bracket_rounds": enriched_bracket,
         "sim_state_payload": sim_state_payload,

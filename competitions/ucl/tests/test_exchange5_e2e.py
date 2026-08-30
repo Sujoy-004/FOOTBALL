@@ -41,6 +41,17 @@ class _EmptyProvider:
         return []
 
 
+class _SeasonRecordingProvider:
+    def __init__(self, events):
+        self._events = list(events)
+        self.last_error = None
+        self.season = "UNSET"
+
+    def fetch_matches(self, competition_id="CL", *, season=None, **kwargs):
+        self.season = season
+        return list(self._events)
+
+
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _make_data_dir(tmp_path: Path) -> Path:
@@ -199,6 +210,22 @@ class TestExchange5EndToEnd:
         mode, reason = resolve_compute_mode(str(dp))
         assert mode == "results"
         assert "2026/27" in reason
+
+
+    def test_active_season_is_forwarded_to_provider_when_supported(self, tmp_path):
+        """An active non-historical season is requested explicitly from providers that support it."""
+        from competitions.ucl.src import pipeline
+        from competitions.ucl.src.seasons import set_current_season
+
+        dp = _make_data_dir(tmp_path)
+        set_current_season(dp, "2026/27", basis="draw", provider="test")
+        provider = _SeasonRecordingProvider(_make_new_season_events())
+
+        result = pipeline.fetch_live_data(dp, "key", "", 7, provider=provider)
+
+        assert result["status"] == "ok"
+        assert provider.season == 2026
+
 
 
 # ── 2. ADVERSARIAL TESTS ──────────────────────────────────────────────────────

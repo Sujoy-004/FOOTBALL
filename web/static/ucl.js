@@ -1,13 +1,13 @@
-// ═══ UCL 2025/26 Module ═══
+// ═══ UEFA Champions League Module ═══
 import {
   destroyModalCharts, modalCharts,
   updateStatusBar, competitions, showSimPopup,
   buildTable, safeJson, renderBracketTree, renderAcquisitionPanel,
-  openIntelModal,
+  openIntelModal, renderLoading, currentCompetition,
 } from "./shared.js";
 
 const API = "/ucl/api";
-const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, simProjections: null, simMeta: null, simRunCount: 0, simBracket: null, simChampion: null };
+const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, simProjections: null, simMeta: null, simRunCount: 0, simBracket: null, simChampion: null, seasons: [], activeSeason: null };
 
 function _esc(s) {
   return String(s == null ? "" : s)
@@ -22,40 +22,158 @@ const sigLabels = {
 const sigOrder = ["refined_elo", "rolling_form", "market_odds", "squad_value", "rest_days"];
 
 export function init(comp) {
-  loadAll();
+  loadAll({ label: "Loading UCL…" });
 }
 
-// ── Data loading ─────────────────────────────────────────────────────
+// ── Data loading (atomic, race-guarded transitions) ──────────────────
+//
+// Every season/competition transition runs through loadAll. Correctness
+// properties, all enforced here:
+//   1. ATOMIC   - appState is mutated only after EVERY fetch resolves, so no
+//                 tab can show previous-season content under the new header.
+//                 The three data tabs display a loader for the real fetch
+//                 duration (no artificial delay).
+//   2. ROLLBACK - on any failure the last fully-valid rendered state is
+//                 restored. Because appState is committed all-at-once at the
+//                 very end, the failed path leaves it untouched; re-rendering
+//                 it restores the prior view verbatim, including the season
+//                 <select> value (rebuilt from appState.seasons).
+//   3. RACE GUARD - a monotonically increasing generation token is captured
+//                 at request start and compared on every response boundary.
+//                 Only the newest transition may commit or render; late
+//                 responses from superseded (A->B->A) switches are discarded.
+//                 The token check is paired with an "is UCL still the active
+//                 competition" check so a late UCL response never renders into
+//                 another competition's reused tab elements.
 
-async function loadAll() {
+let _transitionGen = 0;
+
+// True only while the UCL competition owns the shared tab-* elements. Uses the
+// live `currentCompetition` binding exported by shared.js (set before init()).
+function _isUclActive() {
+  return !!(currentCompetition && currentCompetition.apiPrefix === API);
+}
+
+// A transition is stale if a newer one has started OR the user has navigated
+// away from UCL. Stale transitions must neither mutate appState nor render.
+function _stale(gen) {
+  return gen !== _transitionGen || !_isUclActive();
+}
+
+// Show the shared loader in every tab that renders from appState, so there is
+// no window where one tab shows stale data under the new selection.
+function _showTransitionLoading(label) {
+  ["tab-overview", "tab-standings", "tab-bracket"].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el && typeof renderLoading === "function") renderLoading(el, label);
+  });
+}
+
+// Surface a transition failure without leaving a blank/half-rendered view.
+// The valid previous view has already been re-rendered; this prepends a
+// non-blocking notice above it. textContent -> no injection risk.
+function _surfaceTransitionError(e, o) {
+  const tab = document.getElementById("tab-overview");
+  if (!tab) return;
+  const what = (o && o.season) ? ("Could not switch to " + o.season)
+    : "Could not refresh UCL data";
+  const banner = document.createElement("div");
+  banner.className = "stat-card";
+  banner.style.cssText = "color:#ff6b6b;margin-bottom:8px";
+  banner.textContent = what + " — "
+    + (e && e.message ? e.message : "unknown error") + ". Showing last valid data.";
+  tab.insertBefore(banner, tab.firstChild);
+}
+
+async function loadAll(opts) {
+  const o = opts || {};
+  const gen = ++_transitionGen;
+  // Snapshot for rollback (shallow is enough: appState is never partially
+  // mutated on the failure path, so the previous field values remain intact).
+  const prev = Object.assign({}, appState);
+  const label = o.label || (o.season ? "Loading " + o.season + "…" : "Loading…");
+
+  _showTransitionLoading(label);
+
   try {
-    const [d, s, br, o, sig] = await Promise.all([
+    // A season switch is part of the atomic unit: flip the backend active
+    // season first, then load. If anything downstream fails we roll the UI
+    // back to the previous season's still-intact state.
+    if (o.season != null) {
+      await safeJson(API + "/season", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ season: o.season }),
+      });
+      if (_stale(gen)) return;
+    }
+
+    const [d, s, br, ob, sig, ss] = await Promise.all([
       safeJson(API + "/data"),
       safeJson(API + "/standings"),
       safeJson(API + "/bracket"),
       safeJson(API + "/odds"),
       safeJson(API + "/signals"),
+      safeJson(API + "/seasons"),
     ]);
+
+    // Race guard: discard entirely if a newer transition started (or we left
+    // UCL) while these requests were in flight. No mutation, no render.
+    if (_stale(gen)) return;
+
+    // Session persistence: a run completed against this server process must
+    // survive reloads/navigation. On a season switch the prior season's sim
+    // never carries over, so treat it as "none present" and re-hydrate the
+    // target season's completed run if the backend reports one.
+    const hadSim = o.season != null
+      ? false
+      : !!(prev.simProjections && prev.simProjections.length);
+    let simPayload = null;
+    if (d.simulation && d.simulation.request_state === "completed" && !hadSim) {
+      try { simPayload = await safeJson(API + "/simulation"); }
+      catch (e) { console.error("simulation hydration failed:", e); }
+      if (_stale(gen)) return;
+    }
+
+    // ── Commit: single all-or-nothing mutation of shared state ──
     appState.data = d;
     appState.standings = s.standings || [];
     appState.bracket = br;
-    appState.odds = o.odds || [];
+    appState.odds = ob.odds || [];
     appState.signals = sig.signals || {};
-
-    // Session persistence: a run completed against this server process
-    // must survive page reloads and hash navigation. The backend keeps
-    // completed results in its session store; hydrate from it so the UI
-    // reflects reality instead of claiming no simulation was ever run.
-    if (d.simulation && d.simulation.request_state === "completed"
-        && !(appState.simProjections && appState.simProjections.length)) {
-      try {
-        _applySimulationPayload(await safeJson(API + "/simulation"), 0);
-      } catch (e) { console.error("simulation hydration failed:", e); }
+    appState.seasons = ss.seasons || [];
+    appState.activeSeason = ss.active_season || d.season || null;
+    if (o.season != null) {
+      // New season: the previous season's projections are meaningless here.
+      appState.simProjections = null;
+      appState.simBracket = null;
+      appState.simChampion = null;
+      appState.simMeta = null;
+      appState.simRunCount = 0;
+    }
+    if (simPayload) {
+      try { _applySimulationPayload(simPayload, 0); }
+      catch (e) { console.error("simulation apply failed:", e); }
     }
   } catch (e) {
-    console.error("loadAll API fetch failed:", e);
-    const tab = document.getElementById("tab-overview");
-    if (tab) tab.innerHTML = '<div class="stat-card" style="color:#ff6b6b">Failed to load UCL data: ' + e.message + '</div>';
+    // Superseded / navigated-away transitions own nothing: stay silent.
+    if (_stale(gen)) return;
+    console.error("loadAll transition failed:", e);
+    if (!appState.data) {
+      // First load never succeeded: there is no valid state to roll back to.
+      // Show an explicit error instead of a permanent loader (non-blank).
+      const tab = document.getElementById("tab-overview");
+      if (tab) tab.innerHTML = '<div class="stat-card" style="color:#ff6b6b">Failed to load UCL data: '
+        + _esc(e.message) + '</div>';
+      renderStandings();
+      renderBracket();
+      return;
+    }
+    // Roll back to the last fully-valid rendered state (appState is intact).
+    renderOverview();
+    renderStandings();
+    renderBracket();
+    updateStatus();
+    _surfaceTransitionError(e, o);
     return;
   }
 
@@ -67,18 +185,21 @@ async function loadAll() {
 
 async function reloadData() {
   try {
-    const [d, s, br, o, sig] = await Promise.all([
+    const [d, s, br, o, sig, ss] = await Promise.all([
       safeJson(API + "/data"),
       safeJson(API + "/standings"),
       safeJson(API + "/bracket"),
       safeJson(API + "/odds"),
       safeJson(API + "/signals"),
+      safeJson(API + "/seasons"),
     ]);
     appState.data = d;
     appState.standings = s.standings || [];
     appState.bracket = br;
     appState.odds = o.odds || [];
     appState.signals = sig.signals || {};
+    appState.seasons = ss.seasons || [];
+    appState.activeSeason = ss.active_season || d.season || null;
   } catch (e) {
     console.error("reloadData failed:", e);
   }
@@ -144,17 +265,26 @@ async function renderOverview() {
   const requestState = simState.request_state || "not_requested";
 
   // Stat cards: Teams / Matches Played / Stage  (WC-style hierarchy)
-  let html = '<div class="stats-row">';
-  html += '<div class="stat-card"><div class="val">' + (d.n_teams || 0) + '</div><div class="lbl">Teams</div></div>';
-  html += '<div class="stat-card"><div class="val">' + (d.n_played || 0) + '</div><div class="lbl">Matches Played</div></div>';
-  html += '<div class="stat-card"><div class="val" style="font-size:.75em">' + stage + '</div><div class="lbl">Stage</div></div>';
-  html += '<div class="stat-card"><div class="val">' + nActive + ' / ' + sigOrder.length + '</div><div class="lbl">Signals Available</div></div>';
-  if (d.snapshot_date) html += '<div class="stat-card"><div class="val" style="font-size:.8em">' + d.snapshot_date + '</div><div class="lbl">Season</div></div>';
+  let html = '<div class="chart-section" style="padding:6px 8px;margin-bottom:8px">'
+    + '<div class="title" style="display:inline-block;margin-right:10px">Season</div>'
+    + '<select id="uclSeasonSelect" style="background:#0d2430;color:#F6DBC0;border:1px solid rgba(21,61,76,.5);border-radius:4px;padding:4px 8px;font-size:11px">';
+  (appState.seasons || []).forEach(function(s) {
+    html += '<option value="' + _esc(s.season) + '"' + (s.active ? ' selected' : '') + '>' + _esc(s.season) + (s.historical ? ' (historical)' : '') + '</option>';
+  });
+  html += '</select></div>';
+
+  let htmlStats = '<div class="stats-row">';
+  htmlStats += '<div class="stat-card"><div class="val">' + (d.n_teams || 0) + '</div><div class="lbl">Teams</div></div>';
+  htmlStats += '<div class="stat-card"><div class="val">' + (d.n_played || 0) + '</div><div class="lbl">Matches Played</div></div>';
+  htmlStats += '<div class="stat-card"><div class="val" style="font-size:.75em">' + stage + '</div><div class="lbl">Stage</div></div>';
+  htmlStats += '<div class="stat-card"><div class="val">' + nActive + ' / ' + sigOrder.length + '</div><div class="lbl">Signals Available</div></div>';
+  if (d.snapshot_date) htmlStats += '<div class="stat-card"><div class="val" style="font-size:.8em">' + d.snapshot_date + '</div><div class="lbl">Season</div></div>';
   if (availability !== "not_needed" && d.n_played != null && d.n_unplayed != null) {
-    html += '<div class="stat-card"><div class="val">' + d.n_played + '</div><div class="lbl">REAL MATCHES</div></div>';
-    html += '<div class="stat-card"><div class="val">' + d.n_unplayed + '</div><div class="lbl">UPCOMING</div></div>';
+    htmlStats += '<div class="stat-card"><div class="val">' + d.n_played + '</div><div class="lbl">REAL MATCHES</div></div>';
+    htmlStats += '<div class="stat-card"><div class="val">' + d.n_unplayed + '</div><div class="lbl">UPCOMING</div></div>';
   }
-  html += '</div>';
+  htmlStats += '</div>';
+  html += htmlStats + '\n';
 
   // Current leaders (compact top-8 preview)
   if (standings.length >= 4) {
@@ -249,6 +379,15 @@ async function renderOverview() {
 
   tab.innerHTML = html;
   bindSimulationControls();
+  const seasonSelect = document.getElementById("uclSeasonSelect");
+  if (seasonSelect) seasonSelect.addEventListener("change", function() {
+    // Delegate the whole switch to the atomic transition: the /season POST,
+    // every data fetch, the sim-state reset and the render all run under one
+    // generation token. A failed switch rolls the UI back to the previous
+    // season (this <select> included, since it is rebuilt from appState) and
+    // surfaces the error — never a blank or mislabeled view.
+    loadAll({ season: seasonSelect.value });
+  });
   renderAcquisitionPanel(document.getElementById("uclAcqPanel"), _buildAcquisition(d));
 }
 
@@ -293,7 +432,7 @@ function _buildAcquisition(d) {
     {
       key: "league", label: "League results",
       state: (!attempted || succeeded) ? "ok" : "error",
-      count: refresh.n_matches != null ? refresh.n_matches : null,
+      count: d.n_played != null ? d.n_played : null,
       detail: (attempted && !succeeded) ? (refresh.error || "refresh failed") : undefined,
     },
     {
@@ -314,7 +453,7 @@ function _buildAcquisition(d) {
   ];
 
   return {
-    competition: "UCL 2025/26",
+    competition: "UCL " + (d.lifecycle && d.lifecycle.season ? d.lifecycle.season : (d.season || "")),
     mode,
     source,
     updatedAt: refresh.last_refresh || null,

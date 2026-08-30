@@ -81,21 +81,34 @@ def test_ucl_refresh_endpoint_blocked_in_snapshot(snapshot_env):
     assert is_snapshot_mode()
 
 
-def test_ucl_deterministic_compute_no_knockout_results():
+def _historical_ucl_data(tmp_path):
+    import shutil
+    from competitions.ucl.src.seasons import set_current_season
+    dst = tmp_path / "ucl_data"
+    shutil.copytree(UCL_DATA, dst)
+    set_current_season(dst, "2025/26", basis="pointer_local", provider=None)
+    return dst
+
+
+def test_ucl_deterministic_compute_no_knockout_results(tmp_path):
     """Missing knockout_results.json must NOT suppress standings/odds/signals."""
     from competitions.ucl.src.orchestrator import run_deterministic_compute
-    result = run_deterministic_compute(str(UCL_DATA), bsd_api_key="")
+    data_dir = _historical_ucl_data(tmp_path)
+    (data_dir / "knockout_results.json").unlink(missing_ok=True)
+    result = run_deterministic_compute(str(data_dir), bsd_api_key="")
     assert "error" not in result, f"deterministic_compute errored: {result.get('error')}"
     standings = result.get("standings", [])
     assert len(standings) == 36, f"expected 36 teams, got {len(standings)}"
     assert result.get("mode") == "results"
 
 
-def test_ucl_api_data_valid_json_in_snapshot():
+def test_ucl_api_data_valid_json_in_snapshot(tmp_path, monkeypatch):
     """3+4. /ucl/api/data returns valid JSON in snapshot mode (no empty body)."""
     from fastapi.testclient import TestClient
-    from web.ucl_app import ucl_app
-    with TestClient(ucl_app) as client:
+    import web.ucl_app as app
+    data_dir = _historical_ucl_data(tmp_path)
+    monkeypatch.setattr(app, "DATA_DIR", data_dir)
+    with TestClient(app.ucl_app) as client:
         for url in ("/api/data", "/api/standings",
                     "/api/bracket", "/api/odds"):
             r = client.get(url)
@@ -196,7 +209,7 @@ def test_live_mode_still_reaches_provider(monkeypatch):
         startup._last_decision = None
 
 
-def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch):
+def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch, tmp_path):
     """Exchange 5: snapshot mode must not touch ClubElo either.
 
     The deterministic compute used to call fetch_team_elos unconditionally,
@@ -224,7 +237,8 @@ def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch):
     monkeypatch.setattr(core_ef.urllib.request, "urlopen", _counting_urlopen)
 
     from competitions.ucl.src.orchestrator import run_deterministic_compute
-    result = run_deterministic_compute(str(UCL_DATA), bsd_api_key="")
+    data_dir = _historical_ucl_data(tmp_path)
+    result = run_deterministic_compute(str(data_dir), bsd_api_key="")
     assert "error" not in result, result.get("error")
     assert len(result.get("standings", [])) == 36
     assert calls == {"clubelo": 0, "urlopen": 0}, calls

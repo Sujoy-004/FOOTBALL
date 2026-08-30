@@ -53,13 +53,17 @@ class SquadValueSignal(Signal):
         home_value = values.get(team_a)
         away_value = values.get(team_b)
 
-        all_values = list(values.values())
-        median = sorted(all_values)[len(all_values) // 2] if all_values else 500.0
-
-        if home_value is None:
-            home_value = median
-        if away_value is None:
-            away_value = median
+        # Truthful degradation (Exchange 7): when a team has no known squad
+        # value we ABSTAIN — a uniform distribution carries no directional
+        # lean — instead of substituting the league median, which would
+        # present a fabricated strength as if it were that team's real value.
+        # Cross-season reuse is legitimate (squad value is a slow-moving
+        # structural prior), but the competition layer must resolve names to
+        # this file's vocabulary and pass the resolved map via
+        # ``PredictionContext.squad_values``; football_core never invents a
+        # value it does not actually hold.
+        if home_value is None or away_value is None:
+            return SignalOutput(1 / 3, 1 / 3, 1 / 3)
 
         log_home = math.log(home_value)
         log_away = math.log(away_value)

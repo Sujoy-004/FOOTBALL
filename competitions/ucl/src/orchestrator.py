@@ -247,7 +247,11 @@ def _resolve_elo_ratings(team_names: list[str]) -> dict[str, float]:
 
     if not is_snapshot_mode():
         from competitions.ucl.src.elo_fetcher import fetch_team_elos
-        ratings = fetch_team_elos(team_names)
+        try:
+            ratings = fetch_team_elos(team_names)
+        except Exception as exc:
+            logger.warning("UCL Elo fetch failed (%s); using coefficient fallback", exc)
+            ratings = {}
         if ratings:
             return ratings
     # Coefficient fallback (also the offline path for live mode failures).
@@ -348,6 +352,7 @@ def build_simulation_result(
     n_iterations: int,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
     progress_cb: callable | None = None,
+    season: str = "2025/26",
 ) -> SimulationResult:
     """Run MC simulation + one representative bracket iteration, return SimulationResult."""
     fixtures_dict = {"schedule": asdict(fixtures)}
@@ -360,6 +365,7 @@ def build_simulation_result(
         seed=seed,
         played_matches=played_matches,
         progress_cb=progress_cb,
+        season=season,
     )
 
     rng = random.Random(seed)
@@ -826,12 +832,10 @@ def run_deterministic_compute(
     _active_data_dir = resolve_active_data_dir(data_dir)
 
     results = _step("Load real results", lambda: load_results(_active_data_dir))
-    if not results:
-        return {"error": "results.json not found", "boot": boot}
 
-    knockout = _step("Load knockout results", lambda: load_knockout_results(data_dir))
+    knockout = _step("Load knockout results", lambda: load_knockout_results(_active_data_dir))
     _, ko_availability, ko_detail = load_json_store(
-        Path(data_dir) / "knockout_results.json"
+        Path(_active_data_dir) / "knockout_results.json"
     )
     if not knockout:
         # Knockout data is unavailable (missing, empty, or unreadable):
@@ -854,6 +858,115 @@ def run_deterministic_compute(
     provider = _step("Load fixtures", lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load())
     if not provider:
         return {"error": "fixtures load failed", "boot": boot}
+
+    # A newly activated season with valid fixtures but zero played results is
+    # a legitimate FUTURE state, not an error. Build a factual shell from
+    # the season fixture store so the web layer can show 36 teams / 144
+    # upcoming matches and keep the real simulation path available.
+    if not results:
+        from competitions.ucl.src.seasons import LOCAL_HISTORICAL_SEASON, get_current_season
+        team_names = [t.name for t in provider.teams]
+        elo_ratings = _resolve_elo_ratings(team_names)
+        if not elo_ratings:
+            coefficients = {t.name: t.coefficient for t in provider.teams}
+            max_coeff = max(coefficients.values()) if coefficients else 100.0
+            elo_ratings = {
+                team: 1400.0 + (coefficients.get(team, 50.0) / max_coeff) * 400.0
+                for team in team_names
+            }
+            boot.append({
+                "step": "Elo fallback (coefficients)",
+                "status": "ok",
+                "elapsed": 0.0,
+                "output": f"[{ts()}] coefficient-derived Elo for future season",
+            })
+
+        historical_results = Path(data_dir) / "results.json"
+        current_pointer = get_current_season(data_dir)
+        active_season_value = (
+            str(current_pointer.get("season"))
+            if isinstance(current_pointer, dict) and current_pointer.get("season")
+            else LOCAL_HISTORICAL_SEASON
+        )
+
+        historical_file = (
+            str(historical_results)
+            if active_season_value != LOCAL_HISTORICAL_SEASON and historical_results.exists()
+            else None
+        )
+        engine = _step(
+            "Build signal engine",
+            lambda: build_signal_engine(elo_ratings, results_file=historical_file),
+        )
+
+        phase = compute_competition_phase(_active_data_dir)
+        lifecycle = discover(data_dir, provider_season=active_season_value, phase=phase)
+
+        # Draw-only future fixtures do not yet have official dates or market
+        # odds. Do not evaluate signals that require those fields: the generic
+        # registry intentionally logs per-signal failures, which would turn a
+        # legitimate pre-schedule state into hundreds of warnings. Historical
+        # 2025/26 results are still available to the rolling-form signal via
+        # ``historical_file``; refined Elo is available from the current team
+        # coefficients/ratings.
+        signal_stats: dict[str, dict] = {
+            "refined_elo": {
+                "n_matches": 144, "available": 144, "available_pct": 100.0,
+                "weight": round(engine.weights.get("refined_elo", 0), 4),
+            },
+        }
+        if historical_file:
+            signal_stats["rolling_form"] = {
+                "n_matches": 144, "available": 144, "available_pct": 100.0,
+                "weight": round(engine.weights.get("rolling_form", 0), 4),
+            }
+
+        all_teams = []
+        for rank, team in enumerate(
+            sorted(team_names, key=lambda name: (-elo_ratings.get(name, 0), name)),
+            start=1,
+        ):
+            all_teams.append({
+                "rank": rank,
+                "team": team,
+                "champion_prob": 0.0,
+                "final_prob": 0.0,
+                "sf_prob": 0.0,
+                "qf_prob": 0.0,
+                "top_8_prob": 0.0,
+                "playoff_prob": 0.0,
+                "avg_position": 0.0,
+            })
+
+        return {
+            "mode": "results",
+            "availability": {
+                "league_results": DataAvailability.EMPTY.value,
+                "fixtures": DataAvailability.AVAILABLE.value,
+                "knockout_results": ko_availability.value,
+            },
+            "phase": phase,
+            "lifecycle": lifecycle,
+            "season": active_season_value,
+            "teams": all_teams[:4],
+            "all_teams": all_teams,
+            "n_teams": len(team_names),
+            "n_iterations": 0,
+            "n_total_matches": 0,
+            "seed": 0,
+            "snapshot_date": f"{active_season_value} Season — Upcoming",
+            "champion": None,
+            "standings": [],
+            "playoff": [],
+            "bracket_rounds": {},
+            "league_matchdays": {},
+            "odds": all_teams,
+            "signals": signal_stats,
+            "elo_ratings": elo_ratings,
+            "_results": [],
+            "_signal_engine": engine,
+            "boot": boot,
+        }
 
     team_names = [t.name for t in provider.teams]
     from competitions.ucl.src.elo_fetcher import fetch_team_elos
@@ -933,8 +1046,9 @@ def run_deterministic_compute(
             "league_results": DataAvailability.AVAILABLE.value,
             "knockout_results": ko_availability.value,
         },
-        "phase": compute_competition_phase(data_dir),
-        "lifecycle": discover(data_dir, provider_season=provider_season),
+        "phase": compute_competition_phase(_active_data_dir),
+        "lifecycle": discover(data_dir, provider_season=provider_season,
+                              phase=compute_competition_phase(_active_data_dir)),
         "teams": top4,
         "all_teams": odds_display,
         "n_teams": len(standings),
@@ -997,8 +1111,6 @@ def run_compute_all(
     played_matches = _load_league_played_pairs(results_path)
 
     from competitions.ucl.src.provider import RepoFixtureProvider
-    from competitions.ucl.src.elo_fetcher import fetch_team_elos
-
     fixtures_path = os.path.join(_active_data_dir, "fixtures.json")
     provider = _step("Load fixtures", lambda: RepoFixtureProvider(fixtures_path=fixtures_path).load())
     if not provider:
@@ -1025,7 +1137,7 @@ def run_compute_all(
     # Run MC simulation (played league matches are injected as fixed facts)
     result = _step(
         "Monte Carlo simulation",
-        lambda: build_simulation_result(provider, elo_ratings, seed, n_iterations, played_matches=played_matches),
+        lambda: build_simulation_result(provider, elo_ratings, seed, n_iterations, played_matches=played_matches, season=str(active_season_value if "active_season_value" in locals() else "2025/26")),
     )
     if not result:
         return {"error": "simulation failed", "boot": boot}
@@ -1105,8 +1217,9 @@ def run_compute_all(
             "knockout_results": ko_availability.value,
             "simulated": True,
         },
-        "phase": compute_competition_phase(data_dir),
-        "lifecycle": discover(data_dir, provider_season=provider_season),
+        "phase": compute_competition_phase(_active_data_dir),
+        "lifecycle": discover(data_dir, provider_season=provider_season,
+                              phase=compute_competition_phase(_active_data_dir)),
         "teams": top4,
         "all_teams": odds_display,
         "n_teams": len(result.teams),

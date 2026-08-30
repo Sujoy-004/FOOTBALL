@@ -411,6 +411,7 @@ def run_monte_carlo(
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
     compute_ci: bool = False,
     progress_cb: callable | None = None,
+    season: str = "2025/26",
 ) -> dict:
     """Run Monte Carlo simulation of UCL league phase.
 
@@ -470,7 +471,7 @@ def run_monte_carlo(
         played_matches=played_matches,
     )
     request = SimulationRequest(
-        competition_id="ucl", season="2025/26",
+        competition_id="ucl", season=season,
         n_simulations=n_iterations, seed=seed,
     )
 

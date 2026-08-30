@@ -25,12 +25,27 @@ schedule itself is grouped deterministically (sort by ``match_id``, chunk
 order with the schedule.
 
 Store shape
------------
+----------
 ``data/seasons/2026_27/fixtures.json`` has BOTH the flat ``fixtures`` list
 (resolve_active_view, ``_make_fixture_lookup_from_doc``, lifecycle counts)
 AND the ``schedule`` key (RepoFixtureProvider, validation,
 ``run_compute_all``). ``data/seasons/2026_27/results.json`` is created as an
 empty ledger (nothing has been played).
+
+Default activation
+------------------
+Shipping the store (``build``) makes 2026/27 the default active season by
+initializing ``data/current.json`` when no pointer exists. The pointer is
+never overwritten on re-runs; 2025/26 stays selectable as a completed
+historical season (``deactivate`` / ``set_current_season``).
+
+Official enrichment
+-------------------
+Fixture ids are date-independent (``derive_fixture_id`` hashes only the
+home/away relationship), and the ingest router updates an existing row by
+its id or exact (home, away) pairing instead of appending — so ingesting the
+official dated fixture list enriches the provisional rows in place (id,
+provenance and metadata preserved) with no duplicates.
 
 CLI
 ---
@@ -53,6 +68,7 @@ from competitions.ucl.src.ingest import ingest_ucl_events_multi_season
 from competitions.ucl.src.seasons import (
     LOCAL_HISTORICAL_SEASON,
     derive_fixture_id,
+    get_current_season,
     normalize_season_token,
     read_season_fixtures,
     set_current_season,
@@ -231,7 +247,13 @@ def ensure_draw_season(
 
     Idempotent and deterministic: re-running produces byte-identical stores.
 
-    Returns a summary dict with the season, paths, and counts.
+    Making the store the default active season: shipping the 2026/27 store
+    (this build) initializes ``data/current.json`` to point at it when no
+    pointer exists yet. The existing pointer machinery then drives selection
+    — 2025/26 stays fully selectable as a completed historical season, and
+    the pointer is never rewritten on re-runs (idempotent).
+
+    Returns a summary dict with the season, paths, counts, and pointer.
     """
     data_dir = Path(data_dir) if data_dir is not None else _default_data_dir()
     data_dir = data_dir.resolve()
@@ -253,6 +275,19 @@ def ensure_draw_season(
     if doc is None or not isinstance(doc, dict):
         raise ValueError(f"ingest did not produce {fixtures_path}")
 
+    # Canonical identity re-key: every drawn row must carry the date-
+    # independent derived id, regardless of what a previous scheme stored.
+    pair_to_id = {
+        (m["team_a"], m["team_b"]): m["match_id"]
+        for m in matches
+    }
+    for f in doc.get("fixtures", []):
+        if not isinstance(f, dict):
+            continue
+        rid = pair_to_id.get((f.get("team_a", ""), f.get("team_b", "")))
+        if rid and rid != f.get("match_id"):
+            f["match_id"] = rid
+
     # Deterministic stable ordering: sort flat rows by match_id so the list
     # is in channel order with the (sorted, chunked) schedule.
     doc["fixtures"] = sorted(
@@ -261,7 +296,9 @@ def ensure_draw_season(
     )
     assignment = _assign_matchdays(doc["fixtures"])
     for f in doc["fixtures"]:
-        f["official_matchday"] = None
+        # setdefault: a rebuild preserves any official_matchday already
+        # enriched onto a row by a previous official schedule ingestion.
+        f.setdefault("official_matchday", None)
         f["simulation_matchday"] = assignment[f["match_id"]]
         f["provenance"] = {"fixture": "authoritative", "schedule": "derived"}
 
@@ -279,6 +316,17 @@ def ensure_draw_season(
 
     write_season_fixtures(data_dir, DRAWN_SEASON, doc)
 
+    # Exchange 5 default-activation: ship the store as the active season
+    # unless a pointer already exists (never overwrites a user's selection).
+    current = get_current_season(data_dir)
+    if current is None:
+        current = set_current_season(
+            data_dir,
+            DRAWN_SEASON,
+            basis="draw",
+            provider=PROVIDER_LABEL,
+        )
+
     results_path = data_dir / "seasons" / "2026_27" / "results.json"
     return {
         "season": DRAWN_SEASON,
@@ -290,6 +338,7 @@ def ensure_draw_season(
         "matches_per_matchday": 18,
         "grouping_method": SCHEDULE_GROUPING_METHOD,
         "authoritative_schedule": False,
+        "current": current,
     }
 
 

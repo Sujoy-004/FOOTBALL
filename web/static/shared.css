@@ -806,3 +806,30 @@ body {
 .competition-worldcup .wi-table th { color: #D3A376; border-bottom-color: #8C6E63; }
 .competition-worldcup .wi-table td { border-bottom-color: #8C6E6344; }
 .competition-worldcup .intel-note { color: #FFF2DF88; }
+
+/* ── Lightweight loading indicator (Exchange 7) ── */
+/* Reuses the shared accent (#16A085) / dim (#15565B) palette and inherits the
+   monospace body font. Shown transiently in a tab-content or the active tab
+   during real fetch/build work; the real render overwrites it. */
+.loading-state {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 28px 16px; min-height: 80px;
+  color: #15565B; font-size: 12px; letter-spacing: 0.5px;
+}
+.loading-spinner {
+  width: 16px; height: 16px; flex-shrink: 0; border-radius: 50%;
+  border: 2px solid rgba(22,160,133,0.2); border-top-color: #16A085;
+  animation: loading-spin 0.7s linear infinite;
+}
+.loading-label { color: #15565B; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+
+/* Respect reduced-motion preferences: keep the cue, drop the fast spin. */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner { animation-duration: 2.4s; }
+}
+
+/* WC earth-tone theme */
+.competition-worldcup .loading-state,
+.competition-worldcup .loading-label { color: #8C6E63; }
+.competition-worldcup .loading-spinner { border-color: rgba(211,163,118,0.2); border-top-color: #D3A376; }

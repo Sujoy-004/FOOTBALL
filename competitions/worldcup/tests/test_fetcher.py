@@ -34,6 +34,15 @@ class MockResponse:
             )
 
 
+class FakeSession:
+    """Stands in for requests.Session so BSDDataProvider's self._session.get
+    hits the mocked HTTP seam."""
+
+    def __init__(self, mock_get):
+        self.get = mock_get
+        self.headers = {}
+
+
 SAMPLE_MATCHES = [
     {
         "id": 12345,
@@ -78,7 +87,7 @@ def test_build_historic_url_custom_league(monkeypatch):
 def test_fetch_success(monkeypatch):
     def mock_get(url, **kwargs):
         return MockResponse(200, {"results": SAMPLE_MATCHES})
-    monkeypatch.setattr(requests, "get", mock_get)
+    monkeypatch.setattr(requests, "Session", lambda: FakeSession(mock_get))
 
     result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert len(result) == 1
@@ -88,7 +97,7 @@ def test_fetch_success(monkeypatch):
 def test_fetch_empty_response(monkeypatch):
     def mock_get(url, **kwargs):
         return MockResponse(200, {"results": []})
-    monkeypatch.setattr(requests, "get", mock_get)
+    monkeypatch.setattr(requests, "Session", lambda: FakeSession(mock_get))
 
     result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert result == []
@@ -100,7 +109,9 @@ def test_fetch_all_retries_exhausted(monkeypatch):
     def mock_get(url, **kwargs):
         calls.append(kwargs)
         return MockResponse(500, {})
-    monkeypatch.setattr(requests, "get", mock_get)
+
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    monkeypatch.setattr(requests, "Session", lambda: FakeSession(mock_get))
 
     result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert result == []
@@ -110,7 +121,7 @@ def test_fetch_all_retries_exhausted(monkeypatch):
 def test_fetch_401_returns_empty(monkeypatch):
     def mock_get(url, **kwargs):
         return MockResponse(401, {})
-    monkeypatch.setattr(requests, "get", mock_get)
+    monkeypatch.setattr(requests, "Session", lambda: FakeSession(mock_get))
 
     result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert result == []
@@ -122,7 +133,9 @@ def test_fetch_timeout_retry(monkeypatch):
     def mock_get(url, **kwargs):
         calls.append(kwargs)
         raise requests.exceptions.Timeout()
-    monkeypatch.setattr(requests, "get", mock_get)
+
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    monkeypatch.setattr(requests, "Session", lambda: FakeSession(mock_get))
 
     result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)
     assert result == []
@@ -134,8 +147,8 @@ def test_fetch_malformed_json(monkeypatch):
         def json(self):
             raise json.JSONDecodeError("bad json", "", 0)
     monkeypatch.setattr(
-        requests, "get",
-        lambda url, **kwargs: BadJSONResponse(200, {}),
+        requests, "Session",
+        lambda: FakeSession(lambda url, **kwargs: BadJSONResponse(200, {})),
     )
 
     result = fetch_raw_matches("fake_key", "https://sports.bzzoiro.com/api/events/", 27)

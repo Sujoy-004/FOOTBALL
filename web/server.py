@@ -63,6 +63,22 @@ HERE = Path(__file__).parent
 STATIC_DIR = HERE / "static"
 
 
+def _ensure_ucl_default_season() -> None:
+    """Initialize the shipped UCL draw as the default season when needed.
+
+    This is local-only and idempotent. An existing current.json pointer is
+    never changed, so an explicit historical-season selection is preserved.
+    """
+    from competitions.ucl.src.seasons import get_current_season
+    from competitions.ucl.src.season_draw import ensure_draw_season
+    import web.ucl_app as _ucl
+
+    draw_snapshot = _ucl.DATA_DIR / "draws" / "2026_27_league_draw.json"
+    if get_current_season(_ucl.DATA_DIR) is None and draw_snapshot.exists():
+        ensure_draw_season(_ucl.DATA_DIR)
+        logger.info("[boot] UCL default season initialized from shipped draw: 2026/27")
+
+
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     from web.startup import apply_session_overrides, run_startup_flow
@@ -75,6 +91,13 @@ async def lifespan(app: fastapi.FastAPI):
 
     import web.wc_app as _wc
     import web.ucl_app as _ucl
+
+    # Self-bootstrap the shipped UCL draw as the default active season on a
+    # fresh runtime. This is local-only and preserves any existing pointer.
+    try:
+        _ensure_ucl_default_season()
+    except Exception as exc:
+        logger.warning("[boot] UCL default-season bootstrap skipped: %s", exc)
 
     # Optional eager preload (FOOTBALL_PRELOAD_ALL=1): restore warm-tab
     # behavior by refreshing every registered competition through its own

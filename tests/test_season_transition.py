@@ -90,8 +90,6 @@ class TestProviderSeasonTransition:
         data_dir = _make_base_data_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -107,8 +105,6 @@ class TestProviderSeasonTransition:
         data_dir = _make_base_data_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=0, results_count=50)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -120,8 +116,6 @@ class TestProviderSeasonTransition:
         data_dir = _make_base_data_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=120, results_count=60)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -132,8 +126,6 @@ class TestProviderSeasonTransition:
         data_dir = _make_base_data_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=50, results_count=20)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == SEASON
@@ -147,8 +139,6 @@ class TestProviderSeasonTransition:
         data_dir = _make_base_data_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=0, results_count=0)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == SEASON
@@ -161,8 +151,6 @@ class TestProviderSeasonTransition:
         data_dir = _make_base_data_dir(tmp_path)
         provider_season = "2026/27"
         # Don't add any season store
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == SEASON
@@ -246,8 +234,6 @@ class TestProviderSeasonTransition:
         data_dir = _make_base_data_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=99, results_count=49)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == SEASON
@@ -260,8 +246,6 @@ class TestProviderSeasonTransition:
         data_dir = _make_base_data_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -272,8 +256,6 @@ class TestProviderSeasonTransition:
         data_dir = _make_base_data_dir(tmp_path)
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=0, results_count=50)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -314,15 +296,14 @@ class TestTransitionEdgeCases:
 
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=100, results_count=0)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
-        # Season label switches to provider, but stage/progress still from local evidence
+        # Once the provider season becomes active, lifecycle/progress are scoped
+        # to that season rather than leaking local historical evidence.
         assert result["season"] == provider_season
         assert result["basis"] == "provider"
-        assert result["stage"] == "active"  # Local evidence drives stage
-        assert result["progress"]["played"] == 60  # Local progress
+        assert result["stage"] == "future"
+        assert result["progress"]["played"] == 0
 
     def test_local_future_provider_completed_switches(self, tmp_path):
         """Local season future, provider season has data -> switch."""
@@ -336,8 +317,6 @@ class TestTransitionEdgeCases:
 
         provider_season = "2026/27"
         _add_provider_season_store(data_dir, provider_season, fixtures_count=144, results_count=144)
-        set_current_season(data_dir, provider_season, basis="provider")
-
         result = discover(data_dir, provider_season=provider_season)
 
         assert result["season"] == provider_season
@@ -358,7 +337,8 @@ class TestTransitionEdgeCases:
 
         # If provider_season hint is 2027/28 but current is 2026/27
         result2 = discover(data_dir, provider_season="2027/28")
-        assert result2["season"] == SEASON  # 2027/28 has insufficient data
+        assert result2["season"] == "2026/27"  # current pointer remains active
+        assert result2["season_mismatch"] is True
         assert "provider_season_insufficient_data" in result2["diagnostics"]
 
 

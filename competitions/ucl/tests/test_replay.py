@@ -65,15 +65,22 @@ class TestPlayedMatchesInjection:
     def test_bidirectional_lookup(
         self, sample_fixture_schedule, sample_elo_dict, sample_rng,
     ):
-        played = {("Atletico Madrid", "Man City"): (2, 1)}
+        # The real fixture schedule stores this matchup as (Sporting, Club Brugge).
+        # The caller supplies the result in the REVERSE orientation to prove the
+        # implementation's bidirectional lookup maps it onto the fixture.
+        played = {("Club Brugge", "Sporting"): (2, 1)}
         standings = simulate_league_phase(
             sample_fixture_schedule, sample_elo_dict, sample_rng,
             played_matches=played,
         )
-        city_entry = next(s for s in standings if s["team"] == "Man City")
-        atleti_entry = next(s for s in standings if s["team"] == "Atletico Madrid")
-        assert city_entry["gd"] >= 1
-        assert atleti_entry["gd"] <= -1
+        club_brugge_entry = next(
+            s for s in standings if s["team"] == "Club Brugge")
+        sporting_entry = next(
+            s for s in standings if s["team"] == "Sporting")
+        # First team in the inject dict (Club Brugge) owns home_score=2 and wins,
+        # so it must carry the positive GD signal; Sporting (away_score=1) loses.
+        assert club_brugge_entry["gd"] >= 1
+        assert sporting_entry["gd"] <= -1
 
 
 class TestPlayedMatchesDeterminism:

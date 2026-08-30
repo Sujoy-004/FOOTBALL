@@ -1,4 +1,4 @@
-"""UEFA Champions League 2025/26 competition package."""
+"""UEFA Champions League competition package."""
 import sys
 from pathlib import Path
 

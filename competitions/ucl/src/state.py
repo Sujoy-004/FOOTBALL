@@ -638,7 +638,7 @@ def build_competition_state(data_dir, mode: str = MODE_RESULTS, sim_payload: Opt
 
     _, league_availability, _ = load_json_store(_active_dp / "results.json")
     _, fixtures_availability, _ = load_json_store(_active_dp / "fixtures.json")
-    ko_payload, ko_availability, _ = load_json_store(dp / "knockout_results.json")
+    ko_payload, ko_availability, _ = load_json_store(_active_dp / "knockout_results.json")
 
     # Exchange 5: phase computation uses the active data dir for results,
     # but structural files from root.

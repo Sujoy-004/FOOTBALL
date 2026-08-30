@@ -17,6 +17,22 @@ async function safeJson(url, options) {
   }
 }
 
+// ── Lightweight loading indicator ────────────────────────────────────
+// Injects a small, theme-consistent spinner + label into targetEl, REPLACING
+// its current content. Callers show it immediately before real async work
+// (fetch/build) and let the subsequent real render overwrite it — the loader
+// therefore reflects genuine in-flight work only, never an artificial delay.
+// Safe to call repeatedly (idempotent replace) and with a null/absent target.
+function renderLoading(targetEl, label) {
+  if (!targetEl) return;
+  const text = (label == null || label === "") ? "Loading..." : String(label);
+  targetEl.innerHTML =
+    '<div class="loading-state" role="status" aria-live="polite">'
+    + '<span class="loading-spinner" aria-hidden="true"></span>'
+    + '<span class="loading-label">' + _esc(text) + "</span>"
+    + "</div>";
+}
+
 // ── Competition Registry ──
 const competitions = {
   worldcup: {
@@ -28,7 +44,7 @@ const competitions = {
     tabs: ["Overview", "Bracket", "Standings"],
   },
   ucl: {
-    label: "UCL 2025/26",
+    label: "UEFA Champions League",
     short: "UCL",
     module: "ucl",
     route: "/ucl",
@@ -85,7 +101,7 @@ function renderLanding() {
       <p class="lh-tagline">Real-time match forecasting powered by Elo ratings, multi-signal blending, and Monte Carlo simulation across football's biggest tournaments.</p>
       <div class="lh-actions">
         <a class="lh-btn lh-btn-primary" href="#/worldcup">Explore WorldCup 2026</a>
-        <a class="lh-btn lh-btn-primary" href="#/ucl">Explore UCL 2025/26</a>
+        <a class="lh-btn lh-btn-primary" href="#/ucl">Explore UEFA Champions League</a>
       </div>
     </div>
 
@@ -244,7 +260,16 @@ async function loadCompetition(slug) {
     btn.classList.add("active");
     const tabId = "tab-" + btn.dataset.tab;
     const tabEl = document.getElementById(tabId);
-    if (tabEl) tabEl.classList.add("active");
+    if (tabEl) {
+      tabEl.classList.add("active");
+      // Surface a loader ONLY when this tab has no content yet — its first
+      // reveal while the initial data load is still in flight. Already-built
+      // tabs (and re-clicking the active tab) switch instantly with no flash.
+      if (!tabEl.innerHTML.trim()) {
+        const name = (btn.textContent || "").replace(/>/g, "").trim();
+        renderLoading(tabEl, name ? "Loading " + name + "..." : undefined);
+      }
+    }
     if (btn.dataset.tab === "bracket") setTimeout(drawBracketConnectors, 300);
   });
 
@@ -259,6 +284,13 @@ async function loadCompetition(slug) {
       destroyModalCharts();
     }
   };
+
+  // Competition swap: show a loader in the visible (active) tab while the
+  // module is dynamically imported and boots its first data load. The
+  // module's own render overwrites this loader once real content is ready,
+  // so it lasts exactly as long as the real work does.
+  const activeContent = document.querySelector(".tab-content.active");
+  if (activeContent) renderLoading(activeContent, "Loading " + comp.label + "...");
 
   // Load competition module
   try {
@@ -692,4 +724,5 @@ export {
   showSimPopup,
   openIntelModal,
   safeJson,
+  renderLoading,
 };

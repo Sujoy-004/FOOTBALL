@@ -1,7 +1,7 @@
 // ── World Cup 2026 Module ──
 import {
   buildTable, destroyModalCharts, modalCharts, renderBracketTree,
-  updateStatusBar, competitions,
+  updateStatusBar, competitions, renderLoading, currentCompetition,
 } from "./shared.js";
 
 const API = "/worldcup/api";
@@ -11,36 +11,69 @@ let refreshing = false;
 let autoRefreshOn = false;
 let autoTimer = null;
 
+let _transitionGen = 0;
+
+function _isWcActive() {
+  return !!(currentCompetition && currentCompetition.apiPrefix === API);
+}
+
+function _stale(gen) {
+  return gen !== _transitionGen || !_isWcActive();
+}
+
 export function init(comp) {
   loadAll();
 }
 
 async function loadAll() {
-  const ov = await fetch(API + "/overview").then(r => r.json());
+  const gen = ++_transitionGen;
+  // Loaders reflect the real in-flight fetches below (initial boot AND the
+  // post-simulation reload). Each tab's render call replaces its loader once
+  // data — or a truthful fallback — is ready. No artificial delay is added.
+  renderLoading(document.getElementById("tab-overview"), "Loading overview...");
+  renderLoading(document.getElementById("tab-standings"), "Loading standings...");
+  renderLoading(document.getElementById("tab-bracket"), "Loading bracket...");
+
+  let ov = null;
+  try {
+    ov = await fetch(API + "/overview").then(r => r.json());
+  } catch (e) { console.error("overview load failed:", e); }
+  if (_stale(gen)) return gen;
   appState.overview = ov;
   appState.data = ov;
+  // Rendered unconditionally (with a truthful fallback when ov is null) so the
+  // overview loader always clears, never sticks as a spinner.
   renderOverview();
   updateStatus();
   // Standings tab
   try {
     const s = await fetch(API + "/standings").then(r => r.json());
+    if (_stale(gen)) return gen;
     appState.standings = s;
-    renderStandings();
   } catch {}
+  // Rendered unconditionally so the standings loader always clears (a failed
+  // fetch falls through to renderStandings' truthful "not available" state).
+  if (_stale(gen)) return gen;
+  renderStandings();
   // Bracket tab — full bracket data (chronological + knockout tree)
   try {
     const br = await fetch(API + "/bracket").then(r => r.json());
+    if (_stale(gen)) return gen;
     appState.bracket = br;
   } catch {}
   try {
     const bd = await fetch(API + "/bracket/data").then(r => r.json());
+    if (_stale(gen)) return gen;
     appState.bracketData = bd;
   } catch {}
   try {
     const fb = await fetch(API + "/bracket/full").then(r => r.json());
+    if (_stale(gen)) return gen;
     appState.fullBracket = fb;
   } catch {}
+  if (_stale(gen)) return gen;
   renderBracket();
+  return gen;
 }
 
 function updateStatus() {
@@ -197,12 +230,12 @@ async function startSimulation() {
     document.getElementById("simPopupOverlay").classList.remove("show");
     progressWrap.style.display = "none";
     progressLbl.style.display = "none";
-    await loadAll();
+    const gen = await loadAll();
     try {
       const simResp = await fetch(API + "/simulation").then(r => r.json());
-      appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
-    } catch { appState.simBracket = null; }
-    renderBracket();
+      if (!_stale(gen)) appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
+    } catch { if (!_stale(gen)) appState.simBracket = null; }
+    if (!_stale(gen)) renderBracket();
   } catch (e) {
     progressLbl.textContent = "Error: " + (e.message || "unknown");
     startBtn.disabled = false;
@@ -217,7 +250,7 @@ async function renderOverview() {
   const tab = document.getElementById("tab-overview");
   if (!tab) return;
   const ov = appState.overview || appState.data;
-  if (!ov) return;
+  if (!ov) { tab.innerHTML = '<div class="dim" style="padding:20px">Overview data not available yet.</div>'; return; }
 
   const signals = ov.signals_meta?.signals || [];
   const nActive = signals.filter(s => s.available).length;
@@ -656,7 +689,7 @@ function renderStandings() {
   const tab = document.getElementById("tab-standings");
   if (!tab) return;
   const s = appState.standings;
-  if (!s) return;
+  if (!s) { tab.innerHTML = '<div class="dim" style="padding:20px">Standings data not available yet.</div>'; return; }
   // Handle both old format {standings: {A: [...]}} and new flat list [{}]
   let groups = {};
   if (s.standings && !Array.isArray(s.standings)) {
