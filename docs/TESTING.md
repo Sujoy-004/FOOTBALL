@@ -39,7 +39,7 @@ python -m pytest tests            # cross-cutting regression tests
 
 ## Current baseline
 
-As measured (`python -m pytest --tb=short -q`): **1230 passed / 1 skipped**
+As measured (`python -m pytest --tb=short -q`): **1259 passed / 1 skipped**
 (no failing tests). The one skipped test is an environment-dependent provider
 test that exercises a graceful-degradation path. A minority of integration
 tests additionally need local match-result files produced by a live refresh

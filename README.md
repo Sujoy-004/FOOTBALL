@@ -176,6 +176,11 @@ The bootstrap files in `competitions/ucl/data/bootstrap/` are tracked:
 - `2025_26_knockout_results.json` — v1 historical aggregates (git 7cbc0f6)
 - `league_results_2025_26.json` — full 144-match league ledger
 
+The UCL 2026/27 season needs no bootstrap step: the tracked
+`draws/2026_27_league_draw.json` self-materializes into `seasons/` at server
+boot (`web/server.py:_ensure_ucl_default_season`) when no season pointer
+exists, so a fresh clone boots the 2026/27 default with zero manual steps.
+
 Runtime stores (`results.json`, `knockout_results.json`, `snapshot.json`,
 and future `seasons/` directories) are **gitignored** — they are generated
 artifacts, not source of truth. Tests that need complete stores use
@@ -185,7 +190,7 @@ artifacts, not source of truth. Tests that need complete stores use
 ## Testing
 
 The current post-hardening suite passes cleanly: `python -m pytest
---tb=short -q` reports **1230 passed / 1 skipped** (no failures). The single
+--tb=short -q` reports **1259 passed / 1 skipped** (no failures). The single
 skipped test is an environment-dependent provider test exercising a graceful
 degradation path; a minority of integration tests additionally require
 local match-result files produced by a live refresh; see
@@ -200,11 +205,15 @@ local match-result files produced by a live refresh; see
 - Simulations cannot be cancelled; progress polling is one-shot after a
   terminal state.
 - UCL offline Elo falls back to UEFA-coefficient-derived ratings.
-- UCL 2026/27 Elo coverage is measured, not assumed: 22 of 36 teams
-  currently resolve (61.1%); the rest sit at the 1500 default floor because
-  their ClubElo keys don't match the local draw identities (structural —
-  not fixable without editing team names). The UI renders coverage and
-  provenance instead of implying full coverage.
+- UCL 2026/27 Elo coverage is measured, not assumed: all 36 draw teams
+  resolve to verified ClubElo slugs (was 22/36 before those mappings were
+  added). The mappings are purely additive keys in the tracked
+  `competitions/ucl/data/team_aliases.json` — no team identity was edited.
+  Nuance: Man City, Man United, and Paris SG expose no per-team ClubElo
+  history rows and resolve only through the daily ranking snapshot, so any
+  of them reverts to the coefficient fallback if its ranking period lapses
+  between refreshes. The UI renders coverage and provenance instead of
+  implying full coverage.
 - No accuracy/skill claims: labeled history is still accumulating.
 
 ## Project structure
