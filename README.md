@@ -184,7 +184,7 @@ artifacts, not source of truth. Tests that need complete stores use
 ## Testing
 
 The current post-hardening suite passes cleanly: `python -m pytest
---tb=short -q` reports **1197 passed / 1 skipped** (no failures). The single
+--tb=short -q` reports **1230 passed / 1 skipped** (no failures). The single
 skipped test is an environment-dependent provider test exercising a graceful
 degradation path; a minority of integration tests additionally require
 local match-result files produced by a live refresh; see
