@@ -99,6 +99,9 @@ competitions/ucl/data/knockout_results.json
 competitions/ucl/data/replay_2025_26.json
 competitions/ucl/data/live/
 competitions/ucl/data/seasons/
+# Active-season pointer (runtime state; recreated at boot by
+# web/server.py:_ensure_ucl_default_season when the draw snapshot exists)
+competitions/ucl/data/current.json
 
 
 # Private interview study guide (local only, never commit)
