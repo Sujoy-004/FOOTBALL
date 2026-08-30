@@ -571,6 +571,7 @@ function renderAcquisitionPanel(el, acq) {
     + '<span class="acq-src ' + srcCls + staleCls + '">' + _esc(acq.source || "") + "</span></div>";
   if (acq.updatedAt) h += '<div class="acq-updated">Updated: ' + _esc(acq.updatedAt) + "</div>";
   if (acq.error) h += '<div class="acq-error-line">' + _esc(acq.error) + "</div>";
+  if (acq.notice) h += '<div class="acq-notice-line">' + _esc(acq.notice) + "</div>";
   (acq.stages || []).forEach(s => {
     const state = _ACQ_GLYPHS[s.state] ? s.state : "unavailable";
     const cls = state === "pending" ? "pend" : state;

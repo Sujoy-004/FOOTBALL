@@ -510,7 +510,7 @@ def resolve_played_matches(
             sys.exit(1)
         from competitions.ucl.src.result_provider import BSDMatchResultProvider
         team_aliases_path = os.path.join(data_dir, "team_aliases.json")
-        with open(team_aliases_path) as f:
+        with open(team_aliases_path, encoding="utf-8") as f:
             team_aliases = json.load(f)
         provider = BSDMatchResultProvider(
             api_key, team_aliases, asdict(fixtures_schedule),
@@ -819,6 +819,7 @@ def run_deterministic_compute(
     from competitions.ucl.src.pipeline import (
         load_results, load_knockout_results, compute_deterministic_standings,
         build_deterministic_bracket, build_league_matchdays, compute_signal_eval,
+        compute_elo_coverage,
     )
     from competitions.ucl.src.lifecycle import discover
     from web.common import ts, boot_step
@@ -867,6 +868,7 @@ def run_deterministic_compute(
         from competitions.ucl.src.seasons import LOCAL_HISTORICAL_SEASON, get_current_season
         team_names = [t.name for t in provider.teams]
         elo_ratings = _resolve_elo_ratings(team_names)
+        elo_provenance = "clubelo" if elo_ratings else None
         if not elo_ratings:
             coefficients = {t.name: t.coefficient for t in provider.teams}
             max_coeff = max(coefficients.values()) if coefficients else 100.0
@@ -874,6 +876,7 @@ def run_deterministic_compute(
                 team: 1400.0 + (coefficients.get(team, 50.0) / max_coeff) * 400.0
                 for team in team_names
             }
+            elo_provenance = "coefficient_derived" if elo_ratings else "unavailable"
             boot.append({
                 "step": "Elo fallback (coefficients)",
                 "status": "ok",
@@ -915,7 +918,17 @@ def run_deterministic_compute(
                 "weight": round(engine.weights.get("refined_elo", 0), 4),
             },
         }
+        # REAL measured per-team ClubElo coverage (never hardcoded): the
+        # fetch fills every team and uses the exact DEFAULT_ELO placeholder
+        # for unresolved clubs, so coverage counts non-placeholder ratings.
+        # Coefficient-derived ratings are NOT ClubElo and are reported as
+        # coverage=0 / provenance="coefficient_derived".
+        signal_stats["refined_elo"].update(
+            compute_elo_coverage(team_names, elo_ratings, elo_provenance)
+        )
         if historical_file:
+            # rolling_form keys off historical match results, not Elo rating
+            # coverage; per-team ClubElo coverage does not apply to it.
             signal_stats["rolling_form"] = {
                 "n_matches": 144, "available": 144, "available_pct": 100.0,
                 "weight": round(engine.weights.get("rolling_form", 0), 4),
@@ -972,6 +985,7 @@ def run_deterministic_compute(
     from competitions.ucl.src.elo_fetcher import fetch_team_elos
 
     elo_ratings = _step("Fetch Elo ratings", lambda: _resolve_elo_ratings(team_names))
+    elo_provenance = "clubelo" if elo_ratings else None
     if not elo_ratings:
         elo_ratings = {}
         coefficients = {t.name: t.coefficient for t in provider.teams}
@@ -979,6 +993,7 @@ def run_deterministic_compute(
         for t in team_names:
             c = coefficients.get(t, 50)
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
+        elo_provenance = "coefficient_derived" if elo_ratings else "unavailable"
     if not elo_ratings:
         elo_ratings = {}
         coefficients = {t.name: t.coefficient for t in provider.teams}
@@ -986,6 +1001,7 @@ def run_deterministic_compute(
         for t in team_names:
             c = coefficients.get(t, 50)
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
+        elo_provenance = "coefficient_derived" if elo_ratings else "unavailable"
         boot.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback"})
 
     standings = _step("Compute standings", lambda: compute_deterministic_standings(results))
@@ -1002,7 +1018,7 @@ def run_deterministic_compute(
     engine = _step("Build signal engine", lambda: build_signal_engine(elo_ratings, results_file=_results_tmp.name))
     os.unlink(_results_tmp.name)
 
-    signal_stats = _step("Evaluate signals", lambda: compute_signal_eval(results, engine, elo_ratings))
+    signal_stats = _step("Evaluate signals", lambda: compute_signal_eval(results, engine, elo_ratings, elo_provenance=elo_provenance))
 
     def _was_in_semis(t: str) -> bool:
         for m in knockout.get("rounds", {}).get("SF", []):

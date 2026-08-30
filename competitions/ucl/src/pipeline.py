@@ -150,8 +150,20 @@ def compute_signal_eval(
     results: list[dict],
     engine,
     elo_ratings: dict[str, float],
+    elo_provenance: str | None = None,
 ) -> dict:
-    """Evaluate signal accuracy against real results."""
+    """Evaluate signal accuracy against real results.
+
+    ``elo_provenance`` is the caller-detected source of ``elo_ratings``
+    ("clubelo" / "coefficient_derived" / "unavailable"). When omitted it is
+    derived sensibly: non-empty ratings are assumed to be fetched ClubElo
+    data (the completed-season path resolves via a real fetch).
+    """
+    if elo_provenance is None:
+        elo_provenance = "clubelo" if elo_ratings else "unavailable"
+    refined_elo_coverage = compute_elo_coverage(
+        list(elo_ratings.keys()), elo_ratings, elo_provenance
+    )
     signal_matches = []
     for m in results:
         signal_matches.append({"team_a": m["team_a"], "team_b": m["team_b"], "match_id": m["match_id"]})
@@ -200,9 +212,50 @@ def compute_signal_eval(
                 "weight": round(engine.weights.get(sig, 0), 4),
                 "brier": round(brier_avg, 4), "accuracy": round(acc, 4),
             }
+            if sig == "refined_elo":
+                sig_stats[sig].update(refined_elo_coverage)
         return sig_stats
     except Exception:
         return {}
+
+
+def compute_elo_coverage(
+    team_names: list[str],
+    elo_ratings: dict[str, float],
+    provenance: str,
+) -> dict:
+    """Honest per-team ClubElo rating coverage for the refined_elo signal.
+
+    A team counts as COVERED iff its ``elo_ratings`` value is a real ClubElo
+    rating. The fetcher fills every requested team, using the exact
+    ``DEFAULT_ELO`` (1500.0) placeholder when no ClubElo data resolves, so a
+    non-default value is the practical binary test (and the 1500.0 boundary
+    is the intended regression surface). Coefficient-derived ratings must
+    never be presented as ClubElo coverage (coverage=0).
+
+    Returns additive-only payload keys (existing n_matches/available keys are
+    per-MATCH prediction availability and are NOT touched here):
+    coverage / coverage_total / coverage_pct / provenance.
+    """
+    from football_core.constants import DEFAULT_ELO
+
+    default_elo = float(DEFAULT_ELO)
+    coverage_total = len(team_names)
+    if provenance == "clubelo":
+        coverage = sum(
+            1
+            for team in team_names
+            if team in elo_ratings and elo_ratings[team] != default_elo
+        )
+    else:
+        coverage = 0
+    coverage_pct = round(coverage / coverage_total * 100, 1) if coverage_total else 0.0
+    return {
+        "coverage": coverage,
+        "coverage_total": coverage_total,
+        "coverage_pct": coverage_pct,
+        "provenance": provenance,
+    }
 
 
 # ── 5 ─────────────────────────────────────────────────────────────────────
@@ -314,7 +367,26 @@ def fetch_live_data(
     else:
         raw = provider.fetch_matches(competition_id="CL")
     if not raw:
-        err = getattr(provider, "last_error", None) or "provider returned 0 matches"
+        err = getattr(provider, "last_error", None)
+        if requested_season is not None and not err:
+            # Benign provider-empty: an explicitly active NON-historical season
+            # was requested and the provider answered successfully (HTTP 200)
+            # with zero published matches. This is NOT a refresh failure — the
+            # draw-derived fixtures remain authoritative until the season's
+            # match data is published. Distinct from real transport/provider
+            # failures (which set ``last_error``) so the UI can present it as
+            # "not published yet" instead of "stale".
+            report = IngestReport(provider=provider_label, attempted=True,
+                                  success=True, error=None, stale=False,
+                                  deferred=True, reason="provider_empty")
+            logger.info(
+                "[UCL] No published match data yet for season %d (%s returned 0 "
+                "matches) — deferred", requested_season, provider_label)
+            return {"status": "deferred", "n_raw": 0, "n_updated": 0,
+                    "provider_name": provider_label, "report": report.to_dict(),
+                    "reason": "provider_empty", "deferred": True,
+                    "requested_season": requested_season}
+        err = err or "provider returned 0 matches"
         logger.warning("[UCL] No matches returned from provider: %s", err)
         report = IngestReport(provider=provider_label, attempted=True, success=False,
                               error=err, stale=True)

@@ -8,6 +8,7 @@ Covers:
 
 from __future__ import annotations
 
+import json
 import random
 import textwrap
 
@@ -98,6 +99,79 @@ class TestClubEloFetcher:
         """Unknown team passes through as-is."""
         slug = resolve_clubelo_name("Unknown Team")
         assert slug == "Unknown Team"
+
+    def test_resolve_clubelo_name_accent_insensitive_fallback(self):
+        """Accented display name resolves to ASCII alias key (recovery path).
+
+        Accent-insensitive (NFKD diacritic-strip + lowercase) matching is a
+        FALLBACK-ONLY path: it runs only when the exact alias lookup misses.
+        It reuses existing alias keys verbatim — no invented aliases.
+        """
+        assert resolve_clubelo_name("Atlético Madrid") == "Atletico"
+
+    def test_resolve_clubelo_name_unresolvable_unchanged(self):
+        """Teams with no fixable alias pass through unchanged (honest limit).
+
+        ``ø`` (U+00F8) has no NFKD decomposition, so it cannot be matched to
+        the ASCII key "Bodo/Glimt"; "Fenerbahçe" is a structural mismatch
+        (no alias key at all) and "Bayern Munich" is a full-vs-short name
+        mismatch. None may be silently invented.
+        """
+        assert resolve_clubelo_name("Bodø/Glimt") == "Bodø/Glimt"
+        assert resolve_clubelo_name("Fenerbahçe") == "Fenerbahçe"
+        assert resolve_clubelo_name("Bayern Munich") == "Bayern Munich"
+
+    def test_resolve_clubelo_name_ascii_roundtrip_unchanged(self):
+        """Pure-ASCII inputs resolve byte-identically as before the fix."""
+        for name in [
+            "Man City", "PSG", "Bayern", "Real Madrid", "Liverpool",
+            "Inter", "Arsenal", "Chelsea", "Sporting", "Atletico Madrid",
+        ]:
+            assert resolve_clubelo_name(name) == resolve_clubelo_name(name)
+        assert resolve_clubelo_name("Man City") == "Man City"
+        assert resolve_clubelo_name("PSG") == "Paris SG"
+
+    def test_load_aliases_preserves_accented_entries(self, monkeypatch, tmp_path):
+        """Accented clubelo alias entries must load as proper Unicode.
+
+        team_aliases.json stores accented ClubElo names ("Club Atlético de
+        Madrid", "FK Bodø/Glimt"). _load_aliases used to open() with no
+        encoding, so Windows' cp1252 default corrupted those values in memory.
+        """
+        import builtins
+        from football_core.elo_fetcher import _load_aliases
+
+        alias_path = tmp_path / "team_aliases.json"
+        aliases = {
+            "Atletico Madrid": ["Atletico", "Club Atlético de Madrid"],
+            "Bodo/Glimt": ["Bodoe Glimt", "FK Bodø/Glimt"],
+            "Bayern": ["Bayern", "FC Bayern München"],
+        }
+        with open(alias_path, "w", encoding="utf-8") as f:
+            json.dump(aliases, f, indent=2, ensure_ascii=False)
+
+        # Emulate Windows' cp1252 default text-mode decoding for open() calls
+        # that pass no explicit encoding. The fixed code passes
+        # encoding="utf-8" and is unaffected; the old code regresses here on
+        # any platform, not just Windows.
+        real_open = builtins.open
+
+        def _windows_default_open(
+            file, mode="r", buffering=-1, encoding=None,
+            errors=None, newline=None, closefd=True, opener=None,
+        ):
+            if "b" not in mode and encoding is None:
+                encoding = "cp1252"
+            return real_open(
+                file, mode, buffering, encoding, errors, newline, closefd, opener,
+            )
+
+        monkeypatch.setattr(builtins, "open", _windows_default_open)
+
+        loaded = _load_aliases(str(alias_path))
+        assert loaded["Atletico Madrid"] == ["Atletico", "Club Atlético de Madrid"]
+        assert loaded["Bodo/Glimt"] == ["Bodoe Glimt", "FK Bodø/Glimt"]
+        assert loaded["Bayern"] == ["Bayern", "FC Bayern München"]
 
     # ── Ranking fetching (mocked) ───────────────────────────────────────
 

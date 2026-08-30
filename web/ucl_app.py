@@ -101,14 +101,121 @@ def _refresh_report_path() -> Path:
     return Path(__file__).parent / "last_refresh.json"
 
 
+def _load_refresh_ledger(refresh_path: Path | None = None) -> dict:
+    """Read the freshness ledger file; always returns a dict."""
+    refresh_path = refresh_path if refresh_path is not None else _refresh_report_path()
+    if not refresh_path.exists():
+        return {}
+    try:
+        data = json.loads(refresh_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+_refresh_report: dict = {}
+#: Season-scoped refresh report store, keyed by season display id (e.g.
+#: "2026/27"). The API serves the ACTIVE season's own entry so one season's
+#: deferred/stale outcome never leaks onto another season's view.
+_refresh_reports: dict[str, dict] = {}
+_refresh_reports_seeded: bool = False
+
+
+def _season_refresh_reports() -> dict:
+    """Lazily hydrate the per-season store from the persisted ledger once.
+
+    Backward-compatible loading: both the legacy single ``"ucl"`` entry
+    (attached under its recorded ``active_season``) and the newer
+    ``"ucl_seasons"`` map are folded in. Reports recorded THIS process
+    always win over file state (``setdefault`` keeps the newest).
+    """
+    global _refresh_reports_seeded
+    if not _refresh_reports_seeded:
+        _refresh_reports_seeded = True
+        data = _load_refresh_ledger()
+        seasons = data.get("ucl_seasons")
+        if isinstance(seasons, dict):
+            for season, report in seasons.items():
+                if isinstance(report, dict):
+                    _refresh_reports.setdefault(str(season), report)
+        legacy = data.get("ucl")
+        if isinstance(legacy, dict) and legacy.get("active_season"):
+            _refresh_reports.setdefault(str(legacy["active_season"]), legacy)
+    return _refresh_reports
+
+
+def _active_season_token() -> str:
+    """Canonical season token used for refresh scoping.
+
+    Mirrors what ``_fetch_live_data`` records as ``active_season``: the
+    current.json pointer when present, otherwise the shipped local
+    historical season.
+    """
+    from competitions.ucl.src.seasons import (
+        LOCAL_HISTORICAL_SEASON, get_current_season,
+    )
+    current = get_current_season(DATA_DIR)
+    season = (
+        current.get("season")
+        if isinstance(current, dict) and current.get("season")
+        else None
+    )
+    return str(season or LOCAL_HISTORICAL_SEASON)
+
+
+def _synthesize_season_report(season: str) -> dict:
+    """Store-truthful standby report for a season nobody refreshed this process.
+
+    A settled season (e.g. completed historical 2025/26, 144/144 matches
+    played) is neither deferred nor stale — it is the canonical shipped
+    dataset. No claim about a provider is made (``attempted=False``) because
+    no fetch happened for THIS season in this process.
+    """
+    n_unplayed, n_total = _match_counts()
+    played = n_total - n_unplayed
+    return {
+        "provider": None,
+        "attempted": False,
+        "success": True,
+        "error": None,
+        "stale": False,
+        "deferred": False,
+        "reason": None,
+        "status": "ok",
+        "active_season": season,
+        "last_refresh": datetime.now(timezone.utc).isoformat(),
+        "n_matches": played,
+        "synth": True,
+    }
+
+
+def _refresh_report_for(season: str) -> dict:
+    """Season-scoped refresh report served to the API surface.
+
+    The snapshot-skipped report is process truth (no live data for ANY
+    season) and is served as-is. Otherwise the active season receives its
+    OWN recorded entry; a season with no recorded report gets a synthesized
+    store-truthful entry instead of inheriting another season's.
+    """
+    if _refresh_report.get("skipped_reason"):
+        return _refresh_report
+    report = _season_refresh_reports().get(season)
+    if report is not None:
+        return report
+    return _synthesize_season_report(season)
+
+
 def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None,
                           n_matches: int | None = None, n_updated: int | None = None,
                           finished: dict | None = None, stages: list | None = None,
-                          per_season: dict | None = None, active_season: str | None = None) -> dict:
+                          per_season: dict | None = None, active_season: str | None = None,
+                          deferred: bool = False, reason: str | None = None,
+                          status: str | None = None) -> dict:
     """Record the UCL refresh outcome for the API surface + last_refresh.json.
 
-    Single writer for the UCL entry: the ingestion itself never touches the
-    ledger, it only returns the structured IngestReport payload.
+    Single writer for the UCL entries (umbrella + season-scoped): the
+    ingestion itself never touches the ledger, it only returns the
+    structured IngestReport payload.
     """
     global _refresh_report
     _refresh_report = {
@@ -124,27 +231,28 @@ def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None
         **({"stages": stages} if stages is not None else {}),
         **({"per_season": per_season} if per_season is not None else {}),
         **({"active_season": active_season} if active_season is not None else {}),
+        **({"deferred": deferred} if deferred else {}),
+        **({"reason": reason} if reason is not None else {}),
+        **({"status": status} if status is not None else {}),
     }
+    if active_season:
+        _refresh_reports[str(active_season)] = _refresh_report
     try:
         refresh_path = _refresh_report_path()
-        refresh_data = {}
-        if refresh_path.exists():
-            try:
-                refresh_data = json.loads(refresh_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+        refresh_data = _load_refresh_ledger(refresh_path)
         entry = dict(_refresh_report)
         entry["mode"] = provider_name
         entry["n_matches"] = n_matches or 0
         entry["n_updated"] = n_updated or 0
+        # Legacy single-entry slot stays the latest report (backward
+        # compatible with existing readers of last_refresh.json["ucl"]).
         refresh_data["ucl"] = entry
+        if active_season:
+            refresh_data.setdefault("ucl_seasons", {})[str(active_season)] = entry
         refresh_path.write_text(json.dumps(refresh_data, indent=2), encoding="utf-8")
     except Exception:
         pass
     return _refresh_report
-
-
-_refresh_report: dict = {}
 
 
 def _fetch_live_data() -> None:
@@ -173,6 +281,10 @@ def _fetch_live_data() -> None:
         }
         return
 
+    # Season-scoped freshness: every outcome (including genuine failures)
+    # is recorded against the season it happened on.
+    active_season = _active_season_token()
+
     from web.common import get_data_provider
     from competitions.ucl.src.pipeline import fetch_live_data as _brain_fetch
 
@@ -180,7 +292,8 @@ def _fetch_live_data() -> None:
     if provider is None:
         logger.warning("[UCL] No data provider — skipping live fetch")
         boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] No data provider configured"})
-        _store_refresh_report(False, "no data provider configured", None)
+        _store_refresh_report(False, "no data provider configured", None,
+                              active_season=active_season)
         return
 
     try:
@@ -193,32 +306,33 @@ def _fetch_live_data() -> None:
     except Exception as exc:  # never let a refresh crash the request path
         logger.warning("[UCL] live fetch raised: %s — UCL data may be STALE", exc)
         _store_refresh_report(False, f"{exc.__class__.__name__}: {exc}",
-                              type(provider).__name__)
+                              type(provider).__name__, active_season=active_season)
         return
     report = summary.get("report") or {}
-    ok = summary.get("status") == "ok"
+    status = summary.get("status")
+    ok = status == "ok"
+    deferred = status == "deferred"
+    reason = summary.get("reason")
     provider_name = summary.get("provider_name") or type(provider).__name__
     n_raw = int(summary.get("n_raw") or 0)
     n_updated = int(summary.get("n_updated") or 0)
-    error = report.get("error") if not ok else getattr(provider, "last_error", None)
-    if not ok:
+    error = report.get("error") if not (ok or deferred) else getattr(provider, "last_error", None)
+    if deferred:
+        logger.info("[UCL] Provider has no published match data yet for the "
+                    "active season (deferred) — draw-derived fixtures shown")
+    elif not ok:
         logger.warning("[UCL] Refresh failed: %s — UCL data may be STALE",
                        error or "no ingestable matches")
-    from competitions.ucl.src.seasons import get_current_season
-    current_pointer = get_current_season(DATA_DIR)
-    active_season = (
-        current_pointer.get("season")
-        if isinstance(current_pointer, dict) and current_pointer.get("season")
-        else None
-    )
-    _store_refresh_report(ok, error, provider_name,
+    _store_refresh_report(ok or deferred, error, provider_name,
                           n_matches=n_raw, n_updated=n_updated,
                           finished=report.get("finished"),
                           stages=report.get("stages"),
                           per_season=summary.get("per_season"),
-                          active_season=active_season)
+                          active_season=active_season,
+                          deferred=deferred, reason=reason, status=status)
+    boot_status = "deferred" if deferred else ("ok" if ok else "skip")
     boot_log_local.append({
-        "step": "UCL live fetch", "status": "ok" if ok else "skip", "elapsed": 0.0,
+        "step": "UCL live fetch", "status": boot_status, "elapsed": 0.0,
         "output": f"[{ts()}] {provider_name}: {n_raw} raw matches, {n_updated} updated",
     })
     # Exchange 5: if a new season was activated by the ingest, recompute
@@ -373,7 +487,7 @@ def api_data():
     n_unplayed, n_total = _match_counts()
     lifecycle = _lifecycle_view()
     return JSONResponse({
-        "refresh": _refresh_report,
+        "refresh": _refresh_report_for(_active_season_token()),
         "teams": cache.get("teams", []),
         "all_teams": cache.get("all_teams", []),
         "n_teams": cache.get("n_teams", 0),

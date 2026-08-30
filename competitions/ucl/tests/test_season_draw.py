@@ -47,8 +47,9 @@ from competitions.ucl.src.validation import validate_ucl_fixtures
 def _copy_repo_data_to(tmp_path: Path) -> Path:
     """Materialize a full UCL data dir from the tracked repo data.
 
-    The runtime ``seasons/`` directory is removed so the draw builder is
-    tested from a fresh acquisition every time.
+    The runtime ``seasons/`` directory and the gitignored active-season
+    pointer are removed so the draw builder is tested from a fresh
+    acquisition every time regardless of local runtime state.
     """
     repo_data = Path(__file__).resolve().parents[1] / "data"
     dp = tmp_path / "data"
@@ -56,6 +57,9 @@ def _copy_repo_data_to(tmp_path: Path) -> Path:
     seasons_dir = dp / "seasons"
     if seasons_dir.is_dir():
         shutil.rmtree(seasons_dir)
+    current_pointer = dp / "current.json"
+    if current_pointer.exists():
+        current_pointer.unlink()
     return dp
 
 

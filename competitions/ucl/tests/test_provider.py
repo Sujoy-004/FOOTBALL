@@ -107,6 +107,81 @@ class TestRepoFixtureProvider:
         with pytest.raises(FileNotFoundError):
             provider.load()
 
+    def test_loads_accented_team_names_as_utf8(self, monkeypatch, tmp_path):
+        """Accented names in a UTF-8 fixtures file must round-trip as proper Unicode.
+
+        Regression for the 2026/27 season store: fixtures.json stores accented
+        team/clubelo names ("Atlético Madrid", "Bodø/Glimt", "Fenerbahçe",
+        "Sporting CP"). RepoFixtureProvider.load() used to open() the file with
+        no encoding, so Windows' cp1252 default corrupted every non-ASCII name
+        in memory ("AtlÃ©tico Madrid" ...) before it ever reached ClubElo.
+        """
+        import builtins
+        from competitions.ucl.src.provider import RepoFixtureProvider
+
+        accented = {
+            "Atlético Madrid": 104.75,
+            "Bodø/Glimt": 64.0,
+            "Fenerbahçe": 57.75,
+            "Sporting CP": 84.0,
+        }
+        fixtures_path = tmp_path / "fixtures.json"
+        schedule = {
+            "schedule": {
+                "teams": [
+                    {"name": name, "pot": 1, "clubelo_name": name,
+                     "coefficient": coeff}
+                    for name, coeff in accented.items()
+                ],
+                "matchdays": [
+                    [
+                        {"match_id": "MD1", "team_a": "Atlético Madrid",
+                         "team_b": "Fenerbahçe", "home_pot": 1, "away_pot": 1,
+                         "event_date": None},
+                        {"match_id": "MD2", "team_a": "Bodø/Glimt",
+                         "team_b": "Sporting CP", "home_pot": 1, "away_pot": 2,
+                         "event_date": None},
+                    ]
+                ],
+            }
+        }
+        with open(fixtures_path, "w", encoding="utf-8") as f:
+            json.dump(schedule, f, indent=2, ensure_ascii=False)
+
+        # Emulate Windows' cp1252 default text-mode decoding for open() calls
+        # that pass no explicit encoding. The fixed code passes
+        # encoding="utf-8" and is unaffected; the old code regresses here on
+        # any platform, not just Windows.
+        real_open = builtins.open
+
+        def _windows_default_open(
+            file, mode="r", buffering=-1, encoding=None,
+            errors=None, newline=None, closefd=True, opener=None,
+        ):
+            if "b" not in mode and encoding is None:
+                encoding = "cp1252"
+            return real_open(
+                file, mode, buffering, encoding, errors, newline, closefd, opener,
+            )
+
+        monkeypatch.setattr(builtins, "open", _windows_default_open)
+        # Count-based UCL validation (36 teams / 8 matchdays) is out of scope
+        # here — same no-op pattern as the BSD tests above.
+        monkeypatch.setattr(
+            "competitions.ucl.src.provider.validate_ucl_fixtures",
+            lambda fixtures: None,
+        )
+
+        loaded = RepoFixtureProvider(fixtures_path=str(fixtures_path)).load()
+        loaded_names = {t.name: t.clubelo_name for t in loaded.teams}
+
+        assert loaded_names == {
+            "Atlético Madrid": "Atlético Madrid",
+            "Bodø/Glimt": "Bodø/Glimt",
+            "Fenerbahçe": "Fenerbahçe",
+            "Sporting CP": "Sporting CP",
+        }, loaded_names
+
     def test_invalid_schedule_raises(self, tmp_path):
         """RepoFixtureProvider.load() should raise ValueError on invalid schedule data."""
         from competitions.ucl.src.provider import RepoFixtureProvider

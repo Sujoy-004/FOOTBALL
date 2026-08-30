@@ -168,6 +168,8 @@ class IngestReport:
     finished: dict = field(default_factory=_zero_finished_counters)
     stages: list = field(default_factory=list)
     written_files: list = field(default_factory=list)
+    deferred: bool = False
+    reason: str | None = None
 
     def to_dict(self) -> dict:
         """JSON-safe plain-dict form of the report."""
@@ -181,5 +183,7 @@ class IngestReport:
             "finished": dict(self.finished),
             "stages": [dict(stage) for stage in self.stages],
             "written_files": list(self.written_files),
+            "deferred": self.deferred,
+            "reason": self.reason,
         }
 

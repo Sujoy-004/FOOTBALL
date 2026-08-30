@@ -79,6 +79,7 @@ class BSDDataProvider:
                     continue
                 return None
             except (json.JSONDecodeError, requests.exceptions.JSONDecodeError):
+                self.last_error = "malformed JSON response"
                 logger.debug("Malformed JSON response from %s", url)
                 return None
         return None

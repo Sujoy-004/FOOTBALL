@@ -213,6 +213,8 @@ function updateStatus() {
   let notice = "";
   if (refresh.skipped_reason) {
     notice = '<span style="color:#e6a817">SNAPSHOT - showing stored data (live refresh skipped)</span>';
+  } else if (refresh.deferred === true || refresh.reason === "provider_empty") {
+    notice = '<span style="color:#168777">Provider has no published match data yet - showing draw-derived fixtures</span>';
   } else if (refresh.stale) {
     notice = '<span style="color:#e6a817">STALE - live refresh failed; showing last known data</span>';
   }
@@ -245,6 +247,33 @@ function _uclProjectionBlock() {
   });
   h += '</table>';
   return h;
+}
+
+// Honest per-signal status cell for the Overview Signal Availability table.
+// The leading "Yes/No" reflects per-match prediction availability (the
+// existing `available`/`available_pct` semantics, unchanged). When the served
+// signal entry additionally carries the additive Elo coverage/provenance
+// fields, the cell surfaces the truthful Elo state beneath it instead of a
+// bare "Yes" — never a fabricated "100%". No coverage fields → prior behavior.
+function _signalStatusCell(s) {
+  if (s === undefined || s === null) {
+    return '<span class="dot-red">&#9679;</span> No';
+  }
+  let html = '<span class="dot-green">&#9679;</span> Yes';
+  const coverage = s.coverage;
+  const coverageTotal = s.coverage_total;
+  const coveragePct = s.coverage_pct;
+  const prov = s.provenance;
+  if (prov === "coefficient_derived") {
+    html += ' <span class="dim" style="display:block;font-size:10px;font-weight:normal">'
+      + 'Offline coefficient estimates — no ClubElo ratings</span>';
+  } else if (typeof coverage === "number" && typeof coverageTotal === "number"
+      && coverageTotal > 0 && coveragePct != null && coveragePct < 100) {
+    html += ' <span class="dim" style="display:block;font-size:10px;font-weight:normal">'
+      + coverage + '/' + coverageTotal + ' teams rated (' + Number(coveragePct).toFixed(1)
+      + '%); remaining use a neutral baseline (1500), not ClubElo data</span>';
+  }
+  return html;
 }
 
 async function renderOverview() {
@@ -305,10 +334,8 @@ async function renderOverview() {
     html += '<table class="eval-table"><tr><th>Signal</th><th>Status</th></tr>';
     sigOrder.forEach(function(sk) {
       const s = signals[sk];
-      const available = s !== undefined;
       html += '<tr><td>' + (sigLabels[sk] || sk) + '</td><td>'
-        + '<span class="' + (available ? 'dot-green' : 'dot-red') + '">&#9679;</span> '
-        + (available ? 'Yes' : 'No') + '</td></tr>';
+        + _signalStatusCell(s) + '</td></tr>';
     });
     html += '</table>';
   } else {
@@ -400,11 +427,16 @@ function _buildAcquisition(d) {
   const attempted = refresh.attempted === true;
   const succeeded = refresh.success === true;
   const snapshotMode = !!refresh.skipped_reason;
+  const deferred = refresh.deferred === true || refresh.reason === "provider_empty";
 
-  let mode, source, error = null, stale = false;
+  let mode, source, error = null, stale = false, notice = null;
   if (snapshotMode) {
     mode = "snapshot";
     source = "Snapshot";
+  } else if (deferred) {
+    mode = "live";
+    source = refresh.provider || "LIVE";
+    notice = "Provider has no published match data yet";
   } else {
     mode = "live";
     if (attempted && !succeeded) {
@@ -459,6 +491,7 @@ function _buildAcquisition(d) {
     updatedAt: refresh.last_refresh || null,
     error,
     stale,
+    notice,
     stages,
   };
 }

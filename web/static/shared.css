@@ -752,6 +752,7 @@ body {
 .acq-src-stale { border-style: dashed; }
 .acq-updated { color: #15565B; font-size: 10px; margin-bottom: 4px; }
 .acq-error-line { color: #ff6b6b; font-size: 10px; margin-bottom: 4px; }
+.acq-notice-line { color: #16A085; font-size: 10px; margin-bottom: 4px; }
 .acq-stage { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; border-top: 1px solid rgba(21,61,76,0.25); }
 .acq-glyph { width: 26px; flex-shrink: 0; font-weight: bold; letter-spacing: 0.5px; }
 .acq-ok .acq-glyph { color: #168777; }

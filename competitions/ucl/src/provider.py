@@ -54,7 +54,7 @@ class RepoFixtureProvider:
         ValueError
             If the schedule fails validation.
         """
-        with open(self._path) as f:
+        with open(self._path, encoding="utf-8") as f:
             data = json.load(f)
         schedule = self._dict_to_schedule(data["schedule"])
         validate_ucl_fixtures({"schedule": _schedule_asdict(schedule)})
@@ -244,7 +244,7 @@ class BSDFixtureProvider:
             return None
 
         try:
-            with open(self._cache_path) as f:
+            with open(self._cache_path, encoding="utf-8") as f:
                 data = json.load(f)
         except (json.JSONDecodeError, IOError):
             logger.warning("Cache file corrupt, ignoring")

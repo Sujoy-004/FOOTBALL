@@ -74,6 +74,8 @@ class FootballDataOrgProvider:
                     logger.warning("HTTP %s for %s (%s)", resp.status_code, url, msg)
                     return None
                 if resp.status_code == 429:
+                    if attempt >= 2:
+                        self.last_error = "HTTP 429: rate limited (retries exhausted)"
                     logger.warning("Rate limited (429) for %s — retrying", url)
                     time.sleep(2 ** attempt)
                     continue
@@ -95,6 +97,7 @@ class FootballDataOrgProvider:
                     continue
                 return None
             except requests.exceptions.HTTPError as e:
+                self.last_error = f"HTTP error: {e}"
                 logger.debug("HTTP error (attempt %d/3): %s — %s", attempt + 1, url, e)
                 if attempt < 2:
                     time.sleep(backoff[attempt])
