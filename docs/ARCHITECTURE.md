@@ -82,10 +82,25 @@ dataset (tracked at `data/bootstrap/2025_26_knockout_results.json`,
 extracted byte-identically from git history; provenance `manual`) — it is
 never executed by server startup.
 
-Live feed status: football-data.org/BSD coverage of finished 2025/26 UCL
-knockout matches could NOT be verified (placeholder credentials); the
-provider interface is implemented against the documented API shapes and the
-historical bootstrap guarantees factual completeness offline.
+Live feed status (verified against football-data.org): a fetch of the
+finished 2025/26 season returns 189 matches, cross-checks the committed
+history, and the historical bootstrap guarantees factual completeness
+offline regardless. The provider is season-aware — the UCL ingestor passes
+the requested season explicitly
+(`football_core/data_providers/football_data_org_provider.py`), so a future
+season can never silently serve the prior season's data.
+
+Future-season provider-empty / deferred state: when the active season is
+non-historical (UCL 2026/27), football-data.org answers HTTP 200 but has
+published zero finished matches. `competitions/ucl/src/pipeline.py` records
+this as a **deferred** refresh (`deferred: True`, `reason: "provider_empty"`,
+`stale: False`) — an honest "not published yet" outcome, explicitly distinct
+from a transport/provider failure (which sets `last_error` and reports
+stale). The provider was reachable and answered authoritatively; nothing has
+been published for that season yet. The draw-derived 2026/27 fixtures in the
+committed store remain authoritative and keep serving until live result data
+is published, and the UI labels the state accordingly rather than showing
+fallback/stale.
 
 ## CompetitionState & shared bracket contract
 

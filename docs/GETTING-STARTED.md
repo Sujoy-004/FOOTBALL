@@ -32,6 +32,12 @@ python -m web.server          # http://127.0.0.1:8080
 - `POST /worldcup/api/simulate` / `POST /ucl/api/simulate` — seeded Monte Carlo
   runs (async task + progress polling)
 
+Refreshing the active future UCL season (2026/27): football-data.org is
+reachable but has published zero finished matches yet, so acquisition reports
+`deferred (provider-empty)` — an expected "not published yet" state, not a
+stale/failure — and the committed draw-derived fixtures keep serving until
+live results appear.
+
 ## 4. What-if
 
 Structured only: choose a match and an Elo delta for the home side; the server

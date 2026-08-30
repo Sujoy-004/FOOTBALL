@@ -125,6 +125,7 @@ Simulation is always user-triggered. Nothing runs automatically.
 ## Data modes
 
 Normal startup is fresh-first: the server attempts acquisition lazily per competition and falls back to the last validated stores on failure.
+Fallback is reserved for real failures: if the provider answers HTTP 200 but has published zero matches for the active future season (UCL 2026/27), refresh reports `deferred/provider-empty` — not stale — and the committed draw-derived fixtures keep serving.
 `FOOTBALL_DATA_ORG_KEY` is the recommended provider credential; optional `BSD_API_KEY` and `DATA_PROVIDER=bsd|football-data` remain supported. Explicit snapshot/offline mode performs **zero** live requests — including
 Elo lookups, which fall back to UEFA-coefficient-derived ratings for UCL —
 and both dashboards disclose that stored data is being shown. A refresh
@@ -199,6 +200,11 @@ local match-result files produced by a live refresh; see
 - Simulations cannot be cancelled; progress polling is one-shot after a
   terminal state.
 - UCL offline Elo falls back to UEFA-coefficient-derived ratings.
+- UCL 2026/27 Elo coverage is measured, not assumed: 22 of 36 teams
+  currently resolve (61.1%); the rest sit at the 1500 default floor because
+  their ClubElo keys don't match the local draw identities (structural —
+  not fixable without editing team names). The UI renders coverage and
+  provenance instead of implying full coverage.
 - No accuracy/skill claims: labeled history is still accumulating.
 
 ## Project structure
