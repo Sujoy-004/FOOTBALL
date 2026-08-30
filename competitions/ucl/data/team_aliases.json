@@ -141,5 +141,47 @@
   "Copenhagen": [
     "FC Kobenhavn",
     "FC København"
+  ],
+  "AEK Athens": [
+    "AEK"
+  ],
+  "Bayern Munich": [
+    "Bayern"
+  ],
+  "Bodø/Glimt": [
+    "Bodoe Glimt"
+  ],
+  "Borussia Dortmund": [
+    "Dortmund"
+  ],
+  "Fenerbahçe": [
+    "Fenerbahce"
+  ],
+  "Inter Milan": [
+    "Inter"
+  ],
+  "Manchester City": [
+    "Man City"
+  ],
+  "Manchester United": [
+    "Man United"
+  ],
+  "Paris Saint-Germain": [
+    "Paris SG"
+  ],
+  "PSV Eindhoven": [
+    "PSV"
+  ],
+  "Real Betis": [
+    "Betis"
+  ],
+  "Shakhtar Donetsk": [
+    "Shakhtar"
+  ],
+  "Sporting CP": [
+    "Sporting"
+  ],
+  "VfB Stuttgart": [
+    "Stuttgart"
   ]
 }

@@ -110,16 +110,19 @@ class TestClubEloFetcher:
         assert resolve_clubelo_name("Atlético Madrid") == "Atletico"
 
     def test_resolve_clubelo_name_unresolvable_unchanged(self):
-        """Teams with no fixable alias pass through unchanged (honest limit).
+        """Teams with no alias entry pass through unchanged (honest limit).
 
-        ``ø`` (U+00F8) has no NFKD decomposition, so it cannot be matched to
-        the ASCII key "Bodo/Glimt"; "Fenerbahçe" is a structural mismatch
-        (no alias key at all) and "Bayern Munich" is a full-vs-short name
-        mismatch. None may be silently invented.
+        Names with no committed alias take the identity string into ClubElo
+        resolution; those that match ClubElo's own listing resolve there
+        (Aston Villa, LASK, Viking), while anything truly unknown stays
+        unchanged and lands on the DEFAULT_ELO fallback. None are silently
+        invented. The former structural-mismatch cases (Bodø/Glimt,
+        Fenerbahçe, Bayern Munich, ...) now ship explicit verified aliases,
+        so they no longer pass through.
         """
-        assert resolve_clubelo_name("Bodø/Glimt") == "Bodø/Glimt"
-        assert resolve_clubelo_name("Fenerbahçe") == "Fenerbahçe"
-        assert resolve_clubelo_name("Bayern Munich") == "Bayern Munich"
+        assert resolve_clubelo_name("Aston Villa") == "Aston Villa"
+        assert resolve_clubelo_name("LASK") == "LASK"
+        assert resolve_clubelo_name("Viking") == "Viking"
 
     def test_resolve_clubelo_name_ascii_roundtrip_unchanged(self):
         """Pure-ASCII inputs resolve byte-identically as before the fix."""
