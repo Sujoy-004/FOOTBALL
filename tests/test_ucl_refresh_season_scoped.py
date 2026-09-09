@@ -100,9 +100,27 @@ def isolated_season_refresh_state(tmp_path, monkeypatch):
 # ── helpers ─────────────────────────────────────────────────────────────────
 
 def _seed_ucl_dir(tmp_path: Path) -> Path:
-    """Fresh copy of the real UCL data tree (all seasons + stores)."""
+    """Fresh copy of the real UCL data tree (all seasons + stores).
+
+    The copied season results are RESET to the empty document so the "0
+    finished matches" premise that these refresh tests assert is
+    deterministic instead of depending on whatever finished results happen
+    to be stored in the live (gitignored) data tree.
+    """
     dst = tmp_path / "ucl"
     shutil.copytree(UCL_DATA, dst, dirs_exist_ok=True)
+    from competitions.ucl.src.seasons import empty_results_document
+
+    seasons_dir = dst / "seasons"
+    if seasons_dir.exists():
+        for season_dir_ in seasons_dir.iterdir():
+            if not season_dir_.is_dir():
+                continue
+            season = season_dir_.name.replace("_", "/", 1)
+            (season_dir_ / "results.json").write_text(
+                json.dumps(empty_results_document(season), ensure_ascii=False),
+                encoding="utf-8",
+            )
     return dst
 
 

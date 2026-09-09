@@ -146,7 +146,8 @@
     "AEK"
   ],
   "Bayern Munich": [
-    "Bayern"
+    "Bayern",
+    "FC Bayern München"
   ],
   "Bodø/Glimt": [
     "Bodoe Glimt"
@@ -155,19 +156,25 @@
     "Dortmund"
   ],
   "Fenerbahçe": [
-    "Fenerbahce"
+    "Fenerbahce",
+    "Fenerbahçe SK"
   ],
   "Inter Milan": [
-    "Inter"
+    "Inter",
+    "FC Internazionale Milano"
   ],
   "Manchester City": [
-    "Man City"
+    "Man City",
+    "Manchester City FC"
   ],
   "Manchester United": [
-    "Man United"
+    "Man United",
+    "Manchester United FC"
   ],
   "Paris Saint-Germain": [
-    "Paris SG"
+    "Paris SG",
+    "Paris Saint-Germain FC",
+    "PSG"
   ],
   "PSV Eindhoven": [
     "PSV"
@@ -176,12 +183,61 @@
     "Betis"
   ],
   "Shakhtar Donetsk": [
-    "Shakhtar"
+    "Shakhtar",
+    "FK Shakhtar Donetsk"
   ],
   "Sporting CP": [
-    "Sporting"
+    "Sporting",
+    "Sporting Clube de Portugal"
   ],
   "VfB Stuttgart": [
     "Stuttgart"
+  ],
+  "Aston Villa": [
+    "Aston Villa",
+    "Aston Villa FC"
+  ],
+  "Porto": [
+    "Porto",
+    "FC Porto"
+  ],
+  "Feyenoord": [
+    "Feyenoord",
+    "Feyenoord Rotterdam"
+  ],
+  "Lille": [
+    "Lille",
+    "LOSC Lille"
+  ],
+  "RB Leipzig": [
+    "RB Leipzig"
+  ],
+  "LASK": [
+    "LASK",
+    "LASK Linz"
+  ],
+  "Como": [
+    "Como",
+    "Como 1907"
+  ],
+  "Lens": [
+    "Lens",
+    "RC Lens"
+  ],
+  "Viking": [
+    "Viking",
+    "Viking FK"
+  ],
+  "Sabah": [
+    "Sabah",
+    "Sabah FK"
+  ],
+  "Slovan Bratislava": [
+    "Slovan Bratislava",
+    "ŠK Slovan Bratislava"
+  ],
+  "Roma": [
+    "Roma",
+    "AS Roma"
   ]
 }

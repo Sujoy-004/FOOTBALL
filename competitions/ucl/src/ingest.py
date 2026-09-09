@@ -95,6 +95,7 @@ from football_core.domain import is_semantically_empty
 from football_core.fetcher import (
     IngestReport,
     count_finished,
+    fold_pair_key,
     new_ingestion_stats,
     note_no_target,
     note_unmatchable,
@@ -1095,9 +1096,13 @@ def _upsert_season_fixtures(
         if doc.get("meta", {}).get("provider") is None:
             doc["meta"] = {"provider": provider_name}
 
-    # Existing fixtures indexed by match_id AND by exact home/away pairing.
+    # Existing fixtures indexed by match_id AND by exact home/away pairing AND
+    # by accent-folded canonical pairing (so a provider spelling like
+    # ``Inter``/``Atletico Madrid`` merges into the drawn ``Inter Milan``/
+    # ``Atlético Madrid`` record instead of appending a duplicate matchup).
     existing_by_id: dict[str, dict] = {}
     existing_by_pair: dict[tuple[str, str], dict] = {}
+    existing_by_folded_pair: dict[tuple[str, str], dict] = {}
     for fx in doc.get("fixtures", []):
         if not isinstance(fx, dict):
             continue
@@ -1106,8 +1111,31 @@ def _upsert_season_fixtures(
             existing_by_id[mid] = fx
         existing_by_pair.setdefault(
             _fixture_pair_key(fx.get("team_a", ""), fx.get("team_b", "")), fx)
+        existing_by_folded_pair.setdefault(
+            fold_pair_key(fx.get("team_a", ""), fx.get("team_b", "")), fx)
     fixtures_added = 0
     fixtures_updated = 0
+
+    def _pick_fixture_match(by_id_row, exact_row, folded_row) -> dict | None:
+        """Deterministically pick the fixture an event merges into.
+
+        Priority: the most-precise match (exact canonical pairing) wins over a
+        bare provider match_id, so a canonical scraping event landing on the
+        SAME matchup as an existing short-spelling twin row attaches to the
+        canonical (``gen-*``) fixture instead of the legacy numeric one.
+        """
+        rows = {id(r): r for r in (by_id_row, exact_row, folded_row) if r is not None}
+        if not rows:
+            return None
+        values = list(rows.values())
+        if len(values) == 1:
+            return values[0]
+        if exact_row is not None:
+            return exact_row
+        for row in values:
+            if str(row.get("match_id") or "").startswith("gen-"):
+                return row
+        return by_id_row or values[0]
 
     for ev in scheduled_events:
         home = ev.get("home_team", "").strip()
@@ -1124,11 +1152,11 @@ def _upsert_season_fixtures(
         else:
             fid = derive_fixture_id(home, away, event_date)
 
-        # Match identity: same stored id first, then the exact (home, away)
-        # relationship so an official event never duplicates the provisional
-        # draw fixture under a different provider id.
-        existing_fx = existing_by_id.get(fid) or \
-            existing_by_pair.get(_fixture_pair_key(home, away))
+        existing_fx = _pick_fixture_match(
+            existing_by_id.get(fid),
+            existing_by_pair.get(_fixture_pair_key(home, away)),
+            existing_by_folded_pair.get(fold_pair_key(home, away)),
+        )
 
         if existing_fx is not None:
             # Update mutable fields ONLY; the fixture id, team identity and
@@ -1163,6 +1191,7 @@ def _upsert_season_fixtures(
             doc["fixtures"].append(fx_entry)
             existing_by_id[fid] = fx_entry
             existing_by_pair[_fixture_pair_key(home, away)] = fx_entry
+            existing_by_folded_pair[fold_pair_key(home, away)] = fx_entry
             fixtures_added += 1
 
     # Update availability counts

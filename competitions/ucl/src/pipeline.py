@@ -22,6 +22,7 @@ from competitions.ucl.src.orchestrator import (
     build_signal_engine,
     build_simulation_result,
 )
+from football_core.fetcher import _build_alias_lookup, fold_team_key
 from football_core.signal import PredictionContext
 
 logger = logging.getLogger(__name__)
@@ -278,6 +279,64 @@ def _select_provider(bsd_api_key: str, football_data_org_key: str, ucl_league_id
     return None
 
 
+def build_active_season_lookup(data_dir: str | Path, aliases: dict) -> dict:
+    """Canonical identity lookup for the ACTIVE (non-historical) season.
+
+    Providers addressing the active season must resolve to the season's
+    canonical fixture identity (the draw spellings: ``PSV Eindhoven``,
+    ``Inter Milan``, ``Atlético Madrid``, ``Bodø/Glimt``, ...), NOT the
+    root/legacy spellings. Root ``fixtures.json`` seeding is deliberately
+    EXCLUDED here so a legacy short spelling like ``PSV`` (registered first
+    in ``team_aliases.json``) cannot clobber the draw canonical via the
+    last-writer rule.
+
+    The season's own canonical team names are then seeded under both their
+    exact key and their accent-folded key as a defensive fallback: the folded
+    key is authoritative for the season (e.g. ``bodo/glimt -> Bodø/Glimt``,
+    ``atletico madrid -> Atlético Madrid``) so provider ASCII spellings land
+    on the draw identity.
+    """
+    from competitions.ucl.src.seasons import get_current_season, read_season_fixtures
+
+    lookup = _build_alias_lookup(aliases, bracket=[])
+    active = get_current_season(data_dir)
+    if not (isinstance(active, dict) and active.get("season")):
+        return lookup
+    doc = read_season_fixtures(data_dir, active["season"])
+    if not isinstance(doc, dict):
+        return lookup
+    names: list[str] = []
+    schedule = doc.get("schedule") if isinstance(doc.get("schedule"), dict) else None
+    if isinstance(schedule, dict) and isinstance(schedule.get("matchdays"), list):
+        for md in schedule["matchdays"]:
+            for m in md if isinstance(md, list) else []:
+                if not isinstance(m, dict):
+                    continue
+                for k in ("team_a", "team_b"):
+                    n = (m.get(k) or "").strip()
+                    if n:
+                        names.append(n)
+    else:
+        for f in doc.get("fixtures", []) or []:
+            if not isinstance(f, dict):
+                continue
+            mid = str(f.get("match_id") or "")
+            if mid and not mid.startswith("gen-"):
+                continue
+            for k in ("team_a", "team_b"):
+                n = (f.get(k) or "").strip()
+                if n:
+                    names.append(n)
+    for name in names:
+        key = name.lower()
+        if key not in lookup:
+            lookup[key] = name
+        folded = fold_team_key(name)
+        if folded != key:
+            lookup[folded] = name
+    return lookup
+
+
 def fetch_live_data(
     data_dir: str | Path,
     bsd_api_key: str,
@@ -305,6 +364,7 @@ def fetch_live_data(
         IngestReport,
         _build_alias_lookup,
         count_finished,
+        fold_team_key,
         new_ingestion_stats,
         note_unmatchable,
         normalize_team,
@@ -416,6 +476,14 @@ def fetch_live_data(
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             pass
 
+    # Also register the ACTIVE season's fixture teams through a SEASON-SCOPED
+    # lookup so provider activity on the active season resolves to the draw's
+    # canonical identity — WITHOUT clobbering the legacy root lookup above.
+    # Root seeding stays byte-for-byte legacy so historical (2025/26) exact-pair
+    # matching is unaffected. The season lookup is authoritative only for
+    # events whose season is explicitly the active season.
+    season_alias_lookup = build_active_season_lookup(data_dir_path, aliases)
+
     # Normalize ALL events (finished + scheduled) — do not discard scheduled.
     norm_stats = new_ingestion_stats()
     normalized_events: list[dict] = []
@@ -423,34 +491,58 @@ def fetch_live_data(
     for event in raw:
         status = (event.get("status") or "").lower()
         is_finished = status == "finished"
+
+        home_name = event.get("home_team", "")
+        away_name = event.get("away_team", "")
+        home_score_raw = event.get("home_score")
+        away_score_raw = event.get("away_score")
+
+        # Truth guard: a provider 'finished' event without score evidence is
+        # NOT a usable completed result. Refusing to fabricate a 0-0, so it is
+        # never counted as finished and never written to the results stores —
+        # it is surfaced loudly and skipped until scores exist. The
+        # finished_received == normalized == ingested + skipped_* invariant
+        # still holds because these events are never treated as finished.
+        if is_finished and (home_score_raw is None or away_score_raw is None):
+            logger.warning(
+                "FINISHED EVENT WITHOUT SCORES (%r vs %r) REFUSED — "
+                "cannot fabricate a result; re-ingest when scores exist",
+                home_name, away_name,
+            )
+            continue
+
         if is_finished:
             count_finished(norm_stats)
         norm_stats["normalized"] += 1
 
-        home_name = event.get("home_team", "")
-        away_name = event.get("away_team", "")
-        home_norm = normalize_team(home_name, alias_lookup)
-        away_norm = normalize_team(away_name, alias_lookup)
+        # Exchange 5: preserve season identity for multi-season routing.
+        # Events without provider season info default to the local historical
+        # season — BSD and other non-FDO providers never emit season.
+        season_raw = event.get("season", "")
+        ev_season = season_raw if season_raw else LOCAL_HISTORICAL_SEASON
+        # Active-season events normalize against the SEASON-SCOPED lookup
+        # (canonical draw identity, no root clobber); historical/season-less
+        # events keep the legacy root+alias lookup byte-for-byte.
+        event_lookup = season_alias_lookup if ev_season != LOCAL_HISTORICAL_SEASON else alias_lookup
+
+        home_norm = normalize_team(home_name, event_lookup)
+        away_norm = normalize_team(away_name, event_lookup)
 
         if home_norm is None or away_norm is None:
             note_unmatchable(norm_stats, logger, home_name, away_name,
-                             (event.get("home_score"), event.get("away_score")))
+                             (home_score_raw, away_score_raw))
             n_unmatchable += 1
             continue
 
         ev = {
             "home_team": home_norm,
             "away_team": away_norm,
-            "home_score": event.get("home_score") or 0,
-            "away_score": event.get("away_score") or 0,
+            "home_score": home_score_raw or 0,
+            "away_score": away_score_raw or 0,
             "status": "finished" if is_finished else (event.get("status") or "scheduled"),
             "stage": event.get("stage", ""),
         }
-        # Exchange 5: preserve season identity for multi-season routing.
-        # Events without provider season info default to the local historical
-        # season — BSD and other non-FDO providers never emit season.
-        season_raw = event.get("season", "")
-        ev["season"] = season_raw if season_raw else LOCAL_HISTORICAL_SEASON
+        ev["season"] = ev_season
         # Preserve provider match_id for stable fixture identity.
         match_id = event.get("match_id", "")
         if match_id:

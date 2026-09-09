@@ -1,11 +1,42 @@
 """Fetch and process live match results from BSD API — generic pipeline."""
 
 import logging
+import unicodedata
 from dataclasses import dataclass, field
 
 from football_core.data_providers.bsd_provider import BSDDataProvider
 
 logger = logging.getLogger(__name__)
+
+
+#: Bounded transliteration table so accented spellings collapse onto the same
+#: folded key as their provider-ASCII equivalents (``ø``/``Ø`` have no NFKD
+#: decomposition, so they must be folded explicitly).
+_FOLD_TRANSLIT = str.maketrans({"ø": "o", "Ø": "O"})
+
+
+def fold_team_key(name: str) -> str:
+    """Casefolded, accent-folded key that identifies ONE team spelling family.
+
+    Deliberately bounded: NFC/NFKD-decomposes combining marks, applies a small
+    explicit transliteration for letters without a decomposition (``ø``), and
+    casefolds. It is NOT fuzzy matching — it only collapses known Unicode
+    equivalent spellings of the same name (``Atletico Madrid`` vs
+    ``Atlético Madrid``, ``Bodo/Glimt`` vs ``Bodø/Glimt``) onto one key.
+    """
+    decomposed = unicodedata.normalize("NFKD", name)
+    stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return stripped.translate(_FOLD_TRANSLIT).strip().casefold()
+
+
+def fold_pair_key(home: str, away: str) -> tuple[str, str]:
+    """Identity key for a (home, away) fixture relationship using folded names.
+
+    Home/away order is preserved, so ``A@B`` and ``B@A`` stay distinct —
+    exactly like :func:`competitions.ucl.src.ingest._fixture_pair_key`, but
+    tolerant of accent/ASCII spelling families.
+    """
+    return (fold_team_key(home), fold_team_key(away))
 
 
 def new_ingestion_stats() -> dict:
