@@ -818,7 +818,8 @@ def run_deterministic_compute(
     """
     from competitions.ucl.src.pipeline import (
         load_results, load_knockout_results, compute_deterministic_standings,
-        build_deterministic_bracket, build_league_matchdays, compute_signal_eval,
+        build_deterministic_bracket, build_matchday_map, build_league_matchdays,
+        compute_signal_eval,
         compute_elo_coverage,
     )
     from competitions.ucl.src.lifecycle import discover
@@ -1004,7 +1005,10 @@ def run_deterministic_compute(
         elo_provenance = "coefficient_derived" if elo_ratings else "unavailable"
         boot.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback"})
 
-    standings = _step("Compute standings", lambda: compute_deterministic_standings(results))
+    standings = _step(
+        "Compute standings",
+        lambda: compute_deterministic_standings(results, team_names=team_names),
+    )
     if not standings:
         return {"error": "standings computation failed", "boot": boot}
 
@@ -1054,7 +1058,17 @@ def run_deterministic_compute(
         enriched_bracket[round_name] = matches
 
     n_total_matches = len(results)
-    n_matchdays = len({m.get("match_id", "").split("_")[0] for m in results if "_" in m.get("match_id", "")}) or 1
+    matchday_map = build_matchday_map(_active_data_dir)
+    league_matchdays = build_league_matchdays(results, matchday_map)
+    n_matchdays = len(league_matchdays) or 1
+
+    from competitions.ucl.src.seasons import LOCAL_HISTORICAL_SEASON, get_current_season
+    current_pointer = get_current_season(data_dir)
+    active_season_value = (
+        str(current_pointer.get("season"))
+        if isinstance(current_pointer, dict) and current_pointer.get("season")
+        else LOCAL_HISTORICAL_SEASON
+    )
 
     return {
         "mode": "results",
@@ -1071,12 +1085,12 @@ def run_deterministic_compute(
         "n_iterations": n_matchdays,
         "n_total_matches": n_total_matches,
         "seed": 0,
-        "snapshot_date": "2025/26 Season — Real Results",
+        "snapshot_date": f"{active_season_value} Season — Real Results",
         "champion": champ,
         "standings": standings,
         "playoff": bracket_data.get("playoff", []),
         "bracket_rounds": enriched_bracket,
-        "league_matchdays": build_league_matchdays(results),
+        "league_matchdays": league_matchdays,
         "odds": odds_display,
         "signals": signal_stats,
         "elo_ratings": elo_ratings,

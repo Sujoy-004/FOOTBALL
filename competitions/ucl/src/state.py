@@ -491,8 +491,13 @@ def _league_stage(data_dir: Path, league_availability: DataAvailability) -> dict
     matchdays: dict = {}
     if league_availability is DataAvailability.AVAILABLE:
         try:
-            from competitions.ucl.src.pipeline import build_league_matchdays, load_results
-            matchdays = build_league_matchdays(load_results(data_dir))
+            from competitions.ucl.src.pipeline import (
+                build_league_matchdays,
+                build_matchday_map,
+                load_results,
+            )
+            matchdays = build_league_matchdays(
+                load_results(data_dir), build_matchday_map(data_dir))
         except Exception:
             matchdays = _fallback_matchdays(data_dir)
     return {
@@ -504,7 +509,9 @@ def _league_stage(data_dir: Path, league_availability: DataAvailability) -> dict
 
 
 def _fallback_matchdays(data_dir: Path) -> dict:
+    from competitions.ucl.src.pipeline import build_matchday_map
     from football_core.domain import canonical_from_result_entry
+    matchday_map = build_matchday_map(data_dir)
     rows: list = []
     payload, availability, _ = load_json_store(data_dir / "results.json")
     if availability is DataAvailability.AVAILABLE and isinstance(payload, dict):
@@ -513,13 +520,16 @@ def _fallback_matchdays(data_dir: Path) -> dict:
             rows = [m for m in candidates if isinstance(m, dict)]
     grouped: dict = {}
     for m in rows:
-        prefix = m.get("match_id", "").split("_")[0]
+        match_id = m.get("match_id", "")
+        prefix = match_id.split("_")[0]
+        matchday = matchday_map.get(match_id)
+        key = f"MD{matchday:02d}" if isinstance(matchday, int) and matchday >= 1 else prefix
         row = dict(m)
         cm = canonical_from_result_entry(m, "ucl")
         row.setdefault("winner", cm.winner)
         row["status"] = cm.status.value
         row["provenance"] = "official"
-        grouped.setdefault(prefix, []).append(row)
+        grouped.setdefault(key, []).append(row)
     return {k: grouped[k] for k in sorted(grouped)}
 
 

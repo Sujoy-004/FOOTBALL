@@ -33,6 +33,7 @@ def compute_swiss_standings(
     matches: dict[str, dict],
     elo_ratings: dict[str, float] | None = None,
     uefa_coefficients: dict[str, float] | None = None,
+    team_names: list[str] | None = None,
 ) -> list[dict]:
     """Compute 36-team Swiss standings sorted by the 10-step UCL tiebreaker.
 
@@ -59,6 +60,11 @@ def compute_swiss_standings(
         ``{team_name: elo}``.  Used for the ``elo`` field in output.
     uefa_coefficients:
         ``{team_name: coefficient}`` for step 10.  Missing teams get ``0.0``.
+    team_names:
+        Optional full roster to include even when no match result touches
+        the team yet (e.g. early-season Swiss league phase).  Teams without
+        matches receive zeroed stats.  ``None`` keeps the default behaviour
+        of listing only teams present in ``matches``.
 
     Returns
     -------
@@ -131,6 +137,12 @@ def compute_swiss_standings(
             team_stats[tb]["pts"] += 1
             team_stats[ta]["draws"] += 1
             team_stats[tb]["draws"] += 1
+
+    # Full-roster seeding: appear with zeroed stats even when no result
+    # touches the team yet (early-season Swiss league phase display).
+    if team_names:
+        for team in team_names:
+            team_stats[team]  # access triggers defaultdict factory entry
 
     # Compute conduct scores from raw yellow/red card counts
     for team, stats in team_stats.items():

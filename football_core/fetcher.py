@@ -42,9 +42,10 @@ def fold_pair_key(home: str, away: str) -> tuple[str, str]:
 def new_ingestion_stats() -> dict:
     """Create a zeroed result-ingestion stats dict (truth-ingestion contract).
 
-    Invariant: finished_received == normalized + skipped_unmatchable + skipped_no_target
-    (ingested ⊆ normalized). Any finished match that is not ingested must appear
-    in exactly one skipped_* bucket and be logged at WARNING level.
+    Invariant: finished_received == normalized == ingested +
+    skipped_unmatchable + skipped_no_target + skipped_missing_score.
+    Any finished match that is not ingested must appear in exactly one
+    skipped_* bucket and be logged at WARNING level.
     """
     return {
         "finished_received": 0,
@@ -52,6 +53,7 @@ def new_ingestion_stats() -> dict:
         "ingested": 0,
         "skipped_unmatchable": 0,
         "skipped_no_target": 0,
+        "skipped_missing_score": 0,
     }
 
 
@@ -60,23 +62,57 @@ def count_finished(stats: dict) -> None:
 
 
 def note_unmatchable(stats: dict, log: logging.Logger,
-                     home_name: str, away_name: str, score=None) -> None:
-    """A FINISHED result could not be matched to known teams — surface loudly."""
+                     home_name: str, away_name: str, score=None,
+                     *, season: str | None = None, event_id: str | None = None,
+                     status: str = "finished") -> None:
+    """A finished result could not be matched to known teams."""
     stats["skipped_unmatchable"] += 1
     score_str = f" {score}" if score else ""
     log.warning(
-        "RESULT INGESTION SKIP (unmatchable team names): %r vs %r%s "
-        "— this finished match will be simulated unless re-ingested",
+        "RESULT INGESTION SKIP (unmatchable team names) "
+        "reason=unmatchable_team_names season=%s event_id=%s status=%s: "
+        "%r vs %r%s — this finished match will be simulated unless re-ingested",
+        season or "unknown", event_id or "unknown", status,
         home_name, away_name, score_str,
     )
 
 
 def note_no_target(stats: dict, log: logging.Logger,
-                   home_norm: str, away_norm: str) -> None:
+                   home_norm: str, away_norm: str, *, season: str | None = None,
+                   event_id: str | None = None, status: str = "finished") -> None:
     stats["skipped_no_target"] += 1
     log.warning(
-        "RESULT INGESTION SKIP (no matching fixture/slot): %r vs %r",
-        home_norm, away_norm,
+        "RESULT INGESTION SKIP (no matching fixture/slot) "
+        "reason=no_active_season_target season=%s event_id=%s status=%s: %r vs %r",
+        season or "unknown", event_id or "unknown", status, home_norm, away_norm,
+    )
+
+
+def note_missing_score(stats: dict, log: logging.Logger,
+                       home_name: str, away_name: str, *, season: str | None = None,
+                       event_id: str | None = None, status: str = "finished",
+                       score=None) -> None:
+    """Reject a result without score evidence instead of fabricating 0-0."""
+    stats["skipped_missing_score"] += 1
+    log.warning(
+        "RESULT INGESTION SKIP reason=missing_score season=%s event_id=%s "
+        "status=%s: FINISHED EVENT WITHOUT SCORES %r vs %r score=%s",
+        season or "unknown", event_id or "unknown", status,
+        home_name, away_name, score,
+    )
+
+
+def note_fixture_unmatchable(log: logging.Logger, home_name: str, away_name: str,
+                             *, season: str | None = None,
+                             event_id: str | None = None,
+                             status: str = "scheduled") -> None:
+    """Report a scheduled fixture that cannot be normalized as a result."""
+    log.info(
+        "FIXTURE INGESTION IGNORE reason=optional_metadata_unresolved "
+        "detail=unmatchable_team_names season=%s "
+        "event_id=%s status=%s: %r vs %r",
+        season or "unknown", event_id or "unknown", status,
+        home_name, away_name,
     )
 
 
@@ -86,9 +122,10 @@ def summarize_ingestion(stats: dict, log: logging.Logger, context: str) -> None:
     log.log(
         logging.WARNING if lost else logging.INFO,
         "Ingestion summary [%s]: finished=%d normalized=%d ingested=%d "
-        "skipped_unmatchable=%d skipped_no_target=%d",
+        "skipped_unmatchable=%d skipped_no_target=%d skipped_missing_score=%d",
         context, stats["finished_received"], stats["normalized"],
         stats["ingested"], stats["skipped_unmatchable"], stats["skipped_no_target"],
+        stats.get("skipped_missing_score", 0),
     )
 
 
@@ -173,6 +210,7 @@ def _zero_finished_counters() -> dict:
         "ingested": 0,
         "skipped_unmatchable": 0,
         "skipped_no_target": 0,
+        "skipped_missing_score": 0,
     }
 
 
@@ -183,7 +221,7 @@ class IngestReport:
     Competition-agnostic by design: no sport- or competition-specific
     vocabulary appears here. Invariant for ``finished`` counters:
     ``received == normalized == ingested + skipped_unmatchable +
-    skipped_no_target`` (``ingested`` ⊆ ``normalized``).
+    skipped_no_target + skipped_missing_score`` (``ingested`` ⊆ ``normalized``).
 
     ``stages`` entries are plain dicts shaped ``{key, label, state, count,
     detail}`` with ``state`` limited to ``ok | pending | error |

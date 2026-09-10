@@ -313,7 +313,8 @@ def test_finished_event_without_scores_is_refused(tmp_path, caplog):
         summary = fetch_live_data(ucl_dir, "", "", provider=provider)
     assert any("FINISHED EVENT WITHOUT SCORES" in r.message for r in caplog.records)
     report = summary["report"]
-    assert report.get("finished", {}).get("received", 0) == 0
+    assert report.get("finished", {}).get("received", 0) == 1
+    assert report.get("finished", {}).get("skipped_missing_score", 0) == 1
     assert not (ucl_dir / "seasons" / "2026_27" / "results.json").exists(), \
         "a finished event with no scores must not be recorded as 0-0"
 

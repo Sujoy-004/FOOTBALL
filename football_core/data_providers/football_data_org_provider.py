@@ -144,7 +144,10 @@ class FootballDataOrgProvider:
 
         status = (raw.get("status") or "").lower()
         group = FootballDataOrgProvider._map_group(raw.get("group"))
-        matchday = raw.get("matchday") or 1
+        # Missing provider metadata stays unknown; downstream UCL fixture
+        # state may use its derived draw slot, but must not invent an official
+        # matchday from a default value.
+        matchday = raw.get("matchday")
 
         mapped: dict[str, Any] = {
             "id": raw.get("id", 0),
@@ -216,4 +219,3 @@ class FootballDataOrgProvider:
             return []
         raw_matches = data.get("matches", [])
         return [self._map_match(m) for m in raw_matches]
-

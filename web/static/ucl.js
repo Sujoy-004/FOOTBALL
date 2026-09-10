@@ -8,6 +8,7 @@ import {
 
 const API = "/ucl/api";
 const appState = { data: null, standings: [], bracket: null, odds: [], signals: {}, simProjections: null, simMeta: null, simRunCount: 0, simBracket: null, simChampion: null, seasons: [], activeSeason: null };
+let _uclSimCompareTeams = [];
 
 function _esc(s) {
   return String(s == null ? "" : s)
@@ -226,9 +227,35 @@ function updateStatus() {
 
 // ── Overview ─────────────────────────────────────────────────────────
 
-// Render the completed-run projections block: meta line + aggregate label
-// + top-5 table. Shared by the live and completed-season overview paths so
-// both carry the same Monte Carlo-aggregate wording.
+function _simPct(value) {
+  return typeof value === "number" ? (value * 100).toFixed(1) + "%" : "-";
+}
+
+function _simComparisonRows() {
+  return _uclSimCompareTeams.map(function(team) {
+    return (appState.simProjections || []).find(function(o) { return o.team === team; });
+  }).filter(Boolean);
+}
+
+function bindSimulationProjection() {
+  document.querySelectorAll(".sim-team-toggle").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      const team = btn.dataset.team;
+      const index = _uclSimCompareTeams.indexOf(team);
+      if (index >= 0) {
+        _uclSimCompareTeams.splice(index, 1);
+      } else if (_uclSimCompareTeams.length < 2) {
+        _uclSimCompareTeams.push(team);
+      }
+      renderOverview();
+    });
+  });
+}
+
+// Render the completed-run projections block: aggregate results for every
+// available team plus a compact two-team comparison. The sampled bracket is
+// deliberately described separately because it is one reproducible example,
+// not another probability aggregate.
 function _uclProjectionBlock() {
   const m = appState.simMeta || {};
   const runs = appState.simRunCount || 0;
@@ -237,15 +264,45 @@ function _uclProjectionBlock() {
     + ' RUNS' + (m.seed != null ? ' &middot; seed ' + m.seed : '')
     + ' - projected probabilities, not real results.</div>';
   h += '<div class="dim" style="padding:2px 8px;font-size:11px">'
-    + 'Projected champion probability - Monte Carlo aggregate over '
-    + runs.toLocaleString() + ' runs</div>';
-  h += '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion %</th></tr>';
-  appState.simProjections.slice(0, 5).forEach(function(o, i) {
-    const pct = ((o.champion_prob || 0) * 100).toFixed(1);
-    h += '<tr><td class="num">' + (i + 1) + '</td><td>' + o.team
-      + '</td><td class="num">' + pct + '%</td></tr>';
+    + '<strong>Aggregate probabilities:</strong> share of '
+    + runs.toLocaleString() + ' Monte Carlo runs. Values are exact-stage '
+    + 'outcomes, not cumulative qualification probabilities.</div>';
+  h += '<div class="dim" style="padding:2px 8px;font-size:11px;color:#8E44AD">'
+    + '<strong>Sampled bracket below:</strong> one reproducible simulated '
+    + 'run, not a probability chart.</div>';
+  h += '<div style="max-height:360px;overflow:auto;margin:4px 8px">'
+    + '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion</th>'
+    + '<th>Final</th><th>SF</th><th>QF</th><th>Top 8</th><th>Playoff</th><th></th></tr>';
+  (appState.simProjections || []).forEach(function(o, i) {
+    const selected = _uclSimCompareTeams.indexOf(o.team) >= 0;
+    h += '<tr' + (selected ? ' style="background:rgba(142,68,173,.12)"' : '') + '>'
+      + '<td class="num">' + (o.rank || i + 1) + '</td>'
+      + '<td>' + _esc(o.team) + '</td>'
+      + '<td class="num">' + _simPct(o.champion_prob) + '</td>'
+      + '<td class="num">' + _simPct(o.final_prob) + '</td>'
+      + '<td class="num">' + _simPct(o.sf_prob) + '</td>'
+      + '<td class="num">' + _simPct(o.qf_prob) + '</td>'
+      + '<td class="num">' + _simPct(o.top_8_prob) + '</td>'
+      + '<td class="num">' + _simPct(o.playoff_prob) + '</td>'
+      + '<td><button type="button" class="status-btn sim-team-toggle" data-team="'
+      + _esc(o.team) + '">' + (selected ? 'Remove' : 'Compare') + '</button></td></tr>';
   });
-  h += '</table>';
+  h += '</table></div>';
+  const comparison = _simComparisonRows();
+  if (comparison.length) {
+    h += '<div style="padding:4px 8px;font-size:11px;color:#15565B"><strong>Comparison</strong>'
+      + ' &middot; select up to two teams</div>';
+    h += '<div style="overflow:auto;margin:0 8px"><table class="eval-table"><tr><th>Team</th>'
+      + '<th>Champion</th><th>Final</th><th>SF</th><th>QF</th><th>Top 8</th><th>Playoff</th></tr>';
+    comparison.forEach(function(o) {
+      h += '<tr><td>' + _esc(o.team) + '</td><td class="num">' + _simPct(o.champion_prob)
+        + '</td><td class="num">' + _simPct(o.final_prob) + '</td><td class="num">'
+        + _simPct(o.sf_prob) + '</td><td class="num">' + _simPct(o.qf_prob)
+        + '</td><td class="num">' + _simPct(o.top_8_prob) + '</td><td class="num">'
+        + _simPct(o.playoff_prob) + '</td></tr>';
+    });
+    h += '</table></div>';
+  }
   return h;
 }
 
@@ -406,6 +463,7 @@ async function renderOverview() {
 
   tab.innerHTML = html;
   bindSimulationControls();
+  bindSimulationProjection();
   const seasonSelect = document.getElementById("uclSeasonSelect");
   if (seasonSelect) seasonSelect.addEventListener("change", function() {
     // Delegate the whole switch to the atomic transition: the /season POST,
@@ -529,6 +587,7 @@ function _applySimulationPayload(sim, fallbackRuns) {
   // Canonical bracket-shaped projection payload (stages keyed like /api/bracket).
   appState.simBracket = sim.bracket || null;
   appState.simChampion = sim.champion || null;
+  _uclSimCompareTeams = [];
 }
 
 async function startUclSimulation() {

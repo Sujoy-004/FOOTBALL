@@ -189,6 +189,13 @@ class TestSharedContractStates:
             assert meta["status"] == "completed"
             assert meta["seed"] == 4242
             assert meta["provenance"]["real_results_preserved"] is True
+            assert sim["odds"]
+            for row in sim["odds"]:
+                for field in (
+                    "champion_prob", "final_prob", "sf_prob", "qf_prob",
+                    "top_8_prob", "playoff_prob",
+                ):
+                    assert 0.0 <= row[field] <= 1.0
             # Terminal tasks are cleaned up unconditionally.
             again = client.get(f"/api/simulation/progress/{task_id}").json()
             assert again["status"] == "not_found"
@@ -239,6 +246,11 @@ class TestFrontendTruthWiring:
             assert "/simulate" in js                 # controls now exist
             assert "Run Simulation" in js
             assert "SIMULATION" in js                # provenance banner
+            assert "Aggregate probabilities:" in js
+            assert "Sampled bracket below:" in js
+            for field in ("final_prob", "sf_prob", "qf_prob", "top_8_prob", "playoff_prob"):
+                assert field in js
+            assert "sim-team-toggle" in js
             assert "not needed" in js.lower() or "not_needed" in js
             assert "|| 0.33" not in js and "|| 0.5" not in js
             shared = self._served(client, "shared.js")

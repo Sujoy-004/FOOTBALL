@@ -97,6 +97,7 @@ from football_core.fetcher import (
     count_finished,
     fold_pair_key,
     new_ingestion_stats,
+    note_missing_score,
     note_no_target,
     note_unmatchable,
     summarize_ingestion,
@@ -803,14 +804,37 @@ def ingest_ucl_events(
     # "ingested".
     prepared: list[dict] = []
     for event in events or []:
+        status = str(event.get("status") or "").lower()
+        if status != "finished":
+            logger.info(
+                "FIXTURE INGESTION SKIP reason=non_finished_legacy status=%s "
+                "event_id=%s: %r vs %r",
+                status or "unknown", event.get("match_id") or "unknown",
+                event.get("home_team"), event.get("away_team"),
+            )
+            continue
+
         count_finished(stats)
         stats["normalized"] += 1
         home = (event.get("home_team") or "").strip()
         away = (event.get("away_team") or "").strip()
         stage = event.get("stage") or ""
+        if event.get("home_score") is None or event.get("away_score") is None:
+            note_missing_score(
+                stats, logger, home, away,
+                season=LOCAL_HISTORICAL_SEASON,
+                event_id=str(event.get("match_id") or "unknown"),
+                status=status,
+                score=(event.get("home_score"), event.get("away_score")),
+            )
+            continue
         if not home or not away:
-            note_unmatchable(stats, logger, event.get("home_team"), event.get("away_team"),
-                             (event.get("home_score"), event.get("away_score")))
+            note_unmatchable(
+                stats, logger, event.get("home_team"), event.get("away_team"),
+                (event.get("home_score"), event.get("away_score")),
+                season=LOCAL_HISTORICAL_SEASON,
+                event_id=str(event.get("match_id") or "unknown"), status=status,
+            )
             continue
         if stage != "LEAGUE_STAGE" and stage not in KO_STAGE_MAP:
             stats["skipped_no_target"] += 1
@@ -834,10 +858,15 @@ def ingest_ucl_events(
         had_league_events = True
         match_id = fixture_lookup.get((ev["home_team"], ev["away_team"]))
         if match_id is None:
-            note_no_target(stats, logger, ev["home_team"], ev["away_team"])
+            note_no_target(
+                stats, logger, ev["home_team"], ev["away_team"],
+                season=LOCAL_HISTORICAL_SEASON,
+                event_id=str(ev.get("match_id") or "unknown"),
+                status="finished",
+            )
             continue
-        home_score = int(ev.get("home_score") or 0)
-        away_score = int(ev.get("away_score") or 0)
+        home_score = int(ev["home_score"])
+        away_score = int(ev["away_score"])
         if match_id in by_id:
             entry = by_id[match_id]
             if entry.get("home_score") != home_score or entry.get("away_score") != away_score:
@@ -876,8 +905,8 @@ def ingest_ucl_events(
         pair = frozenset((ev["home_team"], ev["away_team"]))
         payload = {
             "home": ev["home_team"], "away": ev["away_team"],
-            "home_score": int(ev.get("home_score") or 0),
-            "away_score": int(ev.get("away_score") or 0),
+            "home_score": int(ev["home_score"]),
+            "away_score": int(ev["away_score"]),
         }
         for field_name in EVENT_PASSTHROUGH_FIELDS:
             if field_name in ev:
@@ -1167,8 +1196,25 @@ def _upsert_season_fixtures(
                 "stage": ev.get("stage", "LEAGUE_STAGE"),
                 "status": ev.get("status", "scheduled"),
             }
+            # Authoritative matchday rule: an established official_matchday is
+            # never overwritten. A provider round_number only populates the
+            # field when it is still null; on conflict the existing value is
+            # preserved and a diagnostic is emitted.
             if "official_matchday" in ev:
-                mutable["official_matchday"] = ev["official_matchday"]
+                existing_md = existing_fx.get("official_matchday")
+                incoming_md = ev["official_matchday"]
+                if existing_md is None:
+                    mutable["official_matchday"] = incoming_md
+                elif (
+                    incoming_md is not None
+                    and incoming_md != existing_md
+                    and ev.get("_matchday_source") == "round_number"
+                ):
+                    logger.warning(
+                        "FIXTURE MATCHDAY CONFLICT PRESERVED reason=authoritative_official_matchday "
+                        "fixture=%s existing_official_matchday=%s incoming_round_number=%s",
+                        fid, existing_md, incoming_md,
+                    )
             for k, v in mutable.items():
                 if existing_fx.get(k) != v:
                     existing_fx[k] = v
@@ -1213,7 +1259,8 @@ def _upsert_season_results(
 ) -> tuple[int, int, int]:
     """Append finished events into season's results.json, attaching to known fixtures.
 
-    Returns (results_added, results_updated, skipped_no_target).
+    Returns (results_added, results_updated, skipped_no_target,
+    skipped_missing_score).
     """
     sd = season_dir(data_dir, season)
     sd.mkdir(parents=True, exist_ok=True)
@@ -1238,11 +1285,22 @@ def _upsert_season_results(
     results_added = 0
     results_updated = 0
     skipped_no_target = 0
+    skipped_missing_score = 0
 
     for ev in finished_events:
         home = ev.get("home_team", "").strip()
         away = ev.get("away_team", "").strip()
         if not home or not away:
+            continue
+
+        if ev.get("home_score") is None or ev.get("away_score") is None:
+            skipped_missing_score += 1
+            logger.warning(
+                "RESULT INGESTION SKIP reason=missing_score season=%s event_id=%s "
+                "status=finished: %r vs %r score=%s",
+                season, ev.get("match_id") or "unknown", home, away,
+                (ev.get("home_score"), ev.get("away_score")),
+            )
             continue
 
         match_id = ev.get("match_id", "").strip()
@@ -1260,13 +1318,14 @@ def _upsert_season_results(
         if fid is None:
             skipped_no_target += 1
             logger.warning(
-                "[UCL] Season %s: finished event %s vs %s skipped_no_target (no fixture match)",
-                season, home, away
+                "RESULT INGESTION SKIP reason=no_active_season_target season=%s "
+                "event_id=%s status=finished: %s vs %s (no fixture match)",
+                season, ev.get("match_id") or "unknown", home, away,
             )
             continue
 
-        home_score = int(ev.get("home_score") or 0)
-        away_score = int(ev.get("away_score") or 0)
+        home_score = int(ev["home_score"])
+        away_score = int(ev["away_score"])
 
         entry = {
             "match_id": fid,
@@ -1289,7 +1348,7 @@ def _upsert_season_results(
 
     res_doc["matches"] = existing_matches
     _atomic_write_json_local(res_doc, res_path)
-    return results_added, results_updated, skipped_no_target
+    return results_added, results_updated, skipped_no_target, skipped_missing_score
 
 
 def ingest_ucl_events_multi_season(
@@ -1327,43 +1386,95 @@ def ingest_ucl_events_multi_season(
         # Partition into scheduled (status != finished) and finished
         scheduled: list[dict] = []
         finished: list[dict] = []
+        season_skipped_missing_score = 0
         for ev in season_events:
+            status = str(ev.get("status") or "").lower()
+            if status != "finished":
+                scheduled.append(ev)
+                continue
+
             count_finished(stats)
             stats["normalized"] += 1
-            if ev.get("status") == "finished":
-                finished.append(ev)
-            else:
-                scheduled.append(ev)
+            if ev.get("home_score") is None or ev.get("away_score") is None:
+                note_missing_score(
+                    stats, logger, ev.get("home_team", ""), ev.get("away_team", ""),
+                    season=season or LOCAL_HISTORICAL_SEASON,
+                    event_id=str(ev.get("match_id") or "unknown"),
+                    status=status,
+                    score=(ev.get("home_score"), ev.get("away_score")),
+                )
+                season_skipped_missing_score += 1
+                continue
+            finished.append(ev)
 
         if _is_historical_season(season):
             # Route to legacy ingest (EXACTLY current behavior)
             # We need to call the original ingest logic for the historical season
             from competitions.ucl.src.ingest import ingest_ucl_events as legacy_ingest
-            report = legacy_ingest(season_events, dp, provider_name)
+            report = legacy_ingest(finished, dp, provider_name)
             per_season_summary[LOCAL_HISTORICAL_SEASON] = {
                 "legacy": True,
                 "report": report.to_dict(),
                 "fixtures_count": 0,  # legacy uses root fixtures.json
                 "results_count": report.finished["ingested"],
                 "skipped_no_target": report.finished["skipped_no_target"],
+                "skipped_missing_score": report.finished.get("skipped_missing_score", 0),
             }
             written_files.extend(report.written_files)
         else:
             # New season: route to season store
             season_display = season or "unknown"
-            # Create fixtures from:
-            # - All scheduled/timed events (with or without match_id)
-            # - Finished events that have a provider match_id
-            # Finished events without match_id don't create fixtures;
-            # they can only attach via (home,away) pair matching.
-            fixture_source_events = [
-                ev for ev in season_events
-                if ev.get("status") != "finished" or ev.get("match_id")
-            ]
+            # Create/update fixtures from scheduled events. A complete draw
+            # catalog is authoritative, so provider activity outside its
+            # target pairs is ignored instead of growing a phantom catalog.
+            existing_fixture_doc = read_season_fixtures(dp, season_display)
+            existing_fixture_count = (
+                len(existing_fixture_doc.get("fixtures", []))
+                if isinstance(existing_fixture_doc, dict)
+                else 0
+            )
+            schedule = (
+                existing_fixture_doc.get("schedule", {})
+                if isinstance(existing_fixture_doc, dict)
+                else {}
+            )
+            expected_fixture_count = sum(
+                len(md) for md in schedule.get("matchdays", [])
+                if isinstance(md, list)
+            )
+            catalog_complete = bool(
+                expected_fixture_count and existing_fixture_count >= expected_fixture_count
+            )
+            fixture_source_events = list(scheduled)
+            if catalog_complete:
+                existing_ids = {
+                    str(fx.get("match_id")) for fx in existing_fixture_doc.get("fixtures", [])
+                    if isinstance(fx, dict) and fx.get("match_id")
+                }
+                existing_pairs = {
+                    fold_pair_key(fx.get("team_a", ""), fx.get("team_b", ""))
+                    for fx in existing_fixture_doc.get("fixtures", [])
+                    if isinstance(fx, dict)
+                }
+                fixture_source_events = []
+                for ev in [*scheduled, *finished]:
+                    pair = fold_pair_key(ev.get("home_team", ""), ev.get("away_team", ""))
+                    if str(ev.get("match_id") or "") in existing_ids or pair in existing_pairs:
+                        fixture_source_events.append(ev)
+                    else:
+                        logger.info(
+                            "FIXTURE INGESTION IGNORE reason=no_active_season_target "
+                            "season=%s event_id=%s status=%s: %s vs %s",
+                            season_display, ev.get("match_id") or "unknown",
+                            ev.get("status") or "scheduled", ev.get("home_team", ""),
+                            ev.get("away_team", ""),
+                        )
+            elif existing_fixture_count < expected_fixture_count or not expected_fixture_count:
+                fixture_source_events.extend(ev for ev in finished if ev.get("match_id"))
             fx_added, fx_updated, fx_total = _upsert_season_fixtures(
                 dp, season_display, fixture_source_events, provider_name
             )
-            res_added, res_updated, skipped = _upsert_season_results(
+            res_added, res_updated, skipped, skipped_missing_score = _upsert_season_results(
                 dp, season_display, finished, provider_name
             )
             total_skipped_no_target += skipped
@@ -1384,6 +1495,9 @@ def ingest_ucl_events_multi_season(
                 "results_added": res_added,
                 "results_updated": res_updated,
                 "skipped_no_target": skipped,
+                "skipped_missing_score": (
+                    skipped_missing_score + season_skipped_missing_score
+                ),
             }
 
     # Build combined report
@@ -1402,6 +1516,11 @@ def ingest_ucl_events_multi_season(
         "skipped_no_target": total_skipped_no_target
             + sum(s.get("report", {}).get("skipped_no_target", 0) if s.get("legacy") else 0
                   for s in per_season_summary.values()),
+        "skipped_missing_score": stats["skipped_missing_score"] + sum(
+            s.get("report", {}).get("finished", {}).get("skipped_missing_score", 0)
+            if s.get("legacy") else 0
+            for s in per_season_summary.values()
+        ),
     }
     combined_report.last_success_at = datetime.now(timezone.utc).isoformat()
     combined_report.written_files = written_files

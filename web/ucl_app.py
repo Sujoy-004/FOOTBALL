@@ -552,7 +552,8 @@ def api_set_season(req: dict = None):
     if not valid:
         return JSONResponse({"error": "unknown season"}, status_code=404)
     basis = "pointer_local" if season == LOCAL_HISTORICAL_SEASON else "draw"
-    pointer = set_current_season(DATA_DIR, season, basis=basis, provider=(None if season == LOCAL_HISTORICAL_SEASON else "ucl.draw.2026_27"))
+    provider = None if season == LOCAL_HISTORICAL_SEASON else f"ucl.draw.{season.replace('/', '_')}"
+    pointer = set_current_season(DATA_DIR, season, basis=basis, provider=provider)
     global cache, sim_cache, _mode
     try:
         sim_cache = {}
@@ -648,7 +649,11 @@ def _simulation_bracket_state() -> dict | None:
 
 @ucl_app.get("/api/standings")
 def api_standings():
-    return JSONResponse({"standings": cache.get("standings", []), "mode": _mode})
+    return JSONResponse({
+        "standings": cache.get("standings", []),
+        "mode": _mode,
+        "season": _active_season_token(),
+    })
 
 
 @ucl_app.get("/api/bracket")
@@ -668,6 +673,7 @@ def api_odds():
     return JSONResponse({
         "odds": cache.get("odds", []),
         "mode": _mode,
+        "season": _active_season_token(),
         # Results mode serves deterministic achieved-outcome indicators
         # (1.0/0.0), NOT model probabilities. Simulation runs surface their
         # projections through /api/simulation with SIMULATED provenance.
@@ -679,7 +685,11 @@ def api_odds():
 
 @ucl_app.get("/api/signals")
 def api_signals():
-    return JSONResponse({"signals": cache.get("signals", {}), "mode": _mode})
+    return JSONResponse({
+        "signals": cache.get("signals", {}),
+        "mode": _mode,
+        "season": _active_season_token(),
+    })
 
 
 @ucl_app.post("/api/simulate")

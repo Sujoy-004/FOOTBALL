@@ -143,7 +143,8 @@
     "FC København"
   ],
   "AEK Athens": [
-    "AEK"
+    "AEK",
+    "PAE AEK"
   ],
   "Bayern Munich": [
     "Bayern",
@@ -180,7 +181,9 @@
     "PSV"
   ],
   "Real Betis": [
-    "Betis"
+    "Betis",
+    "Real Betis Balompié",
+    "Real Betis Balompie"
   ],
   "Shakhtar Donetsk": [
     "Shakhtar",
@@ -207,7 +210,8 @@
   ],
   "Lille": [
     "Lille",
-    "LOSC Lille"
+    "LOSC Lille",
+    "Lille OSC"
   ],
   "RB Leipzig": [
     "RB Leipzig"

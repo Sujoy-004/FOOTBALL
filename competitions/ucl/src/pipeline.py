@@ -34,7 +34,10 @@ logger = logging.getLogger(__name__)
 # ── 2 ─────────────────────────────────────────────────────────────────────
 
 
-def compute_deterministic_standings(results: list[dict]) -> list[dict]:
+def compute_deterministic_standings(
+    results: list[dict],
+    team_names: list[str] | None = None,
+) -> list[dict]:
     """Compute league standings from finished match results.
 
     Exchange 2 unification: delegates to the UCL brain's canonical
@@ -42,6 +45,10 @@ def compute_deterministic_standings(results: list[dict]) -> list[dict]:
     weaker parallel chain, so real-results and simulated tables are ordered
     by identical rules. Result-ledger rows are adapted into the swiss match
     shape with zero cards (no card data exists in the ledger).
+
+    When *team_names* is provided, every listed team appears in the output
+    even if it has no played results yet (early-season Swiss league phase
+    36-team display).
     """
     from competitions.ucl.src.groups import compute_swiss_standings
 
@@ -64,7 +71,7 @@ def compute_deterministic_standings(results: list[dict]) -> list[dict]:
             "yellow_cards_b": 0,
             "red_cards_b": 0,
         }
-    return compute_swiss_standings(matches)
+    return compute_swiss_standings(matches, team_names=team_names)
 
 
 # ── 3 ─────────────────────────────────────────────────────────────────────
@@ -366,6 +373,8 @@ def fetch_live_data(
         count_finished,
         fold_team_key,
         new_ingestion_stats,
+        note_fixture_unmatchable,
+        note_missing_score,
         note_unmatchable,
         normalize_team,
     )
@@ -488,6 +497,7 @@ def fetch_live_data(
     norm_stats = new_ingestion_stats()
     normalized_events: list[dict] = []
     n_unmatchable = 0
+    n_missing_score = 0
     for event in raw:
         status = (event.get("status") or "").lower()
         is_finished = status == "finished"
@@ -497,29 +507,30 @@ def fetch_live_data(
         home_score_raw = event.get("home_score")
         away_score_raw = event.get("away_score")
 
-        # Truth guard: a provider 'finished' event without score evidence is
-        # NOT a usable completed result. Refusing to fabricate a 0-0, so it is
-        # never counted as finished and never written to the results stores —
-        # it is surfaced loudly and skipped until scores exist. The
-        # finished_received == normalized == ingested + skipped_* invariant
-        # still holds because these events are never treated as finished.
-        if is_finished and (home_score_raw is None or away_score_raw is None):
-            logger.warning(
-                "FINISHED EVENT WITHOUT SCORES (%r vs %r) REFUSED — "
-                "cannot fabricate a result; re-ingest when scores exist",
-                home_name, away_name,
-            )
-            continue
-
-        if is_finished:
-            count_finished(norm_stats)
-        norm_stats["normalized"] += 1
-
         # Exchange 5: preserve season identity for multi-season routing.
         # Events without provider season info default to the local historical
         # season — BSD and other non-FDO providers never emit season.
         season_raw = event.get("season", "")
         ev_season = season_raw if season_raw else LOCAL_HISTORICAL_SEASON
+
+        # Truth guard: a provider 'finished' event without score evidence is
+        # NOT a usable completed result. Refuse to fabricate a 0-0, and retain
+        # the reason in the finished report for diagnostics.
+        if is_finished and (home_score_raw is None or away_score_raw is None):
+            count_finished(norm_stats)
+            norm_stats["normalized"] += 1
+            note_missing_score(
+                norm_stats, logger, home_name, away_name,
+                season=ev_season, event_id=str(event.get("match_id") or "unknown"),
+                status=status, score=(home_score_raw, away_score_raw),
+            )
+            n_missing_score += 1
+            continue
+
+        if is_finished:
+            count_finished(norm_stats)
+            norm_stats["normalized"] += 1
+
         # Active-season events normalize against the SEASON-SCOPED lookup
         # (canonical draw identity, no root clobber); historical/season-less
         # events keep the legacy root+alias lookup byte-for-byte.
@@ -529,20 +540,44 @@ def fetch_live_data(
         away_norm = normalize_team(away_name, event_lookup)
 
         if home_norm is None or away_norm is None:
-            note_unmatchable(norm_stats, logger, home_name, away_name,
-                             (home_score_raw, away_score_raw))
-            n_unmatchable += 1
+            event_id = str(event.get("match_id") or "unknown")
+            if is_finished:
+                note_unmatchable(
+                    norm_stats, logger, home_name, away_name,
+                    (home_score_raw, away_score_raw), season=ev_season,
+                    event_id=event_id, status=status,
+                )
+                n_unmatchable += 1
+            else:
+                note_fixture_unmatchable(
+                    logger, home_name, away_name, season=ev_season,
+                    event_id=event_id, status=status,
+                )
             continue
 
         ev = {
             "home_team": home_norm,
             "away_team": away_norm,
-            "home_score": home_score_raw or 0,
-            "away_score": away_score_raw or 0,
+            "home_score": home_score_raw,
+            "away_score": away_score_raw,
             "status": "finished" if is_finished else (event.get("status") or "scheduled"),
             "stage": event.get("stage", ""),
         }
         ev["season"] = ev_season
+        # Preserve provider round metadata for active-season fixtures. The
+        # season draw remains provisional until this source supplies a value.
+        # Authoritative rule: an established fixture official_matchday is
+        # authoritative; a provider round_number only populates it when null.
+        # We forward the raw source field so the fixture write site can detect
+        # and report a round-vs-official conflict instead of silently
+        # overwriting an established matchday.
+        if ev_season != LOCAL_HISTORICAL_SEASON:
+            if event.get("official_matchday") is not None:
+                ev["official_matchday"] = event["official_matchday"]
+                ev["_matchday_source"] = "official_matchday"
+            elif event.get("round_number") is not None:
+                ev["official_matchday"] = event["round_number"]
+                ev["_matchday_source"] = "round_number"
         # Preserve provider match_id for stable fixture identity.
         match_id = event.get("match_id", "")
         if match_id:
@@ -578,10 +613,17 @@ def fetch_live_data(
 
     # Fold normalization-side skips back in so the global invariant holds.
     merged_finished = dict(report.finished)
-    merged_finished["received"] = merged_finished.get("received", 0) + n_unmatchable
-    merged_finished["normalized"] = merged_finished.get("normalized", 0) + n_unmatchable
+    merged_finished["received"] = (
+        merged_finished.get("received", 0) + n_unmatchable + n_missing_score
+    )
+    merged_finished["normalized"] = (
+        merged_finished.get("normalized", 0) + n_unmatchable + n_missing_score
+    )
     merged_finished["skipped_unmatchable"] = (
         merged_finished.get("skipped_unmatchable", 0) + n_unmatchable
+    )
+    merged_finished["skipped_missing_score"] = (
+        merged_finished.get("skipped_missing_score", 0) + n_missing_score
     )
     report.finished = merged_finished
 
@@ -710,8 +752,47 @@ def load_knockout_results(data_dir: str | Path) -> dict | None:
 # ── 8 ─────────────────────────────────────────────────────────────────────
 
 
-def build_league_matchdays(results: list[dict]) -> dict[str, list[dict]]:
-    """Group results by matchday prefix.
+def build_matchday_map(data_dir: str | Path) -> dict[str, int]:
+    """Read authoritative matchday metadata keyed by fixture id.
+
+    Draw-derived seasons store ``simulation_matchday`` on fixture rows until
+    an official matchday is published.  Historical stores may not have flat
+    fixture rows, so callers can fall back to their legacy match-id grouping.
+    """
+    path = Path(data_dir) / "fixtures.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+
+    rows = payload.get("fixtures") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return {}
+
+    matchday_map: dict[str, int] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        match_id = row.get("match_id")
+        if not isinstance(match_id, str) or not match_id:
+            continue
+        matchday = row.get("official_matchday")
+        if matchday is None:
+            matchday = row.get("simulation_matchday")
+        try:
+            matchday = int(matchday)
+        except (TypeError, ValueError):
+            continue
+        if matchday >= 1:
+            matchday_map[match_id] = matchday
+    return matchday_map
+
+
+def build_league_matchdays(
+    results: list[dict],
+    matchday_map: dict[str, int] | None = None,
+) -> dict[str, list[dict]]:
+    """Group results by authoritative matchday, with legacy fallback.
 
     Each row gains explicit canonical state fields (Exchange 2 truth
     contract): ``status`` ("played" — rows come from the results ledger),
@@ -721,13 +802,16 @@ def build_league_matchdays(results: list[dict]) -> dict[str, list[dict]]:
 
     mds: dict[str, list[dict]] = defaultdict(list)
     for m in results:
-        prefix = m.get("match_id", "").split("_")[0]
+        match_id = m.get("match_id", "")
+        prefix = match_id.split("_")[0]
+        matchday = matchday_map.get(match_id) if matchday_map else None
+        key = f"MD{matchday:02d}" if isinstance(matchday, int) and matchday >= 1 else prefix
         row = dict(m)
         cm = canonical_from_result_entry(m, "ucl")
         row.setdefault("winner", cm.winner)
         row["status"] = cm.status.value
         row["provenance"] = "official"
-        mds[prefix].append(row)
+        mds[key].append(row)
     return dict(sorted(mds.items()))
 
 
