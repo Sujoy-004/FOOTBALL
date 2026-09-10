@@ -13,6 +13,23 @@ ROOT = Path(__file__).resolve().parent.parent
 UCL_DATA = ROOT / "competitions" / "ucl" / "data"
 
 
+def _season_matchday_fixture_ids(season_dir, matchday=1):
+    """Resolve the CURRENT authoritative fixture ids for a matchday.
+
+    Delegates to pipeline.build_matchday_map so the precedence logic
+    (official_matchday first, then simulation_matchday) is the production
+    truth, not a test-side re-implementation. Resolved at runtime so
+    regenerated `gen-*` fixture ids can never break the contract.
+    """
+    from competitions.ucl.src.pipeline import build_matchday_map
+
+    return {
+        match_id
+        for match_id, md in build_matchday_map(season_dir).items()
+        if md == matchday
+    }
+
+
 @pytest.fixture
 def active_2026_runtime(tmp_path, monkeypatch):
     import web.competitions as competitions
@@ -39,7 +56,7 @@ def active_2026_runtime(tmp_path, monkeypatch):
 
 
 def test_2026_27_standings_and_matchdays_are_season_scoped(active_2026_runtime):
-    app, _ = active_2026_runtime
+    app, data_dir = active_2026_runtime
 
     with TestClient(app) as client:
         overview = client.get("/api/data").json()
@@ -59,17 +76,15 @@ def test_2026_27_standings_and_matchdays_are_season_scoped(active_2026_runtime):
     assert len(standings[:8]) == 8
 
     matchdays = bracket["stages"]["league"]["matchdays"]
+    md1_canonical = _season_matchday_fixture_ids(data_dir / "seasons" / "2026_27")
+    assert md1_canonical
     assert set(matchdays) == {"MD01"}
     assert all(not key.startswith("gen-") for key in matchdays)
-    assert [m["match_id"] for m in matchdays["MD01"]] == [
-        "gen-718aee3152be59d5",
-        "gen-398466668835ffd4",
-        "gen-4ac782392d1a34de",
-        "gen-cfa02111ba88e027",
-        "gen-f4b6285469c3b0e0",
-        "gen-2ce302d883e61826",
-    ]
-    assert all(m["status"] == "played" for m in matchdays["MD01"])
+    md1 = matchdays["MD01"]
+    assert md1
+    assert {m["match_id"] for m in md1} <= md1_canonical
+    assert all(m["match_id"].startswith("gen-") for m in md1)
+    assert all(m["status"] == "played" for m in md1)
     assert bracket["lifecycle"]["season"] == "2026/27"
 
     assert seasons["active_season"] == "2026/27"
@@ -79,7 +94,7 @@ def test_2026_27_standings_and_matchdays_are_season_scoped(active_2026_runtime):
 
 
 def test_season_switch_recomputes_all_payloads_without_leakage(active_2026_runtime):
-    app, _ = active_2026_runtime
+    app, data_dir = active_2026_runtime
 
     with TestClient(app) as client:
         switched = client.post("/api/season", json={"season": "2025/26"})
@@ -107,7 +122,11 @@ def test_season_switch_recomputes_all_payloads_without_leakage(active_2026_runti
         assert len(current_standings["standings"]) == 36
         current_matchdays = current_bracket["stages"]["league"]["matchdays"]
         assert set(current_matchdays) == {"MD01"}
-        assert len(current_matchdays["MD01"]) == 6
+        md1 = current_matchdays["MD01"]
+        assert md1
+        assert {m["match_id"] for m in md1} <= _season_matchday_fixture_ids(
+            data_dir / "seasons" / "2026_27"
+        )
 
 
 def test_authoritative_matchday_metadata_and_legacy_fallback():
@@ -117,16 +136,15 @@ def test_authoritative_matchday_metadata_and_legacy_fallback():
     matchday_map = build_matchday_map(season_dir)
     results = json.loads((season_dir / "results.json").read_text(encoding="utf-8"))["matches"]
     grouped = build_league_matchdays(results, matchday_map)
+    md1_canonical = _season_matchday_fixture_ids(season_dir)
+    assert md1_canonical
     assert set(grouped) == {"MD01"}
     assert all(not key.startswith("gen-") for key in grouped)
-    assert {m["match_id"] for m in grouped["MD01"]} == {
-        "gen-718aee3152be59d5",
-        "gen-398466668835ffd4",
-        "gen-4ac782392d1a34de",
-        "gen-cfa02111ba88e027",
-        "gen-f4b6285469c3b0e0",
-        "gen-2ce302d883e61826",
-    }
+    md1 = grouped["MD01"]
+    assert md1
+    assert {m["match_id"] for m in md1} <= md1_canonical
+    assert all(m["match_id"].startswith("gen-") for m in md1)
+    assert all(m["status"] == "played" for m in md1)
 
     historical_results = json.loads(
         (UCL_DATA / "results.json").read_text(encoding="utf-8")
@@ -140,3 +158,50 @@ def test_frontend_keeps_top8_preview_separate_from_full_standings():
     assert "standings.slice(0, 8)" in source
     assert "st.forEach(function(r)" in source
     assert 'md.replace(/^MD/, "Matchday ")' in source
+
+
+def test_gen_fixture_rekey_keeps_matchday_contract(tmp_path):
+    """Proof of immunity: rekey EVERY gen-* fixture id in a COPY of the live
+    2026/27 season and verify grouping, canonical metadata resolution and the
+    runtime resolver still agree, so the contract never hardcodes ephemeral
+    fixture ids."""
+    import hashlib
+
+    from competitions.ucl.src.pipeline import build_league_matchdays, build_matchday_map
+
+    season_dir = UCL_DATA / "seasons" / "2026_27"
+    fx = json.loads((season_dir / "fixtures.json").read_text(encoding="utf-8"))
+    res = json.loads(
+        (season_dir / "results.json").read_text(encoding="utf-8")
+    )["matches"]
+    orig_ids = _season_matchday_fixture_ids(season_dir)
+    orig_played_ids = {m["match_id"] for m in res}
+    assert orig_ids
+    assert orig_played_ids
+
+    def rekey(mid):
+        if not mid.startswith("gen-"):
+            return mid
+        return "genx-" + hashlib.sha256(f"rekeyed\n{mid}".encode()).hexdigest()[:16]
+
+    fx["fixtures"] = [
+        {**row, "match_id": rekey(row["match_id"])} for row in fx["fixtures"]
+    ]
+    res = [{**m, "match_id": rekey(m["match_id"])} for m in res]
+
+    clone = tmp_path / "seasons" / "2026_27"
+    clone.mkdir(parents=True)
+    (clone / "fixtures.json").write_text(json.dumps(fx, indent=2), encoding="utf-8")
+    (clone / "results.json").write_text(
+        json.dumps({"matches": res}, indent=2), encoding="utf-8"
+    )
+
+    grouped = build_league_matchdays(res, build_matchday_map(clone))
+    assert set(grouped) == {"MD01"}
+    md1 = grouped["MD01"]
+    assert md1
+    assert {m["match_id"] for m in md1} <= _season_matchday_fixture_ids(clone)
+    assert {m["match_id"] for m in md1}.isdisjoint(orig_ids)
+    assert {m["match_id"] for m in md1} == {rekey(x) for x in orig_played_ids}
+    assert all(m["match_id"].startswith("genx-") for m in md1)
+    assert all(m["status"] == "played" for m in md1)

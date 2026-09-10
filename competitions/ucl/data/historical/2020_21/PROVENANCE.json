@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "season": "2020/21",
+  "storage_deviation": "stored under data/historical instead of the approved data/seasons path because that path is the gitignored runtime season store",
+  "generated_at": "2026-09-10T18:28:21.635051+00:00",
+  "checks": {
+    "season": "2020_21",
+    "n_matches": 125,
+    "duplicate_match_ids": [],
+    "n_teams": 32,
+    "elo_missing_teams": [
+      "Dynamo Kyiv",
+      "Ferencvaros",
+      "Shakhtar Donetsk"
+    ],
+    "n_odds": 123,
+    "min_date": "2020-10-20T18:55:00Z",
+    "max_date": "2021-05-29T21:00:00Z"
+  },
+  "files": {
+    "matches": "89740be4ba8b4debac5f8117d262d3b499fbe320d732552f8e64ef3a9fa7dd54",
+    "elo_ratings": "f330fe953a9bd31614f590dbc3c0f643d6f1db562374a0dba480e33c9257d00e"
+  },
+  "sources": {
+    "results": {
+      "name": "openfootball/champions-league",
+      "url": "https://raw.githubusercontent.com/openfootball/champions-league/master/2020-21/cl.txt",
+      "license": "CC0-1.0 (public domain)"
+    },
+    "odds": {
+      "name": "v-eatpizzanot/soccer-dataset odds.parquet",
+      "url": "https://huggingface.co/datasets/eatpizzanot/soccer-dataset/resolve/main/odds.parquet",
+      "license": "CC-BY-4.0 (compiled from API-Football closing odds)",
+      "note": "1X2 closing market; bookmaker preference Pinnacle first"
+    },
+    "elo": {
+      "name": "xgabora/Club-Football-Match-Data EloRatings.csv",
+      "url": "https://raw.githubusercontent.com/xgabora/Club-Football-Match-Data/master/data/EloRatings.csv",
+      "license": "MIT (ClubElo archive snapshots)",
+      "deviation": "live api.clubelo.com unreachable from this environment; using MIT-licensed ClubElo snapshot mirror strictly before each season's first match (pre-match, no leakage)"
+    },
+    "team_keys": {
+      "canonical": "data/team_aliases.json keys; long-form aliases used by the 2026/27 production fixtures preferred where present",
+      "extras": "teams absent from 2026/27 (e.g. Red Star Belgrade, Dinamo Zagreb) get stable new keys via backfill/team_map.py"
+    }
+  }
+}

@@ -116,6 +116,15 @@ def build_report(
     # ── Validation section ──
     report["validation"] = result.validation
 
+    # ── Evaluation gate section ──
+    report["evaluation"] = result.evaluation
+    eval_status = None
+    if result.evaluation and isinstance(result.evaluation, dict):
+        _v = result.evaluation.get("verdict")
+        if isinstance(_v, dict):
+            eval_status = _v.get("status")
+    report["evaluation_status"] = eval_status
+
     # ── Counterfactuals section ──
     if counterfactual_results:
         cf_list = []

@@ -292,6 +292,16 @@ def run_validation_suite(
     else:
         raise ValueError(f"Unknown tier '{tier}'")
 
+    # ── Attach match-level evaluation gate ──
+    from competitions.ucl.src.gate import evaluate_matches, load_gate_inputs, verdict_status
+    try:
+        eval_matches, eval_squad = load_gate_inputs()
+        evaluation = evaluate_matches(eval_matches, squad_values=eval_squad)
+        report["evaluation"] = evaluation
+        report["evaluation_status"] = verdict_status(evaluation)
+    except Exception:
+        logger.warning("Gate evaluation failed — report will lack evaluation data", exc_info=True)
+
     return report
 
 

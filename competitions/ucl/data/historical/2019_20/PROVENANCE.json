@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "season": "2019/20",
+  "storage_deviation": "stored under data/historical instead of the approved data/seasons path because that path is the gitignored runtime season store",
+  "generated_at": "2026-09-10T18:28:21.548733+00:00",
+  "checks": {
+    "season": "2019_20",
+    "n_matches": 119,
+    "duplicate_match_ids": [],
+    "n_teams": 32,
+    "elo_missing_teams": [
+      "Dinamo Zagreb",
+      "Red Star Belgrade",
+      "Shakhtar Donetsk",
+      "Slavia Prague"
+    ],
+    "n_odds": 0,
+    "min_date": "2019-09-17T18:55:00Z",
+    "max_date": "2020-08-23T21:00:00Z"
+  },
+  "files": {
+    "matches": "02edd722e764de0e4d4770250a77d117e391a50cfa7cf436073cf8a03b3c27f8",
+    "elo_ratings": "7828631df78c0fc7493a19ed4d5a5e59a15ea148863fd64630eb8427995cee7a"
+  },
+  "sources": {
+    "results": {
+      "name": "openfootball/champions-league",
+      "url": "https://raw.githubusercontent.com/openfootball/champions-league/master/2019-20/cl.txt",
+      "license": "CC0-1.0 (public domain)"
+    },
+    "odds": {
+      "name": "v-eatpizzanot/soccer-dataset odds.parquet",
+      "url": "https://huggingface.co/datasets/eatpizzanot/soccer-dataset/resolve/main/odds.parquet",
+      "license": "CC-BY-4.0 (compiled from API-Football closing odds)",
+      "note": "1X2 closing market; bookmaker preference Pinnacle first"
+    },
+    "elo": {
+      "name": "xgabora/Club-Football-Match-Data EloRatings.csv",
+      "url": "https://raw.githubusercontent.com/xgabora/Club-Football-Match-Data/master/data/EloRatings.csv",
+      "license": "MIT (ClubElo archive snapshots)",
+      "deviation": "live api.clubelo.com unreachable from this environment; using MIT-licensed ClubElo snapshot mirror strictly before each season's first match (pre-match, no leakage)"
+    },
+    "team_keys": {
+      "canonical": "data/team_aliases.json keys; long-form aliases used by the 2026/27 production fixtures preferred where present",
+      "extras": "teams absent from 2026/27 (e.g. Red Star Belgrade, Dinamo Zagreb) get stable new keys via backfill/team_map.py"
+    }
+  }
+}

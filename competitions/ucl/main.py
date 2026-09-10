@@ -167,6 +167,21 @@ def main(argv: list[str] | None = None) -> int:
     print("=" * 56)
     print()
 
+    # ── Evaluation gate warning ───────────────────────────────────────────
+    from competitions.ucl.src.gate import load_gate_inputs, evaluate_matches, verdict_status
+    try:
+        eval_matches, eval_squad = load_gate_inputs()
+        evaluation = evaluate_matches(eval_matches, squad_values=eval_squad)
+        if verdict_status(evaluation) != "PASS":
+            print(
+                "WARN: Champion probabilities UNVERIFIED — "
+                "match-level evaluation gate not passed; "
+                "treat outputs as unvalidated.",
+                file=sys.stderr,
+            )
+    except Exception:
+        pass
+
     # ── Per-season breakdown ─────────────────────────────────────────────
     if per_season:
         print("  Per-season ingest:")

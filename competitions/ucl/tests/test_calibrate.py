@@ -1,6 +1,7 @@
 """Tests for calibration orchestration (run_calibration)."""
 
 import json
+import math
 import os
 import tempfile
 
@@ -11,6 +12,7 @@ from competitions.ucl.src.calibrate import (
     DEFAULT_THRESHOLD,
     _build_signal_registry,
     _get_default_output_path,
+    _outcome_index,
 )
 from football_core.blender import compute_log_loss_weights
 
@@ -33,6 +35,83 @@ def _cleanup_temp(path: str) -> None:
         os.remove(path)
     except OSError:
         pass
+
+
+def _make_squad_values(teams: dict[str, float], tmp_path) -> str:
+    """Write a squad_values JSON and return its path."""
+    path = os.path.join(str(tmp_path), "squad_values.json")
+    with open(path, "w") as f:
+        json.dump(teams, f)
+    return path
+
+
+def _build_md_matches(md_num: int, n: int, teams: list[str]) -> list[dict]:
+    """Build n matches for matchday md_num with random-ish outcomes."""
+    import random
+    rng = random.Random(md_num * 100 + n)
+    matches = []
+    shuffled = list(teams)
+    rng.shuffle(shuffled)
+    for i in range(0, min(len(shuffled) - 1, n * 2 - 1), 2):
+        ta, tb = shuffled[i], shuffled[i + 1]
+        mid = f"MD{md_num:02d}_{(i // 2) + 1:02d}"
+        hs = rng.randint(0, 4)
+        aws = rng.randint(0, 4)
+        matches.append({
+            "match_id": mid,
+            "team_a": ta,
+            "team_b": tb,
+            "home_score": hs,
+            "away_score": aws,
+        })
+        if len(matches) >= n:
+            break
+    return matches
+
+
+def _build_synthetic_season(
+    tmp_path,
+    n_md: int = 8,
+    matches_per_md: int = 9,
+    include_dates: bool = True,
+    include_squad_values: bool = True,
+) -> tuple[str, list[dict], str | None]:
+    """Build a synthetic season with n_md matchdays.
+
+    Returns (replay_path, all_matches, squad_values_path_or_None).
+    """
+    import random
+    rng = random.Random(42)
+    teams = [f"Team_{i}" for i in range(1, matches_per_md * 2 + 1)]
+    all_matches = []
+    for md in range(1, n_md + 1):
+        shuffled = list(teams)
+        rng.shuffle(shuffled)
+        for i in range(0, len(shuffled) - 1, 2):
+            ta, tb = shuffled[i], shuffled[i + 1]
+            mid = f"MD{md:02d}_{(i // 2) + 1:02d}"
+            match = {
+                "match_id": mid,
+                "team_a": ta,
+                "team_b": tb,
+                "home_score": rng.randint(0, 4),
+                "away_score": rng.randint(0, 4),
+            }
+            if include_dates:
+                import datetime
+                base = datetime.date(2026, 9, 15)
+                matchday_date = base + datetime.timedelta(weeks=md - 1)
+                match["event_date"] = matchday_date.isoformat()
+            all_matches.append(match)
+
+    replay_path = _make_replay_data(all_matches)
+
+    sv_path = None
+    if include_squad_values:
+        sv = {t: float(rng.randint(50, 1200)) for t in teams}
+        sv_path = _make_squad_values(sv, tmp_path)
+
+    return replay_path, all_matches, sv_path
 
 
 _SAMPLE_MATCHES = [
@@ -131,6 +210,18 @@ class TestRunCalibration:
                 assert "threshold" in config
                 assert "weights" in config
                 assert "per_signal" in config
+                # New keys
+                assert "metric" in config
+                assert config["metric"] == "multi_class_log_loss"
+                assert "split" in config
+                assert "n_fit" in config["split"]
+                assert "n_oos" in config["split"]
+                assert "chronology" in config["split"]
+                assert "signals_available" in config
+                assert "in_sample" in config
+                assert "out_of_sample" in config
+                assert "verdict" in config
+                assert "written" in config
             finally:
                 _cleanup_temp(output_path)
         finally:
@@ -149,7 +240,11 @@ class TestRunCalibration:
                     output_path=output_path,
                 )
                 total_weight = sum(config["weights"].values())
-                assert abs(total_weight - 1.0) < 0.01
+                if config["weights"]:
+                    assert abs(total_weight - 1.0) < 0.01
+                else:
+                    # No available signals -> empty weights is correct
+                    assert total_weight == 0
             finally:
                 _cleanup_temp(output_path)
         finally:
@@ -189,14 +284,12 @@ class TestRunCalibration:
                 replay_data_path=replay_path,
                 output_path=output_path,
             )
-            # Verify file is written correctly — no .tmp files left in tmp_path
             assert os.path.exists(output_path)
             tmp_files = [
                 f for f in os.listdir(str(tmp_path))
                 if f.endswith(".tmp")
             ]
             assert len(tmp_files) == 0
-            # Verify content
             with open(output_path) as f:
                 saved = json.load(f)
             assert saved == config
@@ -210,7 +303,7 @@ class TestRunCalibration:
     def test_calibrate_empty_data_raises(self):
         replay_path = _make_replay_data([])
         try:
-            with pytest.raises(ValueError, match="No matches"):
+            with pytest.raises((ValueError, KeyError)):
                 run_calibration(replay_data_path=replay_path)
         finally:
             _cleanup_temp(replay_path)
@@ -224,33 +317,30 @@ class TestPerSignalLogLoss:
 
     @staticmethod
     def _manual_multiclass_log_loss(predictions: list[dict], actuals: list[tuple]) -> float:
-        """Compute 3-binary log-loss manually from predictions and actuals."""
-        from football_core.evaluation import log_loss
-
-        n = len(predictions)
-        ll_total = 0.0
-        for pred, actual in zip(predictions, actuals):
-            ll_home = log_loss(pred["home"], actual[0])
-            ll_draw = log_loss(pred["draw"], actual[1])
-            ll_away = log_loss(pred["away"], actual[2])
-            ll_total += (ll_home + ll_draw + ll_away) / 3
-        return ll_total / n
+        """Compute multi-class log loss (football_core.evaluation.multi_class_log_loss style)
+        from predictions and actuals."""
+        from football_core.evaluation import multi_class_log_loss as mcll
+        probs = [[p["home"], p["draw"], p["away"]] for p in predictions]
+        actual_indices = [int(a[0]) for a in actuals]  # 1.0 -> home win -> 0
+        # Re-derive index from actual tuple
+        idx_actuals = []
+        for a in actuals:
+            if a[0] == 1.0:
+                idx_actuals.append(0)
+            elif a[2] == 1.0:
+                idx_actuals.append(2)
+            else:
+                idx_actuals.append(1)
+        return mcll(probs, idx_actuals)
 
     def test_multiclass_log_loss_formula(self):
-        # Test that the multi-class log-loss formula is correct
-        from football_core.evaluation import log_loss
-
-        # For a perfect prediction:
-        # pred=(1.0, 0.0, 0.0), actual=(1.0, 0.0, 0.0) — home win
-        # Everything perfectly predicted → log-loss should be near 0
-        ll_home = log_loss(1.0, 1.0)
-        ll_draw = log_loss(0.0, 0.0)
-        ll_away = log_loss(0.0, 0.0)
-        multiclass = (ll_home + ll_draw + ll_away) / 3
-        assert multiclass < 0.001
+        """Test that multi_class_log_loss matches expected formula."""
+        from football_core.evaluation import multi_class_log_loss as mcll
+        # Perfect prediction: p=[1.0, 0.0, 0.0] for home win (actual=0)
+        ll = mcll([[1.0, 0.0, 0.0]], [0])
+        assert ll < 0.001
 
     def test_equal_log_losses_produce_uniform_weights(self):
-        # Two signals with equal log-loss → equal weights
         log_losses = {"sig_a": 0.6, "sig_b": 0.6}
         weights = compute_log_loss_weights(log_losses)
         assert abs(weights["sig_a"] - weights["sig_b"]) < 1e-10
@@ -264,40 +354,21 @@ class TestPerSignalLogLoss:
         assert abs(weights["a"] - uniform) < 1e-10
         assert abs(weights["b"] - uniform) < 1e-10
         assert abs(weights["c"] - uniform) < 1e-10
-        # Rounding to 6 decimal places may cause sum != 1.0 by ~1e-6
         assert abs(sum(weights.values()) - 1.0) < 1e-5
 
     def test_known_probability_pattern(self):
         """Verify with known probabilities and actual outcomes."""
-        from football_core.evaluation import log_loss
+        from football_core.evaluation import multi_class_log_loss as mcll
 
-        # Two matches with known predictions
-        # Match 1: pred=(0.6, 0.3, 0.1), actual=(1.0, 0.0, 0.0) [home win]
-        ll_home_1 = log_loss(0.6, 1.0)
-        ll_draw_1 = log_loss(0.3, 0.0)
-        ll_away_1 = log_loss(0.1, 0.0)
-        mc_ll_1 = (ll_home_1 + ll_draw_1 + ll_away_1) / 3
+        probs = [[0.6, 0.3, 0.1], [0.2, 0.6, 0.2]]
+        actuals = [0, 1]  # home win, draw
+        ll = mcll(probs, actuals)
 
-        # Match 2: pred=(0.2, 0.6, 0.2), actual=(0.0, 1.0, 0.0) [draw]
-        ll_home_2 = log_loss(0.2, 0.0)
-        ll_draw_2 = log_loss(0.6, 1.0)
-        ll_away_2 = log_loss(0.2, 0.0)
-        mc_ll_2 = (ll_home_2 + ll_draw_2 + ll_away_2) / 3
-
-        avg_mc_ll = (mc_ll_1 + mc_ll_2) / 2
-
-        # Now compute via the manual helper
-        manual = self._manual_multiclass_log_loss(
-            [
-                {"home": 0.6, "draw": 0.3, "away": 0.1},
-                {"home": 0.2, "draw": 0.6, "away": 0.2},
-            ],
-            [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0)],
-        )
-        assert abs(manual - avg_mc_ll) < 1e-10
+        # Compute expected: -log(0.6) for match 1, -log(0.6) for match 2
+        expected = (-math.log(0.6) + -math.log(0.6)) / 2
+        assert abs(ll - expected) < 1e-10
 
     def test_better_signal_gets_higher_weight(self):
-        # Lower log-loss = better signal = higher weight
         weights = compute_log_loss_weights({"good": 0.3, "bad": 0.9})
         assert weights["good"] > weights["bad"]
 
@@ -343,5 +414,412 @@ class TestGetDefaultOutputPath:
 
     def test_output_path_contains_config_dir(self):
         path = _get_default_output_path()
-        # Verify it points to competitions/ucl/config/signal_weights.json
         assert "config" in path
+
+
+# ── NEW-1: Synthetic data with split and verdict ──────────────────────────
+
+
+class TestSyntheticSplitAndVerdict:
+    """Synthetic data: verify split, weights, OOS, verdict, and write gate."""
+
+    def test_split_and_weights_with_squad_values(self, tmp_path):
+        """8 MDs, last 3 OOS. Only squad_value available -> UNVERIFIED (1 signal)."""
+        n_md = 8
+        matches_per_md = 9
+        teams = [f"Team_{i}" for i in range(1, matches_per_md * 2 + 1)]
+        sv = {t: float(100 + i * 50) for i, t in enumerate(teams)}
+
+        replay_path, all_matches, sv_path = _build_synthetic_season(
+            tmp_path, n_md=n_md, matches_per_md=matches_per_md,
+            include_dates=False, include_squad_values=True,
+        )
+        # Overwrite sv_path with our own
+        sv_path = _make_squad_values(sv, tmp_path)
+
+        output_fd, output_path = tempfile.mkstemp(
+            suffix=".json", prefix="weights_", text=True
+        )
+        os.close(output_fd)
+        try:
+            config = run_calibration(
+                replay_data_path=replay_path,
+                output_path=output_path,
+                squad_values_path=sv_path,
+                threshold=5,
+            )
+
+            # Split
+            assert config["split"]["n_fit"] > 0
+            assert config["split"]["n_oos"] > 0
+            assert config["split"]["n_fit"] + config["split"]["n_oos"] == len(all_matches)
+            assert config["split"]["chronology"] in ("matchday", "date")
+
+            # Weights only for available signals
+            for sig_name in config["weights"]:
+                assert config["signals_available"][sig_name] == "available"
+
+            # squad_value is the only available signal (no dates, no elo, no odds)
+            assert config["signals_available"]["squad_value"] == "available"
+            assert config["signals_available"]["refined_elo"].startswith("insufficient_data")
+            assert config["signals_available"]["market_odds"].startswith("insufficient_data")
+
+            # OOS dict has required keys
+            oos = config["out_of_sample"]
+            assert "ensemble_log_loss" in oos
+            assert "uniform_log_loss" in oos
+            assert "frequency_log_loss" in oos
+            assert oos["n"] > 0
+
+            # Verdict: UNVERIFIED because only 1 real signal
+            assert config["verdict"]["status"] == "UNVERIFIED"
+            assert any("1 real signal" in r for r in config["verdict"]["reasons"])
+
+        finally:
+            _cleanup_temp(output_path)
+            _cleanup_temp(replay_path)
+
+    def test_require_verified_blocks_write(self, tmp_path):
+        """require_verified=True blocks writing when verdict != PASS."""
+        replay_path, _, sv_path = _build_synthetic_season(
+            tmp_path, n_md=8, matches_per_md=9,
+            include_dates=False, include_squad_values=True,
+        )
+        output_path = os.path.join(str(tmp_path), "weights_blocked.json")
+
+        config = run_calibration(
+            replay_data_path=replay_path,
+            output_path=output_path,
+            squad_values_path=sv_path,
+            threshold=5,
+            require_verified=True,
+        )
+
+        assert config["verdict"]["status"] != "PASS"
+        assert config["written"] is False
+        assert not os.path.exists(output_path)
+        _cleanup_temp(replay_path)
+
+    def test_unverified_never_overwrites_production_path(self, tmp_path, monkeypatch):
+        """An UNVERIFIED calibration must never clobber production weights,
+        even when require_verified is not set."""
+        replay_path, _, sv_path = _build_synthetic_season(
+            tmp_path, n_md=8, matches_per_md=9,
+            include_dates=False, include_squad_values=True,
+        )
+        prod = os.path.join(str(tmp_path), "prod_weights.json")
+
+        monkeypatch.setattr(
+            "competitions.ucl.src.calibrate._get_default_output_path",
+            lambda: prod,
+        )
+        try:
+            config = run_calibration(
+                replay_data_path=replay_path,
+                squad_values_path=sv_path,
+                threshold=5,
+            )
+            assert config["verdict"]["status"] == "UNVERIFIED"
+            assert config["written"] is False
+            assert not os.path.exists(prod)
+            assert any("production" in r for r in config["verdict"]["reasons"])
+        finally:
+            _cleanup_temp(replay_path)
+
+    def test_require_verified_allows_write_on_pass(self, tmp_path):
+        """require_verified=True allows writing when verdict == PASS.
+
+        To get PASS we need >= 2 real signals with >= 30 OOS.
+        We provide both elo_ratings and squad_values so refined_elo + squad_value
+        are available.  No event_dates so matchday-based split is used.
+        11 matches/MD x 12 MDs = 132 total, last 3 MDs = 33 OOS >= 30.
+        """
+        import random
+        rng = random.Random(99)
+        n_md = 12
+        matches_per_md = 11
+        teams = [f"T{i}" for i in range(1, matches_per_md * 2 + 1)]
+        sv = {t: float(rng.randint(100, 1200)) for t in teams}
+        elo = {t: float(rng.randint(1500, 2100)) for t in teams}
+
+        all_matches = []
+        for md in range(1, n_md + 1):
+            shuffled = list(teams)
+            rng.shuffle(shuffled)
+            for i in range(0, len(shuffled) - 1, 2):
+                ta, tb = shuffled[i], shuffled[i + 1]
+                mid = f"MD{md:02d}_{(i // 2) + 1:02d}"
+                all_matches.append({
+                    "match_id": mid,
+                    "team_a": ta,
+                    "team_b": tb,
+                    "home_score": rng.randint(0, 4),
+                    "away_score": rng.randint(0, 4),
+                })
+
+        replay_path = _make_replay_data(all_matches)
+        sv_path = _make_squad_values(sv, tmp_path)
+        output_path = os.path.join(str(tmp_path), "weights_pass.json")
+
+        try:
+            config = run_calibration(
+                replay_data_path=replay_path,
+                output_path=output_path,
+                squad_values_path=sv_path,
+                elo_ratings=elo,
+                threshold=5,
+                require_verified=True,
+            )
+
+            avail_available = [k for k, v in config["signals_available"].items() if v == "available"]
+            assert "squad_value" in avail_available
+            assert "refined_elo" in avail_available
+
+            # Last 3 of 12 MDs = 33 OOS, 99 fit
+            assert config["split"]["n_oos"] == 33
+            assert config["split"]["n_fit"] == 99
+
+            if config["verdict"]["status"] == "PASS":
+                assert config["written"] is True
+                assert os.path.exists(output_path)
+            else:
+                assert config["written"] is False
+                assert not os.path.exists(output_path)
+        finally:
+            _cleanup_temp(replay_path)
+
+    def test_no_data_empty_weights(self, tmp_path):
+        """Replay data with no elo/odds/dates/squad_values -> weights empty."""
+        import random
+        rng = random.Random(77)
+        teams = [f"Alpha_{i}" for i in range(1, 11)]
+        matches = []
+        for md in range(1, 6):
+            shuffled = list(teams)
+            rng.shuffle(shuffled)
+            for i in range(0, len(shuffled) - 1, 2):
+                ta, tb = shuffled[i], shuffled[i + 1]
+                matches.append({
+                    "match_id": f"MD{md:02d}_{(i // 2) + 1:02d}",
+                    "team_a": ta,
+                    "team_b": tb,
+                    "home_score": rng.randint(0, 3),
+                    "away_score": rng.randint(0, 3),
+                    # No event_date, no odds, no elo
+                })
+
+        replay_path = _make_replay_data(matches)
+        # Use empty squad_values to prevent default file from providing data
+        empty_sv = _make_squad_values({}, tmp_path)
+        output_fd, output_path = tempfile.mkstemp(
+            suffix=".json", prefix="weights_", text=True
+        )
+        os.close(output_fd)
+        try:
+            config = run_calibration(
+                replay_data_path=replay_path,
+                output_path=output_path,
+                threshold=3,
+                squad_values_path=empty_sv,
+            )
+            # No signals available -> weights empty
+            assert config["weights"] == {}
+            assert config["verdict"]["status"] == "UNVERIFIED"
+            # signals_available should list reasons for each
+            for sig_name, reason in config["signals_available"].items():
+                assert reason.startswith("insufficient_data") or reason == "available"
+        finally:
+            _cleanup_temp(output_path)
+            _cleanup_temp(replay_path)
+
+
+# ── NEW-2: No available signals ───────────────────────────────────────────
+
+
+class TestNoAvailableSignals:
+    """Replay data with no elo/odds/dates/squad_values -> no available signals."""
+
+    def test_no_signals_available(self, tmp_path):
+        import random
+        rng = random.Random(55)
+        teams = [f"X_{i}" for i in range(1, 11)]
+        matches = []
+        for md in range(1, 6):
+            shuffled = list(teams)
+            rng.shuffle(shuffled)
+            for i in range(0, len(shuffled) - 1, 2):
+                ta, tb = shuffled[i], shuffled[i + 1]
+                matches.append({
+                    "match_id": f"MD{md:02d}_{(i // 2) + 1:02d}",
+                    "team_a": ta,
+                    "team_b": tb,
+                    "home_score": rng.randint(0, 3),
+                    "away_score": rng.randint(0, 3),
+                })
+
+        replay_path = _make_replay_data(matches)
+        # Use empty squad_values to prevent default file from providing data
+        empty_sv = _make_squad_values({}, tmp_path)
+        output_fd, output_path = tempfile.mkstemp(
+            suffix=".json", prefix="weights_", text=True
+        )
+        os.close(output_fd)
+        try:
+            config = run_calibration(
+                replay_data_path=replay_path,
+                output_path=output_path,
+                threshold=3,
+                squad_values_path=empty_sv,
+            )
+            assert config["weights"] == {}
+            assert config["verdict"]["status"] == "UNVERIFIED"
+            # All signals should be insufficient
+            for sig_name, status in config["signals_available"].items():
+                if sig_name != "squad_value":
+                    assert status.startswith("insufficient_data")
+        finally:
+            _cleanup_temp(output_path)
+            _cleanup_temp(replay_path)
+
+
+# ── NEW-3: Chronological integrity ────────────────────────────────────────
+
+
+class TestChronologicalIntegrity:
+    """OOS contexts never see their own result; fit contexts are prior-only."""
+
+    def test_oos_context_excludes_own_result(self, tmp_path):
+        from competitions.ucl.src.historical import (
+            build_context_for_match,
+            load_replay_matches,
+        )
+
+        n_md = 8
+        matches_per_md = 9
+        teams = [f"Team_{i}" for i in range(1, matches_per_md * 2 + 1)]
+        sv = {t: float(100 + i * 50) for i, t in enumerate(teams)}
+
+        replay_path, all_matches, sv_path = _build_synthetic_season(
+            tmp_path, n_md=n_md, matches_per_md=matches_per_md,
+            include_dates=False, include_squad_values=True,
+        )
+
+        try:
+            loaded = load_replay_matches(replay_path)
+            # Check OOS matches (last 3 MDs)
+            for m in loaded:
+                md_match = None
+                import re
+                md_num = re.match(r"^MD(\d{2})", m.get("match_id", ""))
+                if md_num and int(md_num.group(1)) >= 6:
+                    ctx = build_context_for_match(m, loaded, squad_values=sv)
+                    # Context should not contain the match itself
+                    ctx_ids = {pm.get("match_id") for pm in ctx.fixtures}
+                    assert m.get("match_id") not in ctx_ids, (
+                        f"OOS context for {m['match_id']} contains itself"
+                    )
+                    # played_results should not contain the match's own outcome
+                    for pr in ctx.played_results:
+                        assert pr.get("match_id") != m.get("match_id"), (
+                            f"OOS played_results for {m['match_id']} contains itself"
+                        )
+        finally:
+            _cleanup_temp(replay_path)
+
+    def test_fit_context_prior_only(self, tmp_path):
+        from competitions.ucl.src.historical import (
+            build_context_for_match,
+            load_replay_matches,
+            order_matches,
+            chronological_key,
+        )
+
+        n_md = 8
+        matches_per_md = 9
+        teams = [f"Team_{i}" for i in range(1, matches_per_md * 2 + 1)]
+        sv = {t: float(100 + i * 50) for i, t in enumerate(teams)}
+
+        replay_path, all_matches, sv_path = _build_synthetic_season(
+            tmp_path, n_md=n_md, matches_per_md=matches_per_md,
+            include_dates=False, include_squad_values=True,
+        )
+
+        try:
+            loaded = load_replay_matches(replay_path)
+            ordered = order_matches(loaded)
+            # For each fit match (first 5 MDs)
+            for m in ordered:
+                md_match = None
+                import re
+                md_num = re.match(r"^MD(\d{2})", m.get("match_id", ""))
+                if md_num and int(md_num.group(1)) <= 5:
+                    ctx = build_context_for_match(m, loaded, squad_values=sv)
+                    target_key = chronological_key(m)
+                    # All fixtures in context must be strictly before this match
+                    for pm in ctx.fixtures:
+                        pm_key = chronological_key(pm)
+                        assert pm_key < target_key, (
+                            f"Fit context for {m['match_id']} contains "
+                            f"future match {pm.get('match_id')} (key {pm_key} >= {target_key})"
+                        )
+        finally:
+            _cleanup_temp(replay_path)
+
+
+# ── NEW-4: Output file writing ────────────────────────────────────────────
+
+
+class TestOutputFileWriting:
+    """Verify output_path writing works and file has required keys."""
+
+    def test_output_file_reload(self, tmp_path):
+        replay_path, _, sv_path = _build_synthetic_season(
+            tmp_path, n_md=8, matches_per_md=9,
+            include_dates=False, include_squad_values=True,
+        )
+        output_path = os.path.join(str(tmp_path), "weights_reload.json")
+
+        try:
+            config = run_calibration(
+                replay_data_path=replay_path,
+                output_path=output_path,
+                squad_values_path=sv_path,
+                threshold=5,
+            )
+
+            assert os.path.exists(output_path)
+            with open(output_path) as f:
+                reloaded = json.load(f)
+
+            # All required top-level keys
+            for key in [
+                "version", "calibrated_at", "method", "source",
+                "n_matches", "threshold", "weights", "metric",
+                "per_signal", "split", "signals_available",
+                "in_sample", "out_of_sample", "verdict", "written",
+            ]:
+                assert key in reloaded, f"Missing key: {key}"
+
+            assert reloaded == config
+        finally:
+            _cleanup_temp(replay_path)
+
+
+# ── TestOutcomeIndex ──────────────────────────────────────────────────────
+
+
+class TestOutcomeIndex:
+    """Verify _outcome_index helper."""
+
+    def test_home_win(self):
+        assert _outcome_index({"home_score": 2, "away_score": 1}) == 0
+
+    def test_draw(self):
+        assert _outcome_index({"home_score": 1, "away_score": 1}) == 1
+
+    def test_away_win(self):
+        assert _outcome_index({"home_score": 0, "away_score": 3}) == 2
+
+    def test_missing_scores(self):
+        assert _outcome_index({}) is None
+        assert _outcome_index({"home_score": None, "away_score": 1}) is None

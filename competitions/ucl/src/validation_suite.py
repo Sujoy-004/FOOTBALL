@@ -25,6 +25,12 @@ from football_core.evaluation import (
     trps,
 )
 from football_core.signal import PredictionContext
+from competitions.ucl.src.historical import (
+    chronological_key,
+    order_matches,
+    prior_matches,
+    result_row,
+)
 
 
 @dataclass
@@ -127,50 +133,54 @@ class ValidationSuite:
             for sid in source_ids:
                 source_matches.extend(self.seasons[sid].get("matches", []))
 
-            # Build a minimal played_results list from source matches
-            played_results = [
-                {
-                    "team_a": m["team_a"],
-                    "team_b": m["team_b"],
-                    "winner": m.get("winner"),
-                    "is_draw": m.get("is_draw", False),
-                    "home_score": m.get("home_score", 0),
-                    "away_score": m.get("away_score", 0),
-                }
-                for m in source_matches
-                if m.get("winner") is not None
-            ]
-
-            # Build elo_ratings from season data (or use default)
+            # Build elo_ratings from SOURCE seasons only — never eval season
+            # standings (those carry end-of-season outcomes = leakage).
             elo_ratings: dict[str, float] = {}
-            for m in source_matches + eval_matches:
+            for m in source_matches:
                 for team_key in ("team_a", "team_b"):
                     team = m.get(team_key, "")
                     if team and team not in elo_ratings:
-                        # Default Elo if not provided in standings
                         elo_ratings[team] = 1500.0
 
-            # Merge from standings data if available
-            for sid in source_ids + [eval_id]:
+            for sid in source_ids:
                 standings = self.seasons[sid].get("standings", [])
                 for entry in standings:
                     team = entry.get("team", "")
                     elo = entry.get("elo")
-                    if team and elo is not None:
+                    if team and elo is not None and team not in elo_ratings:
                         elo_ratings[team] = float(elo)
 
-            context = PredictionContext(
-                fixtures=eval_matches,
-                elo_ratings=elo_ratings,
-                played_results=played_results,
-            )
+            # Add absent teams with honest default prior, not leaked eval elo
+            for m in eval_matches:
+                for team_key in ("team_a", "team_b"):
+                    team = m.get(team_key, "")
+                    if team and team not in elo_ratings:
+                        elo_ratings[team] = 1500.0
 
-            # Evaluate each match in eval season
+            # Pre-sort source and eval matches for per-match context building
+            sorted_source = order_matches(source_matches)
+            all_eval = order_matches(eval_matches)
+
+            # Evaluate each match in eval season with per-match context
             season_probs: list[list[float]] = []
             season_actuals: list[int] = []
             for match in eval_matches:
                 if match.get("winner") is None and not match.get("is_draw"):
                     continue  # Skip unplayed matches
+
+                # Per-match context: played_results = source matches + eval
+                # matches strictly BEFORE this one (never its own result or
+                # any later result — that would be leakage).
+                earlier_eval = prior_matches(all_eval, match)
+                played_results = [
+                    result_row(m) for m in sorted_source + earlier_eval
+                ]
+
+                context = PredictionContext(
+                    fixtures=eval_matches,
+                    elo_ratings=dict(elo_ratings),
+                    played_results=played_results,
+                )
 
                 try:
                     bp = self.engine.evaluate(match, context)
@@ -480,10 +490,7 @@ class ValidationSuite:
             # Add eval season teams with default Elo if missing
             for entry in eval_standings:
                 team = entry.get("team", "")
-                elo = entry.get("elo")
-                if team and elo is not None and team not in elo_ratings:
-                    elo_ratings[team] = float(elo)
-                elif team and team not in elo_ratings:
+                if team and team not in elo_ratings:
                     elo_ratings[team] = 1500.0
 
             # Build context from source matches

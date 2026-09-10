@@ -462,3 +462,164 @@ class TestSaveBaseline:
         # Clean up
         if os.path.exists(path):
             os.remove(path)
+
+
+# ── Temporal leakage regression tests ────────────────────────────────────
+
+
+class _RecordingEngine:
+    """Engine stub that records the context passed to every evaluate() call."""
+
+    def __init__(self, default_probs=(0.5, 0.25, 0.25)):
+        self._default = default_probs
+        self.contexts: list[tuple[dict, PredictionContext]] = []
+
+    def evaluate(self, match: dict, context: PredictionContext):
+        self.contexts.append((match, context))
+        if match.get("home_score") is not None and match.get("away_score") is not None:
+            hs, aws = match["home_score"], match["away_score"]
+            if hs > aws:
+                return BlendedPrediction(0.8, 0.15, 0.05, {}, {})
+            elif aws > hs:
+                return BlendedPrediction(0.05, 0.15, 0.8, {}, {})
+            else:
+                return BlendedPrediction(0.1, 0.8, 0.1, {}, {})
+        return BlendedPrediction(*self._default, {}, {})
+
+
+class TestEloLeakRegression:
+    """Bug A: eval-season standings must never appear in elo_ratings context."""
+
+    def test_no_eval_standings_in_elo(self):
+        from competitions.ucl.src.historical import chronological_key
+
+        source_teams = [f"Src{i}" for i in range(4)]
+        eval_teams = [f"Eval{i}" for i in range(4)]
+        all_teams = source_teams + eval_teams
+        n_matchdays = 3
+
+        def _build(season_id, teams, elo_base, has_results):
+            import random as _rng
+            r = _rng.Random(hash(season_id))
+            matches = []
+            for md in range(1, n_matchdays + 1):
+                shuffled = list(teams)
+                r.shuffle(shuffled)
+                for p in range(0, len(shuffled), 2):
+                    if p + 1 >= len(shuffled):
+                        break
+                    ta, tb = shuffled[p], shuffled[p + 1]
+                    sa, sb = r.randint(0, 3), r.randint(0, 3)
+                    winner = ta if sa > sb else (tb if sb > sa else None)
+                    matches.append({
+                        "match_id": f"{season_id}_MD{md:02d}_{p // 2 + 1:02d}",
+                        "team_a": ta, "team_b": tb,
+                        "winner": winner,
+                        "is_draw": winner is None,
+                        "home_score": sa, "away_score": sb,
+                    })
+            standings = []
+            for i, t in enumerate(teams):
+                standings.append({
+                    "team": t, "position": i + 1, "zone": "top_8",
+                    "elo": elo_base + i * 10.0,
+                })
+            return {"matches": matches, "teams": list(teams), "standings": standings}
+
+        seasons = {
+            "Y2023": _build("Y2023", source_teams, 1500.0, True),
+            "Y2024": _build("Y2024", source_teams, 1600.0, True),
+            "Y2025": _build("Y2025", source_teams, 1700.0, True),
+            "Y2026": _build("Y2026", eval_teams,  2100.0, True),
+        }
+        # Verify source vs eval elos are disjoint
+        src_elos = {e for s in ("Y2023", "Y2024", "Y2025")
+                    for e in (x["elo"] for x in seasons[s]["standings"])}
+        eval_elos = {x["elo"] for x in seasons["Y2026"]["standings"]}
+        assert src_elos.isdisjoint(eval_elos), "test setup: source/eval elos must be distinct"
+
+        engine = _RecordingEngine()
+        suite = ValidationSuite(engine, seasons)
+        result = suite.run_tier_2_walk_forward(window=3)
+
+        for match, ctx in engine.contexts:
+            for team, elo in ctx.elo_ratings.items():
+                assert elo not in eval_elos, (
+                    f"Eval-season elo {elo} for {team!r} leaked into context "
+                    f"for match {match.get('match_id')}"
+                )
+
+        per_season = result.details.get("per_season", [])
+        assert len(per_season) == 1
+        assert per_season[0]["season_id"] == "Y2026"
+
+
+class TestPerMatchContextLeakRegression:
+    """Bug B: each eval match must only see strictly-earlier results in context."""
+
+    def test_played_results_ordering(self):
+        from competitions.ucl.src.historical import chronological_key
+
+        teams = ["A", "B", "C", "D"]
+        eval_matches = [
+            {"match_id": "Z_MD01_01", "team_a": "A", "team_b": "B",
+             "winner": "A", "is_draw": False, "home_score": 2, "away_score": 0},
+            {"match_id": "Z_MD02_01", "team_a": "C", "team_b": "D",
+             "winner": "C", "is_draw": False, "home_score": 1, "away_score": 0},
+            {"match_id": "Z_MD03_01", "team_a": "A", "team_b": "C",
+             "winner": "A", "is_draw": False, "home_score": 3, "away_score": 1},
+        ]
+
+        seasons = {
+            "A_SRC": {
+                "matches": [{"match_id": f"A_S_MD{i:02d}_01", "team_a": "A",
+                             "team_b": "B", "winner": "A", "is_draw": False,
+                             "home_score": 1, "away_score": 0}
+                            for i in range(1, 3)],
+                "teams": list(teams),
+                "standings": [{"team": t, "position": i + 1, "zone": "top_8",
+                               "elo": 1500.0}
+                              for i, t in enumerate(teams)],
+            },
+            "Z_EVAL": {
+                "matches": eval_matches,
+                "teams": list(teams),
+                "standings": [{"team": t, "position": i + 1, "zone": "top_8",
+                               "elo": 1600.0}
+                              for i, t in enumerate(teams)],
+            },
+        }
+
+        engine = _RecordingEngine()
+        suite = ValidationSuite(engine, seasons)
+        suite.run_tier_2_walk_forward(window=1)
+
+        eval_match_ids = {m["match_id"] for m in eval_matches}
+        eval_match_list = [m["match_id"] for m in eval_matches]
+        recorded_ids = [m["match_id"] for m, _ in engine.contexts]
+        assert set(recorded_ids) == eval_match_ids
+
+        for i, (match, ctx) in enumerate(engine.contexts):
+            mid = match["match_id"]
+            pr_ids = [r["match_id"] for r in ctx.played_results]
+            assert mid not in pr_ids, (
+                f"Match {mid} sees its own result in played_results"
+            )
+            for later_mid in recorded_ids[i + 1:]:
+                assert later_mid not in pr_ids, (
+                    f"Match {mid} sees later match {later_mid} in played_results"
+                )
+            assert mid in eval_match_ids
+            idx = eval_match_list.index(mid)
+            for earlier_mid in eval_match_list[:idx]:
+                assert earlier_mid in pr_ids, (
+                    f"Match {mid} missing earlier match {earlier_mid}"
+                )
+
+        for _, ctx in engine.contexts:
+            keys = [chronological_key(r, i) for i, r in enumerate(ctx.played_results)]
+            for j in range(len(keys) - 1):
+                assert keys[j] <= keys[j + 1], (
+                    f"played_results not in chronological order: "
+                    f"{keys[j]} > {keys[j + 1]}"
+                )

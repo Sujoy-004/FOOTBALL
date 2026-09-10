@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import random
+import re
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -274,27 +275,83 @@ class _ReplayResultProvider:
     to the MatchResultProvider protocol expected by RollingFormSignal.
     """
 
+    _MD_RE = re.compile(r"^MD(\d{2})[_\-]", re.IGNORECASE)
+
     def __init__(self, path: str) -> None:
         with open(path) as f:
             data = json.load(f)
         self._results = data if isinstance(data, list) else data.get("matches", data.get("results", []))
 
+    def _chronological_key(self, m: dict, index: int = 0) -> tuple:
+        """Sortable key: event_date -> matchday int from match_id -> position."""
+        event_date = m.get("event_date") or ""
+        if event_date:
+            return ("date", event_date)
+        md = self._MD_RE.match(str(m.get("match_id", "")))
+        if md:
+            return ("matchday", int(md.group(1)))
+        return ("position", index)
+
+    def _result_sort_key(self, r: dict) -> tuple:
+        """Chronological sort key from a result dict's event_date field.
+
+        event_date holds either an ISO date or a match_id string.
+        """
+        val = r.get("event_date", "")
+        if val and ("T" in val or "-" in val):
+            return ("date", val)
+        md = self._MD_RE.match(str(val))
+        if md:
+            return ("matchday", int(md.group(1)))
+        return ("position", 0)
+
     def get_team_results(self, team: str, before_date: str, limit: int = 10) -> list[dict]:
+        # Compute chronological key for the before_date cutoff.
+        # before_date may be an ISO date or a match_id string like "MD01_01".
+        before_key: tuple
+        if before_date and ("T" in before_date or "-" in before_date):
+            before_key = ("date", before_date)
+        else:
+            md = self._MD_RE.match(str(before_date))
+            if md:
+                before_key = ("matchday", int(md.group(1)))
+            else:
+                before_key = ("position", 0)
+
+        # Index all results for consistent position-based tie-breaking
+        indexed = [(i, m) for i, m in enumerate(self._results)]
+        # Filter: team match AND strictly before cutoff
+        # Cross-type keys (date vs matchday) are incomparable; we only
+        # filter within the same type to avoid wrong lexicographic orderings.
         results = []
-        for m in self._results:
-            if m.get("team_a") == team or m.get("team_b") == team:
-                if before_date and m.get("match_id", "") >= before_date:
-                    continue
-                is_team_a = m["team_a"] == team
+        for i, m in indexed:
+            if m.get("team_a") != team and m.get("team_b") != team:
+                continue
+            key = self._chronological_key(m, i)
+            key_kind = key[0]
+            before_kind = before_key[0]
+            # Only compare within same type; different types are conservatively
+            # excluded (caller should use consistent date formats).
+            if key_kind == before_kind and key < before_key:
                 winner = m.get("winner")
                 results.append({
-                    "event_date": m.get("match_id", ""),
+                    "event_date": m.get("event_date") or m.get("match_id", ""),
                     "is_draw": winner is None or m.get("is_draw", False),
                     "winner": winner,
                     "team_a": m["team_a"],
                     "team_b": m["team_b"],
                 })
-        results.sort(key=lambda r: r["event_date"], reverse=True)
+                is_team_a = m["team_a"] == team
+                winner = m.get("winner")
+                results.append({
+                    "event_date": m.get("event_date") or m.get("match_id", ""),
+                    "is_draw": winner is None or m.get("is_draw", False),
+                    "winner": winner,
+                    "team_a": m["team_a"],
+                    "team_b": m["team_b"],
+                })
+        # Most-recent-first
+        results.sort(key=self._result_sort_key, reverse=True)
         return results[:limit]
 
 
