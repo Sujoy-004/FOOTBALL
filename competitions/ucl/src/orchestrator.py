@@ -378,8 +378,18 @@ def build_signal_engine(
     elo_ratings: dict[str, float],
     weights_override: dict[str, float] | None = None,
     results_file: str | None = None,
+    strategy: str = "production",
 ) -> Any:
     """Build EnsembleEngine with 8 pre-configured signals and calibrated weights."""
+    if strategy in ("market_elo_equal", "market_elo_prior"):
+        from competitions.ucl.src.ensemble import build_strategy_engine as _build_strategy_engine
+
+        return _build_strategy_engine(strategy, elo_ratings=elo_ratings)
+    if strategy != "production":
+        raise ValueError(
+            f"Unknown ensemble strategy {strategy!r}. Expected one of: "
+            "'production', 'market_elo_equal', 'market_elo_prior'."
+        )
     from football_core.blender import EnsembleEngine
     from football_core.signals.refined_elo import RefinedEloSignal
     from football_core.signals.market_odds import MarketOddsSignal
