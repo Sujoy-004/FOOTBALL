@@ -271,8 +271,14 @@ def _get_config_dir() -> str:
 class _ReplayResultProvider:
     """Reads UCL results.json and provides per-team results for RollingFormSignal.
 
-    Maps the UCL results format (team_a, team_b, home_score, away_score, winner, match_id)
-    to the MatchResultProvider protocol expected by RollingFormSignal.
+    Correct chronology from whichever date evidence actually exists:
+    1) the result row's own ``event_date``;
+    2) the co-located fixtures.json ``event_date`` resolved by ``match_id``;
+    3) a matchday prefix in match_id ("MDxx");
+    4) otherwise position (never trusted against a date anchor).
+
+    One canonical result row per match (no duplicates). Winner/is_draw are
+    derived from actual scores when absent (mirrors historical.result_row).
     """
 
     _MD_RE = re.compile(r"^MD(\d{2})[_\-]", re.IGNORECASE)
@@ -281,10 +287,29 @@ class _ReplayResultProvider:
         with open(path) as f:
             data = json.load(f)
         self._results = data if isinstance(data, list) else data.get("matches", data.get("results", []))
+        self._dates_by_id: dict[str, str] = {}
+        fp = os.path.join(os.path.dirname(os.path.abspath(path)), "fixtures.json")
+        if path and os.path.exists(fp):
+            try:
+                with open(fp) as f:
+                    fd = json.load(f)
+                fl = fd if isinstance(fd, list) else fd.get("fixtures", [])
+            except (OSError, ValueError):
+                fl = []
+            for fix in fl:
+                mid = fix.get("match_id")
+                ed = fix.get("event_date")
+                if mid and ed:
+                    self._dates_by_id.setdefault(mid, ed)
+
+    def _row_date(self, m: dict) -> str:
+        """Resolve the canonical date for a result row (fixture fallback)."""
+        return (
+            m.get("event_date") or self._dates_by_id.get(m.get("match_id", "")) or ""
+        )
 
     def _chronological_key(self, m: dict, index: int = 0) -> tuple:
-        """Sortable key: event_date -> matchday int from match_id -> position."""
-        event_date = m.get("event_date") or ""
+        event_date = self._row_date(m)
         if event_date:
             return ("date", event_date)
         md = self._MD_RE.match(str(m.get("match_id", "")))
@@ -293,10 +318,6 @@ class _ReplayResultProvider:
         return ("position", index)
 
     def _result_sort_key(self, r: dict) -> tuple:
-        """Chronological sort key from a result dict's event_date field.
-
-        event_date holds either an ISO date or a match_id string.
-        """
         val = r.get("event_date", "")
         if val and ("T" in val or "-" in val):
             return ("date", val)
@@ -306,8 +327,6 @@ class _ReplayResultProvider:
         return ("position", 0)
 
     def get_team_results(self, team: str, before_date: str, limit: int = 10) -> list[dict]:
-        # Compute chronological key for the before_date cutoff.
-        # before_date may be an ISO date or a match_id string like "MD01_01".
         before_key: tuple
         if before_date and ("T" in before_date or "-" in before_date):
             before_key = ("date", before_date)
@@ -318,39 +337,39 @@ class _ReplayResultProvider:
             else:
                 before_key = ("position", 0)
 
-        # Index all results for consistent position-based tie-breaking
         indexed = [(i, m) for i, m in enumerate(self._results)]
-        # Filter: team match AND strictly before cutoff
-        # Cross-type keys (date vs matchday) are incomparable; we only
-        # filter within the same type to avoid wrong lexicographic orderings.
-        results = []
+        results: list[dict] = []
+        seen: set[str] = set()
         for i, m in indexed:
+            mid = m.get("match_id")
+            if mid and mid in seen:
+                continue
             if m.get("team_a") != team and m.get("team_b") != team:
                 continue
             key = self._chronological_key(m, i)
             key_kind = key[0]
             before_kind = before_key[0]
-            # Only compare within same type; different types are conservatively
-            # excluded (caller should use consistent date formats).
-            if key_kind == before_kind and key < before_key:
-                winner = m.get("winner")
-                results.append({
-                    "event_date": m.get("event_date") or m.get("match_id", ""),
-                    "is_draw": winner is None or m.get("is_draw", False),
-                    "winner": winner,
-                    "team_a": m["team_a"],
-                    "team_b": m["team_b"],
-                })
-                is_team_a = m["team_a"] == team
-                winner = m.get("winner")
-                results.append({
-                    "event_date": m.get("event_date") or m.get("match_id", ""),
-                    "is_draw": winner is None or m.get("is_draw", False),
-                    "winner": winner,
-                    "team_a": m["team_a"],
-                    "team_b": m["team_b"],
-                })
-        # Most-recent-first
+            if key_kind != before_kind or not (key < before_key):
+                continue
+            hs = m.get("home_score")
+            aws = m.get("away_score")
+            winner = m.get("winner")
+            if winner is None and hs is not None and aws is not None:
+                winner = m["team_a"] if hs > aws else (m["team_b"] if aws > hs else None)
+            is_draw = (
+                bool(hs is not None and aws is not None and hs == aws)
+                if winner is None
+                else bool(m.get("is_draw", False))
+            )
+            if mid:
+                seen.add(mid)
+            results.append({
+                "event_date": self._row_date(m) or str(m.get("match_id", "")),
+                "is_draw": is_draw,
+                "winner": winner,
+                "team_a": m["team_a"],
+                "team_b": m["team_b"],
+            })
         results.sort(key=self._result_sort_key, reverse=True)
         return results[:limit]
 

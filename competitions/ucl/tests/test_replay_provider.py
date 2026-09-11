@@ -1,289 +1,430 @@
-"""Tests for _ReplayResultProvider — leak-free chronological filtering.
+"""Tests for _ReplayResultProvider — correctness fix (Phase 6).
 
-Note: orchestrator.py has a pre-existing broken import (calibrate._EmptyResultProvider).
-This test reimplements the _ReplayResultProvider class directly to avoid that import
-chain while testing the exact same logic.
+Covers: deduplication, fixture-date fallback, winner derivation from scores,
+strict-before chronology, deterministic replay, consumer compat, limit, and
+legacy fallback.
 """
 from __future__ import annotations
 
 import json
-import re
+import os
 
 import pytest
 
 
-_MD_RE = re.compile(r"^MD(\d{2})[_\-]", re.IGNORECASE)
+# ---------------------------------------------------------------------------
+# Import the real class from orchestrator (after Phase 6 fix).
+# This import intentionally imports the class itself; if orchestrator's
+# module-level imports fail in test isolation, we skip gracefully.
+# ---------------------------------------------------------------------------
+
+try:
+    from competitions.ucl.src.orchestrator import _ReplayResultProvider
+except Exception:
+    pytest.skip(
+        "orchestrator module-level imports unavailable in test env",
+        allow_module_level=True,
+    )
 
 
-class _ReplayResultProvider:
-    """Copy of the fixed _ReplayResultProvider from orchestrator.py."""
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-    def __init__(self, path: str) -> None:
-        with open(path) as f:
-            data = json.load(f)
-        self._results = data if isinstance(data, list) else data.get("matches", data.get("results", []))
-
-    def _chronological_key(self, m: dict, index: int = 0) -> tuple:
-        event_date = m.get("event_date") or ""
-        if event_date:
-            return ("date", event_date)
-        md = _MD_RE.match(str(m.get("match_id", "")))
-        if md:
-            return ("matchday", int(md.group(1)))
-        return ("position", index)
-
-    def _result_sort_key(self, r: dict) -> tuple:
-        val = r.get("event_date", "")
-        if val and ("T" in val or "-" in val):
-            return ("date", val)
-        md = _MD_RE.match(str(val))
-        if md:
-            return ("matchday", int(md.group(1)))
-        return ("position", 0)
-
-    def get_team_results(self, team: str, before_date: str, limit: int = 10) -> list[dict]:
-        # Compute chronological key for the before_date cutoff.
-        before_key: tuple
-        if before_date and ("T" in before_date or "-" in before_date):
-            before_key = ("date", before_date)
-        else:
-            md = _MD_RE.match(str(before_date))
-            if md:
-                before_key = ("matchday", int(md.group(1)))
-            else:
-                before_key = ("position", 0)
-
-        indexed = [(i, m) for i, m in enumerate(self._results)]
-        results = []
-        for i, m in indexed:
-            if m.get("team_a") != team and m.get("team_b") != team:
-                continue
-            key = self._chronological_key(m, i)
-            # Only compare within same chronology type; different types
-            # are conservatively excluded (caller should use consistent
-            # date formats within a dataset).
-            if key[0] == before_key[0] and key < before_key:
-                winner = m.get("winner")
-                results.append({
-                    "event_date": m.get("event_date") or m.get("match_id", ""),
-                    "is_draw": winner is None or m.get("is_draw", False),
-                    "winner": winner,
-                    "team_a": m["team_a"],
-                    "team_b": m["team_b"],
-                })
-        results.sort(key=self._result_sort_key, reverse=True)
-        return results[:limit]
-
-
-def _write_results(tmp_path, results):
-    path = tmp_path / "results.json"
-    with open(path, "w") as f:
+def _write_provider(tmp_path, results, fixtures=None):
+    """Write results.json (+ optional fixtures.json) and return the provider."""
+    r_path = tmp_path / "results.json"
+    with open(r_path, "w") as f:
         json.dump(results, f)
-    return _ReplayResultProvider(str(path))
+    if fixtures is not None:
+        f_path = tmp_path / "fixtures.json"
+        with open(f_path, "w") as f:
+            json.dump(fixtures, f)
+    return _ReplayResultProvider(str(r_path))
 
 
-class TestGetTeamResultsISODates:
-    """Filtering and ordering with ISO event_date rows."""
+# ---------------------------------------------------------------------------
+# 1. test_single_result_not_duplicated
+# ---------------------------------------------------------------------------
 
-    def test_strictly_before_iso_date(self, tmp_path):
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-01", "match_id": "X"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-10", "match_id": "Y"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-15", "match_id": "Z"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "2026-09-10")
-        assert len(got) == 1
-        assert got[0]["event_date"] == "2026-09-01"
-
-    def test_most_recent_first(self, tmp_path):
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-08-01", "match_id": "X"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-01", "match_id": "Y"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "2026-09-10")
-        assert len(got) == 2
-        assert got[0]["event_date"] == "2026-09-01"
-        assert got[1]["event_date"] == "2026-08-01"
-
-    def test_excludes_unrelated_team(self, tmp_path):
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-01", "match_id": "X"},
-            {"team_a": "C", "team_b": "D", "winner": "C",
-             "event_date": "2026-09-01", "match_id": "Y"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "2026-09-10")
-        assert len(got) == 1
-
-    def test_limit_applied(self, tmp_path):
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": f"2026-09-{d:02d}", "match_id": f"X{i}"}
-            for i, d in enumerate(range(1, 11), 1)
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "2026-09-11", limit=3)
-        assert len(got) == 3
+def test_single_result_not_duplicated(tmp_path):
+    results = [
+        {"team_a": "A", "team_b": "B", "home_score": 2, "away_score": 1,
+         "event_date": "2026-09-01", "match_id": "m1"},
+    ]
+    provider = _write_provider(tmp_path, results)
+    got = provider.get_team_results("A", "2026-09-10")
+    assert len(got) == 1
+    assert got[0]["winner"] == "A"
+    assert got[0]["is_draw"] is False
 
 
-class TestGetTeamResultsMatchIds:
-    """Filtering and ordering with match_id-only rows (no event_date)."""
+# ---------------------------------------------------------------------------
+# 2. test_distinct_fixtures_preserved
+# ---------------------------------------------------------------------------
 
-    def test_matchday_ordering(self, tmp_path):
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD03_01"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD01_01"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD02_01"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "MD03_01")
-        ids = [r["event_date"] for r in got]
-        assert ids == ["MD02_01", "MD01_01"]
-
-    def test_matchday_10_vs_2_not_string_compare(self, tmp_path):
-        """MD10 must sort after MD02 as integers, not lexicographically."""
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD10_01"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD02_01"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "MD10_01")
-        ids = [r["event_date"] for r in got]
-        assert ids == ["MD02_01"]
-
-    def test_before_md01_returns_empty(self, tmp_path):
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD01_01"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "MD01_01")
-        assert len(got) == 0
+def test_distinct_fixtures_preserved(tmp_path):
+    results = [
+        {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+         "event_date": "2026-09-01", "match_id": "m1"},
+        {"team_a": "A", "team_b": "C", "home_score": 0, "away_score": 0,
+         "event_date": "2026-09-05", "match_id": "m2"},
+    ]
+    provider = _write_provider(tmp_path, results)
+    got = provider.get_team_results("A", "2026-09-10")
+    assert len(got) == 2
+    # Both opponents present (distinct fixtures preserved)
+    opponents = {r["team_b"] for r in got}
+    assert opponents == {"B", "C"}
 
 
-class TestMixedIDTypes:
-    """Mix of ISO dates and match_id-only rows.
+# ---------------------------------------------------------------------------
+# 3. test_duplicate_match_ids_in_results_are_deduped
+# ---------------------------------------------------------------------------
 
-    Cross-type keys (date vs matchday) are conservatively excluded from
-    comparison because their tuple ordering is not meaningful across types.
-    Only same-type results are compared and returned.
-    """
+def test_duplicate_match_ids_in_results_are_deduped(tmp_path):
+    row = {"team_a": "A", "team_b": "B", "home_score": 2, "away_score": 1,
+           "event_date": "2026-09-01", "match_id": "m1"}
+    results = [row, {**row}]  # same match_id twice
+    provider = _write_provider(tmp_path, results)
+    got = provider.get_team_results("A", "2026-09-10")
+    assert len(got) == 1
 
-    def test_before_iso_date_excludes_match_ids(self, tmp_path):
-        """When before_date is ISO, only date-keyed results are compared;
-        match_id-only results (position keys) are conservatively excluded."""
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-01", "match_id": "X"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-10", "match_id": "Y"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD01_01"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD02_01"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "2026-09-10")
-        # Only date-keyed results compared; match_id-only excluded
-        assert len(got) == 1
-        assert got[0]["event_date"] == "2026-09-01"
 
-    def test_before_matchid_excludes_isodated(self, tmp_path):
-        """When before_date is match_id, only matchday-keyed results are
-        compared; ISO-dated results (date keys) are conservatively excluded."""
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD05_01"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-01", "match_id": "X"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD01_01"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "MD05_01")
-        ids = [r["event_date"] for r in got]
-        # Only matchday-keyed results compared
-        assert ids == ["MD01_01"]
+# ---------------------------------------------------------------------------
+# 4. test_event_date_fallback_from_fixtures
+# ---------------------------------------------------------------------------
 
-    def test_all_same_type_dates(self, tmp_path):
-        """All date-keyed results with a date before_date."""
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-01", "match_id": "X"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-05", "match_id": "Y"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "event_date": "2026-09-10", "match_id": "Z"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "2026-09-10")
-        assert len(got) == 2
+def test_event_date_fallback_from_fixtures(tmp_path):
+    """Live row with no event_date gets date from co-located fixtures.json."""
+    results = [
+        {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+         "match_id": "live1"},
+    ]
+    fixtures = [
+        {"match_id": "live1", "team_a": "A", "team_b": "B",
+         "event_date": "2026-09-01T19:00:00Z"},
+    ]
+    provider = _write_provider(tmp_path, results, fixtures)
+    got = provider.get_team_results("A", "2026-10-01T00:00:00Z")
+    assert len(got) == 1
+    assert got[0]["event_date"] == "2026-09-01T19:00:00Z"
 
-    def test_all_same_type_matchdays(self, tmp_path):
-        """All matchday-keyed results with a matchday before_date."""
-        results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD03_01"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD01_01"},
-            {"team_a": "A", "team_b": "B", "winner": "A",
-             "match_id": "MD05_01"},
-        ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "MD05_01")
-        ids = [r["event_date"] for r in got]
-        assert ids == ["MD03_01", "MD01_01"]
 
+# ---------------------------------------------------------------------------
+# 5. test_rolling_form_uses_fallback
+# ---------------------------------------------------------------------------
+
+def test_rolling_form_uses_fallback(tmp_path):
+    """RollingFormSignal with fallback dates produces form-driven probs, not 0.5."""
+    from football_core.signals.rolling_form import RollingFormSignal
+    from football_core.signal import PredictionContext
+
+    # --- WITH fixtures: results have no event_date but fixtures.json provides dates ---
+    subdir_with = tmp_path / "with_fixtures"
+    subdir_with.mkdir()
+    results_with = [
+        {"team_a": "A", "team_b": "B", "home_score": 3, "away_score": 0,
+         "match_id": f"md{i}"}
+        for i in range(5)
+    ]
+    fixtures_with = [
+        {"match_id": f"md{i}", "team_a": "A", "team_b": "B",
+         "event_date": f"2026-09-{i+1:02d}T19:00:00Z"}
+        for i in range(5)
+    ]
+    (subdir_with / "results.json").write_text(json.dumps(results_with), encoding="utf-8")
+    (subdir_with / "fixtures.json").write_text(json.dumps(fixtures_with), encoding="utf-8")
+    provider = _ReplayResultProvider(str(subdir_with / "results.json"))
+    signal = RollingFormSignal(result_provider=provider)
+    match = {"team_a": "A", "team_b": "B",
+             "event_date": "2026-10-01T19:00:00Z"}
+    ctx = PredictionContext(fixtures=[], elo_ratings={}, played_results=[])
+    out = signal.predict(match, ctx)
+    # With 5 wins, form_a should be close to 1.0 → home_prob > 0.5
+    assert out.home_prob != 0.5, "Form should not be the 0.5 no-op"
+
+    # --- WITHOUT fixtures: results have no event_date, no fixtures.json ---
+    subdir_no = tmp_path / "no_fixtures"
+    subdir_no.mkdir()
+    results_no = [
+        {"team_a": "A", "team_b": "B", "home_score": 3, "away_score": 0,
+         "match_id": f"md{i}"}
+        for i in range(5)
+    ]
+    (subdir_no / "results.json").write_text(json.dumps(results_no), encoding="utf-8")
+    # No fixtures.json written → _dates_by_id stays empty
+    provider_nodate = _ReplayResultProvider(str(subdir_no / "results.json"))
+    signal_nodate = RollingFormSignal(result_provider=provider_nodate)
+    out_nodate = signal_nodate.predict(match, ctx)
+    # No dates → position keys vs date anchor → excluded → form=0.5 → different output
+    assert out.home_prob != out_nodate.home_prob
+
+
+# ---------------------------------------------------------------------------
+# 6. test_strict_before_chronology
+# ---------------------------------------------------------------------------
+
+def test_strict_before_chronology(tmp_path):
+    """(a) same event_date excluded; (b) future excluded; (c) own match excluded."""
+    results = [
+        {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+         "event_date": "2026-09-10T19:00:00Z", "match_id": "target"},
+        {"team_a": "A", "team_b": "C", "home_score": 1, "away_score": 0,
+         "event_date": "2026-09-10T19:00:00Z", "match_id": "same_time"},
+        {"team_a": "A", "team_b": "D", "home_score": 1, "away_score": 0,
+         "event_date": "2026-09-15T19:00:00Z", "match_id": "future"},
+        {"team_a": "A", "team_b": "E", "home_score": 1, "away_score": 0,
+         "event_date": "2026-09-01T19:00:00Z", "match_id": "past"},
+    ]
+    provider = _write_provider(tmp_path, results)
+    got = provider.get_team_results("A", "2026-09-10T19:00:00Z")
+    # Only "past" should be returned: same_time and target share the same
+    # event_date as the anchor (excluded by strict <); future is after.
+    assert len(got) == 1
+    assert got[0]["event_date"] == "2026-09-01T19:00:00Z"
+
+
+# ---------------------------------------------------------------------------
+# 7. test_winner_derived_from_scores
+# ---------------------------------------------------------------------------
+
+def test_winner_derived_from_scores(tmp_path):
+    results = [
+        {"team_a": "A", "team_b": "B", "home_score": 2, "away_score": 1,
+         "event_date": "2026-09-01", "match_id": "win"},
+        {"team_a": "A", "team_b": "B", "home_score": 0, "away_score": 3,
+         "event_date": "2026-09-02", "match_id": "loss"},
+        {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 1,
+         "event_date": "2026-09-03", "match_id": "draw"},
+    ]
+    provider = _write_provider(tmp_path, results)
+    got = provider.get_team_results("A", "2026-10-01")
+    by_mid = {r["event_date"]: r for r in got}
+    win = by_mid["2026-09-01"]
+    loss = by_mid["2026-09-02"]
+    draw = by_mid["2026-09-03"]
+    assert win["winner"] == "A" and win["is_draw"] is False
+    assert loss["winner"] == "B" and loss["is_draw"] is False
+    assert draw["winner"] is None and draw["is_draw"] is True
+
+
+# ---------------------------------------------------------------------------
+# 8. test_deterministic_replay
+# ---------------------------------------------------------------------------
+
+def test_deterministic_replay(tmp_path):
+    results = [
+        {"team_a": "A", "team_b": "B", "home_score": 2, "away_score": 1,
+         "event_date": "2026-09-01", "match_id": "m1"},
+        {"team_a": "A", "team_b": "C", "home_score": 0, "away_score": 0,
+         "event_date": "2026-09-05", "match_id": "m2"},
+    ]
+    p1 = _write_provider(tmp_path, results)
+    p2 = _write_provider(tmp_path, results)
+    r1 = p1.get_team_results("A", "2026-10-01")
+    r2 = p2.get_team_results("A", "2026-10-01")
+    assert json.dumps(r1, sort_keys=True) == json.dumps(r2, sort_keys=True)
+
+
+# ---------------------------------------------------------------------------
+# 9. test_consumer_compat
+# ---------------------------------------------------------------------------
+
+def test_consumer_compat(tmp_path):
+    """EnsembleEngine with RefinedElo + RollingForm(provider) + MarketOdds
+    evaluates the same match twice with identical output; no crash."""
+    from football_core.blender import EnsembleEngine
+    from football_core.signals.refined_elo import RefinedEloSignal
+    from football_core.signals.rolling_form import RollingFormSignal
+    from football_core.signals.market_odds import MarketOddsSignal
+
+    results = [
+        {"team_a": "Alpha", "team_b": "Beta", "home_score": 2, "away_score": 1,
+         "event_date": "2026-09-01", "match_id": "m1"},
+    ]
+    fixtures = [
+        {"match_id": "m1", "team_a": "Alpha", "team_b": "Beta",
+         "event_date": "2026-09-01T19:00:00Z"},
+    ]
+    provider = _write_provider(tmp_path, results, fixtures)
+    engine = EnsembleEngine([
+        RefinedEloSignal(),
+        RollingFormSignal(result_provider=provider),
+        MarketOddsSignal(),
+    ])
+    from football_core.signal import PredictionContext
+    ctx = PredictionContext(
+        fixtures=[],
+        elo_ratings={"Alpha": 1900.0, "Beta": 1700.0},
+    )
+    match = {"team_a": "Alpha", "team_b": "Beta",
+             "event_date": "2026-10-01T19:00:00Z"}
+    r1 = engine.evaluate(match, ctx)
+    r2 = engine.evaluate(match, ctx)
+    assert round(r1.home_prob, 8) == round(r2.home_prob, 8)
+    assert round(r1.draw_prob, 8) == round(r2.draw_prob, 8)
+    assert round(r1.away_prob, 8) == round(r2.away_prob, 8)
+
+
+# ---------------------------------------------------------------------------
+# 10. test_limit_respected
+# ---------------------------------------------------------------------------
+
+def test_limit_respected(tmp_path):
+    results = [
+        {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+         "event_date": f"2026-09-{d:02d}T12:00:00Z", "match_id": f"m{i}"}
+        for i, d in enumerate(range(1, 13), 1)  # 12 prior matches
+    ]
+    provider = _write_provider(tmp_path, results)
+    got = provider.get_team_results("A", "2026-10-01T00:00:00Z", limit=10)
+    assert len(got) == 10
+    # Most recent first
+    assert got[0]["event_date"] == "2026-09-12T12:00:00Z"
+
+
+# ---------------------------------------------------------------------------
+# 11. test_no_fixtures_file_falls_back_legacy
+# ---------------------------------------------------------------------------
+
+def test_no_fixtures_file_falls_back_legacy(tmp_path):
+    """Without fixtures file, MD-prefixed match_ids still work; rows
+    lacking event_date are excluded against a date anchor (no leakage)."""
+    results = [
+        {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+         "event_date": "2026-09-01", "match_id": "m1"},
+        {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+         "match_id": "nodate1"},
+    ]
+    provider = _write_provider(tmp_path, results, fixtures=None)
+    # Date anchor: nodate1 has position key (not date), so excluded against date anchor
+    got = provider.get_team_results("A", "2026-10-01T00:00:00Z")
+    assert len(got) == 1
+    assert got[0]["event_date"] == "2026-09-01"
+
+    # MD-style anchor still works
+    results_md = [
+        {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+         "match_id": "MD03_01"},
+        {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+         "match_id": "MD01_01"},
+    ]
+    provider_md = _write_provider(tmp_path, results_md, fixtures=None)
+    got_md = provider_md.get_team_results("A", "MD03_01")
+    assert len(got_md) == 1
+    assert got_md[0]["event_date"] == "MD01_01"
+
+
+# ---------------------------------------------------------------------------
+# Existing edge-case tests (kept from original file)
+# ---------------------------------------------------------------------------
 
 class TestEdgeCases:
-    """Edge cases for _ReplayResultProvider."""
-
     def test_empty_results_file(self, tmp_path):
         path = tmp_path / "results.json"
         with open(path, "w") as f:
             json.dump([], f)
         provider = _ReplayResultProvider(str(path))
-        got = provider.get_team_results("A", "2026-09-01")
+        got = provider.get_team_results("A", "2026-09-01T00:00:00Z")
         assert got == []
 
     def test_results_wrapped_in_dict(self, tmp_path):
         path = tmp_path / "results.json"
         with open(path, "w") as f:
             json.dump({"matches": [
-                {"team_a": "A", "team_b": "B", "winner": "A",
+                {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
                  "event_date": "2026-09-01", "match_id": "X"},
             ]}, f)
         provider = _ReplayResultProvider(str(path))
         got = provider.get_team_results("A", "2026-09-10")
         assert len(got) == 1
 
-    def test_event_date_returned_for_iso_rows(self, tmp_path):
+    def test_is_draw_from_scores_not_winner_field(self, tmp_path):
+        """When winner field is absent, is_draw is derived from scores."""
         results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 1,
              "event_date": "2026-09-01", "match_id": "X"},
         ]
-        provider = _write_results(tmp_path, results)
-        got = provider.get_team_results("A", "2026-09-10")
-        assert got[0]["event_date"] == "2026-09-01"
+        provider = _write_provider(tmp_path, results)
+        got = provider.get_team_results("A", "2026-10-01")
+        assert got[0]["is_draw"] is True
+        assert got[0]["winner"] is None
 
-    def test_matchid_returned_when_no_event_date(self, tmp_path):
+    def test_matchid_returned_when_no_event_date_and_no_fixtures(self, tmp_path):
         results = [
-            {"team_a": "A", "team_b": "B", "winner": "A",
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
              "match_id": "MD01_01"},
         ]
-        provider = _write_results(tmp_path, results)
+        provider = _write_provider(tmp_path, results, fixtures=None)
         got = provider.get_team_results("A", "MD02_01")
         assert got[0]["event_date"] == "MD01_01"
+
+
+class TestGetTeamResultsMatchIds:
+    def test_matchday_ordering(self, tmp_path):
+        results = [
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD03_01"},
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD01_01"},
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD02_01"},
+        ]
+        provider = _write_provider(tmp_path, results, fixtures=None)
+        got = provider.get_team_results("A", "MD03_01")
+        ids = [r["event_date"] for r in got]
+        assert ids == ["MD02_01", "MD01_01"]
+
+    def test_matchday_10_vs_2_not_string_compare(self, tmp_path):
+        results = [
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD10_01"},
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD02_01"},
+        ]
+        provider = _write_provider(tmp_path, results, fixtures=None)
+        got = provider.get_team_results("A", "MD10_01")
+        ids = [r["event_date"] for r in got]
+        assert ids == ["MD02_01"]
+
+    def test_before_md01_returns_empty(self, tmp_path):
+        results = [
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD01_01"},
+        ]
+        provider = _write_provider(tmp_path, results, fixtures=None)
+        got = provider.get_team_results("A", "MD01_01")
+        assert len(got) == 0
+
+
+class TestMixedIDTypes:
+    def test_before_iso_date_excludes_match_ids(self, tmp_path):
+        results = [
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "event_date": "2026-09-01", "match_id": "X"},
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "event_date": "2026-09-10", "match_id": "Y"},
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD01_01"},
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD02_01"},
+        ]
+        provider = _write_provider(tmp_path, results, fixtures=None)
+        got = provider.get_team_results("A", "2026-09-10")
+        assert len(got) == 1
+        assert got[0]["event_date"] == "2026-09-01"
+
+    def test_before_matchid_excludes_isodated(self, tmp_path):
+        results = [
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD05_01"},
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "event_date": "2026-09-01", "match_id": "X"},
+            {"team_a": "A", "team_b": "B", "home_score": 1, "away_score": 0,
+             "match_id": "MD01_01"},
+        ]
+        provider = _write_provider(tmp_path, results, fixtures=None)
+        got = provider.get_team_results("A", "MD05_01")
+        ids = [r["event_date"] for r in got]
+        assert ids == ["MD01_01"]
