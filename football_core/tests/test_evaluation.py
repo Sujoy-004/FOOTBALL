@@ -329,3 +329,48 @@ class TestMultiClassECE:
         actuals = [0, 1]
         ece = multi_class_ece(probs, actuals)
         assert 0.0 <= ece <= 1.0
+
+    def test_ece_tracks_bin_accuracy_given_fixed_confidence(self):
+        """ECE must depend on actual bin accuracy, not just confidence.
+
+        Same 0.75 confidence in every trial; only the hit rate changes.
+        A well-calibrated model (accuracy == confidence == 0.75) scores 0
+        even though it is wrong 25% of the time; a half-accurate model
+        scores the full |confidence - accuracy| gap.
+        """
+        probs = [[0.75, 0.125, 0.125]] * 100
+
+        well_calibrated = [0] * 75 + [2] * 25  # accuracy 0.75 == confidence
+        half_accurate = [0] * 50 + [2] * 50    # accuracy 0.50 <  confidence
+
+        ece_calibrated = multi_class_ece(probs, well_calibrated)
+        ece_half = multi_class_ece(probs, half_accurate)
+
+        # confidence == accuracy in every bin -> no calibration error
+        assert ece_calibrated == pytest.approx(0.0, abs=1e-6)
+        # accuracy gap is what matters: |0.75 - 0.50| = 0.25
+        assert ece_half == pytest.approx(0.25, abs=1e-6)
+        # regression guard: the old implementation always returned
+        # 1 - mean_confidence = 0.25 regardless of accuracy, so it would
+        # have returned the SAME value for the calibrated input.
+        assert ece_calibrated != pytest.approx(0.25, abs=1e-6)
+
+    def test_ece_hand_computed_two_bin_formula(self):
+        """ECE equals the weighted mean of |mean_confidence - accuracy|.
+
+        50 trials at confidence 0.90 with 60% accuracy and 50 trials at
+        confidence 0.55 with 80% accuracy:
+            ECE = .5*|.90-.60| + .5*|.55-.80| = .15 + .125 = .275
+        """
+        probs = [[0.9, 0.05, 0.05]] * 50 + [[0.55, 0.225, 0.225]] * 50
+        actuals = [0] * 30 + [2] * 20 + [0] * 40 + [1] * 10
+        ece = multi_class_ece(probs, actuals)
+        assert ece == pytest.approx(0.275, abs=1e-6)
+
+    def test_ece_uses_confidence_not_class_guessing(self):
+        """n >= 100 keeps the requested 10-bin grid; empty bins are skipped."""
+        n = 100
+        probs = [[0.4, 0.4, 0.2]] * n   # confidence 0.4 with a tie in argmax
+        actuals = [0] * (n // 2) + [2] * (n - n // 2)  # argmax=0, hit rate 0.5
+        ece = multi_class_ece(probs, actuals)
+        assert ece == pytest.approx(abs(0.4 - 0.5), abs=1e-6)

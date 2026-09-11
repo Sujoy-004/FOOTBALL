@@ -314,7 +314,7 @@ def multi_class_ece(
                 bin_correct.append(ok)
         if bin_confs:
             mean_conf = sum(bin_confs) / len(bin_confs)
-            acc = sum(1 for ok in bin_correct) / len(bin_correct)
+            acc = sum(bin_correct) / len(bin_correct)
             bins.append({
                 "bin_start": round(lo, 2),
                 "bin_end": round(hi, 2),
