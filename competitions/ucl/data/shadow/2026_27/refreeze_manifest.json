@@ -1,0 +1,1175 @@
+{
+  "schema": 1,
+  "phase": 6,
+  "reason": "_ReplayResultProvider fix (dedupe + event_date fallback)",
+  "generated_at": "2026-09-11T03:12:15.534386+00:00",
+  "counts": {
+    "changed": 74,
+    "unchanged": 45,
+    "skipped_fixture_changed": 0,
+    "skipped_result_now_known": 0,
+    "not_found": 0
+  },
+  "candidate_records_hash_before": "sha256:54f934fb9de6d194953e2d5d17995c2fff35906f4effc5a0f6b74f2e7fe54d4e",
+  "candidate_records_hash_after": "sha256:54f934fb9de6d194953e2d5d17995c2fff35906f4effc5a0f6b74f2e7fe54d4e",
+  "predictions_file_line_hash": "sha256:53f9bd08f0a4dfde0831bce2a6bfacd9676c3547a19f82f6712ce34b9bb2d422",
+  "changed_records": [
+    {
+      "match_id": "gen-4e0490d00ec17f65",
+      "old_predicted": {
+        "home": 0.4518,
+        "draw": 0.3002,
+        "away": 0.248
+      },
+      "new_predicted": {
+        "home": 0.4794,
+        "draw": 0.2809,
+        "away": 0.2397
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-c94b19a95ff790bc",
+      "old_predicted": {
+        "home": 0.381,
+        "draw": 0.3161,
+        "away": 0.3029
+      },
+      "new_predicted": {
+        "home": 0.3534,
+        "draw": 0.2967,
+        "away": 0.3499
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-f66d1613a6a668b3",
+      "old_predicted": {
+        "home": 0.3375,
+        "draw": 0.2954,
+        "away": 0.3671
+      },
+      "new_predicted": {
+        "home": 0.3234,
+        "draw": 0.2855,
+        "away": 0.3911
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-8b017838492ac2c0",
+      "old_predicted": {
+        "home": 0.355,
+        "draw": 0.3057,
+        "away": 0.3393
+      },
+      "new_predicted": {
+        "home": 0.3409,
+        "draw": 0.2958,
+        "away": 0.3633
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-f4f057d898c4aa8f",
+      "old_predicted": {
+        "home": 0.4606,
+        "draw": 0.3,
+        "away": 0.2394
+      },
+      "new_predicted": {
+        "home": 0.4466,
+        "draw": 0.2901,
+        "away": 0.2633
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-14780746885626a7",
+      "old_predicted": {
+        "home": 0.4396,
+        "draw": 0.3068,
+        "away": 0.2536
+      },
+      "new_predicted": {
+        "home": 0.4254,
+        "draw": 0.297,
+        "away": 0.2776
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-5c3a8de868104628",
+      "old_predicted": {
+        "home": 0.4205,
+        "draw": 0.3241,
+        "away": 0.2554
+      },
+      "new_predicted": {
+        "home": 0.4481,
+        "draw": 0.3048,
+        "away": 0.2471
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-7538b1d248781782",
+      "old_predicted": {
+        "home": 0.4307,
+        "draw": 0.317,
+        "away": 0.2523
+      },
+      "new_predicted": {
+        "home": 0.403,
+        "draw": 0.2977,
+        "away": 0.2993
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-817543726d71ae10",
+      "old_predicted": {
+        "home": 0.385,
+        "draw": 0.3347,
+        "away": 0.2803
+      },
+      "new_predicted": {
+        "home": 0.371,
+        "draw": 0.3248,
+        "away": 0.3042
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-8bd81d79ded72f69",
+      "old_predicted": {
+        "home": 0.3926,
+        "draw": 0.3397,
+        "away": 0.2677
+      },
+      "new_predicted": {
+        "home": 0.3784,
+        "draw": 0.3299,
+        "away": 0.2917
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-f9d86dca5eabc51c",
+      "old_predicted": {
+        "home": 0.4468,
+        "draw": 0.3097,
+        "away": 0.2435
+      },
+      "new_predicted": {
+        "home": 0.4609,
+        "draw": 0.2998,
+        "away": 0.2393
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-9e79d7ed9136dfab",
+      "old_predicted": {
+        "home": 0.3633,
+        "draw": 0.3115,
+        "away": 0.3252
+      },
+      "new_predicted": {
+        "home": 0.3492,
+        "draw": 0.3016,
+        "away": 0.3492
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-5b3613099a46709c",
+      "old_predicted": {
+        "home": 0.46,
+        "draw": 0.2965,
+        "away": 0.2435
+      },
+      "new_predicted": {
+        "home": 0.4741,
+        "draw": 0.2866,
+        "away": 0.2393
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-88d49fec37fb064a",
+      "old_predicted": {
+        "home": 0.4271,
+        "draw": 0.3215,
+        "away": 0.2514
+      },
+      "new_predicted": {
+        "home": 0.4129,
+        "draw": 0.3117,
+        "away": 0.2754
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-a01c089bec7b4d58",
+      "old_predicted": {
+        "home": 0.366,
+        "draw": 0.3194,
+        "away": 0.3146
+      },
+      "new_predicted": {
+        "home": 0.3802,
+        "draw": 0.3095,
+        "away": 0.3103
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-bda9b4c43abf4bcf",
+      "old_predicted": {
+        "home": 0.4697,
+        "draw": 0.285,
+        "away": 0.2453
+      },
+      "new_predicted": {
+        "home": 0.4838,
+        "draw": 0.2751,
+        "away": 0.2411
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-f0ca44f73b9bf5cf",
+      "old_predicted": {
+        "home": 0.4284,
+        "draw": 0.3166,
+        "away": 0.255
+      },
+      "new_predicted": {
+        "home": 0.4143,
+        "draw": 0.3067,
+        "away": 0.279
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-001139e885adedfd",
+      "old_predicted": {
+        "home": 0.4655,
+        "draw": 0.2906,
+        "away": 0.2439
+      },
+      "new_predicted": {
+        "home": 0.4796,
+        "draw": 0.2807,
+        "away": 0.2397
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-2ae71f18a1008722",
+      "old_predicted": {
+        "home": 0.4431,
+        "draw": 0.3083,
+        "away": 0.2486
+      },
+      "new_predicted": {
+        "home": 0.4289,
+        "draw": 0.2985,
+        "away": 0.2726
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-4ecd54b2bbefb070",
+      "old_predicted": {
+        "home": 0.4273,
+        "draw": 0.3194,
+        "away": 0.2533
+      },
+      "new_predicted": {
+        "home": 0.4549,
+        "draw": 0.3,
+        "away": 0.2451
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-c8b2ffb61d5c309d",
+      "old_predicted": {
+        "home": 0.4809,
+        "draw": 0.2961,
+        "away": 0.223
+      },
+      "new_predicted": {
+        "home": 0.5085,
+        "draw": 0.2768,
+        "away": 0.2147
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-ed697a84419e3a71",
+      "old_predicted": {
+        "home": 0.4666,
+        "draw": 0.2939,
+        "away": 0.2395
+      },
+      "new_predicted": {
+        "home": 0.4525,
+        "draw": 0.284,
+        "away": 0.2635
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-f3a20c8422f4a86e",
+      "old_predicted": {
+        "home": 0.4623,
+        "draw": 0.2928,
+        "away": 0.2449
+      },
+      "new_predicted": {
+        "home": 0.4899,
+        "draw": 0.2735,
+        "away": 0.2366
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-7fc3d33a0aad5361",
+      "old_predicted": {
+        "home": 0.4415,
+        "draw": 0.3094,
+        "away": 0.2491
+      },
+      "new_predicted": {
+        "home": 0.414,
+        "draw": 0.29,
+        "away": 0.296
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-b542c6a6703e7c00",
+      "old_predicted": {
+        "home": 0.4048,
+        "draw": 0.3351,
+        "away": 0.2601
+      },
+      "new_predicted": {
+        "home": 0.3908,
+        "draw": 0.3252,
+        "away": 0.284
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-cc641f82cba838a6",
+      "old_predicted": {
+        "home": 0.3719,
+        "draw": 0.3214,
+        "away": 0.3067
+      },
+      "new_predicted": {
+        "home": 0.3442,
+        "draw": 0.3021,
+        "away": 0.3537
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-fafc29018d4d56f9",
+      "old_predicted": {
+        "home": 0.4244,
+        "draw": 0.3234,
+        "away": 0.2522
+      },
+      "new_predicted": {
+        "home": 0.4386,
+        "draw": 0.3135,
+        "away": 0.2479
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-593529bfa4d673eb",
+      "old_predicted": {
+        "home": 0.3718,
+        "draw": 0.2982,
+        "away": 0.33
+      },
+      "new_predicted": {
+        "home": 0.3577,
+        "draw": 0.2883,
+        "away": 0.354
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-613cafa4fc6a791d",
+      "old_predicted": {
+        "home": 0.4066,
+        "draw": 0.323,
+        "away": 0.2704
+      },
+      "new_predicted": {
+        "home": 0.4207,
+        "draw": 0.3131,
+        "away": 0.2662
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-8874471fc8fe3a07",
+      "old_predicted": {
+        "home": 0.4235,
+        "draw": 0.32,
+        "away": 0.2565
+      },
+      "new_predicted": {
+        "home": 0.4094,
+        "draw": 0.3101,
+        "away": 0.2805
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-d9c0be17b26e51b6",
+      "old_predicted": {
+        "home": 0.3749,
+        "draw": 0.3256,
+        "away": 0.2995
+      },
+      "new_predicted": {
+        "home": 0.3608,
+        "draw": 0.3157,
+        "away": 0.3235
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-4a6bb35d8682e776",
+      "old_predicted": {
+        "home": 0.451,
+        "draw": 0.3028,
+        "away": 0.2462
+      },
+      "new_predicted": {
+        "home": 0.4651,
+        "draw": 0.2929,
+        "away": 0.242
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-5cf3e5d07ce01ae9",
+      "old_predicted": {
+        "home": 0.4064,
+        "draw": 0.336,
+        "away": 0.2576
+      },
+      "new_predicted": {
+        "home": 0.3789,
+        "draw": 0.3166,
+        "away": 0.3045
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-1e9bd8125da5ff31",
+      "old_predicted": {
+        "home": 0.4603,
+        "draw": 0.2963,
+        "away": 0.2434
+      },
+      "new_predicted": {
+        "home": 0.4879,
+        "draw": 0.2769,
+        "away": 0.2352
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-4f4f7a4d174ab691",
+      "old_predicted": {
+        "home": 0.4647,
+        "draw": 0.2932,
+        "away": 0.2421
+      },
+      "new_predicted": {
+        "home": 0.4787,
+        "draw": 0.2834,
+        "away": 0.2379
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-c73310241184336f",
+      "old_predicted": {
+        "home": 0.4418,
+        "draw": 0.323,
+        "away": 0.2352
+      },
+      "new_predicted": {
+        "home": 0.4277,
+        "draw": 0.3131,
+        "away": 0.2592
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-da38ca0ccdaa8d94",
+      "old_predicted": {
+        "home": 0.3997,
+        "draw": 0.339,
+        "away": 0.2613
+      },
+      "new_predicted": {
+        "home": 0.3721,
+        "draw": 0.3196,
+        "away": 0.3083
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-4032eafbf5f04514",
+      "old_predicted": {
+        "home": 0.4107,
+        "draw": 0.3128,
+        "away": 0.2765
+      },
+      "new_predicted": {
+        "home": 0.4249,
+        "draw": 0.3029,
+        "away": 0.2722
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-42005b013414044b",
+      "old_predicted": {
+        "home": 0.3474,
+        "draw": 0.3063,
+        "away": 0.3463
+      },
+      "new_predicted": {
+        "home": 0.3333,
+        "draw": 0.2965,
+        "away": 0.3702
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-35f6d524798ed684",
+      "old_predicted": {
+        "home": 0.3679,
+        "draw": 0.3187,
+        "away": 0.3134
+      },
+      "new_predicted": {
+        "home": 0.3538,
+        "draw": 0.3088,
+        "away": 0.3374
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-6f8b3c33d32c4ecc",
+      "old_predicted": {
+        "home": 0.4463,
+        "draw": 0.3061,
+        "away": 0.2476
+      },
+      "new_predicted": {
+        "home": 0.4604,
+        "draw": 0.2962,
+        "away": 0.2434
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-7e2c99531058328d",
+      "old_predicted": {
+        "home": 0.4754,
+        "draw": 0.2877,
+        "away": 0.2369
+      },
+      "new_predicted": {
+        "home": 0.4895,
+        "draw": 0.2778,
+        "away": 0.2327
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-b3ad40b47ffd40ce",
+      "old_predicted": {
+        "home": 0.43,
+        "draw": 0.3175,
+        "away": 0.2525
+      },
+      "new_predicted": {
+        "home": 0.4441,
+        "draw": 0.3076,
+        "away": 0.2483
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-dbec2df197f0d93f",
+      "old_predicted": {
+        "home": 0.384,
+        "draw": 0.3128,
+        "away": 0.3032
+      },
+      "new_predicted": {
+        "home": 0.3699,
+        "draw": 0.3029,
+        "away": 0.3272
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-fa7cd3d340f83e3d",
+      "old_predicted": {
+        "home": 0.4734,
+        "draw": 0.2871,
+        "away": 0.2395
+      },
+      "new_predicted": {
+        "home": 0.4457,
+        "draw": 0.2678,
+        "away": 0.2865
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-5ef28c53db74e742",
+      "old_predicted": {
+        "home": 0.456,
+        "draw": 0.2993,
+        "away": 0.2447
+      },
+      "new_predicted": {
+        "home": 0.4419,
+        "draw": 0.2894,
+        "away": 0.2687
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-04d3bae5486d298e",
+      "old_predicted": {
+        "home": 0.434,
+        "draw": 0.3147,
+        "away": 0.2513
+      },
+      "new_predicted": {
+        "home": 0.4199,
+        "draw": 0.3048,
+        "away": 0.2753
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-de60fbee8e3531b6",
+      "old_predicted": {
+        "home": 0.4036,
+        "draw": 0.336,
+        "away": 0.2604
+      },
+      "new_predicted": {
+        "home": 0.4312,
+        "draw": 0.3166,
+        "away": 0.2522
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-0d13d951a8e3200d",
+      "old_predicted": {
+        "home": 0.4567,
+        "draw": 0.2988,
+        "away": 0.2445
+      },
+      "new_predicted": {
+        "home": 0.4708,
+        "draw": 0.2889,
+        "away": 0.2403
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-292ccc2bbd2efc21",
+      "old_predicted": {
+        "home": 0.4133,
+        "draw": 0.3312,
+        "away": 0.2555
+      },
+      "new_predicted": {
+        "home": 0.3992,
+        "draw": 0.3213,
+        "away": 0.2795
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-07ee1c037fac7ea8",
+      "old_predicted": {
+        "home": 0.4089,
+        "draw": 0.3343,
+        "away": 0.2568
+      },
+      "new_predicted": {
+        "home": 0.4366,
+        "draw": 0.3149,
+        "away": 0.2485
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-1dfc8a8991ad890e",
+      "old_predicted": {
+        "home": 0.3949,
+        "draw": 0.3375,
+        "away": 0.2676
+      },
+      "new_predicted": {
+        "home": 0.4224,
+        "draw": 0.3182,
+        "away": 0.2594
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-8e78a664f82ace2c",
+      "old_predicted": {
+        "home": 0.4512,
+        "draw": 0.3006,
+        "away": 0.2482
+      },
+      "new_predicted": {
+        "home": 0.4654,
+        "draw": 0.2907,
+        "away": 0.2439
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-a6976b690cdbf0be",
+      "old_predicted": {
+        "home": 0.4011,
+        "draw": 0.3397,
+        "away": 0.2592
+      },
+      "new_predicted": {
+        "home": 0.3869,
+        "draw": 0.3299,
+        "away": 0.2832
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-7b818e85950d12ac",
+      "old_predicted": {
+        "home": 0.3713,
+        "draw": 0.3211,
+        "away": 0.3076
+      },
+      "new_predicted": {
+        "home": 0.3854,
+        "draw": 0.3112,
+        "away": 0.3034
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-d9b3a1345228c1ed",
+      "old_predicted": {
+        "home": 0.4228,
+        "draw": 0.3225,
+        "away": 0.2547
+      },
+      "new_predicted": {
+        "home": 0.4087,
+        "draw": 0.3126,
+        "away": 0.2787
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-e2ebbb41e0085dd1",
+      "old_predicted": {
+        "home": 0.4792,
+        "draw": 0.283,
+        "away": 0.2378
+      },
+      "new_predicted": {
+        "home": 0.5068,
+        "draw": 0.2637,
+        "away": 0.2295
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-f5d421049f8b1ac4",
+      "old_predicted": {
+        "home": 0.4448,
+        "draw": 0.3051,
+        "away": 0.2501
+      },
+      "new_predicted": {
+        "home": 0.4307,
+        "draw": 0.2952,
+        "away": 0.2741
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-f69c25805cced358",
+      "old_predicted": {
+        "home": 0.3871,
+        "draw": 0.3341,
+        "away": 0.2788
+      },
+      "new_predicted": {
+        "home": 0.4147,
+        "draw": 0.3148,
+        "away": 0.2705
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-346f252483da880e",
+      "old_predicted": {
+        "home": 0.4183,
+        "draw": 0.3217,
+        "away": 0.26
+      },
+      "new_predicted": {
+        "home": 0.4324,
+        "draw": 0.3118,
+        "away": 0.2558
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-e3ad19d27b4ff168",
+      "old_predicted": {
+        "home": 0.3861,
+        "draw": 0.3294,
+        "away": 0.2845
+      },
+      "new_predicted": {
+        "home": 0.4002,
+        "draw": 0.3195,
+        "away": 0.2803
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-94fc752bacf8cda4",
+      "old_predicted": {
+        "home": 0.3818,
+        "draw": 0.3263,
+        "away": 0.2919
+      },
+      "new_predicted": {
+        "home": 0.3676,
+        "draw": 0.3165,
+        "away": 0.3159
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-e0e34bb5ec4f34de",
+      "old_predicted": {
+        "home": 0.3448,
+        "draw": 0.3045,
+        "away": 0.3507
+      },
+      "new_predicted": {
+        "home": 0.3307,
+        "draw": 0.2946,
+        "away": 0.3747
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-0b5fd6a01c5bdc36",
+      "old_predicted": {
+        "home": 0.4434,
+        "draw": 0.3081,
+        "away": 0.2485
+      },
+      "new_predicted": {
+        "home": 0.4574,
+        "draw": 0.2983,
+        "away": 0.2443
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-16df0d9823a234cc",
+      "old_predicted": {
+        "home": 0.4485,
+        "draw": 0.3025,
+        "away": 0.249
+      },
+      "new_predicted": {
+        "home": 0.4344,
+        "draw": 0.2926,
+        "away": 0.273
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-463d25fa39500319",
+      "old_predicted": {
+        "home": 0.3965,
+        "draw": 0.3387,
+        "away": 0.2648
+      },
+      "new_predicted": {
+        "home": 0.3824,
+        "draw": 0.3288,
+        "away": 0.2888
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-50bf87f8b909bebd",
+      "old_predicted": {
+        "home": 0.4324,
+        "draw": 0.3158,
+        "away": 0.2518
+      },
+      "new_predicted": {
+        "home": 0.4183,
+        "draw": 0.3059,
+        "away": 0.2758
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-54de0afe39fa1844",
+      "old_predicted": {
+        "home": 0.4124,
+        "draw": 0.3298,
+        "away": 0.2578
+      },
+      "new_predicted": {
+        "home": 0.3983,
+        "draw": 0.3199,
+        "away": 0.2818
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-59ce44637c2ac147",
+      "old_predicted": {
+        "home": 0.4769,
+        "draw": 0.2846,
+        "away": 0.2385
+      },
+      "new_predicted": {
+        "home": 0.491,
+        "draw": 0.2748,
+        "away": 0.2342
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-61a12c24a8cf0c36",
+      "old_predicted": {
+        "home": 0.3588,
+        "draw": 0.3143,
+        "away": 0.3269
+      },
+      "new_predicted": {
+        "home": 0.3447,
+        "draw": 0.3045,
+        "away": 0.3508
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-680a0aa91efc0ebb",
+      "old_predicted": {
+        "home": 0.4344,
+        "draw": 0.3164,
+        "away": 0.2492
+      },
+      "new_predicted": {
+        "home": 0.4204,
+        "draw": 0.3065,
+        "away": 0.2731
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-9584809aa8707176",
+      "old_predicted": {
+        "home": 0.4715,
+        "draw": 0.2884,
+        "away": 0.2401
+      },
+      "new_predicted": {
+        "home": 0.4857,
+        "draw": 0.2785,
+        "away": 0.2358
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-9e05b94f056b0f95",
+      "old_predicted": {
+        "home": 0.4645,
+        "draw": 0.2933,
+        "away": 0.2422
+      },
+      "new_predicted": {
+        "home": 0.4505,
+        "draw": 0.2834,
+        "away": 0.2661
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    },
+    {
+      "match_id": "gen-b8303c00a68b7264",
+      "old_predicted": {
+        "home": 0.4637,
+        "draw": 0.2919,
+        "away": 0.2444
+      },
+      "new_predicted": {
+        "home": 0.4914,
+        "draw": 0.2725,
+        "away": 0.2361
+      },
+      "old_rolling_form_weights": null,
+      "new_rolling_form_weights": null
+    }
+  ],
+  "unchanged_records": [
+    "gen-5b32aac774435b2a",
+    "gen-0409ff27d73bac2b",
+    "gen-729c733ee5d13908",
+    "gen-cfa3a0d0b5c3f5d9",
+    "gen-e8defe066271c28a",
+    "gen-34b19eaea1a292b4",
+    "gen-9be516c8dcd00cfa",
+    "gen-968d8b69c826a446",
+    "gen-b6270f9dd0e2bd03",
+    "gen-4b6641910aeb743c",
+    "gen-5d5baaccc119d0d1",
+    "gen-11410b53dc3786e5",
+    "gen-1a2d89e47295a002",
+    "gen-552ab488815f6dfb",
+    "gen-6d15c19a65f835ab",
+    "gen-f48c9afbdc8a8f56",
+    "gen-04d0b5fe60d6c6b1",
+    "gen-271337131da2e40d",
+    "gen-1387bdef5a54c6fb",
+    "gen-2a83ca4e669d42e4",
+    "gen-3d06fa5c823f86f3",
+    "gen-936c477c568267f7",
+    "gen-3899e1001f00126e",
+    "gen-1a17007c89eb7177",
+    "gen-2c8bb42e3a85a749",
+    "gen-3d8b1400bfe44f72",
+    "gen-924fd566f62d07b4",
+    "gen-954f9d19de046558",
+    "gen-a79e1996a933b52f",
+    "gen-3100368fcd272251",
+    "gen-cff9bc9f2072d1e9",
+    "gen-a12cb74c9e8fa9df",
+    "gen-e66c1ef72d3a4d15",
+    "gen-0d1ff7d0f5d416f2",
+    "gen-0fdf8ca064d1bc49",
+    "gen-145b648896250ba1",
+    "gen-822aa91c5a003f21",
+    "gen-82302761d7260499",
+    "gen-f9b4e66d750622eb",
+    "gen-04b443782a0c9d5c",
+    "gen-0d1af29a391e8acd",
+    "gen-4089612767d08b0c",
+    "gen-75ea0fab7ddf9318",
+    "gen-813b035fb1d90194",
+    "gen-aab145292e261491"
+  ]
+}

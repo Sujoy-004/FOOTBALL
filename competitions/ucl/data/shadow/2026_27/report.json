@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "season": "2026/27",
+  "meta": {
+    "model_version": "shadow-1.0.0",
+    "strategies": [
+      "market_elo_equal",
+      "market_elo_prior",
+      "production"
+    ],
+    "segments": [
+      "all",
+      "odds_available",
+      "odds_unavailable"
+    ],
+    "bootstrap": {
+      "n_boot": 2000,
+      "seed": 20260601
+    }
+  },
+  "segments": {
+    "all": {
+      "n": 0,
+      "strategies": {
+        "market_elo_equal": {
+          "n": 0,
+          "status": "insufficient"
+        },
+        "market_elo_prior": {
+          "n": 0,
+          "status": "insufficient"
+        },
+        "production": {
+          "n": 0,
+          "status": "insufficient"
+        }
+      }
+    },
+    "odds_available": {
+      "n": 0,
+      "strategies": {
+        "market_elo_equal": {
+          "n": 0,
+          "status": "insufficient"
+        },
+        "market_elo_prior": {
+          "n": 0,
+          "status": "insufficient"
+        },
+        "production": {
+          "n": 0,
+          "status": "insufficient"
+        }
+      }
+    },
+    "odds_unavailable": {
+      "n": 0,
+      "strategies": {
+        "market_elo_equal": {
+          "n": 0,
+          "status": "insufficient"
+        },
+        "market_elo_prior": {
+          "n": 0,
+          "status": "insufficient"
+        },
+        "production": {
+          "n": 0,
+          "status": "insufficient"
+        }
+      }
+    }
+  },
+  "comparisons": {
+    "market_elo_equal_vs_production": {
+      "verdict": "insufficient_evidence (n=0)",
+      "n": 0
+    },
+    "market_elo_prior_vs_production": {
+      "verdict": "insufficient_evidence (n=0)",
+      "n": 0
+    },
+    "market_elo_equal_vs_market_elo_prior": {
+      "verdict": "insufficient_evidence (n=0)",
+      "n": 0
+    }
+  },
+  "breakdowns": {
+    "by_season": {},
+    "by_matchday": {}
+  },
+  "honesty": {
+    "n_prediction_records": 357,
+    "n_unique_fixtures_frozen": 119,
+    "n_scored_fixtures": 0,
+    "n_pending_fixtures": 119,
+    "n_attached_results": 11
+  },
+  "model_config": {
+    "production": {
+      "weights_hash": "sha256:bb70bdb4587ce39266843d7a4e057ea1140dd8740829309a97726460e8539425",
+      "weights_file": "signal_weights.json",
+      "engine_signals": [
+        "market_odds",
+        "refined_elo",
+        "rest_days",
+        "rolling_form",
+        "squad_value"
+      ]
+    },
+    "market_elo_equal": {
+      "weights_hash": "sha256:def977608a0398066c91f4c6ce27e89f5960327d90b553e03fb0449f5a623cdd",
+      "weights_file": null,
+      "engine_signals": [
+        "market_elo"
+      ]
+    },
+    "market_elo_prior": {
+      "weights_hash": "sha256:def977608a0398066c91f4c6ce27e89f5960327d90b553e03fb0449f5a623cdd",
+      "weights_file": "market_elo_prior_weights.json",
+      "engine_signals": [
+        "market_elo"
+      ]
+    }
+  }
+}

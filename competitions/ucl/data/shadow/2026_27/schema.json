@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "season": "2026/27",
+  "created_at": "2026-09-11T01:47:21.104058+00:00",
+  "model_version": "shadow-1.0.0",
+  "strategies": [
+    "production",
+    "market_elo_equal",
+    "market_elo_prior"
+  ]
+}
