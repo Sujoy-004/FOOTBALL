@@ -1039,12 +1039,23 @@ def _is_historical_season(season: str | None) -> bool:
 
 
 def _make_fixture_lookup_from_doc(doc: dict) -> dict[tuple[str, str], str]:
-    """Build (home, away) -> match_id lookup from a fixtures document."""
+    """Build (home, away) -> match_id lookup from a fixtures document.
+
+    Keys are registered EXACTLY (both orientations) and accent-folded (both
+    orientations), so a result event whose normalized spelling differs from
+    the catalog only by case/diacritics (``Bodo/Glimt`` vs ``Bodø/Glimt``)
+    attaches to the canonical ``gen-*`` fixture instead of being dropped as
+    having no active-season target. This mirrors the folded pair matching the
+    fixtures upsert already uses (:func:`fold_pair_key`).
+    """
     lookup: dict[tuple[str, str], str] = {}
     for md in doc.get("fixtures", []):
         pair = (md["team_a"], md["team_b"])
         lookup[pair] = md["match_id"]
         lookup[(md["team_b"], md["team_a"])] = md["match_id"]
+        folded = fold_pair_key(md["team_a"], md["team_b"])
+        lookup.setdefault(folded, md["match_id"])
+        lookup.setdefault((folded[1], folded[0]), md["match_id"])
     return lookup
 
 
@@ -1269,6 +1280,11 @@ def _upsert_season_results(
     # Load existing fixtures for this season (for match_id lookup)
     fx_doc = read_season_fixtures(data_dir, season)
     fx_lookup = _make_fixture_lookup_from_doc(fx_doc) if fx_doc else {}
+    canonical_names_by_fid: dict[str, tuple[str, str]] = {}
+    if fx_doc:
+        for fx in fx_doc.get("fixtures", []):
+            canonical_names_by_fid.setdefault(
+                fx.get("match_id"), (fx["team_a"], fx["team_b"]))
 
     # Load existing results
     res_doc = read_season_results(data_dir, season)
@@ -1312,8 +1328,17 @@ def _upsert_season_results(
         elif match_id and match_id in fx_lookup:
             fid = match_id
         else:
-            # Fallback: match by (home, away) pair within this season's fixtures
-            fid = fx_lookup.get((home, away)) or fx_lookup.get((away, home))
+            # Fallback: match by (home, away) pair within this season's
+            # fixtures — exact pair first, then accent-folded pair (so a
+            # spelling like ``Bodo/Glimt`` still lands on the catalog's
+            # ``Bodø/Glimt`` identity when the normalization layer did not
+            # fold it). Both orientations are tried.
+            fid = (
+                fx_lookup.get((home, away))
+                or fx_lookup.get((away, home))
+                or fx_lookup.get(fold_pair_key(home, away))
+                or fx_lookup.get(fold_pair_key(away, home))
+            )
 
         if fid is None:
             skipped_no_target += 1
@@ -1327,10 +1352,11 @@ def _upsert_season_results(
         home_score = int(ev["home_score"])
         away_score = int(ev["away_score"])
 
+        canon = canonical_names_by_fid.get(fid)
         entry = {
             "match_id": fid,
-            "team_a": home,
-            "team_b": away,
+            "team_a": canon[0] if canon else home,
+            "team_b": canon[1] if canon else away,
             "home_score": home_score,
             "away_score": away_score,
         }
