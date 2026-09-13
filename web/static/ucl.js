@@ -4,6 +4,7 @@ import {
   updateStatusBar, competitions, showSimPopup,
   buildTable, safeJson, renderBracketTree, renderAcquisitionPanel,
   openIntelModal, renderLoading, currentCompetition,
+  configureCompetitionRefresh,
 } from "./shared.js";
 
 const API = "/ucl/api";
@@ -23,6 +24,10 @@ const sigLabels = {
 const sigOrder = ["refined_elo", "rolling_form", "market_odds", "squad_value", "rest_days"];
 
 export function init(comp) {
+  // Live-refresh reload hook: re-fetches only the live state-bearing
+  // payloads and re-renders (see refreshLive below). Configuration comes
+  // from the shared registry (UCL 90s).
+  configureCompetitionRefresh("ucl", { reload: refreshLive });
   loadAll({ label: "Loading UCL…" });
 }
 
@@ -108,14 +113,14 @@ async function loadAll(opts) {
       if (_stale(gen)) return;
     }
 
-    const [d, s, br, ob, sig, ss] = await Promise.all([
-      safeJson(API + "/data"),
-      safeJson(API + "/standings"),
-      safeJson(API + "/bracket"),
-      safeJson(API + "/odds"),
-      safeJson(API + "/signals"),
+    // Live state block (5 endpoints — never /seasons mid-session) and the
+    // season list fetched in parallel; the atomic all-or-nothing commit
+    // below still holds.
+    const [block, ss] = await Promise.all([
+      _fetchLiveBlock(),
       safeJson(API + "/seasons"),
     ]);
+    const d = block.d;
 
     // Race guard: discard entirely if a newer transition started (or we left
     // UCL) while these requests were in flight. No mutation, no render.
@@ -136,11 +141,7 @@ async function loadAll(opts) {
     }
 
     // ── Commit: single all-or-nothing mutation of shared state ──
-    appState.data = d;
-    appState.standings = s.standings || [];
-    appState.bracket = br;
-    appState.odds = ob.odds || [];
-    appState.signals = sig.signals || {};
+    _commitLiveBlock(block);
     appState.seasons = ss.seasons || [];
     appState.activeSeason = ss.active_season || d.season || null;
     if (o.season != null) {
@@ -184,27 +185,49 @@ async function loadAll(opts) {
   updateStatus();
 }
 
-async function reloadData() {
+// Live state block: the five state-bearing payloads a live refresh
+// re-fetches. Never /seasons (it cannot change mid-session) and never the
+// sim-session payload — the sim DOM is intentionally preserved by live
+// refreshes.
+async function _fetchLiveBlock() {
+  const [d, s, br, ob, sig] = await Promise.all([
+    safeJson(API + "/data"),
+    safeJson(API + "/standings"),
+    safeJson(API + "/bracket"),
+    safeJson(API + "/odds"),
+    safeJson(API + "/signals"),
+  ]);
+  return { d, s, br, ob, sig };
+}
+
+function _commitLiveBlock(block) {
+  appState.data = block.d;
+  appState.standings = block.s.standings || [];
+  appState.bracket = block.br;
+  appState.odds = block.ob.odds || [];
+  appState.signals = block.sig.signals || {};
+}
+
+// Live refresh (Exchange 9C): re-fetches only the live state-bearing
+// payloads and re-renders. It CAPTURES (never increments) the generation
+// token, so loadAll — the only generator of new tokens — always outranks an
+// in-flight live refresh; a live refresh can never commit over a newer full
+// load, and a switching user can never be rendered into by a live refresh.
+async function refreshLive() {
+  const gen = _transitionGen;
+  let block;
   try {
-    const [d, s, br, o, sig, ss] = await Promise.all([
-      safeJson(API + "/data"),
-      safeJson(API + "/standings"),
-      safeJson(API + "/bracket"),
-      safeJson(API + "/odds"),
-      safeJson(API + "/signals"),
-      safeJson(API + "/seasons"),
-    ]);
-    appState.data = d;
-    appState.standings = s.standings || [];
-    appState.bracket = br;
-    appState.odds = o.odds || [];
-    appState.signals = sig.signals || {};
-    appState.seasons = ss.seasons || [];
-    appState.activeSeason = ss.active_season || d.season || null;
+    block = await _fetchLiveBlock();
   } catch (e) {
-    console.error("reloadData failed:", e);
+    console.error("UCL live refresh error:", e);
+    return;
   }
-  renderOverview(); renderStandings(); renderBracket(); updateStatus();
+  if (_stale(gen)) return;
+  _commitLiveBlock(block);
+  renderOverview();
+  renderStandings();
+  renderBracket();
+  updateStatus();
 }
 
 function updateStatus() {

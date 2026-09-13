@@ -1,3 +1,9 @@
+// ── Shared live-refresh manager (Exchange 9C) ────────────────────────
+// One manager instance per page; configuration lives on each registry
+// entry, the reload hook is supplied by each competition module, and the
+// shell owns all lifecycle wiring (activate/stop/visibility/tab clicks).
+import { createRefreshManager } from "./refresh.js";
+
 // ── Safe JSON fetch ──────────────────────────────────────────────────
 // Never blindly parse: surfaces status + URL + body snippet on failure so
 // empty/truncated/error responses produce a readable message instead of
@@ -42,6 +48,7 @@ const competitions = {
     route: "/worldcup",
     apiPrefix: "/worldcup/api",
     tabs: ["Overview", "Bracket", "Standings"],
+    liveRefresh: { enabled: true, intervalMs: 45000, refreshOnActivation: true },
   },
   ucl: {
     label: "UEFA Champions League",
@@ -50,8 +57,51 @@ const competitions = {
     route: "/ucl",
     apiPrefix: "/ucl/api",
     tabs: ["Overview", "Bracket", "Standings"],
+    liveRefresh: { enabled: true, intervalMs: 90000, refreshOnActivation: true },
   },
 };
+
+// ── Live-refresh wiring (Exchange 9C) ────────────────────────────────
+// The manager polls the ACTIVE competition only, and only while the
+// document is visible and the competition is enabled. All timing/visibility
+// policy lives in refresh.js; these wrappers glue it to the SPA lifecycle.
+const refreshManager = createRefreshManager();
+
+function configureCompetitionRefresh(slug, opts) {
+  const cfg = (competitions[slug] && competitions[slug].liveRefresh) || {};
+  refreshManager.registerRefresh(slug, {
+    reload: (opts && opts.reload) || (() => null),
+    enabled: (opts && opts.enabled != null) ? opts.enabled : !!cfg.enabled,
+    intervalMs: (opts && opts.intervalMs) || cfg.intervalMs || 60000,
+    refreshOnActivation: (opts && opts.refreshOnActivation != null)
+      ? opts.refreshOnActivation
+      : cfg.refreshOnActivation !== false,
+  });
+}
+
+// Shell call after a competition module boots: stop any prior timer, arm
+// this competition's. Immediate refresh is intentionally NOT requested here
+// — the module just kicked off its own first load.
+function activateCompetitionRefresh(slug) {
+  refreshManager.activateRefresh(slug, { immediate: false });
+}
+
+// Tab activation / visibility catch-up: never silently reuse stale data
+// when the user returns to a live-data tab.
+function requestCompetitionRefresh(slug) {
+  refreshManager.requestRefresh(slug);
+}
+
+// Leaving to the landing page: full stop (timers + pending follow-ups).
+function stopAllCompetitionRefresh() {
+  refreshManager.stopAllRefresh();
+}
+
+// Visibility catch-up: the page became visible again — refresh the active
+// competition (same activation semantics, still gated by its config).
+document.addEventListener("visibilitychange", () => {
+  refreshManager.notifyVisible();
+});
 
 // ── State ──
 let currentCompetition = null;
@@ -88,6 +138,7 @@ document.addEventListener("click", e => {
 // ── Landing Page ──
 function renderLanding() {
   currentCompetition = null;
+  stopAllCompetitionRefresh();
   document.body.className = "";
   document.getElementById("landingBackdrop").classList.add("show");
 
@@ -271,6 +322,9 @@ async function loadCompetition(slug) {
       }
     }
     if (btn.dataset.tab === "bracket") setTimeout(drawBracketConnectors, 300);
+    // Returning to a live-data tab must not silently reuse stale data: ask
+    // for a catch-up refresh (gated by the competition's liveRefresh config).
+    requestCompetitionRefresh(slug);
   });
 
   // Wire modal
@@ -297,6 +351,8 @@ async function loadCompetition(slug) {
     const mod = await import("./" + (comp.module || slug) + ".js");
     loadedModules[slug] = mod;
     mod.init(comp);
+    // Arm live refresh now that the module registered its reload hook.
+    activateCompetitionRefresh(slug);
   } catch (e) {
     document.getElementById("contentArea").innerHTML =
       '<div style="color:#ff6b6b;padding:20px">Failed to load ' + comp.label + ': ' + e.message + '</div>';
@@ -726,4 +782,8 @@ export {
   openIntelModal,
   safeJson,
   renderLoading,
+  configureCompetitionRefresh,
+  activateCompetitionRefresh,
+  requestCompetitionRefresh,
+  stopAllCompetitionRefresh,
 };

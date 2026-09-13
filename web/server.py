@@ -56,6 +56,7 @@ class _NoCacheASGI:
 
         await self.app(scope, receive, send_wrapper)
 
+from web.cache_control import no_store_for_competition_api
 from web.competitions import REGISTRY, consume_lazy_gate
 
 
@@ -143,7 +144,12 @@ for _adapter in REGISTRY.list():
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-asgi_app: ASGIApp = _NoCacheASGI(app)
+# Cache policy (Exchange 9C): every competition API response is
+# Cache-Control: no-store (registry-derived prefixes) so an open tab always
+# re-fetches fresh data; the outer wrapper keeps /static/ no-cache and the
+# landing page untouched. Simulation endpoints are included — idempotent
+# reads that never recompute server state.
+asgi_app: ASGIApp = _NoCacheASGI(no_store_for_competition_api(app))
 
 if __name__ == "__main__":
     import argparse

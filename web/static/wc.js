@@ -2,14 +2,13 @@
 import {
   buildTable, destroyModalCharts, modalCharts, renderBracketTree,
   updateStatusBar, competitions, renderLoading, currentCompetition,
+  configureCompetitionRefresh,
 } from "./shared.js";
 
 const API = "/worldcup/api";
 const sigLabels = { elo: "Elo", market_odds: "Market Odds", rolling_form: "Rolling Form", squad_value: "Squad Value", rest_days: "Rest Days" };
 const appState = { data: null, overview: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} , simMeta: null };
 let refreshing = false;
-let autoRefreshOn = false;
-let autoTimer = null;
 
 let _transitionGen = 0;
 
@@ -22,7 +21,52 @@ function _stale(gen) {
 }
 
 export function init(comp) {
+  // Live-refresh reload hook: re-fetches the same payloads as loadAll and
+  // re-renders (see refreshLive below). Configuration comes from the shared
+  // registry (WC 45s).
+  configureCompetitionRefresh("worldcup", { reload: refreshLive });
   loadAll();
+}
+
+// Live state payloads (raw fetches kept intentionally tolerant: any single
+// endpoint failing must NOT prevent the others from rendering). Returns null
+// when a newer transition superseded these requests.
+async function _loadWcPayloads(gen) {
+  let ov = null;
+  try {
+    ov = await fetch(API + "/overview").then(r => r.json());
+  } catch (e) { console.error("overview load failed:", e); }
+  if (_stale(gen)) return null;
+  let s = null;
+  try {
+    s = await fetch(API + "/standings").then(r => r.json());
+  } catch {}
+  if (_stale(gen)) return null;
+  let br = null;
+  try {
+    br = await fetch(API + "/bracket").then(r => r.json());
+  } catch {}
+  if (_stale(gen)) return null;
+  let bd = null;
+  try {
+    bd = await fetch(API + "/bracket/data").then(r => r.json());
+  } catch {}
+  if (_stale(gen)) return null;
+  let fb = null;
+  try {
+    fb = await fetch(API + "/bracket/full").then(r => r.json());
+  } catch {}
+  if (_stale(gen)) return null;
+  return { overview: ov, standings: s, bracket: br, bracketData: bd, fullBracket: fb };
+}
+
+function _commitWcPayload(p) {
+  appState.overview = p.overview;
+  appState.data = p.overview;
+  appState.standings = p.standings;
+  appState.bracket = p.bracket;
+  appState.bracketData = p.bracketData;
+  appState.fullBracket = p.fullBracket;
 }
 
 async function loadAll() {
@@ -34,46 +78,32 @@ async function loadAll() {
   renderLoading(document.getElementById("tab-standings"), "Loading standings...");
   renderLoading(document.getElementById("tab-bracket"), "Loading bracket...");
 
-  let ov = null;
-  try {
-    ov = await fetch(API + "/overview").then(r => r.json());
-  } catch (e) { console.error("overview load failed:", e); }
-  if (_stale(gen)) return gen;
-  appState.overview = ov;
-  appState.data = ov;
-  // Rendered unconditionally (with a truthful fallback when ov is null) so the
-  // overview loader always clears, never sticks as a spinner.
+  const payload = await _loadWcPayloads(gen);
+  if (!payload || _stale(gen)) return gen;
+  _commitWcPayload(payload);
+  // Render order preserved: overview -> status -> standings -> bracket.
   renderOverview();
   updateStatus();
-  // Standings tab
-  try {
-    const s = await fetch(API + "/standings").then(r => r.json());
-    if (_stale(gen)) return gen;
-    appState.standings = s;
-  } catch {}
-  // Rendered unconditionally so the standings loader always clears (a failed
-  // fetch falls through to renderStandings' truthful "not available" state).
-  if (_stale(gen)) return gen;
   renderStandings();
-  // Bracket tab — full bracket data (chronological + knockout tree)
-  try {
-    const br = await fetch(API + "/bracket").then(r => r.json());
-    if (_stale(gen)) return gen;
-    appState.bracket = br;
-  } catch {}
-  try {
-    const bd = await fetch(API + "/bracket/data").then(r => r.json());
-    if (_stale(gen)) return gen;
-    appState.bracketData = bd;
-  } catch {}
-  try {
-    const fb = await fetch(API + "/bracket/full").then(r => r.json());
-    if (_stale(gen)) return gen;
-    appState.fullBracket = fb;
-  } catch {}
-  if (_stale(gen)) return gen;
   renderBracket();
   return gen;
+}
+
+// Live refresh (Exchange 9C): same fetch tolerance + render order, but
+// CAPTURES (never increments) the generation token, so loadAll — the only
+// generator of new tokens — always outranks an in-flight live refresh. The
+// sim DOM (appState.simBracket / simulation overlay) is intentionally
+// untouched, and `refreshing` is never set: live refresh does not gate
+// simulation eligibility.
+async function refreshLive() {
+  const gen = _transitionGen;
+  const payload = await _loadWcPayloads(gen);
+  if (!payload || _stale(gen)) return;
+  _commitWcPayload(payload);
+  renderOverview();
+  updateStatus();
+  renderStandings();
+  renderBracket();
 }
 
 function updateStatus() {
@@ -89,13 +119,6 @@ function updateStatus() {
   );
 }
 
-
-function toggleAuto(on) {
-  autoRefreshOn = on;
-  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-  if (on) autoTimer = setInterval(() => doRefresh(), 60000);
-  updateStatus();
-}
 
 // ── Simulation Popup ──
 function showSimPopup() {
