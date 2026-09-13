@@ -131,9 +131,17 @@ body {
 }
 .lc-card:hover { border-color: #16A085; transform: translateY(-3px); box-shadow: 0 8px 30px rgba(22,160,133,0.12); }
 .lc-card:hover::before { opacity: 0.6; }
-.lc-card.worldcup { border-color: rgba(22,160,133,0.25); }
-.lc-card.worldcup .lcc-badge { color: #16A085; }
-.lc-card.ucl { border-color: rgba(21,61,76,0.3); }
+.lc-card.worldcup {
+  border-color: rgba(211,163,118,0.35);
+  background: linear-gradient(rgba(20,12,48,0.45), rgba(20,12,48,0.55)), url("images/wc.webp") center / cover no-repeat;
+}
+.lc-card.worldcup .lcc-badge { color: #D3A376; }
+.lc-card.worldcup .lcc-stat, .lc-card.worldcup .lcc-loading, .lc-card.worldcup .lcc-coming-soon { color: #D3A376; }
+.lc-card.worldcup .lcc-stat strong, .lc-card.worldcup .lcc-name { color: #FFF2DF; }
+.lc-card.ucl {
+  border-color: rgba(21,61,76,0.45);
+  background: linear-gradient(rgba(20,12,48,0.45), rgba(20,12,48,0.55)), url("images/ucl.webp") center / cover no-repeat;
+}
 .lc-card.lc-disabled { opacity: 0.45; cursor: default; }
 .lc-card.lc-disabled:hover { border-color: rgba(21,61,76,0.3); transform: none; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
 .lc-card.lc-disabled:hover::before { opacity: 0; }
@@ -585,8 +593,12 @@ body {
 
 /* ── WC Earth Tone Palette ── */
 .competition-worldcup {
-  background: linear-gradient(135deg, #3E2522, #4A3028 50%, #5A3D30);
+  background: linear-gradient(rgba(10,12,20,0.55), rgba(10,12,20,0.65)), url("images/wc.webp") center / cover fixed no-repeat;
   color: #FFF2DF;
+}
+/* ── UCL palette ── */
+.competition-ucl {
+  background: linear-gradient(rgba(10,12,20,0.55), rgba(10,12,20,0.65)), url("images/ucl.webp") center / cover fixed no-repeat;
 }
 .competition-worldcup .tab-bar { border-bottom-color: #8C6E63; }
 .competition-worldcup .tab-btn { color: #8C6E6388; }
