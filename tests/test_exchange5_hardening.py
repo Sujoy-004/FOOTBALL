@@ -132,7 +132,8 @@ class TestRegistryWiring:
             for adapter in REGISTRY.list():
                 if path.startswith(adapter.mount_prefix):
                     mounted_prefixes.add(adapter.mount_prefix)
-        assert mounted_prefixes == {"/worldcup", "/ucl"}
+        expected = {a.mount_prefix for a in REGISTRY.list()}
+        assert mounted_prefixes == expected
 
     def test_default_count_matches_documented_default(self, snapshot_mode):
         import inspect

@@ -33,23 +33,26 @@ def snapshot_mode(monkeypatch):
 # ── Registry ────────────────────────────────────────────────────────────────
 
 class TestCompetitionRegistry:
-    def test_default_registry_resolves_both_competitions(self):
+    def test_default_registry_resolves_all_competitions(self):
         from web.competitions import build_default_registry
         reg = build_default_registry()
-        assert reg.ids() == ["worldcup", "ucl"]
+        assert reg.ids() == ["worldcup", "ucl", "laliga"]
         wc = reg.get("worldcup")
         ucl = reg.get("ucl")
+        laliga = reg.get("laliga")
         assert wc.mount_prefix == "/worldcup"
         assert ucl.mount_prefix == "/ucl"
-        assert wc.display_name and ucl.display_name
+        assert laliga.mount_prefix == "/laliga"
+        assert wc.display_name and ucl.display_name and laliga.display_name
 
     def test_unknown_competition_lists_known_ids(self):
         from web.competitions import build_default_registry
         reg = build_default_registry()
         with pytest.raises(KeyError) as exc:
-            reg.get("laliga")
+            reg.get("seriea")
         assert "worldcup" in str(exc.value)
         assert "ucl" in str(exc.value)
+        assert "laliga" in str(exc.value)
 
     def test_duplicate_registration_rejected(self):
         from web.competitions import (

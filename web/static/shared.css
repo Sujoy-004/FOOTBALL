@@ -142,6 +142,17 @@ body {
   border-color: rgba(21,61,76,0.45);
   background: linear-gradient(rgba(20,12,48,0.45), rgba(20,12,48,0.55)), url("images/ucl.webp") center / cover no-repeat;
 }
+.lc-card.laliga {
+  border-color: rgba(218,64,64,0.4);
+  background:
+    radial-gradient(120% 90% at 15% 10%, rgba(218,64,64,0.28), transparent 55%),
+    radial-gradient(120% 90% at 90% 90%, rgba(220,160,40,0.18), transparent 55%),
+    linear-gradient(rgba(20,12,48,0.5), rgba(20,12,48,0.6)),
+    linear-gradient(135deg, #1a0a12, #30121c);
+}
+.lc-card.laliga .lcc-badge { color: #E85D5D; }
+.lc-card.laliga .lcc-stat, .lc-card.laliga .lcc-loading, .lc-card.laliga .lcc-coming-soon { color: #E8B45D; }
+.lc-card.laliga .lcc-stat strong, .lc-card.laliga .lcc-name { color: #FFE7E7; }
 .lc-card.lc-disabled { opacity: 0.45; cursor: default; }
 .lc-card.lc-disabled:hover { border-color: rgba(21,61,76,0.3); transform: none; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
 .lc-card.lc-disabled:hover::before { opacity: 0; }
@@ -600,6 +611,62 @@ body {
 .competition-ucl {
   background: linear-gradient(rgba(10,12,20,0.55), rgba(10,12,20,0.65)), url("images/ucl.webp") center / cover fixed no-repeat;
 }
+/* ── LaLiga palette ── */
+.competition-laliga {
+  background: linear-gradient(rgba(16,8,12,0.6), rgba(16,8,12,0.7)),
+    radial-gradient(140% 120% at 18% 8%, rgba(218,64,64,0.22), transparent 60%) fixed;
+}
+.competition-laliga .tab-bar { border-bottom-color: #7A2E2E; }
+.competition-laliga .tab-btn { color: #7A2E2E88; }
+.competition-laliga .tab-btn:hover { color: #FFE7E7; }
+.competition-laliga .tab-btn.active { color: #E85D5D; border-bottom-color: #E85D5D; }
+.competition-laliga .nav-bar { border-left-color: #7A2E2E; }
+.competition-laliga .nav-logo { color: #E85D5D; border-bottom-color: #7A2E2E; }
+.competition-laliga .nl-indicator { background: #E85D5D; }
+.competition-laliga .nav-divider { background: #7A2E2E; }
+.competition-laliga .nav-section-label { color: #7A2E2E88; }
+.competition-laliga .nav-btn { color: #9C4A4A; }
+.competition-laliga .nav-btn:hover { color: #FFE7E7; background: rgba(122,46,46,0.35); }
+.competition-laliga .nav-btn.active { color: #E85D5D; border-left-color: #E85D5D; background: rgba(232,93,93,0.08); }
+.competition-laliga .nav-btn.disabled:hover { color: #9C4A4A; }
+.competition-laliga .nb-badge { color: #E85D5D; }
+.competition-laliga .nav-btn.active .nb-badge { color: #FFE7E7; }
+.competition-laliga .status-bar { border-top-color: #7A2E2E; color: #9C4A4A; }
+.competition-laliga .stat-card { border-color: rgba(122,46,46,0.3); background: rgba(64,20,20,0.6); }
+.competition-laliga .stat-card .val { color: #E85D5D; }
+.competition-laliga .stat-card .lbl { color: #9C4A4A; }
+.competition-laliga .team-card { border-color: rgba(122,46,46,0.3); background: rgba(64,20,20,0.6); }
+.competition-laliga .team-card .name { color: #E85D5D; }
+.competition-laliga .team-card .elo { color: #9C4A4A; }
+.competition-laliga .chart-section .title { color: #E85D5D; }
+.competition-laliga .chart-row .cbar { background: linear-gradient(90deg, #7A2E2E, #E85D5D); }
+.competition-laliga .chart-row .cbar-wrap { background: #7A2E2E44; }
+.competition-laliga .eval-table th { color: #E85D5D; border-bottom-color: #7A2E2E; }
+.competition-laliga .eval-table td { border-bottom-color: #7A2E2E44; }
+.competition-laliga .modal h2 { color: #E85D5D; }
+.competition-laliga .modal .m-sub { color: #9C4A4A; }
+.competition-laliga .status-btn { border-color: #E85D5D; color: #E85D5D; }
+.competition-laliga .status-btn:hover { background: #E85D5D; color: #1A0A12; }
+.competition-laliga .dot-green { color: #C49A6C; }
+.competition-laliga .dot-orange { color: #9C4A4A; }
+.competition-laliga .league-table th { color: #E85D5D; border-bottom-color: #7A2E2E; }
+.competition-laliga .league-table td { border-bottom-color: #7A2E2E44; }
+.competition-laliga .league-table .zone-relegation { background: rgba(218,64,64,0.08); }
+.competition-laliga .champ-bar-row .cbar { background: linear-gradient(90deg, #7A2E2E, #E85D5D); }
+.competition-laliga .champ-bar-row .cbar-wrap { background: #7A2E2E44; }
+.competition-laliga .champ-bar-row .cpct { color: #E85D5D; }
+.competition-laliga .md-header { color: #E85D5D; }
+.competition-laliga .sim-popup h3 { color: #E85D5D; }
+.competition-laliga .sim-popup p { color: #9C4A4A; }
+.competition-laliga .sim-presets button { background: #7A2E2E44; border-color: #9C4A4A; }
+.competition-laliga .sim-presets button:hover { background: #9C4A4A; }
+.competition-laliga .sim-presets button.active { background: #E85D5D; border-color: #E85D5D; color: #1A0A12; }
+.competition-laliga .sim-popup input[type="number"] { background: #3A1616; border-color: #9C4A4A; }
+.competition-laliga .sim-popup input[type="number"]:focus { border-color: #E85D5D; }
+.competition-laliga #simStartBtn { background: #E85D5D; border-color: #E85D5D; color: #1A0A12; }
+.competition-laliga #simStartBtn:hover { background: #FF9090; }
+.competition-laliga #simCancelBtn { border-color: #9C4A4A; color: #9C4A4A; }
+.competition-laliga #simCancelBtn:hover { border-color: #FFE7E7; color: #FFE7E7; }
 .competition-worldcup .tab-bar { border-bottom-color: #8C6E63; }
 .competition-worldcup .tab-btn { color: #8C6E6388; }
 .competition-worldcup .tab-btn:hover { color: #FFF2DF; }

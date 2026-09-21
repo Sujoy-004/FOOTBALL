@@ -124,6 +124,14 @@ async def lifespan(app: fastapi.FastAPI):
     except Exception as e:
         logger.error("[UCL] compute_all failed: %s", e)
         _ucl.cache = {}
+
+    import web.laliga_app as _laliga
+
+    try:
+        _laliga.cache = _laliga.compute_all()
+    except Exception as e:
+        logger.error("[LaLiga] compute_all failed: %s", e)
+        _laliga.cache = {}
     yield
 
 

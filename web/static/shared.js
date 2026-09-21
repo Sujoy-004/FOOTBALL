@@ -59,6 +59,15 @@ const competitions = {
     tabs: ["Overview", "Bracket", "Standings"],
     liveRefresh: { enabled: true, intervalMs: 90000, refreshOnActivation: true },
   },
+  laliga: {
+    label: "LaLiga EA Sports",
+    short: "LaLiga",
+    module: "laliga",
+    route: "/laliga",
+    apiPrefix: "/laliga/api",
+    tabs: ["Overview", "Standings", "Fixtures", "Simulation", "Validation"],
+    liveRefresh: { enabled: true, intervalMs: 90000, refreshOnActivation: true },
+  },
 };
 
 // ── Live-refresh wiring (Exchange 9C) ────────────────────────────────
@@ -153,6 +162,7 @@ function renderLanding() {
       <div class="lh-actions">
         <a class="lh-btn lh-btn-primary" href="#/worldcup">Explore WorldCup 2026</a>
         <a class="lh-btn lh-btn-primary" href="#/ucl">Explore UEFA Champions League</a>
+        <a class="lh-btn lh-btn-primary" href="#/laliga">Explore LaLiga EA Sports</a>
       </div>
     </div>
 
@@ -213,6 +223,7 @@ async function loadLandingStats() {
   const results = await Promise.allSettled([
     safeJson("/worldcup/api/data"),
     safeJson("/ucl/api/data"),
+    safeJson("/laliga/api/data"),
   ]);
   if (results[0].status === "fulfilled") {
     const wc = results[0].value;
@@ -236,6 +247,20 @@ async function loadLandingStats() {
       }
       if (ucl.champion) {
         parts.push('<span class="lcc-stat"><strong>' + ucl.champion + '</strong> champion</span>');
+      }
+      el.innerHTML = parts.join('');
+    }
+  }
+  if (results[2].status === "fulfilled") {
+    const laliga = results[2].value;
+    const el = document.getElementById("lccMeta-laliga");
+    if (el) {
+      const parts = [
+        '<span class="lcc-stat"><strong>' + (laliga.n_teams || '&hellip;') + '</strong> teams</span>',
+        '<span class="lcc-stat"><strong>' + (laliga.n_played || 0) + '/' + (laliga.n_total_fixtures || '&hellip;') + '</strong> matches</span>',
+      ];
+      if (laliga.n_iterations > 0) {
+        parts.push('<span class="lcc-stat"><strong>' + (laliga.n_iterations / 1000).toFixed(0) + 'K</strong> simulations</span>');
       }
       el.innerHTML = parts.join('');
     }

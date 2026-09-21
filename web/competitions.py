@@ -244,7 +244,7 @@ def build_default_registry() -> CompetitionRegistry:
     """
     # Imported here so importing this module stays cheap and side-effect
     # free for unit tests of the registry mechanics themselves.
-    from web import ucl_app, wc_app
+    from web import laliga_app, ucl_app, wc_app
 
     registry = CompetitionRegistry()
 
@@ -325,6 +325,37 @@ def build_default_registry() -> CompetitionRegistry:
         run_simulation=lambda **kw: ucl_app.service.start(
             competition_id="ucl", **kw),
         refresh_fn=ucl_refresh,
+    ))
+
+    def laliga_status() -> dict[str, Any]:
+        counts = laliga_app._match_counts()
+        return {
+            "phase": laliga_app.cache.get("phase") or {},
+            "n_played": counts[1] - counts[0],
+            "n_unplayed": counts[0],
+            "mode": getattr(laliga_app, "_mode", None),
+            "availability": dict(laliga_app.cache.get("availability", {})),
+            "champion": laliga_app.cache.get("champion"),
+        }
+
+    def laliga_simulation_support() -> dict[str, Any]:
+        return laliga_app._simulation_state_block()
+
+    def laliga_refresh() -> dict[str, Any]:
+        return dict(laliga_app._fetch_live_data() or {})
+
+    registry.register(CompetitionAdapter(
+        id="laliga",
+        display_name="LaLiga EA Sports",
+        short="LaLiga",
+        mount_prefix="/laliga",
+        api_prefix="/laliga/api",
+        subapp=laliga_app.laliga_app,
+        get_status=laliga_status,
+        simulation_support=laliga_simulation_support,
+        run_simulation=lambda **kw: laliga_app.service.start(
+            competition_id="laliga", **kw),
+        refresh_fn=laliga_refresh,
     ))
 
     return registry
