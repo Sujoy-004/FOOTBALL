@@ -71,9 +71,10 @@ Implemented today:
 |---|---|---|
 | World Cup 2026 | 48 teams, 12 groups, Annex-C third-place routing, R32..FINAL + third-place playoff | `/worldcup` |
 | UEFA Champions League 2026/27 | 36-team Swiss league, draw-derived schedule pending/official enrichment, playoff round, seeded R16 bracket | `/ucl` |
+| LaLiga EA Sports 2026/27 | 20-team double round-robin (380 fixtures, FDO-sourced), top-4 UCL / 5 Europa / 6 Conference / 18–20 relegation, MD6 postponed fixture carried to MD7 | `/laliga` |
 
 The registry/adapter boundary is designed so future competitions (for
-example La Liga or Serie A) plug in by adding one competition brain and one
+example Serie A) plug in by adding one competition brain and one
 registry entry — no changes to `football_core`.
 
 ## Prediction & signals
