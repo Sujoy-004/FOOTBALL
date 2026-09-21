@@ -104,6 +104,18 @@ competitions/ucl/data/seasons/
 competitions/ucl/data/current.json
 
 
+# LaLiga data — runtime state (regeneratable); the shipped 2026/27 fallback
+# season files stay tracked.
+competitions/laliga/data/seasons/*
+!competitions/laliga/data/seasons/2026_27/
+competitions/laliga/data/seasons/2026_27/*
+!competitions/laliga/data/seasons/2026_27/fixtures.json
+!competitions/laliga/data/seasons/2026_27/results.json
+competitions/laliga/data/current.json
+competitions/laliga/data/refresh_report.json
+competitions/laliga/data/snapshot.json
+
+
 # Private interview study guide (local only, never commit)
 study_guide/
 
