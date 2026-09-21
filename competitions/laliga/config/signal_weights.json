@@ -1,0 +1,10 @@
+{
+  "weights": {
+    "rolling_form": 0.25,
+    "rest_days": 0.05,
+    "squad_value": 0.1,
+    "market_odds": 0.3,
+    "refined_elo": 0.3
+  },
+  "normalization_mode": "softmax"
+}

@@ -1,0 +1,28 @@
+{
+  "snapshot_date": "2026-09-21",
+  "source": "derived",
+  "derivation": "standard Elo fit (K=30, home_adv=60) over shipped 2026/27 played results",
+  "note": "api.clubelo.com was unreachable (HTTP 502) at seed time; live ClubElo retry on runtime refresh",
+  "ratings": {
+    "FC Barcelona": 1595.0,
+    "Real Betis Balompié": 1554.9,
+    "Club Atlético de Madrid": 1554.7,
+    "Real Madrid CF": 1538.7,
+    "Sevilla FC": 1524.4,
+    "RC Deportivo La Coruña": 1510.2,
+    "Deportivo Alavés": 1505.4,
+    "Real Sociedad de Fútbol": 1502.6,
+    "Athletic Club": 1497.1,
+    "Rayo Vallecano de Madrid": 1493.4,
+    "Villarreal CF": 1492.4,
+    "Getafe CF": 1486.2,
+    "RC Celta de Vigo": 1484.1,
+    "CA Osasuna": 1481.9,
+    "Levante UD": 1477.6,
+    "Real Racing Club de Santander": 1475.7,
+    "RCD Espanyol de Barcelona": 1466.3,
+    "Elche CF": 1464.9,
+    "Valencia CF": 1448.3,
+    "Málaga CF": 1446.1
+  }
+}

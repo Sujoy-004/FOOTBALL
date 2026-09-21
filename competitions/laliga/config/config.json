@@ -1,0 +1,9 @@
+{
+  "league_id": 3,
+  "fdo_competition_id": "PD",
+  "season": "2026/27",
+  "n_teams": 20,
+  "n_matchdays": 38,
+  "provider": "FootballDataOrgProvider",
+  "shipped_season": "2026/27"
+}
