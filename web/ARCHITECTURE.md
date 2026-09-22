@@ -45,6 +45,16 @@ every rule below is `web/cache_control.py`, `web/static/refresh.js` and the
     its full load. The fully-loaded `loadAll` (which also fetches `/seasons`
     for UCL) is unchanged.
 
+## Shared UI shell (Phase 12A addendum)
+
+- Every competition renders the SAME primary shell from the shared registry's
+  `tabs` array (Overview → Standings → Bracket|Fixtures → Simulation), with
+  Simulation a first-class tab in all three modules, so no competition may
+  fork the tab bar or ship its own copy of the simulation popup — WC and UCL
+  call the single `showSimPopup` in `shared.js` (competition bounds passed as
+  `opts`), and any auxiliary view such as LaLiga's pure-Elo Validation lives
+  as a section inside Overview, never as an extra top-level tab.
+
 ## Refresh semantics
 
 - Generation-token discipline: `loadAll` is the *only* incrementer of
