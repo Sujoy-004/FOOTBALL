@@ -470,25 +470,13 @@ async function renderSimulation() {
       + 'A simulation is currently running. Reload in a moment to see its '
       + 'projections.</div>';
   } else {
-    if (requestState === "completed" && appState.simProjections
-        && appState.simProjections.length) {
-      html += _uclProjectionBlock();
-    } else if (requestState === "failed") {
-      html += '<div class="dim" style="padding:4px 8px;font-size:12px;color:#ff6b6b">'
-        + 'The last simulation failed. No projected probabilities exist.</div>';
-    } else {
-      html += '<div class="dim" style="padding:2px 8px;font-size:11px">'
-        + 'No simulation has been run in this session, so no projected '
-        + 'probabilities exist.</div>';
-    }
-
-    html += '<div class="dim" style="padding:2px 8px;font-size:11px">'
-      + 'Current season: ' + (d.n_played || 0) + ' matches played, '
-      + (d.n_unplayed != null ? d.n_unplayed : "?") + ' remaining</div>';
-
-    // Control card: user chooses whether/how to simulate.
+    // Control card first: user chooses whether/how to simulate. Results and
+    // provenance render AFTER it so every competition reads header → controls
+    // → status → results (Phase 12B layout contract).
     html += '<div style="padding:6px 8px">';
-    html += '<div style="margin-bottom:4px;font-size:11px;color:#15565B">Runs:'
+    html += '<div style="margin-bottom:4px;font-size:11px;color:#15565B">Current season: '
+      + (d.n_played || 0) + ' matches played, '
+      + (d.n_unplayed != null ? d.n_unplayed : "?") + ' remaining&nbsp;&nbsp;&middot;&nbsp;&nbsp;Runs:'
       + '</div>'
       + '<button class="status-btn sim-preset" data-runs="1000">1K</button> '
       + '<button class="status-btn sim-preset active" data-runs="5000">5K</button> '
@@ -505,6 +493,18 @@ async function renderSimulation() {
       + '<button class="status-btn" id="uclSimStartBtn">&#9654; Run Simulation</button>'
       + '<span id="uclSimProgressLbl" class="dim" style="margin-left:8px;font-size:11px"></span></div>';
     html += '</div>';
+
+    if (requestState === "completed" && appState.simProjections
+        && appState.simProjections.length) {
+      html += _uclProjectionBlock();
+    } else if (requestState === "failed") {
+      html += '<div class="dim" style="padding:4px 8px;font-size:12px;color:#ff6b6b">'
+        + 'The last simulation failed. No projected probabilities exist.</div>';
+    } else {
+      html += '<div class="dim" style="padding:2px 8px;font-size:11px">'
+        + 'No simulation has been run in this session, so no projected '
+        + 'probabilities exist.</div>';
+    }
   }
   html += '</div>';
   tab.innerHTML = html;
