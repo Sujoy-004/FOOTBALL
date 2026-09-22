@@ -11,7 +11,7 @@ body {
 .tab-btn {
   background: transparent; border: none; color: #15565B; padding: 8px 14px;
   font-family: inherit; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s; white-space: nowrap;
 }
 .tab-btn:hover { color: #F6DBC0; }
 .tab-btn.active { color: #16A085; border-bottom-color: #16A085; }

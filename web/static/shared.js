@@ -47,7 +47,7 @@ const competitions = {
     module: "wc",
     route: "/worldcup",
     apiPrefix: "/worldcup/api",
-    tabs: ["Overview", "Bracket", "Standings"],
+    tabs: ["Overview", "Standings", "Bracket", "Simulation"],
     liveRefresh: { enabled: true, intervalMs: 45000, refreshOnActivation: true },
   },
   ucl: {
@@ -56,7 +56,7 @@ const competitions = {
     module: "ucl",
     route: "/ucl",
     apiPrefix: "/ucl/api",
-    tabs: ["Overview", "Bracket", "Standings"],
+    tabs: ["Overview", "Standings", "Bracket", "Simulation"],
     liveRefresh: { enabled: true, intervalMs: 90000, refreshOnActivation: true },
   },
   laliga: {
@@ -65,7 +65,7 @@ const competitions = {
     module: "laliga",
     route: "/laliga",
     apiPrefix: "/laliga/api",
-    tabs: ["Overview", "Standings", "Fixtures", "Simulation", "Validation"],
+    tabs: ["Overview", "Standings", "Fixtures", "Simulation"],
     liveRefresh: { enabled: true, intervalMs: 90000, refreshOnActivation: true },
   },
 };
@@ -296,11 +296,11 @@ async function loadCompetition(slug) {
   renderNavBar(slug);
 
   // Build shell
-  const tabHtml = comp.tabs.map(t =>
-    `<button class="tab-btn" data-tab="${t.toLowerCase().replace(/\s+/g, "")}">>> ${t}</button>`
+  const tabHtml = comp.tabs.map((t, i) =>
+    `<button class="tab-btn" role="tab" aria-selected="${i === 0}" data-tab="${t.toLowerCase().replace(/\s+/g, "")}">>> ${t}</button>`
   ).join("");
   const contentHtml = comp.tabs.map(t =>
-    `<div class="tab-content" id="tab-${t.toLowerCase().replace(/\s+/g, "")}"></div>`
+    `<div class="tab-content" role="tabpanel" id="tab-${t.toLowerCase().replace(/\s+/g, "")}"></div>`
   ).join("");
 
   document.getElementById("contentArea").innerHTML = `
@@ -331,7 +331,11 @@ async function loadCompetition(slug) {
   document.getElementById("tabBar").addEventListener("click", e => {
     const btn = e.target.closest(".tab-btn");
     if (!btn) return;
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(b => {
+      const active = b === btn;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
+    });
     document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
     btn.classList.add("active");
     const tabId = "tab-" + btn.dataset.tab;
@@ -723,6 +727,37 @@ function createSimPopup() {
 
 function showSimPopup(apiPrefix, opts = {}) {
   const overlay = createSimPopup();
+  // Per-competition bounds/presets. Defaults preserve LaLiga's existing
+  // behavior; WC overrides {min:1, max:1000000}. Preset row + input are
+  // rebuilt on each show so a later competition cannot inherit stale bounds.
+  const presets = Array.isArray(opts.presets) ? opts.presets
+    : [10000, 50000, 100000, 500000];
+  const min = opts.min != null ? opts.min : 1000;
+  const max = opts.max != null ? opts.max : 500000;
+  const initial = opts.initial != null ? opts.initial : 50000;
+
+  const presetsEl = document.getElementById("simPresets");
+  if (presetsEl) {
+    presetsEl.innerHTML = presets.map(p =>
+      '<button data-iters="' + p + '"' + (p === initial ? ' class="active"' : "") + ">"
+      + (p >= 1000 ? (p / 1000) + "K" : String(p)) + "</button>"
+    ).join("");
+    presetsEl.querySelectorAll(".sim-presets button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        presetsEl.querySelectorAll(".sim-presets button").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const input = document.getElementById("simCustomIters");
+        if (input) input.value = btn.dataset.iters;
+      });
+    });
+  }
+  const customInput = document.getElementById("simCustomIters");
+  if (customInput) {
+    customInput.min = String(min);
+    customInput.max = String(max);
+    customInput.value = String(initial);
+  }
+
   overlay.classList.add("show");
   document.getElementById("simStartBtn").onclick = () =>
     _startSim(apiPrefix, opts.onComplete, opts.bodyBuilder || (iters => ({ iterations: iters })));
