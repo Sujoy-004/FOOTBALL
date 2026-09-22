@@ -24,6 +24,7 @@ SHARED = (WEB_STATIC / "shared.js").read_text(encoding="utf-8")
 UCL = (WEB_STATIC / "ucl.js").read_text(encoding="utf-8")
 WC = (WEB_STATIC / "wc.js").read_text(encoding="utf-8")
 LALIGA = (WEB_STATIC / "laliga.js").read_text(encoding="utf-8")
+CSS = (WEB_STATIC / "shared.css").read_text(encoding="utf-8")
 
 
 # ── Shared shell contract ─────────────────────────────────────────────
@@ -148,3 +149,113 @@ def test_esm_syntax_valid(name):
             capture_output=True, text=True,
         )
         assert res.returncode == 0, res.stdout + res.stderr
+
+
+# ── Phase 12B — LaLiga exclusive background ──────────────────────────
+
+def test_laliga_body_background_uses_its_own_image():
+    block = CSS.split(".competition-laliga {", 1)[1].split("\n}", 1)[0]
+    assert 'url("images/laliga.webp")' in block
+    assert "linear-gradient" in block          # darkening overlay for readability
+    assert "fixed no-repeat" in block
+
+
+def test_laliga_landing_card_background_uses_its_own_image():
+    block = CSS.split(".lc-card.laliga {", 1)[1].split("\n}", 1)[0]
+    assert 'url("images/laliga.webp")' in block
+
+
+def test_background_paths_are_relative_and_never_absolute():
+    assert "Pictures" not in CSS
+    assert "laliga_oil_paint" not in CSS
+    assert "C:\\" not in CSS
+    assert "C:/" not in CSS
+    assert ":\\" not in CSS and file_drive_residue_check(CSS)
+
+
+def file_drive_residue_check(css):
+    # No windows drive-letter absolute path residue ("x:\..." or "x:/...").
+    import re
+    return not re.search(r"[a-zA-Z]:[\\/]", css)
+
+
+def test_laliga_background_image_ships_in_static_assets():
+    assert (WEB_STATIC / "images" / "laliga.webp").is_file()
+
+
+# ── Phase 12B — Overview parity ──────────────────────────────────────
+
+def test_laliga_overview_uses_shared_stats_strip():
+    body = LALIGA.split("function _overviewHtml()", 1)[1].split("\nfunction ", 1)[0]
+    assert 'class="stats-row"' in body
+    assert 'class="stat-card"' in body
+    assert "Season" in body and "Matchday" in body
+
+
+def test_laliga_overview_uses_shared_eval_tables():
+    assert "Top of the Table" in LALIGA
+    assert "Signal Evaluation" in LALIGA
+    assert 'class="eval-table"' in LALIGA
+    assert "ol-signal-list" not in LALIGA
+
+
+def test_laliga_overview_drops_private_primitives():
+    assert "section-title" not in LALIGA
+    assert "cteam" not in LALIGA
+
+
+def test_laliga_acquisition_panel_is_wired_not_dead():
+    """The #acqHost div was rendered empty (renderAcquisitionPanel imported
+    but never called). render() must fill it on every render."""
+    render_body = LALIGA.split("function render()", 1)[1].split("\nfunction ", 1)[0]
+    assert "renderAcquisitionPanel(acqHost" in render_body
+    assert 'getElementById("acqHost")' in render_body
+
+
+# ── Phase 12B — Simulation layout contract ───────────────────────────
+
+def test_laliga_sim_controls_lead_results_provenance_trails():
+    sim = LALIGA.split("function _simulationHtml()", 1)[1].split("\nfunction ", 1)[0]
+    ctrl = sim.index("Simulation Controls")
+    summary = sim.index("Projected Championship")
+    prov = sim.index("sim-provenance")
+    assert ctrl < summary, "controls must render before result summaries"
+    # Provenance trails the result blocks; the what-if and live-refresh
+    # sections are competition-specific slots that render after it.
+    assert summary < prov, "provenance must come after the results"
+
+
+def test_laliga_sim_uses_shared_table_and_bar_primitives():
+    sim = LALIGA.split("function _simulationHtml()", 1)[1].split("\nfunction ", 1)[0]
+    assert 'class="eval-table"' in sim
+    assert 'class="champ-bar-row"' in sim
+    assert 'class="cname"' in sim
+
+
+def test_ucl_sim_controls_lead_results():
+    sim = UCL.split("async function renderSimulation()", 1)[1].split("\nfunction ", 1)[0]
+    assert sim.rindex('id="uclSimStartBtn"') < sim.rindex("_uclProjectionBlock()")
+
+
+def test_wc_sim_banners_use_shared_provenance_class():
+    sim = WC.split("function renderSimulation()", 1)[1].split("\nfunction ", 1)[0]
+    assert 'class="sim-provenance"' in sim
+    assert 'class="sim-provenance failed"' in sim
+    assert "Simulation is not needed" in sim
+
+
+# ── Phase 12B — shared primitives shipped in the stylesheet ──────────
+
+def test_shared_css_primitives_exist():
+    for sel in (".sim-provenance", ".phase-card", ".status-btn.sim-preset.active",
+                ".pred-cell", ".form-field"):
+        assert sel in CSS, sel
+    assert "\n.m-sub {" in CSS          # bare .m-sub exists, not only the .modal override
+    assert '\n.dim { color:' in CSS
+
+
+def test_new_primitives_are_competition_palette_bounded():
+    assert ".competition-laliga .sim-provenance" in CSS
+    assert ".competition-worldcup .sim-provenance" in CSS
+    assert ".competition-laliga .phase-card" in CSS
+    assert ".competition-worldcup .phase-card" in CSS
