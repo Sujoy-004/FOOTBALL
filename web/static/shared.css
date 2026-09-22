@@ -144,11 +144,7 @@ body {
 }
 .lc-card.laliga {
   border-color: rgba(218,64,64,0.4);
-  background:
-    radial-gradient(120% 90% at 15% 10%, rgba(218,64,64,0.28), transparent 55%),
-    radial-gradient(120% 90% at 90% 90%, rgba(220,160,40,0.18), transparent 55%),
-    linear-gradient(rgba(20,12,48,0.5), rgba(20,12,48,0.6)),
-    linear-gradient(135deg, #1a0a12, #30121c);
+  background: linear-gradient(rgba(16,8,12,0.55), rgba(16,8,12,0.65)), url("images/laliga.webp") center / cover no-repeat;
 }
 .lc-card.laliga .lcc-badge { color: #E85D5D; }
 .lc-card.laliga .lcc-stat, .lc-card.laliga .lcc-loading, .lc-card.laliga .lcc-coming-soon { color: #E8B45D; }
@@ -257,6 +253,54 @@ body {
 .eval-table td { padding: 3px 8px; border-bottom: 1px solid #153D4C; font-size: 11px; }
 .eval-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .dot-green { color: #168777; } .dot-orange { color: #15565B; } .dot-red { color: #ff6b6b; }
+
+/* Phase 12B — shared primitives across the three competition shells */
+.dim { color: rgba(246,219,192,0.55); font-size: 11px; }
+.m-sub { color: rgba(21,86,91,0.9); font-size: 11px; margin-bottom: 6px; }
+.vs-sep { color: #15565B; font-weight: normal; }
+.m-score-big { font-family: "JetBrains Mono", monospace; font-weight: 700; color: #16A085; }
+.form-line { font-family: "JetBrains Mono", monospace; letter-spacing: 2px; color: #16A085; }
+.insight-text { font-style: italic; color: rgba(246,219,192,0.7); font-size: 12px; line-height: 1.6; }
+
+.phase-card {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 10px 12px;
+  background: rgba(20,12,48,0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.phase-card > div { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.phase-card .lbl { font-size: 10px; color: #15565B; text-transform: uppercase; letter-spacing: 1px; }
+.phase-card .val { font-size: 16px; color: #16A085; font-weight: bold; }
+
+.form-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; flex: 1; min-width: 140px; }
+.form-field .lbl { font-size: 10px; color: #15565B; text-transform: uppercase; letter-spacing: 1px; }
+.form-field input, .form-field select {
+  background: #140C30; border: 1px solid #153D4C; border-radius: 3px;
+  padding: 5px 8px; color: #F8F4E9; font-family: inherit; font-size: 12px; outline: none;
+}
+.form-field input:focus, .form-field select:focus { border-color: #16A085; }
+
+.pred-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pred-cell {
+  border: 1px solid rgba(21,61,76,0.3); border-radius: 8px; padding: 8px 10px;
+  background: rgba(20,12,48,0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.pred-cell .val { font-size: 18px; color: #16A085; font-weight: bold; }
+.pred-cell .lbl { font-size: 9px; color: #15565B; text-transform: uppercase; letter-spacing: 1px; }
+
+.status-btn.sim-preset.active { background: #16A085; border-color: #16A085; color: #140C30; font-weight: bold; }
+
+.sim-provenance {
+  border: 1px solid rgba(142,68,173,0.5); border-radius: 8px;
+  background: rgba(20,12,48,0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  padding: 6px 10px; margin: 4px 0;
+}
+.sim-provenance .title { color: #8E44AD; font-size: 11px; font-weight: bold; margin-bottom: 2px; }
+.sim-provenance .body { font-size: 11px; color: rgba(246,219,192,0.7); line-height: 1.5; }
+.sim-provenance.failed { border-color: rgba(255,107,107,0.5); }
+.sim-provenance.failed .title { color: #ff6b6b; }
 
 /* Bracket */
 .bracket-wrap { position: relative; overflow-x: auto; padding: 20px 0; min-height: 500px; }
@@ -613,8 +657,7 @@ body {
 }
 /* ── LaLiga palette ── */
 .competition-laliga {
-  background: linear-gradient(rgba(16,8,12,0.6), rgba(16,8,12,0.7)),
-    radial-gradient(140% 120% at 18% 8%, rgba(218,64,64,0.22), transparent 60%) fixed;
+  background: linear-gradient(rgba(16,8,12,0.6), rgba(16,8,12,0.7)), url("images/laliga.webp") center / cover fixed no-repeat;
 }
 .competition-laliga .tab-bar { border-bottom-color: #7A2E2E; }
 .competition-laliga .tab-btn { color: #7A2E2E88; }
@@ -635,6 +678,17 @@ body {
 .competition-laliga .stat-card { border-color: rgba(122,46,46,0.3); background: rgba(64,20,20,0.6); }
 .competition-laliga .stat-card .val { color: #E85D5D; }
 .competition-laliga .stat-card .lbl { color: #9C4A4A; }
+.competition-laliga .m-sub { color: #9C4A4A; }
+.competition-laliga .phase-card { border-color: rgba(122,46,46,0.3); background: rgba(64,20,20,0.6); }
+.competition-laliga .phase-card .val { color: #E85D5D; }
+.competition-laliga .phase-card .lbl { color: #9C4A4A; }
+.competition-laliga .form-field input, .competition-laliga .form-field select { background: #3A1616; border-color: #9C4A4A; }
+.competition-laliga .form-field input:focus, .competition-laliga .form-field select:focus { border-color: #E85D5D; }
+.competition-laliga .pred-cell { border-color: rgba(122,46,46,0.3); background: rgba(64,20,20,0.6); }
+.competition-laliga .pred-cell .val { color: #E85D5D; }
+.competition-laliga .status-btn.sim-preset.active { background: #E85D5D; border-color: #E85D5D; color: #1A0A12; }
+.competition-laliga .sim-provenance { border-color: rgba(232,93,93,0.45); background: rgba(64,20,20,0.4); }
+.competition-laliga .sim-provenance .title { color: #E85D5D; }
 .competition-laliga .team-card { border-color: rgba(122,46,46,0.3); background: rgba(64,20,20,0.6); }
 .competition-laliga .team-card .name { color: #E85D5D; }
 .competition-laliga .team-card .elo { color: #9C4A4A; }
@@ -688,6 +742,12 @@ body {
 }
 .competition-worldcup .stat-card .val { color: #D3A376; }
 .competition-worldcup .stat-card .lbl { color: #8C6E63; }
+.competition-worldcup .m-sub { color: #8C6E63; }
+.competition-worldcup .phase-card { border-color: rgba(140,110,99,0.3); background: rgba(62,37,34,0.65); }
+.competition-worldcup .phase-card .val { color: #D3A376; }
+.competition-worldcup .phase-card .lbl { color: #8C6E63; }
+.competition-worldcup .sim-provenance { border-color: rgba(211,163,118,0.45); background: rgba(62,37,34,0.4); }
+.competition-worldcup .sim-provenance .title { color: #D3A376; }
 .competition-worldcup .team-card { border-color: rgba(140,110,99,0.3); background: rgba(62,37,34,0.65); }
 .competition-worldcup .team-card .name { color: #D3A376; }
 .competition-worldcup .team-card .elo { color: #8C6E63; }
