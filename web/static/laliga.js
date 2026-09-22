@@ -48,8 +48,8 @@ function _stale(gen) {
 }
 
 function _showTransitionLoading(label) {
-  ["tab-overview", "tab-standings", "tab-fixtures", "tab-simulation",
-   "tab-validation"].forEach(function(id) {
+  ["tab-overview", "tab-standings", "tab-fixtures",
+   "tab-simulation"].forEach(function(id) {
     const el = document.getElementById(id);
     if (el && typeof renderLoading === "function") renderLoading(el, label);
   });
@@ -140,7 +140,7 @@ async function refreshValidate() {
     const v = await safeJson(API + "/validation");
     if (!_stale(_transitionGen)) {
       appState.validation = v && v.validation ? v.validation : null;
-      const el = document.getElementById("tab-validation");
+      const el = document.getElementById("validationSection");
       if (el) {
         const html = _evalBlock();
         if (html) el.innerHTML = html;
@@ -151,7 +151,7 @@ async function refreshValidate() {
 
 // ── Render ──
 function render() {
-  const tabs = ["tab-overview", "tab-standings", "tab-fixtures", "tab-simulation", "tab-validation"];
+  const tabs = ["tab-overview", "tab-standings", "tab-fixtures", "tab-simulation"];
   tabs.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -159,8 +159,11 @@ function render() {
     else if (id === "tab-standings") el.innerHTML = _standingsHtml();
     else if (id === "tab-fixtures") { el.innerHTML = _fixturesHtml(); bindMatchClicks(el); }
     else if (id === "tab-simulation") el.innerHTML = _simulationHtml();
-    else if (id === "tab-validation") el.innerHTML = _evalBlock() || "";
   });
+  // The pure-Elo validation card lives inside Overview; bind the simulation
+  // controls on every render so the Simulation tab works on FIRST visit (the
+  // onComplete callback below also re-binds after a completed run).
+  bindSimulation();
   updateStatusBar(
     _esc(appState.season || "") + " &middot; " + appState.n_played + "/"
       + (appState.n_played + appState.n_unplayed) + " played &middot; "
@@ -235,6 +238,7 @@ function _overviewHtml() {
   html += '<div class="chart-section"><div class="title">Top of the Table</div>'
     + buildTable((appState.standings || []).slice(0, 5).map(t => ({ name: t.team, prized: t.points / 100 })), ["prized"], { prized: "Pts/100" })
     + "</div>";
+  html += '<div id="validationSection">' + (_evalBlock() || "") + "</div>";
   return html;
 }
 
