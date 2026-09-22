@@ -1,7 +1,7 @@
 // ═══ UEFA Champions League Module ═══
 import {
   destroyModalCharts, modalCharts,
-  updateStatusBar, competitions, showSimPopup,
+  updateStatusBar, competitions,
   buildTable, safeJson, renderBracketTree, renderAcquisitionPanel,
   openIntelModal, renderLoading, currentCompetition,
   configureCompetitionRefresh,
@@ -69,7 +69,7 @@ function _stale(gen) {
 // Show the shared loader in every tab that renders from appState, so there is
 // no window where one tab shows stale data under the new selection.
 function _showTransitionLoading(label) {
-  ["tab-overview", "tab-standings", "tab-bracket"].forEach(function(id) {
+  ["tab-overview", "tab-standings", "tab-bracket", "tab-simulation"].forEach(function(id) {
     const el = document.getElementById(id);
     if (el && typeof renderLoading === "function") renderLoading(el, label);
   });
@@ -168,12 +168,14 @@ async function loadAll(opts) {
         + _esc(e.message) + '</div>';
       renderStandings();
       renderBracket();
+      renderSimulation();
       return;
     }
     // Roll back to the last fully-valid rendered state (appState is intact).
     renderOverview();
     renderStandings();
     renderBracket();
+    renderSimulation();
     updateStatus();
     _surfaceTransitionError(e, o);
     return;
@@ -182,6 +184,7 @@ async function loadAll(opts) {
   renderOverview();
   renderStandings();
   renderBracket();
+  renderSimulation();
   updateStatus();
 }
 
@@ -270,7 +273,7 @@ function bindSimulationProjection() {
       } else if (_uclSimCompareTeams.length < 2) {
         _uclSimCompareTeams.push(team);
       }
-      renderOverview();
+      renderSimulation();
     });
   });
 }
@@ -371,7 +374,6 @@ async function renderOverview() {
   const stage = phase.label || "Unknown";
   const simState = d.simulation || {};
   const availability = simState.availability || "available";
-  const requestState = simState.request_state || "not_requested";
 
   // Stat cards: Teams / Matches Played / Stage  (WC-style hierarchy)
   let html = '<div class="chart-section" style="padding:6px 8px;margin-bottom:8px">'
@@ -423,10 +425,37 @@ async function renderOverview() {
   }
   html += '</div>';
 
-  // ── Simulation section (Exchange 4 shared product contract) ──────
-  // Driven by the backend's availability/request-state block; the UI never
-  // infers eligibility and never fabricates outcomes for undecided stages.
-  html += '<div class="chart-section"><div class="title">Simulation</div>';
+  // ── Data acquisition status (truthful snapshot/live/stale report) ──
+  html += '<div class="chart-section"><div class="title">Data Acquisition</div>';
+  html += '<div id="uclAcqPanel"></div>';
+  html += '</div>';
+
+  tab.innerHTML = html;
+  const seasonSelect = document.getElementById("uclSeasonSelect");
+  if (seasonSelect) seasonSelect.addEventListener("change", function() {
+    // Delegate the whole switch to the atomic transition: the /season POST,
+    // every data fetch, the sim-state reset and the render all run under one
+    // generation token. A failed switch rolls the UI back to the previous
+    // season (this <select> included, since it is rebuilt from appState) and
+    // surfaces the error — never a blank or mislabeled view.
+    loadAll({ season: seasonSelect.value });
+  });
+  renderAcquisitionPanel(document.getElementById("uclAcqPanel"), _buildAcquisition(d));
+}
+
+// ── Simulation tab (first-class; driven by the backend's availability /
+// request-state block, exactly as the section previously embedded in the
+// Overview. The UI never infers eligibility and never fabricates outcomes.)
+async function renderSimulation() {
+  const tab = document.getElementById("tab-simulation");
+  if (!tab) return;
+  const d = appState.data;
+  if (!d) { tab.innerHTML = '<div class="dim">Loading...</div>'; return; }
+  const simState = d.simulation || {};
+  const availability = simState.availability || "available";
+  const requestState = simState.request_state || "not_requested";
+
+  let html = '<div class="chart-section" style="padding:6px 8px"><div class="title">Simulation</div>';
 
   if (availability === "not_needed") {
     if (requestState === "completed" && appState.simProjections
@@ -478,25 +507,9 @@ async function renderOverview() {
     html += '</div>';
   }
   html += '</div>';
-
-  // ── Data acquisition status (truthful snapshot/live/stale report) ──
-  html += '<div class="chart-section"><div class="title">Data Acquisition</div>';
-  html += '<div id="uclAcqPanel"></div>';
-  html += '</div>';
-
   tab.innerHTML = html;
   bindSimulationControls();
   bindSimulationProjection();
-  const seasonSelect = document.getElementById("uclSeasonSelect");
-  if (seasonSelect) seasonSelect.addEventListener("change", function() {
-    // Delegate the whole switch to the atomic transition: the /season POST,
-    // every data fetch, the sim-state reset and the render all run under one
-    // generation token. A failed switch rolls the UI back to the previous
-    // season (this <select> included, since it is rebuilt from appState) and
-    // surfaces the error — never a blank or mislabeled view.
-    loadAll({ season: seasonSelect.value });
-  });
-  renderAcquisitionPanel(document.getElementById("uclAcqPanel"), _buildAcquisition(d));
 }
 
 // Build the truthful acquisition object from /api/data (+ phase stores).
@@ -659,11 +672,11 @@ async function startUclSimulation() {
     });
     const sim = await safeJson(API + "/simulation");
     _applySimulationPayload(sim, runs);
-    // The overview gate reads request_state from appState.data, which was
+    // The tab gate reads request_state from appState.data, which was
     // fetched before this run existed. Refetch so the just-completed run is
     // visible instead of being masked by the stale boot-time state.
     appState.data = await safeJson(API + "/data");
-    renderOverview();
+    renderSimulation();
     renderBracket();
   } catch (e) {
     if (lbl) lbl.textContent = "Error: " + (e.message || "unknown");
