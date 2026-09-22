@@ -2,14 +2,12 @@
 import {
   buildTable, destroyModalCharts, modalCharts, renderBracketTree,
   updateStatusBar, competitions, renderLoading, currentCompetition,
-  configureCompetitionRefresh,
+  configureCompetitionRefresh, showSimPopup,
 } from "./shared.js";
 
 const API = "/worldcup/api";
 const sigLabels = { elo: "Elo", market_odds: "Market Odds", rolling_form: "Rolling Form", squad_value: "Squad Value", rest_days: "Rest Days" };
 const appState = { data: null, overview: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} , simMeta: null };
-let refreshing = false;
-
 let _transitionGen = 0;
 
 function _isWcActive() {
@@ -77,24 +75,26 @@ async function loadAll() {
   renderLoading(document.getElementById("tab-overview"), "Loading overview...");
   renderLoading(document.getElementById("tab-standings"), "Loading standings...");
   renderLoading(document.getElementById("tab-bracket"), "Loading bracket...");
+  renderLoading(document.getElementById("tab-simulation"), "Loading simulation...");
 
   const payload = await _loadWcPayloads(gen);
   if (!payload || _stale(gen)) return gen;
   _commitWcPayload(payload);
-  // Render order preserved: overview -> status -> standings -> bracket.
+  // Render order preserved: overview -> status -> standings -> bracket -> sim.
   renderOverview();
   updateStatus();
   renderStandings();
   renderBracket();
+  renderSimulation();
   return gen;
 }
 
 // Live refresh (Exchange 9C): same fetch tolerance + render order, but
 // CAPTURES (never increments) the generation token, so loadAll — the only
 // generator of new tokens — always outranks an in-flight live refresh. The
-// sim DOM (appState.simBracket / simulation overlay) is intentionally
-// untouched, and `refreshing` is never set: live refresh does not gate
-// simulation eligibility.
+// sim tab DOM (appState.simBracket / simulation overlay) is intentionally
+// untouched by live refresh: only loadAll (first boot, season/sim reload)
+// renders it, so a completed run survives ordinary refreshes.
 async function refreshLive() {
   const gen = _transitionGen;
   const payload = await _loadWcPayloads(gen);
@@ -109,7 +109,6 @@ async function refreshLive() {
 function updateStatus() {
   const d = appState.data;
   if (!d) return;
-  if (refreshing) return;
   const signals = d.signals_meta?.signals || [];
   const nActive = signals.filter(s => s.available).length;
   const stale = d.refresh && d.refresh.stale;
@@ -119,153 +118,6 @@ function updateStatus() {
   );
 }
 
-
-// ── Simulation Popup ──
-function showSimPopup() {
-  if (refreshing) return;
-  let overlay = document.getElementById("simPopupOverlay");
-  if (!overlay) {
-    overlay = document.createElement("div");
-    overlay.id = "simPopupOverlay";
-    overlay.className = "sim-popup-overlay";
-    overlay.innerHTML = `
-      <div class="sim-popup">
-        <h3>Simulate Tournament</h3>
-        <p>Number of Monte Carlo iterations:</p>
-        <div class="sim-presets" id="simPresets">
-          <button data-iters="10000">10K</button>
-          <button data-iters="50000" class="active">50K</button>
-          <button data-iters="100000">100K</button>
-          <button data-iters="500000">500K</button>
-        </div>
-        <input type="number" id="simCustomIters" value="50000" min="1" max="1000000">
-        <div class="sim-actions">
-          <button id="simCancelBtn">Cancel</button>
-          <button id="simStartBtn">&#9654; Start</button>
-        </div>
-        <div id="simProgressWrap" class="progress-bar-wrap" style="display:none;margin-top:10px">
-          <div class="progress-bar-fill" id="simProgressFill" style="width:0%"></div>
-        </div>
-        <div class="progress-lbl" id="simProgressLbl" style="display:none"></div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-
-    // Wire presets
-    overlay.querySelectorAll(".sim-presets button").forEach(btn => {
-      btn.addEventListener("click", () => {
-        overlay.querySelectorAll(".sim-presets button").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        document.getElementById("simCustomIters").value = btn.dataset.iters;
-      });
-    });
-
-    // Cancel
-    document.getElementById("simCancelBtn").addEventListener("click", () => {
-      overlay.classList.remove("show");
-    });
-
-    // Start
-    document.getElementById("simStartBtn").addEventListener("click", startSimulation);
-
-    // Overlay click to close
-    overlay.addEventListener("click", e => {
-      if (e.target === overlay) overlay.classList.remove("show");
-    });
-  }
-  overlay.classList.add("show");
-}
-
-async function startSimulation() {
-  refreshing = true;
-  const iters = parseInt(document.getElementById("simCustomIters").value) || 50000;
-  const startBtn = document.getElementById("simStartBtn");
-  const cancelBtn = document.getElementById("simCancelBtn");
-  const progressWrap = document.getElementById("simProgressWrap");
-  const progressFill = document.getElementById("simProgressFill");
-  const progressLbl = document.getElementById("simProgressLbl");
-
-  startBtn.disabled = true;
-  cancelBtn.style.display = "none";
-  progressWrap.style.display = "block";
-  progressLbl.style.display = "block";
-  progressFill.style.width = "0%";
-  progressLbl.textContent = "Starting simulation...";
-
-  try {
-    const resp = await (await fetch(API + "/simulate", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ iterations: iters })
-    })).json();
-
-    if (resp.error) {
-      progressLbl.textContent = "Error: " + resp.error;
-      startBtn.disabled = false;
-      cancelBtn.style.display = "";
-      refreshing = false;
-      return;
-    }
-
-    if (resp.status === "not_needed") {
-      progressLbl.textContent = resp.message || "All matches played.";
-      startBtn.disabled = false;
-      cancelBtn.style.display = "";
-      refreshing = false;
-      return;
-    }
-
-    const taskId = resp.task_id;
-    const totalIters = resp.iterations;
-    let t0 = Date.now();
-
-    await new Promise((resolve, reject) => {
-      const poll = setInterval(async () => {
-        try {
-          const p = await (await fetch(API + "/simulation/progress/" + taskId)).json();
-          if (p.error) { clearInterval(poll); reject(new Error(p.error)); return; }
-
-          progressFill.style.width = p.progress + "%";
-          const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
-          let label = p.stage || "Simulating...";
-          if (p.total_iterations > 0) {
-            label += "  " + (p.iteration || 0).toLocaleString() + "/" + p.total_iterations.toLocaleString();
-          }
-          label += "  (" + p.progress.toFixed(0) + "%)  " + elapsed + "s";
-          if (p.elapsed) label += "  ETA: " + Math.max(0, Math.round(p.elapsed * ((100 - p.progress) / Math.max(p.progress, 1)))) + "s";
-          progressLbl.textContent = label;
-
-          if (p.status === "completed") {
-            clearInterval(poll);
-            resolve();
-          }
-          if (p.status === "failed") {
-            clearInterval(poll);
-            reject(new Error(p.error || "simulation failed"));
-          }
-        } catch (e) {
-          clearInterval(poll);
-          reject(e);
-        }
-      }, 200);
-    });
-
-    // Complete — close popup, reload data
-    document.getElementById("simPopupOverlay").classList.remove("show");
-    progressWrap.style.display = "none";
-    progressLbl.style.display = "none";
-    const gen = await loadAll();
-    try {
-      const simResp = await fetch(API + "/simulation").then(r => r.json());
-      if (!_stale(gen)) appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
-    } catch { if (!_stale(gen)) appState.simBracket = null; }
-    if (!_stale(gen)) renderBracket();
-  } catch (e) {
-    progressLbl.textContent = "Error: " + (e.message || "unknown");
-    startBtn.disabled = false;
-    cancelBtn.style.display = "";
-  }
-  refreshing = false;
-}
 
 // ── Overview (real data only) ──
 
@@ -347,6 +199,47 @@ function renderOverviewSignals(signals) {
   return html + '</table>';
 }
 
+// ── Simulation tab (whole-competition Monte Carlo, first-class) ──
+// The launcher now lives on a dedicated Simulation tab and opens the SHARED
+// simulation popup (shared.js) with WC's bounds (up to 1,000,000 iterations),
+// instead of a third copy of the popup. The backend reports status
+// "not_needed" when every result is already known (mirrored on the shared
+// popup). The bracket tab keeps its sim-provenance banner + KO overlay.
+function renderSimulation() {
+  const tab = document.getElementById("tab-simulation");
+  if (!tab) return;
+  const d = appState.data;
+  if (!d) { tab.innerHTML = '<div class="dim" style="padding:20px">Simulation data not available yet.</div>'; return; }
+
+  const nUnplayed = (d.n_unplayed != null) ? d.n_unplayed : null;
+  const seasonComplete = nUnplayed === 0
+    || !!(d.phase && d.phase.completed);
+
+  let html = '<div class="chart-section"><div class="title">Tournament Simulation</div>';
+  if (seasonComplete) {
+    html += '<div class="dim" style="padding:4px 8px;font-size:11px">All competition results are already known from real match data. Simulation is not needed.</div>';
+  } else {
+    html += '<div style="padding:4px 0 8px">'
+      + '<button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining Matches</button>'
+      + ' <span class="dim" style="font-size:11px">Monte Carlo projection over the remaining ' + nUnplayed + ' matches (up to 1,000,000 iterations)</span></div>';
+  }
+  if (appState.simMeta && appState.simMeta.status === "completed") {
+    const m = appState.simMeta;
+    html += '<div class="chart-section" style="border:1px solid rgba(142,68,173,.5)">'
+      + '<div class="title">SIMULATION &middot; ' + (m.count || 0).toLocaleString() + ' RUNS'
+      + ' &middot; seed ' + (m.seed != null ? m.seed : 'auto') + '</div>'
+      + '<div class="dim" style="font-size:11px;padding:2px 8px">Projected knockout probability (aggregate over '
+      + (m.count || 0).toLocaleString() + ' runs). Real played results are unchanged. '
+      + 'The bracket tab shows one example simulated bracket (sampled run).</div></div>';
+  } else if (appState.simMeta && appState.simMeta.status === "failed") {
+    html += '<div class="chart-section" style="border:1px solid rgba(255,107,107,.5)">'
+      + '<div class="title">SIMULATION &middot; FAILED</div>'
+      + '<div class="dim" style="font-size:11px;padding:2px 8px">The last simulation failed; no projected probabilities exist.</div></div>';
+  }
+  html += '</div>';
+  tab.innerHTML = html;
+}
+
 // ── Bracket (Phase 3: group accordion + knockout tree via shared renderer) ──
 
 function _esc(s) {
@@ -422,11 +315,6 @@ function renderBracket() {
   const nUnplayed = (appState.data && appState.data.n_unplayed != null) ? appState.data.n_unplayed : null;
   const seasonComplete = nUnplayed === 0
     || !!(appState.data && appState.data.phase && appState.data.phase.completed);
-    if (seasonComplete) {
-      html += '<div class="dim" style="text-align:right;margin-bottom:8px;font-size:11px">All competition results are already known from real match data. Simulation is not needed.</div>';
-    } else {
-      html += '<div style="text-align:right;margin-bottom:8px"><button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining Matches</button></div>';
-    }
 
   // Truth banners (Exchange 4): simulation provenance + not-requested state.
   if (appState.simMeta && appState.simMeta.status === "completed") {
@@ -518,10 +406,29 @@ function renderMatchRow(m) {
 
 // ── Bracket controls ──
 // Tournament simulation (whole-competition Monte Carlo) stays a separate,
-// truthfully labeled control. The per-card button is a MATCH-level What-If
-// (see openMatchModal / __sendWhatIf) — the two concepts are never merged.
+// truthfully labeled control, launched from the Simulation tab via the shared
+// popup. The per-card button is a MATCH-level What-If (see openMatchModal /
+// __sendWhatIf) — the two concepts are never merged.
 window.__simulateAllRemaining = function() {
-  showSimPopup();
+  showSimPopup(API, {
+    min: 1,
+    max: 1000000,
+    onComplete: async function() {
+      // Mirrors the previous WC-local runner: reload every payload, then
+      // hydrate the simulation artifacts (bracket overlay + meta banner).
+      const gen = await loadAll();
+      try {
+        const simResp = await fetch(API + "/simulation").then(r => r.json());
+        if (!_stale(gen)) {
+          appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
+          appState.simMeta = simResp.simulation_meta || null;
+        }
+      } catch {
+        if (!_stale(gen)) { appState.simBracket = null; appState.simMeta = null; }
+      }
+      if (!_stale(gen)) { renderBracket(); renderSimulation(); }
+    },
+  });
 };
 
 window.__openWhatIf = function(matchId) {
