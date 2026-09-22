@@ -5,7 +5,7 @@
 // Mirrors the shared shell conventions used by wc.js/ucl.js.
 import {
   destroyModalCharts, updateStatusBar,
-  showSimPopup, buildTable, safeJson, renderAcquisitionPanel,
+  showSimPopup, safeJson, renderAcquisitionPanel,
   openIntelModal, renderLoading, currentCompetition,
   configureCompetitionRefresh,
 } from "./shared.js";
@@ -163,6 +163,8 @@ function render() {
   // The pure-Elo validation card lives inside Overview; bind the simulation
   // controls on every render so the Simulation tab works on FIRST visit (the
   // onComplete callback below also re-binds after a completed run).
+  const acqHost = document.getElementById("acqHost");
+  if (acqHost) renderAcquisitionPanel(acqHost, _acquisition());
   bindSimulation();
   updateStatusBar(
     _esc(appState.season || "") + " &middot; " + appState.n_played + "/"
@@ -189,13 +191,11 @@ function sigInfo() {
 }
 
 // ── Overview ──
-function _overviewHtml() {
-  const d = appState.data || {};
+function _acquisition() {
   const phase = appState.phase || {};
   const prog = phase.progress || {};
   const reports = appState.refresh || {};
-
-  const acquisition = {
+  return {
     competition: "LaLiga EA Sports " + (appState.season || ""),
     source: reports.skipped_reason ? "snapshot (offline)" : (reports.error ? "stale/error" : (reports.provider || "shipped data")),
     mode: reports.skipped_reason ? "snapshot" : "live",
@@ -209,35 +209,58 @@ function _overviewHtml() {
       { key: "quality", label: "Prediction signals", state: Object.keys(appState.signals).length ? "ok" : "pending", count: Object.keys(appState.signals).length ? Object.keys(appState.signals).length : 0 },
     ],
   };
-  let html = '<div class="chart-section"><div class="title">Acquisition &amp; Status</div>';
-  html += '<div id="acqHost"></div></div>';
-  html += '<div class="section-title">' + _esc("Season Phase") + "</div>";
-  html += '<div class="phase-card"><div><span class="lbl">Season</span><span class="val">' + _esc(appState.season || "—") + "</span></div>";
-  html += '<div><span class="lbl">Matchday</span><span class="val">' + (prog.current_matchday || 0) + " / " + (prog.n_matchdays || 38) + "</span></div>";
-  html += '<div><span class="lbl">Played</span><span class="val">' + (prog.n_played || 0) + "</span></div>";
-  html += '<div><span class="lbl">Remaining</span><span class="val">' + (prog.n_unplayed || 0) + "</span></div>";
-  html += '<div><span class="lbl">Mode</span><span class="val">' + _esc(appState.mode || "—") + "</span></div></div>";
+}
 
-  html += '<div class="chart-section"><div class="title">Signal Evaluation (vs played results)</div><div class="ol-signal-list">';
-  if (!Object.keys(appState.signals).length) {
-    html += '<div class="m-sub">No signal evaluation yet.</div>';
+function _overviewHtml() {
+  const phase = appState.phase || {};
+  const prog = phase.progress || {};
+
+  let html = '<div class="stats-row">'
+    + '<div class="stat-card"><div class="val">' + _esc(appState.season || "—") + '</div><div class="lbl">Season</div></div>'
+    + '<div class="stat-card"><div class="val">' + (prog.current_matchday || 0) + " / " + (prog.n_matchdays || 38) + '</div><div class="lbl">Matchday</div></div>'
+    + '<div class="stat-card"><div class="val">' + (prog.n_played || 0) + " / " + (prog.n_total != null ? prog.n_total : (prog.n_played || 0)) + '</div><div class="lbl">Played</div></div>'
+    + '<div class="stat-card"><div class="val">' + (prog.n_unplayed || 0) + '</div><div class="lbl">Remaining</div></div>'
+    + '<div class="stat-card"><div class="val">' + _esc(appState.mode || "—") + '</div><div class="lbl">Mode</div></div>'
+    + "</div>";
+
+  html += '<div class="chart-section"><div class="title">Top of the Table</div>';
+  const standings = appState.standings || [];
+  if (!standings.length) {
+    html += '<p class="m-sub">No standings yet.</p>';
   } else {
+    html += '<table class="eval-table"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th class="num">Pts</th></tr></thead><tbody>';
+    standings.slice(0, 8).forEach(function(t) {
+      const gd = t.goal_diff >= 0 ? "+" + t.goal_diff : String(t.goal_diff);
+      html += '<tr><td class="num">' + t.position + '</td><td>' + _esc(t.team) + '</td>'
+        + '<td class="num">' + t.played + '</td><td class="num">' + t.wins + '</td>'
+        + '<td class="num">' + t.draws + '</td><td class="num">' + t.losses + '</td>'
+        + '<td class="num">' + t.goals_for + '</td><td class="num">' + t.goals_against + '</td>'
+        + '<td class="num">' + gd + '</td><td class="num"><strong>' + t.points + '</strong></td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+
+  html += '<div class="chart-section"><div class="title">Signal Evaluation (vs played results)</div>';
+  const sigKeys = Object.keys(appState.signals || {});
+  if (!sigKeys.length) {
+    html += '<p class="m-sub">No signal evaluation yet.</p>';
+  } else {
+    html += '<table class="eval-table"><thead><tr><th>Signal</th><th class="num">Accuracy</th><th class="num">Brier</th><th class="num">Available</th></tr></thead><tbody>';
     sigOrder.forEach(function(name) {
       const s = appState.signals[name];
       if (!s) return;
       const acc = typeof s.accuracy === "number" ? (s.accuracy * 100).toFixed(0) + "%" : "—";
       const brier = typeof s.brier === "number" ? s.brier.toFixed(3) : "—";
       const avail = s.available != null ? s.available : "—";
-      html += '<div class="md-row" style="display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid rgba(21,61,76,.12)">'
-        + '<span class="md-team">' + _esc(sigLabels[name] || name) + "</span>"
-        + '<span class="md-score">acc ' + acc + " &middot; brier " + brier
-        + " &middot; avail " + avail + "</span></div>";
+      html += '<tr><td>' + _esc(sigLabels[name] || name) + '</td>'
+        + '<td class="num">' + acc + '</td><td class="num">' + brier + '</td><td class="num">' + avail + '</td></tr>';
     });
+    html += '</tbody></table>';
   }
-  html += "</div></div>";
-  html += '<div class="chart-section"><div class="title">Top of the Table</div>'
-    + buildTable((appState.standings || []).slice(0, 5).map(t => ({ name: t.team, prized: t.points / 100 })), ["prized"], { prized: "Pts/100" })
-    + "</div>";
+  html += '</div>';
+
+  html += '<div class="chart-section"><div class="title">Acquisition &amp; Status</div><div id="acqHost"></div></div>';
   html += '<div id="validationSection">' + (_evalBlock() || "") + "</div>";
   return html;
 }
@@ -438,33 +461,66 @@ function _simulationHtml() {
   const sim = appState.sim || {};
   const meta = appState.simMeta || {};
   const odds = sim.odds || [];
-  const requested = meta.requested_count || 0;
-  const actual = sim.n_iterations || 0;
-  let html = '<div class="chart-section"><div class="title">Monte Carlo Projection' + (requested ? " — " + requested.toLocaleString() + " iterations" : "") + "</div>";
+  const actual = sim.n_iterations || meta.count || 0;
+  const completed = meta.status === "completed";
+  const failed = (meta.status === "failed") || !!sim.error;
 
-  if (!odds.length) {
-    html += '<p class="m-sub">No simulation requested yet. The deterministic table reflects played matches; simulate to project the finished season.</p>';
+  // Header
+  let html = '<div class="chart-section"><div class="title">Simulation</div>'
+    + '<p class="m-sub">Monte Carlo projection of the season outcome. Played matches are unchanged; simulate to project the finished season.</p></div>';
+
+  // Controls
+  html += '<div class="chart-section"><div class="title">Simulation Controls</div>'
+    + '<div class="sim-actions">'
+    + '<button class="status-btn" id="simRunBtn">&#9654; Run Simulation</button>'
+    + "</div></div>";
+
+  // Run / progress state
+  if (completed) {
+    html += '<div class="m-sub" style="padding:2px 8px">'
+      + (actual ? actual.toLocaleString() + " iterations completed" : "Simulation completed")
+      + (sim.seed != null ? " &middot; seed " + sim.seed : "") + "</div>";
+  } else if (failed) {
+    html += '<div class="m-sub" style="padding:2px 8px;color:#ff8a8a">The last simulation failed; no projections exist.</div>';
   } else {
-    html += buildTable(odds.slice(0, 10).map(function(o) {
-      return { name: o.team, champ: o.champion_prob };
-    }), ["champ"], { champ: "Champion" });
+    html += '<div class="m-sub" style="padding:2px 8px">No simulation requested yet. The deterministic table reflects played matches; simulate to project the finished season.</div>';
+  }
+
+  // Result summary
+  if (odds.length) {
+    html += '<div class="chart-section"><div class="title">Projected Championship — Top 10</div>';
+    html += '<table class="eval-table"><thead><tr><th>Team</th><th class="num">Champion probability</th></tr></thead><tbody>';
+    odds.slice(0, 10).forEach(function(o) {
+      html += '<tr><td>' + _esc(o.team) + '</td><td class="num">' + _simPct(o.champion_prob) + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // Detailed results
+  if (odds.length) {
     html += '<div class="chart-section"><div class="title">Champion Probability</div>';
     odds.forEach(function(o) {
       const p = o.champion_prob || 0;
-      html += '<div class="champ-bar-row"><span class="cpct">' + (p * 100).toFixed(1) + "%</span>"
-        + '<span class="cteam">' + _esc(o.team) + "</span>"
-        + '<div class="cbar-wrap"><div class="cbar" style="width:' + (p * 100).toFixed(1) + '%"></div></div></div>';
+      html += '<div class="champ-bar-row"><span class="cname">' + _esc(o.team) + "</span>"
+        + '<div class="cbar-wrap"><div class="cbar" style="width:' + (p * 100).toFixed(1) + '%"></div></div>'
+        + '<span class="cpct">' + (p * 100).toFixed(1) + "%</span></div>";
     });
     html += "</div>";
   }
 
-  html += '<div class="chart-section"><div class="title">Simulation Controls</div>'
-    + '<div class="sim-actions">'
-    + '<button class="status-btn" id="simRunBtn">Run Simulation</button> '
-    + "<span class=\"m-sub\">" + (actual ? actual.toLocaleString() + " iterations completed" : "no simulation cached")
-    + (sim.seed != null ? " &middot; seed " + sim.seed : "") + "</span>"
-    + "</div></div>";
+  // Provenance
+  if (completed || actual) {
+    html += '<div class="sim-provenance">'
+      + '<div class="title">SIMULATION &middot; ' + (actual || (meta.count || 0)).toLocaleString() + ' RUNS'
+      + (sim.seed != null ? ' &middot; seed ' + sim.seed : '') + '</div>'
+      + '<div class="body">Projected probabilities, not real results. Played matches and the league table are unchanged.</div>'
+      + '</div>';
+  } else if (failed) {
+    html += '<div class="sim-provenance failed"><div class="title">SIMULATION &middot; FAILED</div>'
+      + '<div class="body">The last simulation failed; no projected probabilities exist.</div></div>';
+  }
 
+  // Competition-specific slots
   html += '<div class="chart-section"><div class="title">Head-to-Head What-If</div>'
     + '<div class="form-grid">'
     + '<label class="form-field"><span class="lbl">Match (by ID or search below)</span>'
@@ -533,9 +589,11 @@ function _populateWhatIfSelect() {
             + '<td class="num">' + (e.delta >= 0 ? "+" : "") + (e.delta * 100).toFixed(1) + "%</td></tr>";
         });
         html += "</tbody></table>";
-        (r.top5_baseline || []).forEach(function(o, i) {
-          html += '<div class="champ-bar-row"><span class="cpct">' + (o.champion * 100).toFixed(1) + "%</span>"
-            + '<span class="cteam">' + _esc(o.team) + " <span class=\"m-sub\">baseline</span></span></div>";
+        (r.top5_baseline || []).forEach(function(o) {
+          const bp = o.champion || 0;
+          html += '<div class="champ-bar-row"><span class="cname">' + _esc(o.team) + "</span>"
+            + '<div class="cbar-wrap"><div class="cbar" style="width:' + (bp * 100).toFixed(1) + '%"></div></div>'
+            + '<span class="cpct">' + (bp * 100).toFixed(1) + '%</span></div>';
         });
         resEl.innerHTML = html;
       } catch (e) {
