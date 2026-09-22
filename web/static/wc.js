@@ -225,16 +225,16 @@ function renderSimulation() {
   }
   if (appState.simMeta && appState.simMeta.status === "completed") {
     const m = appState.simMeta;
-    html += '<div class="chart-section" style="border:1px solid rgba(142,68,173,.5)">'
+    html += '<div class="sim-provenance">'
       + '<div class="title">SIMULATION &middot; ' + (m.count || 0).toLocaleString() + ' RUNS'
       + ' &middot; seed ' + (m.seed != null ? m.seed : 'auto') + '</div>'
-      + '<div class="dim" style="font-size:11px;padding:2px 8px">Projected knockout probability (aggregate over '
+      + '<div class="body">Projected knockout probability (aggregate over '
       + (m.count || 0).toLocaleString() + ' runs). Real played results are unchanged. '
       + 'The bracket tab shows one example simulated bracket (sampled run).</div></div>';
   } else if (appState.simMeta && appState.simMeta.status === "failed") {
-    html += '<div class="chart-section" style="border:1px solid rgba(255,107,107,.5)">'
+    html += '<div class="sim-provenance failed">'
       + '<div class="title">SIMULATION &middot; FAILED</div>'
-      + '<div class="dim" style="font-size:11px;padding:2px 8px">The last simulation failed; no projected probabilities exist.</div></div>';
+      + '<div class="body">The last simulation failed; no projected probabilities exist.</div></div>';
   }
   html += '</div>';
   tab.innerHTML = html;
