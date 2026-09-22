@@ -77,3 +77,37 @@ every rule below is `web/cache_control.py`, `web/static/refresh.js` and the
   safe and keeps request/render ordering truthful for the user.
 - Root cause it closes (Phase 9B): an open tab across a server-side refresh
   must not replay a stale cached JSON payload.
+
+## Shared visual structure (Phase 12B addendum)
+
+One shared stylesheet (`web/static/shared.css`). Every competition themes by
+a body class that is the ONLY place palette colors live
+(`.competition-laliga` / `-worldcup` / `-ucl`), so a competition fork is a
+block of `color:` overrides, never new page structure.
+
+- **Backgrounds are per-competition image + overlay.** WC (`images/wc.webp`),
+  UCL (`images/ucl.webp`) and — new in 12B — LaLiga (`images/laliga.webp`)
+  each declare a `linear-gradient(...), url("images/<comp>.webp") center /
+  cover fixed no-repeat;` on the body class, and the same image as an
+  `lc-card` landing tile (no absolute paths; the darkening gradient is the
+  readability guarantee over the artwork). `fixed` rides the last layer the
+  same way it does on the pre-existing W.C./UCL rules.
+- **Shared structural primitives** (defined once, themed by the palette
+  block): `.stats-row/.stat-card` (dashboard strip), `.chart-section/.title`
+  (section), `.eval-table` (data tables), `.status-btn`, `.m-sub`/`.dim`
+  (descriptors), `.phase-card`/`.pred-cell`/`.form-field` (cards + forms),
+  `.sim-provenance` (+ `.failed`) — the simulation provenance banner.
+- **Overview layout contract:** every Overview is `stats-row` strip →
+  themed `.chart-section` blocks ordered around the competition's facts.
+  Shared tables replace per-competition ad-hoc rows (`.ol-signal-list`,
+  `buildTable` misuse, `.section-title` were removed). Acquisition is always
+  rendered by the shared `shared.js:renderAcquisitionPanel` into a
+  competition-owned host div.
+- **Simulation layout contract:** every Simulation tab renders in canonical
+  order — header → controls/launcher → run/status → result summary →
+  detailed results → provenance (`.sim-provenance` carries runs/seed and the
+  "projected, not real" honesty copy). A completed run must appear in-session
+  (sim tab re-renders after `simMeta` commit) and refreshes must never wipe
+  it. Competition outcome widgets are slots inside this order (WC: example
+  simulated bracket; UCL: aggregate knockout/playoff table; LaLiga: champion
+  bars + what-if).
