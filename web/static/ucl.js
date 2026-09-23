@@ -481,10 +481,10 @@ async function renderSimulation() {
     popup: {
       apiPrefix: API,
       min: 1000,
-      max: 100000,
-      presets: [1000, 5000, 10000, 100000],
+      max: 500000,
+      presets: [10000, 50000, 100000, 500000],
       seed: true,
-      initial: 5000,
+      initial: 50000,
       bodyBuilder: function(iters, seed) {
         return (seed != null) ? { iterations: iters, seed: seed } : { iterations: iters };
       },
