@@ -1,0 +1,1 @@
+"""Source adapters for the historical LaLiga backfill."""

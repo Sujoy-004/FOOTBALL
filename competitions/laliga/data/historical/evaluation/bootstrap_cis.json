@@ -1,0 +1,492 @@
+{
+  "meta": {
+    "generated_at": "2026-09-22T04:50:13.839666+00:00",
+    "dataset": "competitions/laliga/data/historical (2019/20-2023/24)",
+    "population": "all 1900 completed matches",
+    "method": "percentile 95% bootstrap, seed 20260601, n_boot=2000, paired over identical resamples",
+    "resample_scheme_note": "plain iid resample-by-match chosen over season-block bootstrap (n=1900 across only 5 seasons \u2014 blocks would be too coarse); within-season team/opponent dependence is not modelled, so CIs treat matches as exchangeable",
+    "ece_note": "ece recomputed on each resample with the same 10-bin confidence binning as multi_class_ece",
+    "brier_note": "brier per resample = mean per-match squared-error vector length /3 (multi_class_brier convention)"
+  },
+  "models": {
+    "uniform": {
+      "log_loss": {
+        "point": 1.098612,
+        "95ci": [
+          1.098612,
+          1.098612
+        ]
+      },
+      "brier": {
+        "point": 0.222222,
+        "95ci": [
+          0.222222,
+          0.222222
+        ]
+      },
+      "ece": {
+        "point": 0.11193,
+        "95ci": [
+          0.089298,
+          0.134561
+        ]
+      },
+      "accuracy": {
+        "point": 0.445263,
+        "95ci": [
+          0.422632,
+          0.467895
+        ]
+      }
+    },
+    "freq_prior_season": {
+      "log_loss": {
+        "point": 1.079064,
+        "95ci": [
+          1.06974,
+          1.088614
+        ]
+      },
+      "brier": {
+        "point": 0.217684,
+        "95ci": [
+          0.215481,
+          0.219942
+        ]
+      },
+      "ece": {
+        "point": 0.026711,
+        "95ci": [
+          0.018902,
+          0.051418
+        ]
+      },
+      "accuracy": {
+        "point": 0.445263,
+        "95ci": [
+          0.422632,
+          0.467895
+        ]
+      }
+    },
+    "market_only": {
+      "log_loss": {
+        "point": 0.975754,
+        "95ci": [
+          0.955989,
+          0.995518
+        ]
+      },
+      "brier": {
+        "point": 0.193663,
+        "95ci": [
+          0.189092,
+          0.198212
+        ]
+      },
+      "ece": {
+        "point": 0.028982,
+        "95ci": [
+          0.020876,
+          0.054275
+        ]
+      },
+      "accuracy": {
+        "point": 0.533158,
+        "95ci": [
+          0.51,
+          0.556316
+        ]
+      }
+    },
+    "elo_only": {
+      "log_loss": {
+        "point": 1.092397,
+        "95ci": [
+          1.056204,
+          1.128703
+        ]
+      },
+      "brier": {
+        "point": 0.216771,
+        "95ci": [
+          0.208866,
+          0.224519
+        ]
+      },
+      "ece": {
+        "point": 0.158256,
+        "95ci": [
+          0.135881,
+          0.181848
+        ]
+      },
+      "accuracy": {
+        "point": 0.486316,
+        "95ci": [
+          0.462632,
+          0.509474
+        ]
+      }
+    },
+    "market_elo_equal": {
+      "log_loss": {
+        "point": 0.99782,
+        "95ci": [
+          0.972822,
+          1.023258
+        ]
+      },
+      "brier": {
+        "point": 0.19897,
+        "95ci": [
+          0.193062,
+          0.204783
+        ]
+      },
+      "ece": {
+        "point": 0.064988,
+        "95ci": [
+          0.045164,
+          0.088717
+        ]
+      },
+      "accuracy": {
+        "point": 0.502632,
+        "95ci": [
+          0.478947,
+          0.525263
+        ]
+      }
+    },
+    "market_form_equal": {
+      "log_loss": {
+        "point": 1.003115,
+        "95ci": [
+          0.986295,
+          1.019764
+        ]
+      },
+      "brier": {
+        "point": 0.200146,
+        "95ci": [
+          0.196352,
+          0.204023
+        ]
+      },
+      "ece": {
+        "point": 0.049068,
+        "95ci": [
+          0.031661,
+          0.070959
+        ]
+      },
+      "accuracy": {
+        "point": 0.491579,
+        "95ci": [
+          0.467895,
+          0.514737
+        ]
+      }
+    },
+    "market_form_rest": {
+      "log_loss": {
+        "point": 0.997088,
+        "95ci": [
+          0.98189,
+          1.012179
+        ]
+      },
+      "brier": {
+        "point": 0.198713,
+        "95ci": [
+          0.195144,
+          0.202286
+        ]
+      },
+      "ece": {
+        "point": 0.053205,
+        "95ci": [
+          0.035336,
+          0.075056
+        ]
+      },
+      "accuracy": {
+        "point": 0.505789,
+        "95ci": [
+          0.482105,
+          0.528434
+        ]
+      }
+    },
+    "market_form_rest_elo_equal": {
+      "log_loss": {
+        "point": 1.009799,
+        "95ci": [
+          0.993917,
+          1.025764
+        ]
+      },
+      "brier": {
+        "point": 0.201545,
+        "95ci": [
+          0.197707,
+          0.205394
+        ]
+      },
+      "ece": {
+        "point": 0.050946,
+        "95ci": [
+          0.031532,
+          0.072287
+        ]
+      },
+      "accuracy": {
+        "point": 0.487895,
+        "95ci": [
+          0.464197,
+          0.510539
+        ]
+      }
+    },
+    "production_with_historical_inputs": {
+      "log_loss": {
+        "point": 1.005445,
+        "95ci": [
+          0.984871,
+          1.026008
+        ]
+      },
+      "brier": {
+        "point": 0.200626,
+        "95ci": [
+          0.195874,
+          0.205492
+        ]
+      },
+      "ece": {
+        "point": 0.063102,
+        "95ci": [
+          0.041152,
+          0.08448
+        ]
+      },
+      "accuracy": {
+        "point": 0.488947,
+        "95ci": [
+          0.46525,
+          0.512105
+        ]
+      }
+    }
+  },
+  "delta_ll": {
+    "production_with_historical_inputs_vs_market_only": {
+      "delta_ll": 0.029525,
+      "2.5": 0.018461,
+      "97.5": 0.040917
+    },
+    "production_with_historical_inputs_vs_uniform": {
+      "delta_ll": -0.093254,
+      "2.5": -0.113742,
+      "97.5": -0.072604
+    },
+    "production_with_historical_inputs_vs_freq_prior_season": {
+      "delta_ll": -0.073618,
+      "2.5": -0.089433,
+      "97.5": -0.05821
+    },
+    "market_only_vs_uniform": {
+      "delta_ll": -0.122779,
+      "2.5": -0.142623,
+      "97.5": -0.103095
+    },
+    "market_only_vs_freq_prior_season": {
+      "delta_ll": -0.103143,
+      "2.5": -0.120304,
+      "97.5": -0.085083
+    },
+    "production_with_historical_inputs_vs_elo_only": {
+      "delta_ll": -0.086815,
+      "2.5": -0.104043,
+      "97.5": -0.069973
+    },
+    "market_only_vs_elo_only": {
+      "delta_ll": -0.116339,
+      "2.5": -0.141637,
+      "97.5": -0.092174
+    }
+  },
+  "weights_learned": {
+    "per_season": {
+      "2020_21": {
+        "train_pool_n": 380,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 0.980778,
+          "refined_elo": 1.108036,
+          "rolling_form": 1.083429,
+          "rest_days": 1.098725
+        },
+        "weights": {
+          "market_odds": 0.271514,
+          "refined_elo": 0.24033,
+          "rolling_form": 0.245789,
+          "rest_days": 0.242367
+        },
+        "evaluation": {
+          "n": 380,
+          "log_loss": 1.014366,
+          "brier": 0.202556,
+          "ece": 0.025261,
+          "mean_confidence": 0.481341,
+          "accuracy": 0.502632,
+          "weights_source": "train:2019_20 -> eval:2020_21"
+        }
+      },
+      "2021_22": {
+        "train_pool_n": 760,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 0.982178,
+          "refined_elo": 1.10749,
+          "rolling_form": 1.095442,
+          "rest_days": 1.09851
+        },
+        "weights": {
+          "market_odds": 0.27192,
+          "refined_elo": 0.241152,
+          "rolling_form": 0.243804,
+          "rest_days": 0.243124
+        },
+        "evaluation": {
+          "n": 380,
+          "log_loss": 1.012312,
+          "brier": 0.202262,
+          "ece": 0.079013,
+          "mean_confidence": 0.483698,
+          "accuracy": 0.473684,
+          "weights_source": "train:2019_20+2020_21 -> eval:2021_22"
+        }
+      },
+      "2022_23": {
+        "train_pool_n": 1140,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 0.98341,
+          "refined_elo": 1.1032,
+          "rolling_form": 1.092061,
+          "rest_days": 1.099744
+        },
+        "weights": {
+          "market_odds": 0.271286,
+          "refined_elo": 0.241829,
+          "rolling_form": 0.244296,
+          "rest_days": 0.242589
+        },
+        "evaluation": {
+          "n": 380,
+          "log_loss": 1.001035,
+          "brier": 0.199502,
+          "ece": 0.074652,
+          "mean_confidence": 0.482519,
+          "accuracy": 0.497368,
+          "weights_source": "train:2019_20+2020_21+2021_22 -> eval:2022_23"
+        }
+      },
+      "2023_24": {
+        "train_pool_n": 1520,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 0.982482,
+          "refined_elo": 1.096217,
+          "rolling_form": 1.08892,
+          "rest_days": 1.099603
+        },
+        "weights": {
+          "market_odds": 0.270857,
+          "refined_elo": 0.242755,
+          "rolling_form": 0.244381,
+          "rest_days": 0.242007
+        },
+        "evaluation": {
+          "n": 380,
+          "log_loss": 0.998549,
+          "brier": 0.198898,
+          "ece": 0.102652,
+          "mean_confidence": 0.48347,
+          "accuracy": 0.484211,
+          "weights_source": "train:2019_20+2020_21+2021_22+2022_23 -> eval:2023_24"
+        }
+      }
+    },
+    "stability": {
+      "per_signal_min_max": {
+        "market_odds": {
+          "min": 0.270857,
+          "max": 0.27192,
+          "spread": 0.001063
+        },
+        "refined_elo": {
+          "min": 0.24033,
+          "max": 0.242755,
+          "spread": 0.002425
+        },
+        "rolling_form": {
+          "min": 0.243804,
+          "max": 0.245789,
+          "spread": 0.001985
+        },
+        "rest_days": {
+          "min": 0.242007,
+          "max": 0.243124,
+          "spread": 0.001117
+        }
+      },
+      "window_to_window_shift": {
+        "2021_22": {
+          "market_odds": 0.000406,
+          "refined_elo": 0.000822,
+          "rest_days": 0.000757,
+          "rolling_form": -0.001985
+        },
+        "2022_23": {
+          "market_odds": -0.000634,
+          "refined_elo": 0.000677,
+          "rest_days": -0.000535,
+          "rolling_form": 0.000492
+        },
+        "2023_24": {
+          "market_odds": -0.000429,
+          "refined_elo": 0.000926,
+          "rest_days": -0.000582,
+          "rolling_form": 8.5e-05
+        }
+      },
+      "vs_production": {
+        "pearson": 0.4579
+      }
+    },
+    "note": "reused verbatim from eval_results.json (inverse-log-loss weights fit on STRICTLY-prior seasons; never the eval season)"
+  }
+}

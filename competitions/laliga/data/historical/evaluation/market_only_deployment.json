@@ -1,0 +1,681 @@
+{
+  "meta": {
+    "generated_at": "2026-09-21",
+    "generated_at_note": "pinned to data/elo_seed.json snapshot_date (NOT wall-clock) so the artifact is a pure function of pinned inputs \u2014 byte-stable across identical-input re-runs",
+    "dataset": "competitions/laliga/data/historical (2019/20-2023/24) + live seasons/2026_27",
+    "method": "replay with historical.build_context_for_match (prior-only) and per-season pre-match Elo snapshots; no future-data leakage; production config reuses evaluate.py renormalized weights verbatim; market_only is the REAL phase-12A candidate: build_strategy_engine('market_only') evaluated via engine.evaluate()",
+    "bootstrap": {
+      "seed": 20260601,
+      "n_boot": 2000,
+      "scheme": "plain resample-by-match, paired over identical resamples, 95% percentile"
+    },
+    "weights": {
+      "production_raw": {
+        "rolling_form": 0.25,
+        "rest_days": 0.05,
+        "squad_value": 0.1,
+        "market_odds": 0.3,
+        "refined_elo": 0.3
+      },
+      "production_renormalized_over_historical": {
+        "rolling_form": 0.2777777777777778,
+        "rest_days": 0.055555555555555566,
+        "market_odds": 0.33333333333333337,
+        "refined_elo": 0.33333333333333337
+      },
+      "market_only": {
+        "market_odds": 1.0
+      }
+    },
+    "ece_note": "corrected ECE = multi_class_ece (confidence-vs-accuracy, 10 bins for n>=100)"
+  },
+  "populations": {
+    "A_odds_present": {
+      "n": 1900,
+      "coverage_note": "100% odds coverage \u2014 has_odds(m) true for all 1900 historical matches",
+      "models": {
+        "production": {
+          "n": 1900,
+          "log_loss": 1.005445,
+          "brier": 0.200626,
+          "ece": 0.06307,
+          "mean_confidence": 0.525588,
+          "accuracy": 0.488947
+        },
+        "market_only": {
+          "n": 1900,
+          "log_loss": 0.975754,
+          "brier": 0.193663,
+          "ece": 0.029002,
+          "mean_confidence": 0.511002,
+          "accuracy": 0.533158
+        },
+        "uniform": {
+          "n": 1900,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.112,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.445263
+        },
+        "freq": {
+          "n": 1900,
+          "log_loss": 1.079064,
+          "brier": 0.217684,
+          "ece": 0.02676,
+          "mean_confidence": 0.422149,
+          "accuracy": 0.445263
+        },
+        "elo_only": {
+          "n": 1900,
+          "log_loss": 1.092397,
+          "brier": 0.216771,
+          "ece": 0.158274,
+          "mean_confidence": 0.644572,
+          "accuracy": 0.486316
+        }
+      },
+      "delta_ll_vs_production": {
+        "market_only": {
+          "delta_ll": 0.029525,
+          "2.5": 0.018461,
+          "97.5": 0.040917
+        },
+        "uniform": {
+          "delta_ll": -0.093254,
+          "2.5": -0.113742,
+          "97.5": -0.072604
+        },
+        "freq": {
+          "delta_ll": -0.073618,
+          "2.5": -0.089433,
+          "97.5": -0.05821
+        },
+        "elo_only": {
+          "delta_ll": -0.086815,
+          "2.5": -0.104043,
+          "97.5": -0.069973
+        }
+      }
+    },
+    "B_odds_absent": {
+      "n_historical_odds_absent": 0,
+      "limitation": "The historical dataset has ZERO odds-absent matches (100% odds coverage). No synthetic odds-less population is fabricated; the genuine odds-absent deployment population is the live 2026/27 season, reported as behavior/fallback evidence (never scored).",
+      "live": {
+        "season": "2026_27",
+        "n_fixtures": 380,
+        "n_finished": 69,
+        "n_unplayed": 311,
+        "n_odds_absent": 69,
+        "n_odds_present": 0,
+        "engines": {
+          "production": "pipeline.build_signal_engine(strategy='production') with data/elo_seed.json, live results.json, data/squad_values.json",
+          "market_only": "pipeline.build_signal_engine(strategy='market_only') -> ensemble.build_strategy_engine('market_only')",
+          "context": "historical.build_context_for_match (prior-only) on the live 2026/27 completed matches"
+        },
+        "production": {
+          "n_outputs": 69,
+          "distinct_outputs": 69,
+          "all_uniform": false,
+          "example_output": {
+            "home": 0.474534,
+            "draw": 0.307826,
+            "away": 0.21764
+          },
+          "example_signal_breakdown": {
+            "market_odds": {
+              "home": 0.3333,
+              "draw": 0.3333,
+              "away": 0.3333,
+              "weight": 0.3
+            },
+            "refined_elo": {
+              "home": 0.6651,
+              "draw": 0.2344,
+              "away": 0.1005,
+              "weight": 0.3
+            },
+            "rest_days": {
+              "home": 0.3333,
+              "draw": 0.3333,
+              "away": 0.3333,
+              "weight": 0.05
+            },
+            "rolling_form": {
+              "home": 0.5,
+              "draw": 0.35,
+              "away": 0.15,
+              "weight": 0.25
+            },
+            "squad_value": {
+              "home": 0.3333,
+              "draw": 0.3333,
+              "away": 0.3333,
+              "weight": 0.1
+            }
+          },
+          "signal_fallback_note": "MarketOddsSignal contribution is exact uniform (0.3333/0.3333/0.3333, weight 0.3) because live rows carry no odds; the other four signals carry on."
+        },
+        "market_only": {
+          "n_outputs": 69,
+          "distinct_outputs": 1,
+          "all_uniform": true,
+          "example_output": {
+            "home": 0.333333,
+            "draw": 0.333333,
+            "away": 0.333333
+          },
+          "example_signal_breakdown": {
+            "market_odds": {
+              "home": 0.3333,
+              "draw": 0.3333,
+              "away": 0.3333,
+              "weight": 1.0
+            }
+          },
+          "uniform_fallback_note": "market_only emits the exact neutral fallback (1/3,1/3,1/3) on every odds-absent live match."
+        },
+        "determinism": {
+          "production_identical_across_two_engine_instances": true,
+          "market_only_identical_across_two_engine_instances": true,
+          "production_breakdown_identical": true,
+          "market_only_breakdown_identical": true
+        },
+        "fallback_checks": {
+          "market_signal_uniform_on_all_odds_absent": true,
+          "market_only_breakdown_only_market_odds_weight_1": true,
+          "market_signal_prior_only_empty_context_still_uniform": true
+        },
+        "scoring_note": "BEHAVIOR / FALLBACK EVIDENCE ONLY \u2014 outputs above are NOT scored against outcomes (no pre-kickoff frozen predictions exist for LaLiga; retroactive prediction creation is forbidden this phase)."
+      }
+    },
+    "C_all": {
+      "n": 1900,
+      "coverage_note": "100% odds coverage \u2014 has_odds(m) true for all 1900 historical matches",
+      "models": {
+        "production": {
+          "n": 1900,
+          "log_loss": 1.005445,
+          "brier": 0.200626,
+          "ece": 0.06307,
+          "mean_confidence": 0.525588,
+          "accuracy": 0.488947
+        },
+        "market_only": {
+          "n": 1900,
+          "log_loss": 0.975754,
+          "brier": 0.193663,
+          "ece": 0.029002,
+          "mean_confidence": 0.511002,
+          "accuracy": 0.533158
+        },
+        "uniform": {
+          "n": 1900,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.112,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.445263
+        },
+        "freq": {
+          "n": 1900,
+          "log_loss": 1.079064,
+          "brier": 0.217684,
+          "ece": 0.02676,
+          "mean_confidence": 0.422149,
+          "accuracy": 0.445263
+        },
+        "elo_only": {
+          "n": 1900,
+          "log_loss": 1.092397,
+          "brier": 0.216771,
+          "ece": 0.158274,
+          "mean_confidence": 0.644572,
+          "accuracy": 0.486316
+        }
+      },
+      "delta_ll_vs_production": {
+        "market_only": {
+          "delta_ll": 0.029525,
+          "2.5": 0.018461,
+          "97.5": 0.040917
+        },
+        "uniform": {
+          "delta_ll": -0.093254,
+          "2.5": -0.113742,
+          "97.5": -0.072604
+        },
+        "freq": {
+          "delta_ll": -0.073618,
+          "2.5": -0.089433,
+          "97.5": -0.05821
+        },
+        "elo_only": {
+          "delta_ll": -0.086815,
+          "2.5": -0.104043,
+          "97.5": -0.069973
+        }
+      },
+      "note": "== population A: the historical dataset is 100% odds-covered, so 'all' and 'odds-present' coincide (n=1900). Reported separately for completeness; numbers are identical to A."
+    }
+  },
+  "fallback_comparison": {
+    "mechanisms": [
+      {
+        "id": 1,
+        "label": "market_only where odds exist",
+        "evidence": {
+          "n": 1900,
+          "log_loss": 0.975754,
+          "brier": 0.193663,
+          "ece": 0.029002,
+          "mean_confidence": 0.511002,
+          "accuracy": 0.533158
+        }
+      },
+      {
+        "id": 2,
+        "label": "production's existing fallback when odds absent",
+        "evidence": "live behavior \u2014 MarketOddsSignal contribution degrades to exact uniform (weight 0.3) inside the 5-signal blend; the other four signals carry on (see populations.B_odds_absent.live.production)"
+      },
+      {
+        "id": 3,
+        "label": "natural neutral/prior fallback = exact uniform",
+        "evidence": "MarketOddsSignal.predict() returns (1/3,1/3,1/3) on missing/invalid odds (football_core/signals/market_odds.py:44-49) \u2014 deterministic, prior-only, never fabricates, provenance-preserving, independently testable; identical to what market_only emits live."
+      }
+    ],
+    "verdict": "On the live odds-absent population, mechanism 1 and mechanism 3 produce byte-identical outputs (exact uniform) because market_only's sole signal degrades to the uniform fallback; mechanism 2 (production) continues to blend the four non-market signals with the market component pinned to uniform. Rationale is evidence-based (fallback_checks), not gate-driven."
+  },
+  "per_season": {
+    "2019_20": {
+      "n": 380,
+      "metrics": {
+        "production": {
+          "n": 380,
+          "log_loss": 1.013182,
+          "brier": 0.202542,
+          "ece": 0.077815,
+          "mean_confidence": 0.526668,
+          "accuracy": 0.484211
+        },
+        "market_only": {
+          "n": 380,
+          "log_loss": 0.980778,
+          "brier": 0.19545,
+          "ece": 0.031196,
+          "mean_confidence": 0.512783,
+          "accuracy": 0.510526
+        },
+        "uniform": {
+          "n": 380,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1246,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.457895
+        },
+        "freq": {
+          "n": 380,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1246,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.457895
+        },
+        "elo_only": {
+          "n": 380,
+          "log_loss": 1.108036,
+          "brier": 0.221164,
+          "ece": 0.165493,
+          "mean_confidence": 0.644945,
+          "accuracy": 0.486842
+        }
+      },
+      "delta_ll_production_minus_market": {
+        "point": 0.032405,
+        "delta_ll": 0.032195,
+        "2.5": 0.005956,
+        "97.5": 0.057716
+      }
+    },
+    "2020_21": {
+      "n": 380,
+      "metrics": {
+        "production": {
+          "n": 380,
+          "log_loss": 1.013925,
+          "brier": 0.202352,
+          "ece": 0.037094,
+          "mean_confidence": 0.523882,
+          "accuracy": 0.502632
+        },
+        "market_only": {
+          "n": 380,
+          "log_loss": 0.983578,
+          "brier": 0.194795,
+          "ece": 0.053818,
+          "mean_confidence": 0.512702,
+          "accuracy": 0.539474
+        },
+        "uniform": {
+          "n": 380,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.0825,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.415789
+        },
+        "freq": {
+          "n": 380,
+          "log_loss": 1.087747,
+          "brier": 0.219765,
+          "ece": 0.0421,
+          "mean_confidence": 0.457895,
+          "accuracy": 0.415789
+        },
+        "elo_only": {
+          "n": 380,
+          "log_loss": 1.106945,
+          "brier": 0.219603,
+          "ece": 0.157283,
+          "mean_confidence": 0.646746,
+          "accuracy": 0.489474
+        }
+      },
+      "delta_ll_production_minus_market": {
+        "point": 0.030347,
+        "delta_ll": 0.029771,
+        "2.5": 0.002677,
+        "97.5": 0.055326
+      }
+    },
+    "2021_22": {
+      "n": 380,
+      "metrics": {
+        "production": {
+          "n": 380,
+          "log_loss": 1.010662,
+          "brier": 0.201898,
+          "ece": 0.096769,
+          "mean_confidence": 0.526433,
+          "accuracy": 0.473684
+        },
+        "market_only": {
+          "n": 380,
+          "log_loss": 0.985875,
+          "brier": 0.195689,
+          "ece": 0.050726,
+          "mean_confidence": 0.507721,
+          "accuracy": 0.521053
+        },
+        "uniform": {
+          "n": 380,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1009,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.434211
+        },
+        "freq": {
+          "n": 380,
+          "log_loss": 1.076655,
+          "brier": 0.217138,
+          "ece": 0.0026,
+          "mean_confidence": 0.436842,
+          "accuracy": 0.434211
+        },
+        "elo_only": {
+          "n": 380,
+          "log_loss": 1.09462,
+          "brier": 0.216901,
+          "ece": 0.172912,
+          "mean_confidence": 0.646573,
+          "accuracy": 0.473684
+        }
+      },
+      "delta_ll_production_minus_market": {
+        "point": 0.024787,
+        "delta_ll": 0.024648,
+        "2.5": 0.001316,
+        "97.5": 0.048446
+      }
+    },
+    "2022_23": {
+      "n": 380,
+      "metrics": {
+        "production": {
+          "n": 380,
+          "log_loss": 0.997219,
+          "brier": 0.198635,
+          "ece": 0.038723,
+          "mean_confidence": 0.525202,
+          "accuracy": 0.5
+        },
+        "market_only": {
+          "n": 380,
+          "log_loss": 0.979697,
+          "brier": 0.194358,
+          "ece": 0.038498,
+          "mean_confidence": 0.509372,
+          "accuracy": 0.539474
+        },
+        "uniform": {
+          "n": 380,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1456,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.478947
+        },
+        "freq": {
+          "n": 380,
+          "log_loss": 1.057764,
+          "brier": 0.212658,
+          "ece": 0.0429,
+          "mean_confidence": 0.435965,
+          "accuracy": 0.478947
+        },
+        "elo_only": {
+          "n": 380,
+          "log_loss": 1.075269,
+          "brier": 0.212708,
+          "ece": 0.142703,
+          "mean_confidence": 0.645331,
+          "accuracy": 0.502632
+        }
+      },
+      "delta_ll_production_minus_market": {
+        "point": 0.017522,
+        "delta_ll": 0.017599,
+        "2.5": -0.007449,
+        "97.5": 0.042091
+      }
+    },
+    "2023_24": {
+      "n": 380,
+      "metrics": {
+        "production": {
+          "n": 380,
+          "log_loss": 0.992237,
+          "brier": 0.197702,
+          "ece": 0.095621,
+          "mean_confidence": 0.525752,
+          "accuracy": 0.484211
+        },
+        "market_only": {
+          "n": 380,
+          "log_loss": 0.948841,
+          "brier": 0.188021,
+          "ece": 0.051571,
+          "mean_confidence": 0.512433,
+          "accuracy": 0.555263
+        },
+        "uniform": {
+          "n": 380,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1062,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.439474
+        },
+        "freq": {
+          "n": 380,
+          "log_loss": 1.074543,
+          "brier": 0.216635,
+          "ece": 0.0072,
+          "mean_confidence": 0.446711,
+          "accuracy": 0.439474
+        },
+        "elo_only": {
+          "n": 380,
+          "log_loss": 1.077113,
+          "brier": 0.21348,
+          "ece": 0.160308,
+          "mean_confidence": 0.639263,
+          "accuracy": 0.478947
+        }
+      },
+      "delta_ll_production_minus_market": {
+        "point": 0.043396,
+        "delta_ll": 0.043497,
+        "2.5": 0.021033,
+        "97.5": 0.066003
+      }
+    }
+  },
+  "per_season_checks": {
+    "monotone_direction_of_effect": "market_only has lower LL in every season (all production-market deltas positive)",
+    "per_season_delta_production_minus_market": {
+      "2019_20": 0.032405,
+      "2020_21": 0.030347,
+      "2021_22": 0.024787,
+      "2022_23": 0.017522,
+      "2023_24": 0.043396
+    },
+    "pooled_delta_point": 0.029691,
+    "dominant_season": "2023_24",
+    "weakest_season": "2022_23",
+    "share_of_pooled_sum": {
+      "2019_20": 0.2183,
+      "2020_21": 0.2044,
+      "2021_22": 0.167,
+      "2022_23": 0.118,
+      "2023_24": 0.2923
+    },
+    "note": "seasons have equal n (380), so pooled delta == mean of per-season deltas; the shared figure shows how much of the summed delta each season carries. 2023_24 is the largest single-season contributor; 2022_23 the smallest."
+  },
+  "live_season": {
+    "season": "2026_27",
+    "n_completed": 69,
+    "n_unplayed": 311,
+    "n_total": 380,
+    "n_odds_absent": 69,
+    "n_odds_present": 0,
+    "insufficient_evidence": true,
+    "reason": "No pre-kickoff frozen predictions exist for LaLiga live matches and there is no LaLiga shadow store (the UCL shadow store exists and stays untouched). Without pre-kickoff frozen predictions, scoring the 69 completed live matches would require retroactive prediction creation, which the phase forbids \u2014 so live 2026/27 is INSUFFICIENT EVIDENCE for any model ranking. Nothing was tuned from it."
+  },
+  "deployment_implications": {
+    "live_odds_ingestion": "fetch_live_data() (pipeline.py:431-450) builds row dicts with ONLY match_id/home_team/away_team/event_date/status/matchday/stage \u2014 no odds fields; the 2026/27 fixtures (380) and results (69) contain no odds for any match, so the live deployment population is 100% odds-absent.",
+    "promoting_market_only_today": "build_strategy_engine('market_only') contains exactly one MarketOddsSignal weighted 1.0; on every live match it emits exact (1/3,1/3,1/3). Promoting market_only now therefore means uniform predictions on every live match.",
+    "historical_superiority_scope": "market_only's historical superiority (pooled delta production - market_only = +0.0295, 95% CI exclusively positive) holds ONLY on the fully odds-covered historical population \u2014 it says nothing about an odds-absent population.",
+    "promotion_meaningfulness": "Promotion of market_only as the live engine is only meaningful if/when live odds are ingested, which requires a pipeline change (fetch_live_data must populate odds fields from the provider) \u2014 OUT OF SCOPE for this phase."
+  },
+  "cross_checks": {
+    "pooled_vs_architecture_exploration": {
+      "market_only": {
+        "ours": 0.975754,
+        "phase11": 0.975754,
+        "abs_diff": 0.0,
+        "mismatch_gt_1e6": false
+      },
+      "elo_only": {
+        "ours": 1.092397,
+        "phase11": 1.092397,
+        "abs_diff": 0.0,
+        "mismatch_gt_1e6": false
+      },
+      "uniform": {
+        "ours": 1.098612,
+        "phase11": 1.098612,
+        "abs_diff": 0.0,
+        "mismatch_gt_1e6": false
+      }
+    },
+    "per_season_vs_architecture_exploration": {
+      "2019_20": {
+        "production": {
+          "ours": 1.013182,
+          "phase11": 1.013182,
+          "abs_diff": 0.0
+        },
+        "market_only": {
+          "ours": 0.980778,
+          "phase11": 0.980778,
+          "abs_diff": 0.0
+        }
+      },
+      "2020_21": {
+        "production": {
+          "ours": 1.013925,
+          "phase11": 1.013925,
+          "abs_diff": 0.0
+        },
+        "market_only": {
+          "ours": 0.983578,
+          "phase11": 0.983578,
+          "abs_diff": 0.0
+        }
+      },
+      "2021_22": {
+        "production": {
+          "ours": 1.010662,
+          "phase11": 1.010662,
+          "abs_diff": 0.0
+        },
+        "market_only": {
+          "ours": 0.985875,
+          "phase11": 0.985875,
+          "abs_diff": 0.0
+        }
+      },
+      "2022_23": {
+        "production": {
+          "ours": 0.997219,
+          "phase11": 0.997219,
+          "abs_diff": 0.0
+        },
+        "market_only": {
+          "ours": 0.979697,
+          "phase11": 0.979697,
+          "abs_diff": 0.0
+        }
+      },
+      "2023_24": {
+        "production": {
+          "ours": 0.992237,
+          "phase11": 0.992237,
+          "abs_diff": 0.0
+        },
+        "market_only": {
+          "ours": 0.948841,
+          "phase11": 0.948841,
+          "abs_diff": 0.0
+        }
+      }
+    },
+    "pooled_delta_ll_vs_bootstrap_cis": {
+      "ours": {
+        "delta_ll": 0.029525,
+        "2.5": 0.018461,
+        "97.5": 0.040917
+      },
+      "phase11_delta": {
+        "delta_ll": 0.029525,
+        "2.5": 0.018461,
+        "97.5": 0.040917
+      },
+      "note": "Phase 11 bootstrap used the BARE MarketOddsSignal for market_only; this run uses build_strategy_engine('market_only'), so tiny differences must come only from the engine's 6-dp output rounding."
+    },
+    "ece_note": "point ECE via metrics_from -> multi_class_ece (10 bins); bootstrap_cis previously stored ece via pooled_metrics/ece_points, which can differ at ~1e-5 from pure float accumulation \u2014 both conventions are reported where used."
+  }
+}

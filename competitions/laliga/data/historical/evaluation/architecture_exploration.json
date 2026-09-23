@@ -1,0 +1,726 @@
+{
+  "meta": {
+    "generated_at": "2026-09-22T04:50:11.893803+00:00",
+    "dataset": "competitions/laliga/data/historical (2019/20-2023/24)",
+    "population": "all 1900 completed matches \u2014 every LaLiga historical match has usable market odds and Elo coverage",
+    "method": "replay with historical.build_context_for_match (prior-only) and per-season pre-match Elo snapshots; no future-data leakage",
+    "weighting": {
+      "production_with_historical_inputs": {
+        "rolling_form": 0.2777777777777778,
+        "rest_days": 0.055555555555555566,
+        "market_odds": 0.33333333333333337,
+        "refined_elo": 0.33333333333333337
+      },
+      "note": "squad_value has no historical data, so the five production weights are renormalized over market_odds/refined_elo/rolling_form/rest_days (evaluate.py convention); no weights are fitted on the evaluation set"
+    },
+    "ece_note": "ece = football_core.evaluation.multi_class_ece (production)",
+    "brier_note": "brier = multi_class_brier convention (1/3 scale)",
+    "cross_check_vs_eval_results": {
+      "production_with_historical_inputs": {
+        "our_pooled": 1.005445,
+        "eval_results": 1.005445
+      },
+      "market_only": {
+        "our_pooled": 0.975754,
+        "eval_results": 0.975754
+      },
+      "elo_only": {
+        "our_pooled": 1.092397,
+        "eval_results": 1.092397
+      }
+    }
+  },
+  "configs": {
+    "market_only": {
+      "signals": [
+        "market_odds"
+      ],
+      "weights": {
+        "market_odds": 1.0
+      },
+      "weight_note": "bare single signal (weight 1.0)"
+    },
+    "elo_only": {
+      "signals": [
+        "refined_elo"
+      ],
+      "weights": {
+        "refined_elo": 1.0
+      },
+      "weight_note": "bare single signal (weight 1.0)"
+    },
+    "market_elo_equal": {
+      "signals": [
+        "market_odds",
+        "refined_elo"
+      ],
+      "weights": {
+        "market_odds": 0.5,
+        "refined_elo": 0.5
+      },
+      "weight_note": "fixed weights"
+    },
+    "market_form_equal": {
+      "signals": [
+        "market_odds",
+        "rolling_form"
+      ],
+      "weights": {
+        "market_odds": 0.5,
+        "rolling_form": 0.5
+      },
+      "weight_note": "fixed weights"
+    },
+    "market_form_rest": {
+      "signals": [
+        "market_odds",
+        "rolling_form",
+        "rest_days"
+      ],
+      "weights": {
+        "market_odds": 0.55,
+        "rolling_form": 0.35,
+        "rest_days": 0.1
+      },
+      "weight_note": "fixed weights"
+    },
+    "market_form_rest_elo_equal": {
+      "signals": [
+        "market_odds",
+        "refined_elo",
+        "rolling_form",
+        "rest_days"
+      ],
+      "weights": {
+        "market_odds": 0.25,
+        "refined_elo": 0.25,
+        "rolling_form": 0.25,
+        "rest_days": 0.25
+      },
+      "weight_note": "fixed weights"
+    },
+    "production_with_historical_inputs": {
+      "signals": [
+        "market_odds",
+        "refined_elo",
+        "rolling_form",
+        "rest_days"
+      ],
+      "weights": {
+        "rolling_form": 0.2777777777777778,
+        "rest_days": 0.055555555555555566,
+        "market_odds": 0.33333333333333337,
+        "refined_elo": 0.33333333333333337
+      },
+      "weight_note": "production weights renormalized over the listed signals"
+    }
+  },
+  "per_season": {
+    "2019_20": {
+      "n": 380,
+      "market_only": {
+        "n": 380,
+        "log_loss": 0.980778,
+        "brier": 0.19545,
+        "ece": 0.031196,
+        "mean_confidence": 0.512783,
+        "accuracy": 0.510526
+      },
+      "elo_only": {
+        "n": 380,
+        "log_loss": 1.108036,
+        "brier": 0.221164,
+        "ece": 0.165493,
+        "mean_confidence": 0.644945,
+        "accuracy": 0.486842
+      },
+      "market_elo_equal": {
+        "n": 380,
+        "log_loss": 1.008116,
+        "brier": 0.202093,
+        "ece": 0.076475,
+        "mean_confidence": 0.565897,
+        "accuracy": 0.497368
+      },
+      "market_form_equal": {
+        "n": 380,
+        "log_loss": 1.004575,
+        "brier": 0.200654,
+        "ece": 0.036597,
+        "mean_confidence": 0.48209,
+        "accuracy": 0.489474
+      },
+      "market_form_rest": {
+        "n": 380,
+        "log_loss": 0.99919,
+        "brier": 0.19937,
+        "ece": 0.052161,
+        "mean_confidence": 0.470535,
+        "accuracy": 0.494737
+      },
+      "market_form_rest_elo_equal": {
+        "n": 380,
+        "log_loss": 1.016005,
+        "brier": 0.202953,
+        "ece": 0.046972,
+        "mean_confidence": 0.484546,
+        "accuracy": 0.484211
+      },
+      "production_with_historical_inputs": {
+        "n": 380,
+        "log_loss": 1.013182,
+        "brier": 0.202542,
+        "ece": 0.077815,
+        "mean_confidence": 0.526668,
+        "accuracy": 0.484211
+      }
+    },
+    "2020_21": {
+      "n": 380,
+      "market_only": {
+        "n": 380,
+        "log_loss": 0.983578,
+        "brier": 0.194795,
+        "ece": 0.053818,
+        "mean_confidence": 0.512702,
+        "accuracy": 0.539474
+      },
+      "elo_only": {
+        "n": 380,
+        "log_loss": 1.106945,
+        "brier": 0.219603,
+        "ece": 0.157283,
+        "mean_confidence": 0.646746,
+        "accuracy": 0.489474
+      },
+      "market_elo_equal": {
+        "n": 380,
+        "log_loss": 1.006523,
+        "brier": 0.200167,
+        "ece": 0.063146,
+        "mean_confidence": 0.565781,
+        "accuracy": 0.502632
+      },
+      "market_form_equal": {
+        "n": 380,
+        "log_loss": 1.012913,
+        "brier": 0.202103,
+        "ece": 0.026563,
+        "mean_confidence": 0.476326,
+        "accuracy": 0.5
+      },
+      "market_form_rest": {
+        "n": 380,
+        "log_loss": 1.004626,
+        "brier": 0.200161,
+        "ece": 0.052326,
+        "mean_confidence": 0.465281,
+        "accuracy": 0.515789
+      },
+      "market_form_rest_elo_equal": {
+        "n": 380,
+        "log_loss": 1.016093,
+        "brier": 0.202971,
+        "ece": 0.034389,
+        "mean_confidence": 0.481748,
+        "accuracy": 0.502632
+      },
+      "production_with_historical_inputs": {
+        "n": 380,
+        "log_loss": 1.013925,
+        "brier": 0.202352,
+        "ece": 0.037094,
+        "mean_confidence": 0.523882,
+        "accuracy": 0.502632
+      }
+    },
+    "2021_22": {
+      "n": 380,
+      "market_only": {
+        "n": 380,
+        "log_loss": 0.985875,
+        "brier": 0.195689,
+        "ece": 0.050726,
+        "mean_confidence": 0.507721,
+        "accuracy": 0.521053
+      },
+      "elo_only": {
+        "n": 380,
+        "log_loss": 1.09462,
+        "brier": 0.216901,
+        "ece": 0.172912,
+        "mean_confidence": 0.646573,
+        "accuracy": 0.473684
+      },
+      "market_elo_equal": {
+        "n": 380,
+        "log_loss": 1.006905,
+        "brier": 0.200651,
+        "ece": 0.086731,
+        "mean_confidence": 0.567268,
+        "accuracy": 0.486842
+      },
+      "market_form_equal": {
+        "n": 380,
+        "log_loss": 1.009274,
+        "brier": 0.20177,
+        "ece": 0.089978,
+        "mean_confidence": 0.479537,
+        "accuracy": 0.468421
+      },
+      "market_form_rest": {
+        "n": 380,
+        "log_loss": 1.003671,
+        "brier": 0.200398,
+        "ece": 0.072793,
+        "mean_confidence": 0.466694,
+        "accuracy": 0.486842
+      },
+      "market_form_rest_elo_equal": {
+        "n": 380,
+        "log_loss": 1.013828,
+        "brier": 0.202607,
+        "ece": 0.082614,
+        "mean_confidence": 0.484015,
+        "accuracy": 0.473684
+      },
+      "production_with_historical_inputs": {
+        "n": 380,
+        "log_loss": 1.010662,
+        "brier": 0.201898,
+        "ece": 0.096769,
+        "mean_confidence": 0.526433,
+        "accuracy": 0.473684
+      }
+    },
+    "2022_23": {
+      "n": 380,
+      "market_only": {
+        "n": 380,
+        "log_loss": 0.979697,
+        "brier": 0.194358,
+        "ece": 0.038498,
+        "mean_confidence": 0.509372,
+        "accuracy": 0.539474
+      },
+      "elo_only": {
+        "n": 380,
+        "log_loss": 1.075269,
+        "brier": 0.212708,
+        "ece": 0.142703,
+        "mean_confidence": 0.645331,
+        "accuracy": 0.502632
+      },
+      "market_elo_equal": {
+        "n": 380,
+        "log_loss": 0.989818,
+        "brier": 0.197104,
+        "ece": 0.038957,
+        "mean_confidence": 0.563948,
+        "accuracy": 0.528947
+      },
+      "market_form_equal": {
+        "n": 380,
+        "log_loss": 1.000869,
+        "brier": 0.199391,
+        "ece": 0.040734,
+        "mean_confidence": 0.480739,
+        "accuracy": 0.515789
+      },
+      "market_form_rest": {
+        "n": 380,
+        "log_loss": 0.995694,
+        "brier": 0.198275,
+        "ece": 0.056114,
+        "mean_confidence": 0.467583,
+        "accuracy": 0.523684
+      },
+      "market_form_rest_elo_equal": {
+        "n": 380,
+        "log_loss": 1.002437,
+        "brier": 0.199822,
+        "ece": 0.064403,
+        "mean_confidence": 0.482763,
+        "accuracy": 0.497368
+      },
+      "production_with_historical_inputs": {
+        "n": 380,
+        "log_loss": 0.997219,
+        "brier": 0.198635,
+        "ece": 0.038723,
+        "mean_confidence": 0.525202,
+        "accuracy": 0.5
+      }
+    },
+    "2023_24": {
+      "n": 380,
+      "market_only": {
+        "n": 380,
+        "log_loss": 0.948841,
+        "brier": 0.188021,
+        "ece": 0.051571,
+        "mean_confidence": 0.512433,
+        "accuracy": 0.555263
+      },
+      "elo_only": {
+        "n": 380,
+        "log_loss": 1.077113,
+        "brier": 0.21348,
+        "ece": 0.160308,
+        "mean_confidence": 0.639263,
+        "accuracy": 0.478947
+      },
+      "market_elo_equal": {
+        "n": 380,
+        "log_loss": 0.977738,
+        "brier": 0.194835,
+        "ece": 0.077913,
+        "mean_confidence": 0.563304,
+        "accuracy": 0.497368
+      },
+      "market_form_equal": {
+        "n": 380,
+        "log_loss": 0.987946,
+        "brier": 0.196812,
+        "ece": 0.102527,
+        "mean_confidence": 0.484096,
+        "accuracy": 0.484211
+      },
+      "market_form_rest": {
+        "n": 380,
+        "log_loss": 0.982259,
+        "brier": 0.19536,
+        "ece": 0.079473,
+        "mean_confidence": 0.471283,
+        "accuracy": 0.507895
+      },
+      "market_form_rest_elo_equal": {
+        "n": 380,
+        "log_loss": 1.000631,
+        "brier": 0.199369,
+        "ece": 0.10639,
+        "mean_confidence": 0.483361,
+        "accuracy": 0.481579
+      },
+      "production_with_historical_inputs": {
+        "n": 380,
+        "log_loss": 0.992237,
+        "brier": 0.197702,
+        "ece": 0.095621,
+        "mean_confidence": 0.525752,
+        "accuracy": 0.484211
+      }
+    }
+  },
+  "pooled": {
+    "n": 1900,
+    "model_order": [
+      "market_only",
+      "elo_only",
+      "market_elo_equal",
+      "market_form_equal",
+      "market_form_rest",
+      "market_form_rest_elo_equal",
+      "production_with_historical_inputs"
+    ],
+    "models": {
+      "market_only": {
+        "n": 1900,
+        "log_loss": 0.975754,
+        "brier": 0.193663,
+        "ece": 0.029002,
+        "mean_confidence": 0.511002,
+        "accuracy": 0.533158
+      },
+      "elo_only": {
+        "n": 1900,
+        "log_loss": 1.092397,
+        "brier": 0.216771,
+        "ece": 0.158274,
+        "mean_confidence": 0.644572,
+        "accuracy": 0.486316
+      },
+      "market_elo_equal": {
+        "n": 1900,
+        "log_loss": 0.99782,
+        "brier": 0.19897,
+        "ece": 0.064975,
+        "mean_confidence": 0.56524,
+        "accuracy": 0.502632
+      },
+      "market_form_equal": {
+        "n": 1900,
+        "log_loss": 1.003115,
+        "brier": 0.200146,
+        "ece": 0.049059,
+        "mean_confidence": 0.480558,
+        "accuracy": 0.491579
+      },
+      "market_form_rest": {
+        "n": 1900,
+        "log_loss": 0.997088,
+        "brier": 0.198713,
+        "ece": 0.053215,
+        "mean_confidence": 0.468275,
+        "accuracy": 0.505789
+      },
+      "market_form_rest_elo_equal": {
+        "n": 1900,
+        "log_loss": 1.009799,
+        "brier": 0.201545,
+        "ece": 0.050932,
+        "mean_confidence": 0.483287,
+        "accuracy": 0.487895
+      },
+      "production_with_historical_inputs": {
+        "n": 1900,
+        "log_loss": 1.005445,
+        "brier": 0.200626,
+        "ece": 0.06307,
+        "mean_confidence": 0.525588,
+        "accuracy": 0.488947
+      },
+      "uniform": {
+        "n": 1900,
+        "log_loss": 1.098612,
+        "brier": 0.222222,
+        "ece": 0.11193,
+        "mean_confidence": 0.333333,
+        "accuracy": 0.445263
+      },
+      "freq_prior_season": {
+        "n": 1900,
+        "log_loss": 1.079064,
+        "brier": 0.217684,
+        "ece": 0.026711,
+        "mean_confidence": 0.422149,
+        "accuracy": 0.445263
+      }
+    }
+  },
+  "ablation": {
+    "per_season": {
+      "2019_20": {
+        "n": 380,
+        "remove_refined_elo": {
+          "n": 380,
+          "log_loss": 1.003353,
+          "brier": 0.200331,
+          "ece": 0.034381,
+          "mean_confidence": 0.470886,
+          "accuracy": 0.497368
+        },
+        "remove_market_odds": {
+          "n": 380,
+          "log_loss": 1.057646,
+          "brier": 0.211185,
+          "ece": 0.097091,
+          "mean_confidence": 0.551521,
+          "accuracy": 0.468421
+        },
+        "remove_rolling_form": {
+          "n": 380,
+          "log_loss": 1.00448,
+          "brier": 0.201049,
+          "ece": 0.062525,
+          "mean_confidence": 0.548063,
+          "accuracy": 0.497368
+        },
+        "remove_rest_days": {
+          "n": 380,
+          "log_loss": 1.01465,
+          "brier": 0.202931,
+          "ece": 0.078694,
+          "mean_confidence": 0.537973,
+          "accuracy": 0.481579
+        }
+      },
+      "2020_21": {
+        "n": 380,
+        "remove_refined_elo": {
+          "n": 380,
+          "log_loss": 1.00994,
+          "brier": 0.201458,
+          "ece": 0.065455,
+          "mean_confidence": 0.465524,
+          "accuracy": 0.502632
+        },
+        "remove_market_odds": {
+          "n": 380,
+          "log_loss": 1.058555,
+          "brier": 0.212109,
+          "ece": 0.113431,
+          "mean_confidence": 0.550973,
+          "accuracy": 0.455263
+        },
+        "remove_rolling_form": {
+          "n": 380,
+          "log_loss": 1.001043,
+          "brier": 0.19923,
+          "ece": 0.053423,
+          "mean_confidence": 0.547826,
+          "accuracy": 0.502632
+        },
+        "remove_rest_days": {
+          "n": 380,
+          "log_loss": 1.016161,
+          "brier": 0.202741,
+          "ece": 0.038614,
+          "mean_confidence": 0.535139,
+          "accuracy": 0.502632
+        }
+      },
+      "2021_22": {
+        "n": 380,
+        "remove_refined_elo": {
+          "n": 380,
+          "log_loss": 1.007781,
+          "brier": 0.201408,
+          "ece": 0.074158,
+          "mean_confidence": 0.467805,
+          "accuracy": 0.476316
+        },
+        "remove_market_odds": {
+          "n": 380,
+          "log_loss": 1.04677,
+          "brier": 0.209324,
+          "ece": 0.100791,
+          "mean_confidence": 0.550858,
+          "accuracy": 0.457895
+        },
+        "remove_rolling_form": {
+          "n": 380,
+          "log_loss": 1.001959,
+          "brier": 0.199741,
+          "ece": 0.064139,
+          "mean_confidence": 0.549296,
+          "accuracy": 0.486842
+        },
+        "remove_rest_days": {
+          "n": 380,
+          "log_loss": 1.012388,
+          "brier": 0.202232,
+          "ece": 0.089987,
+          "mean_confidence": 0.537775,
+          "accuracy": 0.473684
+        }
+      },
+      "2022_23": {
+        "n": 380,
+        "remove_refined_elo": {
+          "n": 380,
+          "log_loss": 0.999587,
+          "brier": 0.199173,
+          "ece": 0.049707,
+          "mean_confidence": 0.468701,
+          "accuracy": 0.518421
+        },
+        "remove_market_odds": {
+          "n": 380,
+          "log_loss": 1.032618,
+          "brier": 0.205719,
+          "ece": 0.068923,
+          "mean_confidence": 0.550533,
+          "accuracy": 0.5
+        },
+        "remove_rolling_form": {
+          "n": 380,
+          "log_loss": 0.986694,
+          "brier": 0.196378,
+          "ece": 0.031927,
+          "mean_confidence": 0.546011,
+          "accuracy": 0.528947
+        },
+        "remove_rest_days": {
+          "n": 380,
+          "log_loss": 0.998306,
+          "brier": 0.198843,
+          "ece": 0.048595,
+          "mean_confidence": 0.53663,
+          "accuracy": 0.5
+        }
+      },
+      "2023_24": {
+        "n": 380,
+        "remove_refined_elo": {
+          "n": 380,
+          "log_loss": 0.987411,
+          "brier": 0.19659,
+          "ece": 0.094947,
+          "mean_confidence": 0.472239,
+          "accuracy": 0.492105
+        },
+        "remove_market_odds": {
+          "n": 380,
+          "log_loss": 1.038105,
+          "brier": 0.207116,
+          "ece": 0.136994,
+          "mean_confidence": 0.550002,
+          "accuracy": 0.460526
+        },
+        "remove_rolling_form": {
+          "n": 380,
+          "log_loss": 0.977274,
+          "brier": 0.194439,
+          "ece": 0.070085,
+          "mean_confidence": 0.545527,
+          "accuracy": 0.497368
+        },
+        "remove_rest_days": {
+          "n": 380,
+          "log_loss": 0.99217,
+          "brier": 0.197788,
+          "ece": 0.098477,
+          "mean_confidence": 0.537182,
+          "accuracy": 0.484211
+        }
+      }
+    },
+    "overall": {
+      "n": 1900,
+      "remove_refined_elo": {
+        "n": 1900,
+        "log_loss": 1.001614,
+        "brier": 0.199792,
+        "ece": 0.053059,
+        "mean_confidence": 0.469031,
+        "accuracy": 0.497368
+      },
+      "remove_market_odds": {
+        "n": 1900,
+        "log_loss": 1.046739,
+        "brier": 0.209091,
+        "ece": 0.089204,
+        "mean_confidence": 0.550778,
+        "accuracy": 0.468421
+      },
+      "remove_rolling_form": {
+        "n": 1900,
+        "log_loss": 0.99429,
+        "brier": 0.198167,
+        "ece": 0.051402,
+        "mean_confidence": 0.547345,
+        "accuracy": 0.502632
+      },
+      "remove_rest_days": {
+        "n": 1900,
+        "log_loss": 1.006735,
+        "brier": 0.200907,
+        "ece": 0.059542,
+        "mean_confidence": 0.53694,
+        "accuracy": 0.488421
+      }
+    },
+    "delta_log_loss_overall_removal_minus_full": {
+      "remove_refined_elo": -0.003831,
+      "remove_market_odds": 0.041294,
+      "remove_rolling_form": -0.011155,
+      "remove_rest_days": 0.00129
+    },
+    "summary": {
+      "signal_with_largest_log_loss_contribution": "remove_market_odds",
+      "signal_closest_to_redundant": "remove_rest_days",
+      "note": "delta-log-loss = LL(without signal) - LL(full); positive means removing the signal hurts (the signal helps)."
+    }
+  }
+}
