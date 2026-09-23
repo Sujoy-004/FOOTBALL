@@ -2,12 +2,12 @@
 import {
   buildTable, destroyModalCharts, modalCharts, renderBracketTree,
   updateStatusBar, competitions, renderLoading, currentCompetition,
-  configureCompetitionRefresh, showSimPopup,
+  configureCompetitionRefresh, renderSimulationShell, bindSimulationShell,
 } from "./shared.js";
 
 const API = "/worldcup/api";
 const sigLabels = { elo: "Elo", market_odds: "Market Odds", rolling_form: "Rolling Form", squad_value: "Squad Value", rest_days: "Rest Days" };
-const appState = { data: null, overview: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {} , simMeta: null };
+const appState = { data: null, overview: null, standings: null, bracket: null, fullBracket: null, eval: null, blend: null, signalCache: {}, simMeta: null, simBracket: null, simTopTeams: null };
 let _transitionGen = 0;
 
 function _isWcActive() {
@@ -200,44 +200,125 @@ function renderOverviewSignals(signals) {
 }
 
 // ── Simulation tab (whole-competition Monte Carlo, first-class) ──
-// The launcher now lives on a dedicated Simulation tab and opens the SHARED
-// simulation popup (shared.js) with WC's bounds (up to 1,000,000 iterations),
-// instead of a third copy of the popup. The backend reports status
-// "not_needed" when every result is already known (mirrored on the shared
-// popup). The bracket tab keeps its sim-provenance banner + KO overlay.
+// Renders through the shared shell (shared.js): title/purpose/launcher come
+// from the shell and the launcher opens the SHARED simulation popup with WC's
+// bounds (up to 1,000,000 iterations) instead of a third copy of the popup.
+// The backend reports availability "not_needed" when every result is already
+// known (seasonComplete below mirrors it), in which case the shell shows the
+// notNeeded block and never the launcher. The bracket tab keeps its KO
+// overlay; a completed run's sampled bracket is one reproducible example.
 function renderSimulation() {
   const tab = document.getElementById("tab-simulation");
   if (!tab) return;
   const d = appState.data;
   if (!d) { tab.innerHTML = '<div class="dim" style="padding:20px">Simulation data not available yet.</div>'; return; }
 
+  const simState = d.simulation || {};
+  const meta = appState.simMeta || {};
   const nUnplayed = (d.n_unplayed != null) ? d.n_unplayed : null;
   const seasonComplete = nUnplayed === 0
-    || !!(d.phase && d.phase.completed);
+    || !!(d.phase && d.phase.completed)
+    || simState.availability === "not_needed";
+  const availability = seasonComplete ? "not_needed"
+    : (simState.availability || "available");
+  const requestState = (meta.status === "completed" || meta.status === "failed")
+    ? meta.status : (simState.request_state || "not_requested");
+  const hasResults = !!appState.simTopTeams && appState.simTopTeams.length > 0
+    && meta.status === "completed";
 
-  let html = '<div class="chart-section"><div class="title">Tournament Simulation</div>';
-  if (seasonComplete) {
-    html += '<div class="dim" style="padding:4px 8px;font-size:11px">All competition results are already known from real match data. Simulation is not needed.</div>';
-  } else {
-    html += '<div style="padding:4px 0 8px">'
-      + '<button class="status-btn" onclick="window.__simulateAllRemaining()">&#9654; Simulate All Remaining Matches</button>'
-      + ' <span class="dim" style="font-size:11px">Monte Carlo projection over the remaining ' + nUnplayed + ' matches (up to 1,000,000 iterations)</span></div>';
-  }
-  if (appState.simMeta && appState.simMeta.status === "completed") {
-    const m = appState.simMeta;
-    html += '<div class="sim-provenance">'
-      + '<div class="title">SIMULATION &middot; ' + (m.count || 0).toLocaleString() + ' RUNS'
-      + ' &middot; seed ' + (m.seed != null ? m.seed : 'auto') + '</div>'
-      + '<div class="body">Projected knockout probability (aggregate over '
-      + (m.count || 0).toLocaleString() + ' runs). Real played results are unchanged. '
-      + 'The bracket tab shows one example simulated bracket (sampled run).</div></div>';
-  } else if (appState.simMeta && appState.simMeta.status === "failed") {
-    html += '<div class="sim-provenance failed">'
-      + '<div class="title">SIMULATION &middot; FAILED</div>'
-      + '<div class="body">The last simulation failed; no projected probabilities exist.</div></div>';
-  }
-  html += '</div>';
-  tab.innerHTML = html;
+  const state = {
+    availability: availability,
+    request_state: requestState,
+    hasResults: hasResults,
+    meta: { count: meta.count || 0, seed: meta.seed },
+  };
+
+  const opts = {
+    purpose: "Whole-competition seeded simulation projecting the champion and every knockout stage. Played matches are unchanged; you choose whether to simulate and how many runs to run.",
+    stateLine: function() {
+      return nUnplayed == null ? "" : (nUnplayed === 0
+        ? "All " + (d.n_played || 0) + " matches are decided."
+        : (d.n_played || 0) + " matches played, " + nUnplayed + " remaining");
+    },
+    notNeeded: function() {
+      let h = '<div class="dim" style="padding:4px 8px;font-size:11px">'
+        + "All competition results are already known from real match data. Simulation is not needed.";
+      if (meta.status === "completed") {
+        h += " The tournament is decided; the projections below are historical and the bracket tab shows the real knockout tree.";
+      } else {
+        h += " The full knockout bracket and every group result are already decided.";
+        h += " See the Bracket tab for the real knockout tree and the Overview tab for the final standings.";
+      }
+      h += "</div>";
+      return h;
+    },
+    resultSlot: _simulationResultSlot,
+    popup: {
+      apiPrefix: API,
+      min: 1,
+      max: 1000000,
+      presets: [100, 1000, 10000, 100000],
+      seed: false,
+      initial: 10000,
+      bodyBuilder: iters => ({ iterations: iters }),
+      onComplete: async function() {
+        const gen = _transitionGen;
+        try {
+          const simResp = await (await fetch(API + "/simulation")).json();
+          if (!_stale(gen)) {
+            appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
+            appState.simMeta = simResp.simulation_meta || null;
+            appState.simTopTeams = simResp.top_teams || [];
+            renderBracket();
+            renderSimulation();
+          }
+        } catch (e) {
+          if (!_stale(gen)) {
+            appState.simBracket = null;
+            appState.simMeta = null;
+            appState.simTopTeams = [];
+            renderBracket();
+            renderSimulation();
+          }
+        }
+      },
+    },
+  };
+
+  tab.innerHTML = renderSimulationShell(state, opts);
+  bindSimulationShell(state, opts);
+  const bl = tab.querySelector(".sim-bracket-link");
+  if (bl) bl.addEventListener("click", function(e) {
+    e.preventDefault();
+    const btn = document.querySelector('.tab-btn[data-tab="bracket"]');
+    if (btn) btn.click();
+  });
+}
+
+// Completed-run result slot: aggregate knockout probability for each team
+// plus a pointer to the one reproducible sampled bracket on the Bracket tab.
+function _simulationResultSlot() {
+  const rows = appState.simTopTeams || [];
+  if (!rows.length) return "";
+  const pct = function(v) {
+    return typeof v === "number" ? (v * 100).toFixed(1) + "%" : "—";
+  };
+  let html = '<div style="max-height:360px;overflow:auto;margin:4px 8px">'
+    + '<table class="eval-table"><tr><th>#</th><th>Team</th><th>Champion</th>'
+    + "<th>Final</th><th>SF</th><th>QF</th></tr>";
+  rows.forEach(function(o, i) {
+    html += '<tr><td class="num">' + (i + 1) + "</td><td>" + _esc(o.name) + "</td>"
+      + '<td class="num">' + pct(o.champion) + "</td>"
+      + '<td class="num">' + pct(o.final) + "</td>"
+      + '<td class="num">' + pct(o.sf) + "</td>"
+      + '<td class="num">' + pct(o.qf) + "</td></tr>";
+  });
+  html += "</table></div>";
+  html += '<div class="dim" style="padding:4px 8px;font-size:11px">'
+    + "Aggregate knockout probabilities across the sampled runs. "
+    + 'The <a href="#" class="sim-bracket-link">Bracket tab</a> shows one example '
+    + "simulated bracket (sampled run), not an aggregate.</div>";
+  return html;
 }
 
 // ── Bracket (Phase 3: group accordion + knockout tree via shared renderer) ──
@@ -407,30 +488,9 @@ function renderMatchRow(m) {
 // ── Bracket controls ──
 // Tournament simulation (whole-competition Monte Carlo) stays a separate,
 // truthfully labeled control, launched from the Simulation tab via the shared
-// popup. The per-card button is a MATCH-level What-If (see openMatchModal /
-// __sendWhatIf) — the two concepts are never merged.
-window.__simulateAllRemaining = function() {
-  showSimPopup(API, {
-    min: 1,
-    max: 1000000,
-    onComplete: async function() {
-      // Mirrors the previous WC-local runner: reload every payload, then
-      // hydrate the simulation artifacts (bracket overlay + meta banner).
-      const gen = await loadAll();
-      try {
-        const simResp = await fetch(API + "/simulation").then(r => r.json());
-        if (!_stale(gen)) {
-          appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
-          appState.simMeta = simResp.simulation_meta || null;
-        }
-      } catch {
-        if (!_stale(gen)) { appState.simBracket = null; appState.simMeta = null; }
-      }
-      if (!_stale(gen)) { renderBracket(); renderSimulation(); }
-    },
-  });
-};
-
+// popup (see renderSimulation's popup config). The per-card button is a
+// MATCH-level What-If (see openMatchModal / __sendWhatIf) — the two concepts
+// are never merged.
 window.__openWhatIf = function(matchId) {
   openMatchModal(matchId);
 };

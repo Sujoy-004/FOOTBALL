@@ -701,6 +701,10 @@ function createSimPopup() {
         <button data-iters="500000">500K</button>
       </div>
       <input type="number" id="simCustomIters" value="50000" min="1000" max="500000">
+      <div id="simSeedRow" style="display:none">
+        <p style="margin-bottom:4px">Optional seed:</p>
+        <input type="number" id="simSeedInput" placeholder="seed (auto)">
+      </div>
       <div class="sim-actions">
         <button id="simCancelBtn">Cancel</button>
         <button id="simStartBtn">&#9654; Start</button>
@@ -757,6 +761,12 @@ function showSimPopup(apiPrefix, opts = {}) {
     customInput.max = String(max);
     customInput.value = String(initial);
   }
+  // Seed row: shown only when opts.seed is truthy; hidden state clears any
+  // stale value so a prior competition's seed never leaks into this run.
+  const seedRow = document.getElementById("simSeedRow");
+  if (seedRow) seedRow.style.display = opts.seed ? "" : "none";
+  const seedInput = document.getElementById("simSeedInput");
+  if (seedInput && !opts.seed) seedInput.value = "";
 
   overlay.classList.add("show");
   document.getElementById("simStartBtn").onclick = () =>
@@ -767,6 +777,12 @@ async function _startSim(apiPrefix, onComplete, bodyBuilder) {
   if (_simPolling) return;
   _simPolling = true;
   const iters = parseInt(document.getElementById("simCustomIters").value) || 50000;
+  const seedEl = document.getElementById("simSeedInput");
+  let seed = null;
+  if (seedEl && seedEl.value !== "") {
+    const n = parseInt(seedEl.value, 10);
+    seed = Number.isFinite(n) ? n : null;
+  }
   const startBtn = document.getElementById("simStartBtn");
   const cancelBtn = document.getElementById("simCancelBtn");
   const progressWrap = document.getElementById("simProgressWrap");
@@ -781,7 +797,7 @@ async function _startSim(apiPrefix, onComplete, bodyBuilder) {
   try {
     const resp = await (await fetch(apiPrefix + "/simulate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(bodyBuilder(iters)),
+      body: JSON.stringify(bodyBuilder(iters, seed)),
     })).json();
     if (resp.error) throw new Error(resp.error);
     if (resp.status === "not_needed") {
@@ -826,6 +842,116 @@ async function _startSim(apiPrefix, onComplete, bodyBuilder) {
   }
 }
 
+// ── Shared Simulation Shell (Phase 12D) ──────────────────────────────
+// Pure presentation shell for the Simulation tab: one canonical layout,
+// one state machine driven solely by availability/request_state, one
+// provenance footer. Competition modules supply the slot callbacks
+// (resultSlot / whatIf / notNeeded) and the popup config; structure only
+// lives here. Deterministic string in/string out — usable without a DOM.
+
+const _SIM_HONESTY = "Projected probabilities, not real results. Played results are unchanged.";
+const _SIM_FAILED_BODY = "The last simulation failed; no projected probabilities exist.";
+const _SIM_IDLE_LINE = "No simulation has been run in this session yet.";
+const _SIM_RUNNING_LINE = "A simulation is currently running. Progress shows in the popup.";
+
+function _simProvenanceFooter(state, opts) {
+  const meta = (state && state.meta) || {};
+  const count = typeof meta.count === "number" ? meta.count : 0;
+  const seed = meta.seed != null ? meta.seed : "auto";
+  let body = _SIM_HONESTY;
+  if (opts && opts.provenanceBody) body += " " + opts.provenanceBody;
+  return '<div class="sim-provenance">'
+    + '<div class="title">SIMULATION &middot; ' + count.toLocaleString() + ' RUNS'
+    + ' &middot; seed ' + _esc(String(seed)) + "</div>"
+    + '<div class="body">' + _esc(body) + "</div></div>";
+}
+
+function _simProvenanceFailed() {
+  return '<div class="sim-provenance failed">'
+    + '<div class="title">SIMULATION &middot; FAILED</div>'
+    + '<div class="body">' + _esc(_SIM_FAILED_BODY) + "</div></div>";
+}
+
+function renderSimulationShell(state, opts) {
+  const o = opts || {};
+  const st = state || {};
+  const availability = st.availability || "available";
+  const req = st.request_state || "not_requested";
+  const hasResults = !!st.hasResults;
+  const notNeeded = availability === "not_needed";
+  const title = o.title != null ? o.title : "Simulation";
+  const launchLabel = o.launchLabel != null ? o.launchLabel : "Run Simulation";
+
+  // Section 1 — title + purpose + current-state line + launcher + run line.
+  let h = '<div class="chart-section"><div class="title">' + _esc(title) + "</div>";
+  if (o.purpose) h += '<p class="m-sub">' + _esc(o.purpose) + "</p>";
+  const stateLine = typeof o.stateLine === "function" ? o.stateLine(st)
+    : (o.stateLine != null ? o.stateLine : "");
+  if (stateLine) h += '<div class="dim">' + _esc(stateLine) + "</div>";
+
+  if (!notNeeded) {
+    const running = req === "running";
+    h += '<div style="padding:4px 0 4px">'
+      + '<button class="status-btn" id="simLaunchBtn"'
+      + (running ? " disabled" : "") + ">" + _esc(launchLabel) + "</button>"
+      + ' <span id="simLaunchState" class="dim" style="font-size:11px"></span>'
+      + "</div>";
+    if (running) h += '<div class="dim">' + _SIM_RUNNING_LINE + "</div>";
+    else if (req === "failed") h += '<div class="dim">' + _esc(_SIM_FAILED_BODY) + "</div>";
+    else if (!(req === "completed" && hasResults)) h += '<div class="dim">' + _SIM_IDLE_LINE + "</div>";
+  }
+  h += "</div>";
+
+  // Decided-state block: after the title section, before any slot. The
+  // launcher is never rendered under not_needed.
+  if (notNeeded && typeof o.notNeeded === "function") h += o.notNeeded(st) || "";
+
+  // Competition slots: only for a preserved completed run (failed never
+  // shows fabricated numbers; running keeps a prior finished run visible).
+  const showResults = notNeeded
+    ? (req === "completed" && hasResults)
+    : (hasResults && (req === "completed" || req === "running"));
+  if (showResults && typeof o.resultSlot === "function") h += o.resultSlot(st) || "";
+  if (!notNeeded && req === "completed" && hasResults && typeof o.whatIf === "function") {
+    h += o.whatIf(st) || "";
+  }
+
+  // Provenance footer.
+  if (notNeeded) {
+    if (req === "completed" && hasResults) h += _simProvenanceFooter(st, o);
+  } else if (req === "failed") {
+    h += _simProvenanceFailed();
+  } else if (showResults) {
+    h += _simProvenanceFooter(st, o);
+  }
+  return h;
+}
+
+// DOM wiring after the shell HTML is injected. onclick assignment (not
+// addEventListener) makes repeated re-binds idempotent; clicks on a
+// disabled launcher are ignored; a missing button is a quiet no-op.
+function bindSimulationShell(state, opts) {
+  const btn = document.getElementById("simLaunchBtn");
+  if (!btn) return;
+  const o = opts || {};
+  const popup = o.popup || {};
+  const st = state || {};
+  const running = st.availability !== "not_needed" && st.request_state === "running";
+  btn.disabled = running;
+  btn.onclick = () => {
+    if (btn.disabled) return;
+    showSimPopup(popup.apiPrefix, {
+      min: popup.min,
+      max: popup.max,
+      presets: popup.presets,
+      seed: popup.seed,
+      initial: popup.initial,
+      onComplete: popup.onComplete,
+      bodyBuilder: popup.bodyBuilder,
+    });
+  };
+}
+
 // ── Exports ──
 export {
   competitions,
@@ -839,6 +965,8 @@ export {
   updateStatusBar,
   createSimPopup,
   showSimPopup,
+  renderSimulationShell,
+  bindSimulationShell,
   openIntelModal,
   safeJson,
   renderLoading,

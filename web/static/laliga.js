@@ -5,9 +5,10 @@
 // Mirrors the shared shell conventions used by wc.js/ucl.js.
 import {
   destroyModalCharts, updateStatusBar,
-  showSimPopup, safeJson, renderAcquisitionPanel,
+  safeJson, renderAcquisitionPanel,
   openIntelModal, renderLoading, currentCompetition,
   configureCompetitionRefresh,
+  renderSimulationShell, bindSimulationShell,
 } from "./shared.js";
 
 const API = "/laliga/api";
@@ -401,52 +402,8 @@ async function openMatchModal(mid) {
     body += '<div class="chart-section"><div class="title">Insight</div>'
       + "<p class=\"insight-text\">" + _esc(ins.insight) + "</p></div>";
   }
-  // What-if quick link
-  body += '<div class="chart-section"><div class="title">What-If</div>'
-    + '<button class="status-btn" id="whatifOpenBtn">Adjust Elo &amp; re-run simulation</button></div>';
 
   openIntelModal({ titleHtml: titleHtml, sub: sub, bodyHtml: body });
-  const wb = document.getElementById("whatifOpenBtn");
-  if (wb) wb.onclick = function() { openWhatIf(mid, ta, tb); };
-}
-
-// ── What-If (match Elo counterfactual) ──
-function openWhatIf(mid, ta, tb) {
-  const iters = 10000;
-  const body = '<div class="chart-section"><div class="title">What-If &mdash; ' + _esc(ta) + " v " + _esc(tb) + "</div>"
-    + '<div class="form-grid">'
-    + '<label class="form-field"><span class="lbl">' + _esc(ta) + ' Elo delta</span>'
-    + '<input type="number" id="wiDelta" value="50" min="-200" max="200"></label>'
-    + "</div>"
-    + '<div class="sim-actions"><button class="status-btn" id="wiRunBtn">Run ' + iters.toLocaleString() + " simulations</button></div>"
-    + '<div id="wiResult" style="margin-top:12px"></div></div>';
-  openIntelModal({ titleHtml: "What-If Analysis", sub: "Apply an Elo shift to one fixture and re-run the seeded Monte Carlo.", bodyHtml: body });
-  document.getElementById("wiRunBtn").onclick = async function() {
-    const delta = parseInt(document.getElementById("wiDelta").value) || 50;
-    const resEl = document.getElementById("wiResult");
-    resEl.innerHTML = '<span class="m-sub">Running ' + iters.toLocaleString() + " simulations&hellip;</span>";
-    try {
-      const r = await safeJson(API + "/what-if", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ match_id: mid, elo_delta: delta, iterations: iters }),
-      });
-      if (r.error) throw new Error(r.error);
-      let html = '<table class="eval-table"><thead><tr><th>Team</th><th>Baseline</th><th>Adjusted</th><th>Delta</th></tr></thead><tbody>';
-      (Object.keys(r.teams || {})).forEach(function(t) {
-        const e = r.teams[t];
-        html += "<tr><td>" + _esc(t) + "</td>"
-          + '<td class="num">' + _simPct(e.baseline) + "</td>"
-          + '<td class="num">' + _simPct(e.adjusted) + "</td>"
-          + '<td class="num">' + (e.delta >= 0 ? "+" : "") + (e.delta * 100).toFixed(1) + "%</td></tr>";
-      });
-      html += "</tbody></table>";
-      html += '<div style="margin-top:10px" class="m-sub">Iterations: ' + r.iterations + "</div>";
-      resEl.innerHTML = html;
-    } catch (e) {
-      resEl.innerHTML = '<span class="m-sub" style="color:#ff8a8a">Failed: ' + _esc(e.message) + "</span>";
-    }
-  };
 }
 
 function bindMatchClicks(scope) {
@@ -457,80 +414,149 @@ function bindMatchClicks(scope) {
 }
 
 // ── Simulation ──
-function _simulationHtml() {
+// Rendered through the shared shell (shared.js): title/purpose/state line,
+// launcher, and provenance footer all come from the shell. LaLiga supplies
+// the notNeeded / resultSlot / whatIf blocks and the popup config. The
+// launcher opens the SHARED seedable popup with LaLiga's 1K..500K bounds.
+let _simShellConfig = null;
+
+function _simulationShellConfig() {
   const sim = appState.sim || {};
   const meta = appState.simMeta || {};
   const odds = sim.odds || [];
+  const d = appState.data || {};
+  const simBlock = d.simulation || {};
+  const availability = simBlock.availability === "not_needed" ? "not_needed"
+    : (simBlock.availability || "available");
+  const requestState = (meta.status === "completed" || meta.status === "failed")
+    ? meta.status : (simBlock.request_state || "not_requested");
+  const hasResults = meta.status === "completed" && odds.length > 0;
   const actual = sim.n_iterations || meta.count || 0;
-  const completed = meta.status === "completed";
-  const failed = (meta.status === "failed") || !!sim.error;
 
-  // Header
-  let html = '<div class="chart-section"><div class="title">Simulation</div>'
-    + '<p class="m-sub">Monte Carlo projection of the season outcome. Played matches are unchanged; simulate to project the finished season.</p></div>';
+  const state = {
+    availability: availability,
+    request_state: requestState,
+    hasResults: hasResults,
+    meta: {
+      count: actual,
+      seed: sim.seed != null ? sim.seed : (meta.seed != null ? meta.seed : null),
+    },
+  };
 
-  // Controls
-  html += '<div class="chart-section"><div class="title">Simulation Controls</div>'
-    + '<div class="sim-actions">'
-    + '<button class="status-btn" id="simRunBtn">&#9654; Run Simulation</button>'
-    + "</div></div>";
+  const opts = {
+    purpose: "Monte Carlo projection of the season outcome. Played matches are unchanged; simulate to project the finished season.",
+    stateLine: function() {
+      const total = d.n_total_fixtures || ((d.n_played || 0) + (d.n_unplayed || 0));
+      return "Season " + (d.season || "") + " &middot; "
+        + (d.n_played || 0) + "/" + total + " played";
+    },
+    launchLabel: "Run Simulation",
+    notNeeded: function() {
+      const champ = d.champion
+        ? " The " + (d.season || "season") + " champion is " + d.champion + "."
+        : "";
+      return '<div class="dim" style="padding:4px 8px;font-size:11px">'
+        + "The season is fully played out; the final table is a matter of record, not projection."
+        + champ
+        + " See the Standings tab for the final table and the Overview tab for the season summary."
+        + (hasResults ? " The archived projections below are from a run completed earlier." : "")
+        + "</div>";
+    },
+    resultSlot: _simulationResultSlot,
+    whatIf: availability !== "not_needed" ? _simulationWhatIf : null,
+    provenanceBody: "Played matches and the league table are unchanged.",
+    popup: {
+      apiPrefix: API,
+      min: 1000,
+      max: 500000,
+      presets: [10000, 50000, 100000, 500000],
+      seed: true,
+      initial: 50000,
+      bodyBuilder: function(iters, seed) {
+        return (seed != null) ? { iterations: iters, seed: seed } : { iterations: iters };
+      },
+      onComplete: async function() {
+        try {
+          const sim = await safeJson(API + "/simulation");
+          const data = await safeJson(API + "/data");
+          if (_stale(_transitionGen)) return;
+          applySimulation(sim);
+          appState.data = data;
+          appState.standings = data.standings || [];
+          appState.mode = data.mode || appState.mode;
+          appState.phase = data.phase || appState.phase;
+          appState.season = data.season || appState.season;
+          appState.n_teams = data.n_teams || appState.n_teams;
+          appState.n_played = data.n_played || appState.n_played;
+          appState.n_unplayed = data.n_unplayed != null ? data.n_unplayed : appState.n_unplayed;
+          appState.refresh = data.refresh || appState.refresh;
+          render();
+        } catch (e) {
+          console.error("LaLiga simulation completion failed:", e);
+        }
+      },
+    },
+  };
+  return { state: state, opts: opts };
+}
 
-  // Run / progress state
-  if (completed) {
-    html += '<div class="m-sub" style="padding:2px 8px">'
-      + (actual ? actual.toLocaleString() + " iterations completed" : "Simulation completed")
-      + (sim.seed != null ? " &middot; seed " + sim.seed : "") + "</div>";
-  } else if (failed) {
-    html += '<div class="m-sub" style="padding:2px 8px;color:#ff8a8a">The last simulation failed; no projections exist.</div>';
-  } else {
-    html += '<div class="m-sub" style="padding:2px 8px">No simulation requested yet. The deterministic table reflects played matches; simulate to project the finished season.</div>';
-  }
+function _simulationHtml() {
+  const cfg = _simulationShellConfig();
+  _simShellConfig = cfg;
+  return renderSimulationShell(cfg.state, cfg.opts);
+}
 
-  // Result summary
-  if (odds.length) {
-    html += '<div class="chart-section"><div class="title">Projected Championship — Top 10</div>';
-    html += '<table class="eval-table"><thead><tr><th>Team</th><th class="num">Champion probability</th></tr></thead><tbody>';
-    odds.slice(0, 10).forEach(function(o) {
-      html += '<tr><td>' + _esc(o.team) + '</td><td class="num">' + _simPct(o.champion_prob) + '</td></tr>';
+// Result slot (shown only for a preserved completed run). Top-10 champion
+// probabilities, full champion bars, and the new projection-detail metrics
+// (average position, top-6 / mid-table / bottom probabilities).
+function _simulationResultSlot() {
+  const sim = appState.sim || {};
+  const odds = sim.odds || [];
+  if (!odds.length) return "";
+
+  let html = '<div class="chart-section"><div class="title">Projected Championship &mdash; Top 10</div>'
+    + '<table class="eval-table"><thead><tr><th>Team</th><th class="num">Champion probability</th></tr></thead><tbody>';
+  odds.slice(0, 10).forEach(function(o) {
+    html += "<tr><td>" + _esc(o.team) + "</td><td class=\"num\">" + _simPct(o.champion_prob) + "</td></tr>";
+  });
+  html += "</tbody></table></div>";
+
+  html += '<div class="chart-section"><div class="title">Champion Probability</div>';
+  odds.forEach(function(o) {
+    const p = o.champion_prob || 0;
+    html += '<div class="champ-bar-row"><span class="cname">' + _esc(o.team) + "</span>"
+      + '<div class="cbar-wrap"><div class="cbar" style="width:' + (p * 100).toFixed(1) + '%"></div></div>'
+      + '<span class="cpct">' + (p * 100).toFixed(1) + "%</span></div>";
+  });
+  html += "</div>";
+
+  const detail = _simComparisonRows();
+  if (detail.length) {
+    html += '<div class="chart-section"><div class="title">Projection Detail</div>'
+      + '<table class="eval-table"><thead><tr><th>Team</th><th class="num">Avg pos</th>'
+      + '<th class="num">Top 6</th><th class="num">Mid table</th><th class="num">Bottom</th></tr></thead><tbody>';
+    detail.forEach(function(o) {
+      html += "<tr><td>" + _esc(o.team) + "</td>"
+        + '<td class="num">' + (o._avgPos != null ? _esc(o._avgPos.toFixed(1)) : "—") + "</td>"
+        + '<td class="num">' + (o._t6 != null ? (o._t6.toFixed(1) + "%") : "—") + "</td>"
+        + '<td class="num">' + (o._mid != null ? (o._mid.toFixed(1) + "%") : "—") + "</td>"
+        + '<td class="num">' + (o._bot != null ? (o._bot.toFixed(1) + "%") : "—") + "</td></tr>";
     });
-    html += '</tbody></table></div>';
+    html += "</tbody></table></div>";
   }
+  return html;
+}
 
-  // Detailed results
-  if (odds.length) {
-    html += '<div class="chart-section"><div class="title">Champion Probability</div>';
-    odds.forEach(function(o) {
-      const p = o.champion_prob || 0;
-      html += '<div class="champ-bar-row"><span class="cname">' + _esc(o.team) + "</span>"
-        + '<div class="cbar-wrap"><div class="cbar" style="width:' + (p * 100).toFixed(1) + '%"></div></div>'
-        + '<span class="cpct">' + (p * 100).toFixed(1) + "%</span></div>";
-    });
-    html += "</div>";
-  }
-
-  // Provenance
-  if (completed || actual) {
-    html += '<div class="sim-provenance">'
-      + '<div class="title">SIMULATION &middot; ' + (actual || (meta.count || 0)).toLocaleString() + ' RUNS'
-      + (sim.seed != null ? ' &middot; seed ' + sim.seed : '') + '</div>'
-      + '<div class="body">Projected probabilities, not real results. Played matches and the league table are unchanged.</div>'
-      + '</div>';
-  } else if (failed) {
-    html += '<div class="sim-provenance failed"><div class="title">SIMULATION &middot; FAILED</div>'
-      + '<div class="body">The last simulation failed; no projected probabilities exist.</div></div>';
-  }
-
-  // Competition-specific slots
-  html += '<div class="chart-section"><div class="title">Head-to-Head What-If</div>'
+// What-if slot: the in-tab (non-modal) head-to-head counterfactual runner.
+// Rendered only when the shell's what-if gate holds (live season + completed
+// run). The modal duplicate was removed — this is the single canonical copy.
+function _simulationWhatIf() {
+  return '<div class="chart-section"><div class="title">Head-to-Head What-If</div>'
     + '<div class="form-grid">'
     + '<label class="form-field"><span class="lbl">Match (by ID or search below)</span>'
     + '<input type="text" id="wiMatchSearch" placeholder="Type team name…"></label>'
     + '<label class="form-field"><span class="lbl">Fixture</span><select id="wiMatchSelect"></select></label>'
     + "</div><div id=\"wiStandalone\"></div></div>";
-
-  html += '<div class="chart-section"><div class="title">Live Refresh</div>'
-    + '<button class="status-btn" id="rofRefreshBtn">Re-fetch live data</button></div>';
-  return html;
 }
 
 function _populateWhatIfSelect() {
@@ -604,60 +630,15 @@ function _populateWhatIfSelect() {
 }
 
 function bindSimulation() {
-  const runBtn = document.getElementById("simRunBtn");
-  if (runBtn) {
-    runBtn.onclick = function() {
-      showSimPopup(API, {
-        onComplete: async function() {
-          try {
-            const sim = await safeJson(API + "/simulation");
-            if (!_stale(_transitionGen)) applySimulation(sim);
-            setUpRefreshBtn();
-          } catch {
-            try {
-              const sim = await safeJson(API + "/simulation");
-              if (!_stale(_transitionGen)) applySimulation(sim);
-            } catch { /* ignore */ }
-          }
-          if (!_stale(_transitionGen)) {
-            const el = document.getElementById("tab-simulation");
-            if (el) { el.innerHTML = _simulationHtml(); bindSimulation(); }
-          }
-        },
-        bodyBuilder: function(iters) { return { iterations: iters }; },
-      });
-    };
-  }
-  setUpRefreshBtn();
+  // The shared shell owns the launcher wiring; the what-if select is the
+  // single in-tab panel this module keeps.
+  if (_simShellConfig) bindSimulationShell(_simShellConfig.state, _simShellConfig.opts);
   _populateWhatIfSelect();
-}
-
-function setUpRefreshBtn() {
-  const btn = document.getElementById("rofRefreshBtn");
-  if (btn) {
-    btn.onclick = async function() {
-      btn.disabled = true;
-      btn.textContent = "Refreshing…";
-      try {
-        const r = await safeJson(API + "/refresh", { method: "POST" });
-        if (r && r.status) {
-          btn.textContent = r.status === "ok" ? "Refreshed" : "Refresh skipped";
-        }
-        await loadAll({ label: "Reloading LaLiga…" });
-      } catch (e) {
-        btn.textContent = "Refresh failed";
-      }
-      setTimeout(function() { btn.disabled = false; }, 2000);
-    };
-  }
 }
 
 async function refreshLive() {
   try {
-    const [data, sim] = await Promise.all([
-      safeJson(API + "/data"),
-      safeJson(API + "/simulation"),
-    ]);
+    const data = await safeJson(API + "/data");
     if (_stale(_transitionGen)) return null;
     appState.data = data;
     appState.standings = data.standings || [];
@@ -668,7 +649,11 @@ async function refreshLive() {
     appState.n_played = data.n_played || appState.n_played;
     appState.n_unplayed = data.n_unplayed != null ? data.n_unplayed : appState.n_unplayed;
     appState.refresh = data.refresh || appState.refresh;
-    applySimulation(sim);
+    // refreshLive is factual-only: it re-fetches /api/data (played results,
+    // mode, phase) and re-renders. It deliberately does NOT re-fetch or
+    // re-apply the simulation endpoint, so an existing simulation result /
+    // sim tab state survives ordinary live refreshes (the sim tab only
+    // re-renders from held appState.sim / appState.simMeta).
     render();
     return true;
   } catch (e) {
