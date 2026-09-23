@@ -187,7 +187,13 @@ def _fetch_live_data():
 
     provider = get_data_provider(BSD_API_KEY, FOOTBALL_DATA_ORG_KEY, LALIGA_BSD_LEAGUE_ID)
     if provider is None:
-        logger.warning("[LaLiga] No data provider — skipping live fetch")
+        logger.warning(
+            "[LaLiga] NOT_CONFIGURED - no data provider available "
+            "(BSD key configured: %s, football-data key configured: %s, "
+            "DATA_PROVIDER=%s); skipping live fetch",
+            bool(BSD_API_KEY), bool(FOOTBALL_DATA_ORG_KEY),
+            os.environ.get("DATA_PROVIDER", "") or "(unset)",
+        )
         _store_refresh_report(False, "no data provider configured", None,
                               active_season=active_season)
         return None
@@ -216,9 +222,11 @@ def _fetch_live_data():
     n_updated = int(summary.get("n_updated") or 0)
     error = report.get("error") if not (ok or deferred) else getattr(provider, "last_error", None)
     if deferred:
-        logger.info("[LaLiga] Provider has no published match data yet (deferred)")
+        logger.info("[LaLiga] CONFIGURED_BUT_UNAVAILABLE - no published "
+                    "match data yet (deferred)")
     elif not ok:
-        logger.warning("[LaLiga] Refresh failed: %s", error or "no ingestable matches")
+        logger.warning("[LaLiga] CONFIGURED_BUT_UNAVAILABLE - refresh failed: %s",
+                       error or "no ingestable matches")
     _store_refresh_report(ok or deferred, error, provider_name,
                           n_matches=n_raw, n_updated=n_updated,
                           active_season=active_season,
@@ -229,6 +237,8 @@ def _fetch_live_data():
         "output": f"[{ts()}] {provider_name}: {n_raw} raw matches, {n_updated} updated",
     })
     if ok:
+        logger.info("[LaLiga] CONNECTED via %s: %s raw matches, %s updated",
+                    provider_name, n_raw, n_updated)
         _recompute_cache()
     return summary
 

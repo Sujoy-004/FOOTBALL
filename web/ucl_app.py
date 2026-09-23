@@ -290,7 +290,13 @@ def _fetch_live_data() -> None:
 
     provider = get_data_provider(BSD_API_KEY, FOOTBALL_DATA_ORG_KEY, UCL_LEAGUE_ID)
     if provider is None:
-        logger.warning("[UCL] No data provider — skipping live fetch")
+        logger.warning(
+            "[UCL] NOT_CONFIGURED - no data provider available "
+            "(BSD key configured: %s, football-data key configured: %s, "
+            "DATA_PROVIDER=%s); skipping live fetch",
+            bool(BSD_API_KEY), bool(FOOTBALL_DATA_ORG_KEY),
+            os.environ.get("DATA_PROVIDER", "") or "(unset)",
+        )
         boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] No data provider configured"})
         _store_refresh_report(False, "no data provider configured", None,
                               active_season=active_season)
@@ -318,11 +324,16 @@ def _fetch_live_data() -> None:
     n_updated = int(summary.get("n_updated") or 0)
     error = report.get("error") if not (ok or deferred) else getattr(provider, "last_error", None)
     if deferred:
-        logger.info("[UCL] Provider has no published match data yet for the "
-                    "active season (deferred) — draw-derived fixtures shown")
+        logger.info("[UCL] CONFIGURED_BUT_UNAVAILABLE - provider has no "
+                    "published match data yet for the active season "
+                    "(draw-derived fixtures shown)")
     elif not ok:
-        logger.warning("[UCL] Refresh failed: %s — UCL data may be STALE",
+        logger.warning("[UCL] CONFIGURED_BUT_UNAVAILABLE - refresh failed: "
+                       "%s — UCL data may be STALE",
                        error or "no ingestable matches")
+    else:
+        logger.info("[UCL] CONNECTED via %s: %s raw matches, %s updated",
+                    provider_name, n_raw, n_updated)
     _store_refresh_report(ok or deferred, error, provider_name,
                           n_matches=n_raw, n_updated=n_updated,
                           finished=report.get("finished"),
