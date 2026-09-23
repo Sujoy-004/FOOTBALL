@@ -300,7 +300,7 @@ def test_ucl_seed_reaches_body_builder_and_compare_kept():
     assert "bodyBuilder: function(iters, seed)" in UCL
     assert "(seed != null) ? { iterations: iters, seed: seed } : { iterations: iters }" in UCL
     assert "seed: true" in UCL
-    assert "presets: [1000, 5000, 10000, 100000]" in UCL
+    assert "presets: [10000, 50000, 100000, 500000]" in UCL
     assert "sim-team-toggle" in UCL               # team-compare toggle retained
     assert "resultSlot: _uclProjectionBlock" in UCL
 
@@ -329,6 +329,50 @@ def test_laliga_validation_remains_in_overview():
     assert "_evalBlock" in LALIGA
     assert 'id="validationSection"' in LALIGA
     assert "tab-validation" not in LALIGA
+
+
+# ── pre-Phase 13 corrective: UCL ↔ LaLiga simulation-iteration parity ──
+
+def test_ucl_iteration_parity_with_laliga():
+    """Corrective phase: UCL must expose the SAME user-facing iteration
+    contract as LaLiga — presets [10000, 50000, 100000, 500000], max 500000,
+    initial 50000 — while keeping min 1000 and its seed-enabled popup.
+    LaLiga keeps the identical canonical preset/bounds row."""
+    assert "presets: [10000, 50000, 100000, 500000]" in UCL     # (a) UCL presets
+    assert "max: 500000" in UCL                                  # (a) UCL max
+    assert "initial: 50000" in UCL                               # (a) UCL initial
+    assert "presets: [10000, 50000, 100000, 500000]" in LALIGA   # (b) LaLiga presets
+    assert "max: 500000" in LALIGA                               # (b) LaLiga max
+    assert "min: 1000" in UCL and "max: 500000" in UCL                  # (c) UCL custom-input range
+    assert "seed: true" in UCL                                   # seed behavior preserved
+    assert "bodyBuilder: function(iters, seed)" in UCL
+
+
+def test_ucl_simulation_entry_point_wired_via_shared_shell():
+    """Corrective-phase regression: the UCL Run Simulation launcher must stay
+    wired. renderSimulation injects the shared shell into the sim tab FIRST,
+    then binds the launcher in the SAME function (order guarantees the
+    #simLaunchBtn exists before onclick assignment), and the popup routes
+    the POST to the UCL backend."""
+    sim = _fn_body(UCL, "async function renderSimulation()")
+    assert "tab.innerHTML = renderSimulationShell(state, opts);" in sim
+    assert "bindSimulationShell(state, opts);" in sim
+    assert sim.index("tab.innerHTML = renderSimulationShell(state, opts);") \
+        < sim.index("bindSimulationShell(state, opts);")
+    assert "apiPrefix: API" in sim
+    assert 'const API = "/ucl/api"' in UCL
+    assert "bindSimulationProjection();" in sim
+
+
+def test_sim_preset_row_defined_only_in_shared_js():
+    """Corrective-phase guard on 'single shared popup': the preset row id
+    #simPresets and its per-competition rebuild live only in shared.js — no
+    competition ships its own preset-markup copy."""
+    assert SHARED.count("id=\"simPresets\"") == 1
+    assert "presetsEl.innerHTML = presets.map(" in SHARED
+    assert "opts.presets" in SHARED
+    for src, name in ((UCL, "ucl.js"), (WC, "wc.js"), (LALIGA, "laliga.js")):
+        assert "simPresets" not in src, name
 
 
 # ── Syntax gate (mirrors the normalization suite) ────────────────────
