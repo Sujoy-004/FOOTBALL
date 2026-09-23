@@ -113,6 +113,8 @@ def run_mc_simulation(
     playable_fixtures: list[dict] | None = None,
     team_names: list[str] | None = None,
     season: str = "2026/27",
+    *,
+    strategy: str = "production",
 ) -> dict:
     """Full Monte Carlo pipeline for the LaLiga championship.
 
@@ -120,6 +122,8 @@ def run_mc_simulation(
     mode/teams/all_teams/n_teams/n_iterations/seed/snapshot_date/
     champion/standings/odds/signals/elo_ratings/show_ci/_meta.
     Does NOT write to disk or the web cache.
+
+    ``strategy`` selects the signal engine (default five-signal production).
     """
     from competitions.laliga.src.pipeline import (
         load_elo_ratings,
@@ -202,7 +206,7 @@ def run_mc_simulation(
     if progress_cb:
         progress_cb(85, n_iterations)
 
-    engine = build_signal_engine(elo_ratings, weights_override=weights)
+    engine = build_signal_engine(elo_ratings, weights_override=weights, strategy=strategy)
     signal_stats = _signal_stats(engine, elo_ratings, fixtures)
 
     if progress_cb:

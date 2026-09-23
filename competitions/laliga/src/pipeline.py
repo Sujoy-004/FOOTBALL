@@ -146,8 +146,14 @@ def build_signal_engine(
     weights_override: dict[str, float] | None = None,
     results_file: str | None = None,
     squad_values_path: str | None = None,
+    *,
+    strategy: str = "production",
 ) -> EnsembleEngine:
-    """The standard five-signal ensemble (parity with the UCL brain)."""
+    """The standard five-signal ensemble (parity with the UCL brain); non-production strategies dispatch to build_strategy_engine."""
+    if strategy != "production":
+        from competitions.laliga.src.ensemble import build_strategy_engine as _build_strategy_engine
+
+        return _build_strategy_engine(strategy, elo_ratings=elo_ratings)
     from football_core.signals.refined_elo import RefinedEloSignal
     from football_core.signals.market_odds import MarketOddsSignal
     from football_core.signals.rolling_form import RollingFormSignal
