@@ -294,29 +294,3 @@ tests/                    cross-cutting regression suites (truth model,
                           engine contract, immutability, product contract)
 docs/                     ARCHITECTURE.md, GETTING-STARTED.md, TESTING.md
 ```
-
-`study_guide/` is local-only interview material and is not part of the
-repository.
-
-## Interview value
-
-The technically interesting parts, all verifiable in the tree:
-
-- **One engine, many formats.** `MonteCarloEngine` knows nothing about
-  groups or brackets; each competition realizes one tournament per call
-  behind `SimulationRules.simulate_one(context)` and declares its own
-  aggregations.
-- **A real truth model.** `MatchStatus` / `ResultProvenance` /
-  `DataAvailability` replace empty-array guesswork; stores distinguish
-  missing vs empty vs unreadable; the UI renders those states instead of
-  inferring them.
-- **Played-match conditioning at scale.** Real results are injected as
-  immutable facts into every iteration — verified by a test asserting the
-  simulated league table reproduces the actual season table exactly.
-- **Correctness found by measurement.** Knockout probabilities once keyed
-  by bracket slot inverted strength rankings; the fix (matchup-aware
-  fallback) is regression-tested by proving poisoned slot probabilities
-  cannot change outcomes.
-- **Deliberate deletion.** Speculative protocols designed during the build
-  were later removed when unused — the engine boundary that shipped is the
-  smaller one.
