@@ -1,16 +1,19 @@
 # FOOTBALL
 
 A shared football prediction and Monte Carlo simulation engine with
-competition-specific brains — currently World Cup 2026 and UEFA Champions
-League 2026/27 (the active default, draw-derived; the 2025/26 season remains
-selectable as completed history) — where real played matches are immutable
-facts and every simulated number is explicitly labeled as simulated.
+competition-specific brains — World Cup 2026, UEFA Champions League 2026/27
+(the active default, draw-derived; the 2025/26 season remains selectable as
+completed history), and LaLiga EA Sports 2026/27 — where real played matches
+are immutable facts and every simulated number is explicitly labeled as
+simulated.
 
 ## What it does
 
 - **Ingests real football data** from external providers (football-data.org
   or BSD) into per-competition result stores, or runs entirely offline on a
-  committed snapshot.
+  committed snapshot. Bookmaker market odds are enriched separately via
+  the optional `ODDS_PROVIDER` (The Odds API or BSD) — see
+  "Bookmaker odds" below.
 - **Produces match probabilities** from a five-signal ensemble
   (`refined_elo · market_odds · rolling_form · squad_value · rest_days`)
   blended by one canonical `EnsembleEngine`, plus a Poisson score model
@@ -33,10 +36,10 @@ facts and every simulated number is explicitly labeled as simulated.
                   |
         CompetitionRegistry (web/competitions.py)
                   |
-      +-----------+-----------+
-      |                       |
- World Cup brain          UCL brain          (competitions/*)
- FIFA rules/format        UEFA rules/format
+      +-----------+-----------+-----------------+
+      |                       |                 |
+ World Cup brain          UCL brain        LaLiga brain   (competitions/*)
+ FIFA rules/format        UEFA rules/format  round-robin + table rules
  SimulationRules adapter  SimulationRules adapter
       |                       |
       +-----------+-----------+
@@ -56,8 +59,9 @@ facts and every simulated number is explicitly labeled as simulated.
   third-place qualification via the Annex-C table, and an R32-to-FINAL
   knockout with a third-place playoff; UCL has a 36-team Swiss league with
   the ten-step UEFA tiebreaker chain, a playoff round, and a
-  data-driven knockout bracket. Each ships a `SimulationRules`
-  adapter that realizes one tournament per call.
+  data-driven knockout bracket; LaLiga is a 20-team double round-robin with a
+  table-rules adapter. Each ships a `SimulationRules` adapter that realizes
+  one tournament per call.
 - **The web layer** owns discovery and orchestration only: an explicit
   `CompetitionRegistry` (the server's mounts derive from it), one
   `SimulationTaskService` for every background run, canonical lifecycle
@@ -127,11 +131,61 @@ Simulation is always user-triggered. Nothing runs automatically.
 
 Normal startup is fresh-first: the server attempts acquisition lazily per competition and falls back to the last validated stores on failure.
 Fallback is reserved for real failures: if the provider answers HTTP 200 but has published zero matches for the active future season (UCL 2026/27), refresh reports `deferred/provider-empty` — not stale — and the committed draw-derived fixtures keep serving.
-`FOOTBALL_DATA_ORG_KEY` is the recommended provider credential; optional `BSD_API_KEY` and `DATA_PROVIDER=bsd|football-data` remain supported. Explicit snapshot/offline mode performs **zero** live requests — including
+`FOOTBALL_DATA_ORG_KEY` is the recommended provider credential; optional `BSD_API_KEY` and `DATA_PROVIDER=bsd|football-data` remain supported. Bookmaker odds are governed separately by `ODDS_PROVIDER`/`THE_ODDS_API_KEY` (see "Bookmaker odds"). Explicit snapshot/offline mode performs **zero** live requests — including
 Elo lookups, which fall back to UEFA-coefficient-derived ratings for UCL —
 and both dashboards disclose that stored data is being shown. A refresh
 endpoint re-ingests live results into the canonical stores without touching
 simulation state.
+
+## Bookmaker odds
+
+Market odds are a separate, optional enrichment layer — distinct from the
+fixture/result feed:
+
+- `DATA_PROVIDER` (football-data | bsd) → **fixtures and results**.
+- `ODDS_PROVIDER` (the-odds-api | bsd | auto | none) → **bookmaker market
+  odds** (1X2, decimal, vig-removed). Unset keeps each competition's legacy
+  odds behavior (e.g. LaLiga falls back to BSD); `none` disables odds
+  enrichment explicitly. `auto` precedence is deterministic:
+  **the-odds-api → bsd → none**, and the provider that actually supplied
+  odds is reported in every odds summary.
+
+Supported odds providers:
+
+- **The Odds API** (`THE_ODDS_API_KEY`) — live market odds. Sport keys are
+  mapped per competition (LaLiga `soccer_spain_la_liga`, UCL
+  `soccer_uefa_champs_league`, World Cup `soccer_fifa_world_cup`).
+- **BSD** (`BSD_API_KEY`) — the pre-existing event feed, reused for odds.
+
+Current provider capabilities (verified live):
+
+| Competition | The Odds API odds | Consumption |
+|---|---|---|
+| LaLiga 2026/27 | **available** (real live fixtures mapped 20/20) | wired: The Odds API or BSD → canonical mapping → validation → de-vig → runtime odds store → `MarketOddsSignal` → `market_only` strategy |
+| UCL 2026/27 | available in the live feed | **intentionally unchanged** — UCL still uses its existing odds path |
+| World Cup 2026 | returns no usable events | unchanged — remains an odds-free competition |
+
+The odds flow for LaLiga is: provider events → canonical fixture mapping
+(folded team pair + kickoff date + home/away identity; unmatched or
+flipped events are rejected, never guessed) → 1X2 validation → single-book
+vig removal (`football_core.predictors.odds.remove_vig`) → runtime odds
+store → `MarketOddsSignal` → signals blended by the ensemble, with
+`market_only` selectable as an explicit strategy (candidate only — never
+promoted).
+
+**Freshness**: each record tracks `provider_last_update` (the bookmaker's
+own timestamp, distinct from `fetched_at`); both must precede the match
+kickoff. Post-kickoff provider updates are rejected as stale. A never-odds
+match stays `MISSING`, not falsely `STALE`.
+
+**Fallback**: missing, invalid, or stale odds remain honest
+(`MISSING`/`INVALID`/`STALE`, never fabricated 0.0); `market_only` degrades
+to uniform thirds when no valid odds exist; production weights and the rest
+of the pipeline are unchanged.
+
+**Security**: `.env` stays local and gitignored; API keys never appear in
+source, tests, logs, or artifacts; redacted diagnostics only
+(configured/status/counts, never the key).
 
 ## Performance
 
@@ -153,7 +207,8 @@ identical between 5,000 and 10,000 runs (max champion-probability delta
 ```bash
 pip install -r requirements.txt
 
-cp .env.example .env    # optional: add FOOTBALL_DATA_ORG_KEY for live mode
+cp .env.example .env    # optional: FOOTBALL_DATA_ORG_KEY for live fixtures,
+                        # and ODDS_PROVIDER/THE_ODDS_API_KEY for bookmaker odds
 
 python -m web.server    # http://127.0.0.1:8080
 # explicit offline mode: python -m web.server --offline
@@ -191,7 +246,7 @@ artifacts, not source of truth. Tests that need complete stores use
 ## Testing
 
 The current post-hardening suite passes cleanly: `python -m pytest
---tb=short -q` reports **1259 passed / 1 skipped** (no failures). The single
+--tb=short -q` reports **1751 passed / 1 skipped** (no failures). The single
 skipped test is an environment-dependent provider test exercising a graceful
 degradation path; a minority of integration tests additionally require
 local match-result files produced by a live refresh; see
@@ -222,13 +277,17 @@ local match-result files produced by a live refresh; see
 ```text
 football_core/            shared kernel: domain truth model, signals +
                           ensemble, Poisson model, MonteCarloEngine,
-                          shared insight, Elo infra, providers, persistence
+                          shared insight, Elo infra, generic odds-provider
+                          layer (contract, The Odds API + BSD adapters,
+                          acquisition core), providers, persistence
 competitions/worldcup/    WC brain: groups/Annex-C/knockout rules,
                           SimulationRules adapter, engine/pipeline,
                           signal caches, benchmark, tests
 competitions/ucl/         UCL brain: Swiss/playoff/bracket rules,
                           SimulationRules adapter, orchestrator/pipeline,
                           calibration, bootstrap CIs, tests
+competitions/laliga/      LaLiga brain: round-robin + table rules,
+                          simulation, odds ingestion adapter, tests
 web/                      CompetitionRegistry, SimulationTaskService,
                           startup flow, FastAPI sub-apps, vanilla-JS SPA
 tests/                    cross-cutting regression suites (truth model,

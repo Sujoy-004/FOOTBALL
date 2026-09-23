@@ -15,6 +15,11 @@ Copy `.env.example` to `.env` and fill in:
 - `FOOTBALL_DATA_ORG_KEY` — free key from football-data.org (recommended)
 - `BSD_API_KEY` — optional alternative provider
 - `DATA_PROVIDER` — `bsd` or `football-data` to pin the provider (auto-detects when unset)
+- `ODDS_PROVIDER` — `the-odds-api`, `bsd`, `auto` (default), or `none` for
+  bookmaker market odds (separate from `DATA_PROVIDER`; `auto` precedence is
+  the-odds-api → bsd → none)
+- `THE_ODDS_API_KEY` — free key from the-odds-api.com; enables live LaLiga
+  market odds when `ODDS_PROVIDER=the-odds-api|auto`
 
 Without keys, the dashboard uses the last validated local data; every external dependency degrades gracefully and the UI shows the acquisition/freshness state. Use `python -m web.server --offline` for an explicitly network-free session.
 
@@ -29,6 +34,8 @@ python -m web.server          # http://127.0.0.1:8080
 - `/worldcup` — WC 2026 dashboard (overview, standings, bracket, match insight,
   what-if, seeded simulation)
 - `/ucl` — UCL 2026/27 dashboard (future fixtures, standings when available, bracket, what-if) with 2025/26 selectable as historical data
+- `/laliga` — LaLiga EA Sports 2026/27 dashboard (standings, fixtures, match
+  insight, odds status)
 - `POST /worldcup/api/simulate` / `POST /ucl/api/simulate` — seeded Monte Carlo
   runs (async task + progress polling)
 
@@ -37,6 +44,14 @@ reachable but has published zero finished matches yet, so acquisition reports
 `deferred (provider-empty)` — an expected "not published yet" state, not a
 stale/failure — and the committed draw-derived fixtures keep serving until
 live results appear.
+
+LaLiga bookmaker odds: with `ODDS_PROVIDER=the-odds-api|auto` and a
+`THE_ODDS_API_KEY`, real market odds are ingested for LaLiga (verified: the
+live feed maps 20/20 current-season events, de-vigs a deterministic single
+book, and drives the `market_only` strategy non-uniformly). UCL's The-Odds-API
+feed is available but UCL consumption is unchanged; World Cup returns no
+usable odds events through The Odds API, so it remains odds-free. Odds
+fallbacks are honest (missing/invalid/stale are reported, never fabricated).
 
 ## 4. What-if
 

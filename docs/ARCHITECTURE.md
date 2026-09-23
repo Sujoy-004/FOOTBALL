@@ -13,11 +13,13 @@ Match probabilities  (Poisson score model driven by rating difference)
 MonteCarloEngine (football_core)      ← validation · seeded RNG · N runs ·
         ↓                                aggregation · SIMULATED provenance
 SimulationRules (one adapter per competition brain)
-        ↙                          ↘
-World Cup 2026                 UCL 2026/27
-                              ↳ 2025/26 retained as historical
-12 groups + Annex-C + TPP     Swiss league + playoff + seeded R16
-        ↘                          ↙
+        ↙                    ↘               ↘
+World Cup 2026          UCL 2026/27     LaLiga 2026/27
+  12 groups +            Swiss league +   20-team
+  Annex-C + TPP          playoff +        round-robin
+                         seeded R16       + table rules
+                         ↳ 2025/26 retained as historical
+        ↘                    ↙
 CompetitionRegistry ── FastAPI shell ── dashboard
 ```
 
@@ -42,7 +44,8 @@ CompetitionRegistry ── FastAPI shell ── dashboard
 | `groups.py` | Poisson match model: expected goals from rating diff, cached CDF sampling, played-result injection, league-format sampler, tiebreaker chains |
 | `knockout.py` | Knockout primitives: single match (+ET/pens), two-legged ties, blended-prob resolution with matchup-aware Elo fallback |
 | `elo.py` / `elo_fetcher.py` / `elo_sync.py` | Elo math; ClubElo fetch; eloratings.net TSV sync with graduated correction |
-| `predictors/odds.py` | Market-odds ingestion from BSD event payloads (vig removal) |
+| `predictors/odds.py` | Single-book devig (`remove_vig`) — the canonical vig-removal math |
+| `odds.py` | Generic live market-odds layer: `OddsProvider` contract, `TheOddsApiOddsProvider`, `BSDOddsProvider`, `ODDS_PROVIDER` resolution (the-odds-api/bsd/auto/none), deterministic primary-book selection, canonical acquisition core (fixture mapping, validation, freshness, state, store), observability. Data provider (`DATA_PROVIDER`) stays fixtures/results-only |
 | `data_providers/` | BSD + football-data.org result/event providers (`fetch_matches` only) |
 | `evaluation.py` | Brier, log-loss, ECE, calibration curve, TRPS (numpy only here) |
 | `state.py` | Atomic JSON persistence helpers; bracket DAG validation (`validate_bracket`) |
@@ -102,7 +105,35 @@ committed store remain authoritative and keep serving until live result data
 is published, and the UI labels the state accordingly rather than showing
 fallback/stale.
 
-## CompetitionState & shared bracket contract
+### Bookmaker market odds (`ODDS_PROVIDER`)
+
+Market odds are enriched separately from fixtures/results. `DATA_PROVIDER`
+selects the fixture/result feed; `ODDS_PROVIDER` selects the odds source:
+
+- `the-odds-api` — live market odds through
+  `football_core.odds.TheOddsApiOddsProvider` (official v4 `/v4/sports/{sport}/odds/`,
+  h2h, decimal, EU books; sport keys per competition in `SPORT_KEYS`).
+- `bsd` — the pre-existing BSD event feed re-shaped through
+  `BSDOddsProvider` (league ids per competition in `LEAGUE_IDS`).
+- `auto` — **the-odds-api → bsd → none** (deterministic). The acting
+  provider is reported in the odds summary, never inferred later.
+- `none` — explicit disable. Unset keeps legacy behavior (LaLiga falls back
+  to BSD).
+
+Book selection is deterministic and documented: primary book (`pinnacle`
+by default) when it carries a complete h2h set, else the most-recently
+updated book, ties broken lexically. No multi-book averaging. Prices are
+matched by folded team name, never by outcome ordering. Providence per
+record: `provider`, `bookmaker`, `provider_event_id`, `provider_last_update`,
+`fetched_at`, `event_kickoff`, `provenance`.
+
+Capabilities (verified live, Phase 13B): LaLiga 2026/27 maps **20/20** real
+The-Odds-API events onto canonical fixtures with real non-uniform odds; UCL
+feed availability is verified but UCL consumption is intentionally
+unchanged; World Cup returns no usable events through The Odds API and stays
+odds-free.
+
+### CompetitionState & shared bracket contract
 
 Each brain emits one structural state object that both factual and simulated
 views share:
@@ -182,15 +213,16 @@ Lifecycle states exposed by both competitions: `not_requested`,
 - `web/simulation_service.py` — one task registry/thread lifecycle for all
   simulations and calibrations, plus the shared status vocabulary and
   completed-run metadata block.
-- `web/wc_app.py`, `web/ucl_app.py` — HTTP + presentation-compute adapters
-  over each brain's compute functions (format rules stay in the brains).
+- `web/wc_app.py`, `web/ucl_app.py`, `web/laliga_app.py` — HTTP +
+  presentation-compute adapters over each brain's compute functions (format
+  rules stay in the brains).
 
 ## Signals
 
 | Signal | Data source | Degradation |
 |---|---|---|
 | `refined_elo` | context Elo ratings (ClubElo) | defaults to 1500 |
-| `market_odds` | odds on BSD event payloads, devigged | uniform thirds |
+| `market_odds` | devigged bookmaker odds from the live odds provider (`ODDS_PROVIDER`: The Odds API or BSD) | uniform thirds |
 | `rolling_form` | recent results via a result-history provider | neutral form |
 | `squad_value` | committed squad-value JSON (log-ratio sigmoid); path injected by the owning competition | uniform thirds |
 | `rest_days` | fixture schedule gaps | assumes 7 days rest |

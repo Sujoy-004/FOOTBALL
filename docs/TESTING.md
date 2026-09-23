@@ -20,11 +20,15 @@ python -m pytest tests            # cross-cutting regression tests
 ## What is covered
 
 - **football_core** — Elo math, Poisson simulation, tiebreakers, evaluation
-  metrics, ensemble blending, weight-fitting contract, signal behaviour.
+  metrics, ensemble blending, weight-fitting contract, signal behaviour,
+  generic odds-provider layer (providers, resolution/precedence, mapping,
+  validation, freshness, states).
 - **World Cup** — group/knockout format logic (Annex C, third-place),
   state persistence, fetch/parse adapters, counterfactual overrides.
 - **UCL** — Swiss tiebreaker chain, playoff round, R16 bracket rules,
   two-legged ties, Monte Carlo determinism, bootstrap CIs, calibration.
+- **LaLiga** — table rules, simulation, odds ingestion, MarketOddsSignal /
+  market_only regression, historical leakage.
 - **Cross-cutting (`tests/`)** — canonical ensemble guarantees: blend math,
   weight normalization/determinism/fallback, no deleted-signal leakage,
   WC + UCL production integration.
@@ -39,7 +43,7 @@ python -m pytest tests            # cross-cutting regression tests
 
 ## Current baseline
 
-As measured (`python -m pytest --tb=short -q`): **1259 passed / 1 skipped**
+As measured (`python -m pytest --tb=short -q`): **1751 passed / 1 skipped**
 (no failing tests). The one skipped test is an environment-dependent provider
 test that exercises a graceful-degradation path. A minority of integration
 tests additionally need local match-result files produced by a live refresh
