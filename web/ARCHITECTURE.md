@@ -64,10 +64,12 @@ every rule below is `web/cache_control.py`, `web/static/refresh.js` and the
 - A refresh and a full load may both commit if they share the same token;
   both fetched the same server state and the later write wins, which is
   harmless.
-- `refreshLive` never touches simulation state: UCL keeps its sim session
-  payload, WC keeps `simBracket`/the simulation overlay, and neither
-  touches the shared simulation popup. A running simulation's progress is
-  owned by the popup, so unrelated live refresh does not disturb it.
+- `refreshLive` never touches simulation state, in every competition: UCL,
+  WC and LaLiga all refetch only factual live payloads on live refresh and
+  re-render the Simulation tab from held `simMeta`/sim state — none of them
+  re-fetches or re-applies `/api/simulation` in a refresh path, so a
+  completed simulation survives live refresh and the shared simulation
+  popup's progress is never disturbed by unrelated polling.
 
 ## Cache semantics
 
@@ -111,3 +113,36 @@ block of `color:` overrides, never new page structure.
   it. Competition outcome widgets are slots inside this order (WC: example
   simulated bracket; UCL: aggregate knockout/playoff table; LaLiga: champion
   bars + what-if).
+
+## Shared simulation shell (Phase 12D addendum)
+
+The Simulation tab is built by ONE shared presentation shell in
+`shared.js`: `renderSimulationShell(state, opts)` emits the canonical
+layout and `bindSimulationShell(state, opts)` wires the launcher to the
+single shared `showSimPopup`. Competition modules contribute only *content
+slots*; structure and state semantics live in the shell.
+
+- **Canonical order** (shell-enforced, modules cannot reorder): title +
+  purpose → current-state line → launcher (`#simLaunchBtn`, via the shared
+  popup) → run/progress line → PRIMARY result slot → What-If → provenance
+  footer (`.sim-provenance`, shared; `.sim-provenance.failed` for failures).
+- **State contract** (`shared.js` reads `availability` / `request_state`
+  from each competition's `/api/data` `simulation` block): five states —
+  IDLE (no run asked yet), RUNNING (launcher disabled, prior results stay
+  visible), COMPLETE (result slot + what-if + provenance), NOT_NEEDED
+  (season decided: no launcher, decided-fact block, prior run preserved),
+  FAILED (`.sim-provenance.failed`, never fabricated numbers).
+- **State machine is implemented once**, in `renderSimulationShell`; each
+  competition passes its raw `availability`/`request_state` plus opts and
+  the shell owns branching, defaulting, provenance and empty/failed
+  handling.
+- **What-If**: LaLiga has exactly ONE in-tab whole-competition counterfactual
+  panel (`/what-if`, 10k iterations, elo delta) rendered as the shell's
+  what-if slot on available seasons; the duplicated modal What-If was
+  removed. UCL/WC keep per-match What-If shortcuts inside match modals and
+  do not render a whole-competition what-if slot.
+- **Live-refresh isolation is now uniform**: `laliga.js:refreshLive`
+  refetches `/api/data` only (the previous /simulation re-fetch + re-apply
+  was removed), matching UCL/WC. A completed sim result survives refresh and
+  the LaLiga sim tab re-renders from held state, never from a fresh
+  simulation fetch.
