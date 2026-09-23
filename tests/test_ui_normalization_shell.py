@@ -81,11 +81,12 @@ def test_wc_simulation_isolated_from_live_refresh():
 def test_wc_uses_shared_popup_no_duplicate():
     assert "function startSimulation" not in WC
     assert "simPopupOverlay" not in WC          # WC-local popup DOM removed
-    assert "showSimPopup" in WC                 # reuses the shared popup
+    assert "showSimPopup" not in WC             # launcher wired via the shell
+    assert "bindSimulationShell(" in WC         # shell owns the shared popup
 
 
 def test_wc_keeps_its_sim_entry_point_and_bounds():
-    assert "window.__simulateAllRemaining" in WC
+    assert "bindSimulationShell(" in WC         # sim entry point via the shell
     assert "max: 1000000" in WC
     assert "min: 1" in WC
 
@@ -95,19 +96,16 @@ def test_wc_completion_renders_sim_tab_after_simmeta_update():
     COMPLETED run in-session, not only after competition re-entry.
 
     1. Pre-run state: loadAll itself renders the sim tab on boot/reload.
-    2. Completion fetches and commits simMeta.
+    2. Completion (the shell-popup onComplete) fetches and commits simMeta.
     3. renderSimulation() is invoked AFTER the simMeta assignment.
-    4. It reflects the run without re-entry: one loadAll, and it runs BEFORE
-       the sim fetch — the render that follows the simMeta write is the only
-       thing that refreshes the tab."""
-    cb = WC.split("window.__simulateAllRemaining = function()", 1)[1]
-    cb = cb.split("window.__openWhatIf", 1)[0]
-
-    assert "onComplete: async function()" in cb
+    4. It reflects the run without re-entry and without loadAll on the
+       completion path — only /simulation is fetched, so a completed run (or
+       a routine refresh) can never wipe the sim tab state."""
+    sim = WC.split("function renderSimulation()", 1)[1].split("\nfunction ", 1)[0]
+    cb = sim.split("onComplete: async function()", 1)[1]
+    assert "appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;" in cb
     assert "appState.simMeta = simResp.simulation_meta || null;" in cb
-    assert cb.count("await loadAll();") == 1
-    assert cb.index("appState.simMeta = simResp.simulation_meta || null;") \
-        > cb.index("const gen = await loadAll();")
+    assert cb.count("await loadAll();") == 0
     assert cb.index("renderSimulation();") \
         > cb.index("appState.simMeta = simResp.simulation_meta || null;")
 
@@ -215,33 +213,51 @@ def test_laliga_acquisition_panel_is_wired_not_dead():
 # ── Phase 12B — Simulation layout contract ───────────────────────────
 
 def test_laliga_sim_controls_lead_results_provenance_trails():
+    """LaLiga renders through the shared shell, which enforces the canonical
+    order header -> launcher -> results (resultSlot) -> what-if -> provenance.
+    LaLiga no longer owns inline provenance markup."""
     sim = LALIGA.split("function _simulationHtml()", 1)[1].split("\nfunction ", 1)[0]
-    ctrl = sim.index("Simulation Controls")
-    summary = sim.index("Projected Championship")
-    prov = sim.index("sim-provenance")
-    assert ctrl < summary, "controls must render before result summaries"
-    # Provenance trails the result blocks; the what-if and live-refresh
-    # sections are competition-specific slots that render after it.
-    assert summary < prov, "provenance must come after the results"
+    assert "renderSimulationShell(" in sim
+    assert "bindSimulationShell(" in LALIGA
+    assert 'class="sim-provenance"' not in LALIGA
+    shell = SHARED.split("function renderSimulationShell(", 1)[1].split("\nfunction bindSimulationShell(", 1)[0]
+    assert shell.index('id="simLaunchBtn"') < shell.index("o.resultSlot(")
+    assert shell.index("o.resultSlot(") < shell.index("o.whatIf(")
+    assert shell.index("o.whatIf(") < shell.index("_simProvenanceFooter(")
 
 
 def test_laliga_sim_uses_shared_table_and_bar_primitives():
-    sim = LALIGA.split("function _simulationHtml()", 1)[1].split("\nfunction ", 1)[0]
-    assert 'class="eval-table"' in sim
-    assert 'class="champ-bar-row"' in sim
-    assert 'class="cname"' in sim
+    slot = LALIGA.split("function _simulationResultSlot()", 1)[1].split("\nfunction ", 1)[0]
+    assert 'class="eval-table"' in slot
+    assert 'class="champ-bar-row"' in slot
+    assert 'class="cname"' in slot
 
 
 def test_ucl_sim_controls_lead_results():
+    """Launcher controls lead the results. The launcher is emitted by the
+    shared shell (id=simLaunchBtn) before it calls the module's resultSlot;
+    UCL no longer owns inline sim-control markup."""
     sim = UCL.split("async function renderSimulation()", 1)[1].split("\nfunction ", 1)[0]
-    assert sim.rindex('id="uclSimStartBtn"') < sim.rindex("_uclProjectionBlock()")
+    assert "renderSimulationShell(" in sim
+    assert "bindSimulationShell(" in sim
+    assert "uclSimStartBtn" not in UCL
+    assert "uclSimCustom" not in UCL
+    assert "uclSimSeed" not in UCL
+    shell = SHARED.split("function renderSimulationShell(", 1)[1].split("\nfunction bindSimulationShell(", 1)[0]
+    assert shell.index('id="simLaunchBtn"') < shell.index("o.resultSlot(")
 
 
 def test_wc_sim_banners_use_shared_provenance_class():
+    """Provenance banners come from the shared shell only. WC's render feeds
+    the shell (and keeps the completed-season copy) but no longer ships
+    inline .sim-provenance markup."""
     sim = WC.split("function renderSimulation()", 1)[1].split("\nfunction ", 1)[0]
-    assert 'class="sim-provenance"' in sim
-    assert 'class="sim-provenance failed"' in sim
+    assert "renderSimulationShell(" in sim
     assert "Simulation is not needed" in sim
+    assert 'class="sim-provenance"' not in WC
+    assert 'class="sim-provenance failed"' not in WC
+    assert 'class="sim-provenance"' in SHARED      # shell owns the banner markup
+    assert 'class="sim-provenance failed"' in SHARED
 
 
 # ── Phase 12B — shared primitives shipped in the stylesheet ──────────

@@ -246,9 +246,11 @@ class TestFrontendTruthWiring:
         from web.server import app as server_app
         with TestClient(server_app) as client:
             js = self._served(client, "ucl.js")
-            assert "/simulate" in js                 # controls now exist
+            shared = self._served(client, "shared.js")
+            assert "/simulate" in shared         # launcher POSTs via the shared popup
+            assert "renderSimulationShell" in js
             assert "Run Simulation" in js
-            assert "SIMULATION" in js                # provenance banner
+            assert "SIMULATION" in js            # provenance banner (shell/bracket)
             assert "Aggregate probabilities:" in js
             assert "Sampled bracket below:" in js
             for field in ("final_prob", "sf_prob", "qf_prob", "top_8_prob", "playoff_prob"):
@@ -256,5 +258,4 @@ class TestFrontendTruthWiring:
             assert "sim-team-toggle" in js
             assert "not needed" in js.lower() or "not_needed" in js
             assert "|| 0.33" not in js and "|| 0.5" not in js
-            shared = self._served(client, "shared.js")
             assert '"not_needed"' in shared and '"completed"' in shared
