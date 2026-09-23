@@ -1,8 +1,5 @@
 {
-  "schema": 1,
-  "season": "2026/27",
   "provider": "FootballDataOrgProvider",
-  "competition_id": "PD",
   "availability": {
     "all_played": false,
     "fully_received": true,
@@ -60,42 +57,6 @@
       "home_team": "Club Atlético de Madrid",
       "away_team": "Málaga CF",
       "event_date": "2026-08-19T19:00:00Z",
-      "status": "finished",
-      "matchday": 1,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564637",
-      "home_team": "Valencia CF",
-      "away_team": "Real Betis Balompié",
-      "event_date": "2026-08-25T19:00:00Z",
-      "status": "finished",
-      "matchday": 1,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564631",
-      "home_team": "Real Madrid CF",
-      "away_team": "Real Sociedad de Fútbol",
-      "event_date": "2026-08-26T19:00:00Z",
-      "status": "finished",
-      "matchday": 1,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564636",
-      "home_team": "RC Celta de Vigo",
-      "away_team": "CA Osasuna",
-      "event_date": "2026-08-27T18:30:00Z",
-      "status": "finished",
-      "matchday": 1,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564630",
-      "home_team": "FC Barcelona",
-      "away_team": "Athletic Club",
-      "event_date": "2026-08-27T19:00:00Z",
       "status": "finished",
       "matchday": 1,
       "stage": "REGULAR_SEASON"
@@ -191,6 +152,42 @@
       "stage": "REGULAR_SEASON"
     },
     {
+      "match_id": "564637",
+      "home_team": "Valencia CF",
+      "away_team": "Real Betis Balompié",
+      "event_date": "2026-08-25T19:00:00Z",
+      "status": "finished",
+      "matchday": 1,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564631",
+      "home_team": "Real Madrid CF",
+      "away_team": "Real Sociedad de Fútbol",
+      "event_date": "2026-08-26T19:00:00Z",
+      "status": "finished",
+      "matchday": 1,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564636",
+      "home_team": "RC Celta de Vigo",
+      "away_team": "CA Osasuna",
+      "event_date": "2026-08-27T18:30:00Z",
+      "status": "finished",
+      "matchday": 1,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564630",
+      "home_team": "FC Barcelona",
+      "away_team": "Athletic Club",
+      "event_date": "2026-08-27T19:00:00Z",
+      "status": "finished",
+      "matchday": 1,
+      "stage": "REGULAR_SEASON"
+    },
+    {
       "match_id": "564654",
       "home_team": "Real Racing Club de Santander",
       "away_team": "Elche CF",
@@ -278,6 +275,15 @@
       "event_date": "2026-08-31T19:30:00Z",
       "status": "finished",
       "matchday": 3,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564682",
+      "home_team": "Real Sociedad de Fútbol",
+      "away_team": "RC Celta de Vigo",
+      "event_date": "2026-09-03T19:00:00Z",
+      "status": "finished",
+      "matchday": 6,
       "stage": "REGULAR_SEASON"
     },
     {
@@ -461,15 +467,6 @@
       "stage": "REGULAR_SEASON"
     },
     {
-      "match_id": "564682",
-      "home_team": "Real Sociedad de Fútbol",
-      "away_team": "RC Celta de Vigo",
-      "event_date": "2026-09-03T19:00:00Z",
-      "status": "finished",
-      "matchday": 6,
-      "stage": "REGULAR_SEASON"
-    },
-    {
       "match_id": "564678",
       "home_team": "Rayo Vallecano de Madrid",
       "away_team": "RCD Espanyol de Barcelona",
@@ -538,15 +535,6 @@
       "away_team": "Villarreal CF",
       "event_date": "2026-09-17T19:30:00Z",
       "status": "finished",
-      "matchday": 6,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564685",
-      "home_team": "Levante UD",
-      "away_team": "Athletic Club",
-      "event_date": "2026-10-21T18:00:00Z",
-      "status": "timed",
       "matchday": 6,
       "stage": "REGULAR_SEASON"
     },
@@ -821,83 +809,29 @@
       "stage": "REGULAR_SEASON"
     },
     {
-      "match_id": "564718",
-      "home_team": "Rayo Vallecano de Madrid",
-      "away_team": "Elche CF",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
-      "matchday": 10,
+      "match_id": "564685",
+      "home_team": "Levante UD",
+      "away_team": "Athletic Club",
+      "event_date": "2026-10-21T18:00:00Z",
+      "status": "timed",
+      "matchday": 6,
       "stage": "REGULAR_SEASON"
     },
     {
       "match_id": "564719",
       "home_team": "Deportivo Alavés",
       "away_team": "Málaga CF",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
+      "event_date": "2026-10-23T19:00:00Z",
+      "status": "timed",
       "matchday": 10,
       "stage": "REGULAR_SEASON"
     },
     {
-      "match_id": "564720",
-      "home_team": "Athletic Club",
-      "away_team": "Getafe CF",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
-      "matchday": 10,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564721",
-      "home_team": "Sevilla FC",
-      "away_team": "CA Osasuna",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
-      "matchday": 10,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564722",
-      "home_team": "Valencia CF",
-      "away_team": "Villarreal CF",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
-      "matchday": 10,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564723",
-      "home_team": "FC Barcelona",
-      "away_team": "Real Madrid CF",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
-      "matchday": 10,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564724",
-      "home_team": "Club Atlético de Madrid",
-      "away_team": "RC Deportivo La Coruña",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
-      "matchday": 10,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564725",
-      "home_team": "RC Celta de Vigo",
-      "away_team": "Real Betis Balompié",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
-      "matchday": 10,
-      "stage": "REGULAR_SEASON"
-    },
-    {
-      "match_id": "564726",
-      "home_team": "Real Sociedad de Fútbol",
-      "away_team": "Levante UD",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
+      "match_id": "564718",
+      "home_team": "Rayo Vallecano de Madrid",
+      "away_team": "Elche CF",
+      "event_date": "2026-10-24T12:00:00Z",
+      "status": "timed",
       "matchday": 10,
       "stage": "REGULAR_SEASON"
     },
@@ -905,8 +839,71 @@
       "match_id": "564727",
       "home_team": "Real Racing Club de Santander",
       "away_team": "RCD Espanyol de Barcelona",
-      "event_date": "2026-10-25T00:00:00Z",
-      "status": "scheduled",
+      "event_date": "2026-10-24T14:15:00Z",
+      "status": "timed",
+      "matchday": 10,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564722",
+      "home_team": "Valencia CF",
+      "away_team": "Villarreal CF",
+      "event_date": "2026-10-24T16:30:00Z",
+      "status": "timed",
+      "matchday": 10,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564724",
+      "home_team": "Club Atlético de Madrid",
+      "away_team": "RC Deportivo La Coruña",
+      "event_date": "2026-10-24T19:00:00Z",
+      "status": "timed",
+      "matchday": 10,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564720",
+      "home_team": "Athletic Club",
+      "away_team": "Getafe CF",
+      "event_date": "2026-10-25T13:00:00Z",
+      "status": "timed",
+      "matchday": 10,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564725",
+      "home_team": "RC Celta de Vigo",
+      "away_team": "Real Betis Balompié",
+      "event_date": "2026-10-25T15:15:00Z",
+      "status": "timed",
+      "matchday": 10,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564726",
+      "home_team": "Real Sociedad de Fútbol",
+      "away_team": "Levante UD",
+      "event_date": "2026-10-25T17:30:00Z",
+      "status": "timed",
+      "matchday": 10,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564723",
+      "home_team": "FC Barcelona",
+      "away_team": "Real Madrid CF",
+      "event_date": "2026-10-25T20:00:00Z",
+      "status": "timed",
+      "matchday": 10,
+      "stage": "REGULAR_SEASON"
+    },
+    {
+      "match_id": "564721",
+      "home_team": "Sevilla FC",
+      "away_team": "CA Osasuna",
+      "event_date": "2026-10-26T20:00:00Z",
+      "status": "timed",
       "matchday": 10,
       "stage": "REGULAR_SEASON"
     },
@@ -3430,5 +3427,7 @@
       "matchday": 38,
       "stage": "REGULAR_SEASON"
     }
-  ]
+  ],
+  "schema": 1,
+  "season": "2026/27"
 }

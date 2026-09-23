@@ -134,6 +134,7 @@ def _store_refresh_report(
     n_matches: int | None = None, n_updated: int | None = None,
     active_season: str | None = None, deferred: bool = False,
     reason: str | None = None, status: str | None = None,
+    odds_status: dict | None = None,
 ) -> dict:
     global _refresh_report
     _refresh_report = {
@@ -149,6 +150,7 @@ def _store_refresh_report(
         **({"deferred": deferred} if deferred else {}),
         **({"reason": reason} if reason is not None else {}),
         **({"status": status} if status is not None else {}),
+        **({"odds_status": odds_status} if odds_status is not None else {}),
     }
     if active_season:
         cache_entry[str(active_season)] = _refresh_report
@@ -230,7 +232,8 @@ def _fetch_live_data():
     _store_refresh_report(ok or deferred, error, provider_name,
                           n_matches=n_raw, n_updated=n_updated,
                           active_season=active_season,
-                          deferred=deferred, reason=reason, status=status)
+                          deferred=deferred, reason=reason, status=status,
+                          odds_status=summary.get("odds"))
     boot_log_local.append({
         "step": "LaLiga live fetch", "status": "deferred" if deferred else ("ok" if ok else "skip"),
         "elapsed": 0.0,
@@ -333,6 +336,8 @@ def api_data():
         "phase": cache.get("phase", {}),
         "season": _active_season_token(),
         "n_total_fixtures": n_total,
+        "odds_status": (_refresh_report.get("odds_status")
+                        or cache.get("odds_status") or {}),
         "simulation": _simulation_state_block(),
         "n_unplayed": n_unplayed,
         "n_played": n_total - n_unplayed,
@@ -684,12 +689,20 @@ def api_match_insight(match_id: str = "", context: str = ""):
     prob_available = False
     prob_reason = "engine_unavailable"
     if engine:
+        from competitions.laliga.src.odds import decorate_matches, load_odds
+        decorate_matches([match_data], load_odds(DATA_DIR))
+        eval_match = {
+            "team_a": ta, "team_b": tb, "match_id": match_id,
+            "odds_home": match_data.get("odds_home"),
+            "odds_draw": match_data.get("odds_draw"),
+            "odds_away": match_data.get("odds_away"),
+        }
         try:
             ctx = PredictionContext(
-                fixtures=[{"team_a": ta, "team_b": tb, "match_id": match_id}],
+                fixtures=[eval_match],
                 elo_ratings=elo_map, played_results=[],
             )
-            bp = engine.evaluate({"team_a": ta, "team_b": tb, "match_id": match_id}, ctx)
+            bp = engine.evaluate(eval_match, ctx)
             blended_prob = round(bp.home_prob, 4)
             prob_available = True
             prob_reason = None

@@ -33,6 +33,7 @@ from competitions.laliga.src.constants import (
     SHIPPED_SEASON,
 )
 from competitions.laliga.src.groups import compute_laliga_standings, played_map_from_rows
+from competitions.laliga.src.odds import acquire_laliga_odds, load_odds, odds_status_summary
 
 logger = logging.getLogger(__name__)
 
@@ -337,6 +338,7 @@ def compute_deterministic(data_dir=DATA_DIR, season_token=None) -> dict:
         "all_teams": all_teams,
         "standings": standings,
         "odds": odds,
+        "odds_status": odds_status_summary(load_odds(data_dir, season_token), fixtures),
         "signals": signals,
         "n_teams": len(all_teams),
         "n_iterations": 0,
@@ -461,6 +463,9 @@ def fetch_live_data(
     _season_store.write_fixtures(fixtures_payload, data_dir, SHIPPED_SEASON)
     _season_store.write_results(results_payload, data_dir, SHIPPED_SEASON)
 
+    odds_summary = acquire_laliga_odds(data_dir, SHIPPED_SEASON, bsd_api_key)
+    odds_public = {k: v for k, v in odds_summary.items() if k != "matches"}
+
     report.provider = type(provider).__name__
     report.finished["received"] = sum(1 for r in results if r.get("status") == STATUS_FINISHED)
     report.finished["normalized"] = len(results)
@@ -475,6 +480,7 @@ def fetch_live_data(
         "n_raw": len(events),
         "n_updated": len(results),
         "per_season": {SHIPPED_SEASON: {"fixtures": len(fixtures), "results": len(results)}},
+        "odds": odds_public,
     }
 
 

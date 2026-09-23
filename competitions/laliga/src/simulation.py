@@ -132,6 +132,7 @@ def run_mc_simulation(
         load_team_names,
         build_signal_engine,
     )
+    from competitions.laliga.src.odds import decorate_matches, load_odds
 
     if progress_cb:
         progress_cb(0, 100, "Loading fixtures...")
@@ -148,6 +149,7 @@ def run_mc_simulation(
             for f in load_fixtures(data_dir) if f.get("status") != "finished"
         ]
     played = played_map if played_map is not None else load_played_flat(data_dir)
+    decorate_matches(fixtures, load_odds(data_dir))
     if progress_cb:
         progress_cb(10, 100, "Resolving Elo ratings...")
 
@@ -245,7 +247,9 @@ def _signal_stats(engine, elo_ratings: dict, fixtures: list[dict]) -> dict:
     ctx = PredictionContext(
         fixtures=[{"team_a": f.get("team_a") or f.get("home_team"),
                    "team_b": f.get("team_b") or f.get("away_team"),
-                   "match_id": f["match_id"]}
+                   "match_id": f["match_id"],
+                   "odds_home": f.get("odds_home"), "odds_draw": f.get("odds_draw"),
+                   "odds_away": f.get("odds_away")}
                   for f in fixtures if f.get("status") != "finished"],
         elo_ratings=elo_ratings,
     )

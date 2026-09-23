@@ -1,7 +1,9 @@
 {
   "Athletic Club": [
     "Athletic",
-    "Athletic Club"
+    "Athletic Club",
+    "Athletic Bilbao",
+    "Bilbao"
   ],
   "CA Osasuna": [
     "Osasuna",
@@ -9,7 +11,9 @@
   ],
   "Club Atlético de Madrid": [
     "Atletico",
-    "Club Atlético de Madrid"
+    "Club Atlético de Madrid",
+    "Atlético Madrid",
+    "Atletico Madrid"
   ],
   "Deportivo Alavés": [
     "Alaves",
@@ -53,6 +57,7 @@
   ],
   "Real Betis Balompié": [
     "Betis",
+    "Real Betis",
     "Real Betis Balompié"
   ],
   "Real Madrid CF": [
