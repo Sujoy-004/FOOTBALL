@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import math
-
-import pytest
 
 from competitions.ucl.src.gate import (
     evaluate_matches,

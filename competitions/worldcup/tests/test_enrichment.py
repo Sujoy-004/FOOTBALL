@@ -1,6 +1,5 @@
 """Tests for the enrichment module (extract_stats, extract_context)."""
 
-import pytest
 
 from football_core.enrichment import extract_stats, extract_context
 

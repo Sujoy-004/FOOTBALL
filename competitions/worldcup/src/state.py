@@ -1,9 +1,6 @@
 """State persistence — extends football_core with WC-specific validation and advanced features."""
 
 import json
-import os
-import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 

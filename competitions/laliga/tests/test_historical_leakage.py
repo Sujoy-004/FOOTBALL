@@ -14,7 +14,6 @@ import json
 import os
 import re
 
-import pytest
 
 from football_core.signals.market_odds import MarketOddsSignal
 from football_core.signals.refined_elo import RefinedEloSignal

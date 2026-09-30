@@ -6,7 +6,6 @@ fair play card distribution, and group iteration integrity.
 
 import random
 
-import pytest
 
 from src import constants
 from src.groups import (

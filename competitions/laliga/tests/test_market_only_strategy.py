@@ -6,7 +6,6 @@ from the production five-signal engine, and the ``run_mc_simulation`` wiring.
 """
 from __future__ import annotations
 
-import math
 
 import pytest
 

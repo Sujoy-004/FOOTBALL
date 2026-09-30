@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
 from football_core.data_providers.bsd_provider import BSDDataProvider
 from football_core.fetcher import fold_team_key

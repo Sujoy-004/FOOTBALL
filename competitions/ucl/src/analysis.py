@@ -10,7 +10,6 @@ import logging
 import os
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Any
 
 from football_core.provider import FixtureSchedule
 

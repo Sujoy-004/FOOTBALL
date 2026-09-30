@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 
 from competitions.ucl.src.orchestrator import (
     _load_league_played_pairs,

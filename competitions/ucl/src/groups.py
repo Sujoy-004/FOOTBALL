@@ -11,7 +11,6 @@ Per UCLT-01, UCLT-02, UCLT-06:
 
 from __future__ import annotations
 
-import random
 from collections import defaultdict
 
 from football_core.constants import (

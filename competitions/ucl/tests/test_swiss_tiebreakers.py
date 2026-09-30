@@ -6,7 +6,6 @@ opponent stat correctness, and H2H absence.
 
 from __future__ import annotations
 
-import pytest
 
 from competitions.ucl.src.groups import compute_swiss_standings
 

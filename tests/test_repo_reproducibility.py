@@ -14,11 +14,8 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
-import pytest
 
 
 def _make_fresh_checkout_view(tmp_path: Path) -> Path:

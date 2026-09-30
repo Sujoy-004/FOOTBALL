@@ -30,7 +30,6 @@ import csv
 import functools
 import json
 import logging
-import time
 import unicodedata
 import urllib.request
 from datetime import date

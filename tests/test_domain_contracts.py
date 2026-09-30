@@ -7,7 +7,6 @@ empty vs unavailable stores — independent of any competition.
 
 import json
 
-import pytest
 
 from football_core.domain import (
     CanonicalMatch,

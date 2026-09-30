@@ -13,10 +13,8 @@ Usage:
 from __future__ import annotations
 
 import logging
-import math
 import os
 from datetime import datetime, timezone
-from typing import Any
 
 from football_core.blender import (
     EnsembleEngine,

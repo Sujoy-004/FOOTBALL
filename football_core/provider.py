@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Protocol, runtime_checkable, List, Optional
+from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 

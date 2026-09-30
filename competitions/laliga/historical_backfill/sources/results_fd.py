@@ -37,7 +37,6 @@ Source notes:
 from __future__ import annotations
 
 import datetime as _dt
-import io
 import os
 import tempfile
 from urllib import request as urllib_request

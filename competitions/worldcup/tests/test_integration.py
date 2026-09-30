@@ -8,7 +8,6 @@ correctly.
 
 from datetime import datetime, timezone
 
-import pytest
 
 from src.elo import update_ratings
 from src.state import load_played, load_teams, save_played, save_teams

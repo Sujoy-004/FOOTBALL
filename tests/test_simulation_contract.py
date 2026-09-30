@@ -5,7 +5,6 @@ and protocol shapes. The Monte Carlo engine itself arrives in a later
 exchange and must satisfy these contracts.
 """
 
-import random
 
 import pytest
 

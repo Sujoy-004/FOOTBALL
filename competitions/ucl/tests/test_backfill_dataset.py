@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 
-import pytest
 
 from competitions.ucl.historical_backfill.contract import HISTORICAL_DIR
 from competitions.ucl.src.gate import evaluate_matches

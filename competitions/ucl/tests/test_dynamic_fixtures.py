@@ -20,7 +20,6 @@ import json
 import shutil
 from pathlib import Path
 
-import pytest
 
 from competitions.ucl.src.ingest import ingest_ucl_events_multi_season
 from competitions.ucl.src.seasons import (

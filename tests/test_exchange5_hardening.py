@@ -7,7 +7,6 @@ odds-semantics marker.
 
 from __future__ import annotations
 
-import shutil
 import time
 from pathlib import Path
 

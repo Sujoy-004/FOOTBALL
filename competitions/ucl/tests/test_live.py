@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from competitions.ucl.src.simulation import run_monte_carlo
 

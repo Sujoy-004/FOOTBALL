@@ -6,11 +6,8 @@ All tests use fixture data — no network access required.
 """
 
 import json
-import os
 from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from src.elo_sync import (
     apply_graduated_correction,

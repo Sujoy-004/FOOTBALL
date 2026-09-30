@@ -1,6 +1,5 @@
 """Tests for UCL BSD fetcher."""
 
-import pytest
 from competitions.ucl.src.fetcher import fetch_ucl_matches, build_ucl_url, UCL_LEAGUE_ID
 
 

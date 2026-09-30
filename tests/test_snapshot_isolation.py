@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import shutil
-import sys
 from pathlib import Path
 
 import pytest
@@ -122,7 +121,6 @@ def test_ucl_browser_chain_snapshot_zero_calls_and_valid_json(snapshot_env, monk
     parent server boot -> static module fetch -> five SPA API fetches.
     Asserts zero live provider calls AND parseable bodies throughout.
     """
-    import shutil
     from web.server import app as server_app
 
     with TestClient(server_app) as client:

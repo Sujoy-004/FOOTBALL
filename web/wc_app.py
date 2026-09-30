@@ -1,8 +1,7 @@
-import json, os, uuid
+import json, os
 import logging
 from pathlib import Path
 from datetime import datetime, timezone
-import threading
 
 import fastapi
 from fastapi.responses import JSONResponse

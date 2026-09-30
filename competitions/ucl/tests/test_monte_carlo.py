@@ -10,9 +10,6 @@ Covers:
 
 from __future__ import annotations
 
-import random
-
-import pytest
 
 from competitions.ucl.src.simulation import (
     aggregate_mc_results,

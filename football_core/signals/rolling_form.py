@@ -1,7 +1,6 @@
 """Rolling form signal — multi-window form features with exponential decay weighting (D-09: uses MatchResultProvider)."""
 
 import logging
-from datetime import datetime
 
 from football_core.elo import expected_score
 from football_core.provider import ResultHistoryProvider

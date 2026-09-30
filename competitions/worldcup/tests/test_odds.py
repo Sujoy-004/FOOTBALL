@@ -2,9 +2,8 @@
 
 All file I/O tests use tmp_path to avoid modifying real data files.
 """
-from datetime import datetime, timezone
+from datetime import datetime
 
-import pytest
 
 from src.predictors.odds import (
     fetch_and_cache_odds,

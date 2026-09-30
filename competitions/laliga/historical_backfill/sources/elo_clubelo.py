@@ -27,12 +27,10 @@ Source notes:
 from __future__ import annotations
 
 import os
-import tempfile
 from datetime import date
 from typing import Dict
 
 import pandas as pd
-import requests
 
 from football_core.historical_backfill import elo_snapshots, load_elo_frame
 

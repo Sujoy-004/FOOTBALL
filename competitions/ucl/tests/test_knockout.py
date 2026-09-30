@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import random
 
-import pytest
 
 from competitions.ucl.src.knockout import (
     build_r16_bracket,

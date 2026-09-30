@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 
 from football_core.elo_fetcher import (
     ELO_SNAPSHOT_DIR,

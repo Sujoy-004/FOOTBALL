@@ -10,7 +10,6 @@ Exchange 4 adds season-transition logic tests.
 import json
 from pathlib import Path
 
-import pytest
 
 from competitions.ucl.src.lifecycle import LIFECYCLE_CONTRACT, discover, SUFFICIENT_FIXTURES_THRESHOLD, SUFFICIENT_RESULTS_THRESHOLD
 from competitions.ucl.src.seasons import (

@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-import pytest
 
 from football_core.blender import compute_signal_contributions
 from football_core.signal import BlendedPrediction

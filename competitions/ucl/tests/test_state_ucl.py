@@ -1,6 +1,5 @@
 """Tests for competitions.ucl.src.state.build_competition_state."""
 
-import copy
 import json
 from pathlib import Path
 

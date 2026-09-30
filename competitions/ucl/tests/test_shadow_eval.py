@@ -1,10 +1,8 @@
 """Tests for shadow_eval — frozen pre-kickoff prediction log for UCL."""
 
 import json
-import os
-from datetime import datetime, timezone
-from pathlib import Path
-
+from datetime import timezone
+from datetime import timezone
 import pytest
 
 from competitions.ucl.src.shadow_eval import (

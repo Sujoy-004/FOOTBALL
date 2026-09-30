@@ -14,7 +14,6 @@ import random
 import shutil
 from pathlib import Path
 
-import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 WC_DATA = ROOT / "competitions" / "worldcup" / "data"

@@ -1,7 +1,6 @@
 """Skipped-validation reporting (R1) and UNVERIFIED surfacing (R2)."""
 from __future__ import annotations
 
-import pytest
 
 from competitions.ucl.src.validation_suite import ValidationResult, ValidationSuite
 

@@ -14,7 +14,6 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-import pytest
 
 REPO_DATA = Path(__file__).resolve().parents[1] / "data"
 

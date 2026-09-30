@@ -1,8 +1,8 @@
 """Signal interface and registry — competition-agnostic signal architecture."""
 
 import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import List, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 

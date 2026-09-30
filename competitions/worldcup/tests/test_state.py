@@ -5,9 +5,6 @@ All file I/O tests use tmp_path to avoid modifying real data files.
 
 import itertools
 import json
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest

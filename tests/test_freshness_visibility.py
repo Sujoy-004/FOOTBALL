@@ -57,7 +57,6 @@ def dead_provider(monkeypatch):
 
 def test_wc_failed_refresh_is_visible_and_marked_stale(monkeypatch, caplog):
     """WC: failed refresh -> structured report, stale flag, persisted reason."""
-    import logging
 
     import competitions.worldcup.src.pipeline as wc_pipeline
 

@@ -1,8 +1,6 @@
 """Tests for evaluation.py metrics and baseline reporting."""
 
-import json
 import math
-import os
 import pytest
 from src.evaluation import (
     brier_score, log_loss, compute_metrics,

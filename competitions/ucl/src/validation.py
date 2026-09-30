@@ -11,7 +11,6 @@ Validates the full UCL fixture schedule against competition requirements:
 
 from __future__ import annotations
 
-import collections
 from typing import Any, Dict, List, Set, Tuple
 
 

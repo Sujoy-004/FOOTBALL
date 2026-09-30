@@ -2,7 +2,6 @@
 
 import dataclasses
 import json
-import math
 
 import pytest
 

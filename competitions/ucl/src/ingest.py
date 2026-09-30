@@ -82,7 +82,6 @@ stores on the second run (no file rewrite, no ``meta.updated_at`` bump).
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 from datetime import datetime, timezone
