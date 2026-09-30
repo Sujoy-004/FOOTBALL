@@ -725,8 +725,9 @@ def api_elo():
          so the view is not blank, always labelled "coefficient");
       c) nothing -> an explicit empty state.
 
-    ``source`` names the tier the numbers actually came from. It is never
-    "live" for coefficient-derived values.
+    ``source`` names the tier the numbers actually came from, and ``as_of``
+    is when they were read (empty unless they are real ClubElo values, since
+    a coefficient estimate has no date).
 
     A GET never fetches: the cache was populated at boot from the stored
     ClubElo snapshot, and this handler only reads it.
@@ -736,16 +737,18 @@ def api_elo():
         for team, value in (cache.get("elo_ratings") or {}).items()
         if isinstance(value, (int, float))
     }
-    provenance = ((cache.get("signals") or {}).get("refined_elo") or {}).get("provenance")
+    refined_elo = (cache.get("signals") or {}).get("refined_elo") or {}
+    provenance = refined_elo.get("provenance")
     coefficient_derived = provenance == "coefficient_derived"
     if coefficient_derived:
         # Boot could not reach ClubElo, so these are placeholders. Keep them
         # only as the last resort — a real on-disk source outranks them.
-        ratings, source = {}, "coefficient"
+        ratings, source, as_of = {}, "coefficient", ""
     elif ratings:
-        source = "live"
+        # Boot labels the ratings' own provenance; report that, not a guess.
+        source, as_of = provenance or "clubelo", refined_elo.get("as_of") or ""
     else:
-        source = "empty"
+        source, as_of = "empty", ""
 
     if not ratings and coefficient_derived:
         ratings = {
@@ -758,9 +761,8 @@ def api_elo():
         return JSONResponse({"ratings": {}, "source": "empty", "as_of": ""})
     return JSONResponse({
         "ratings": ratings,
-        # Boot labels the ratings' own provenance; report that, not a guess.
         "source": source,
-        "as_of": "",
+        "as_of": as_of,
     })
 
 

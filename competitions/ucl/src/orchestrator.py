@@ -237,6 +237,21 @@ def build_sim_state_payload(
     return payload
 
 
+def _attach_elo_as_of(signal_stats: dict, elo_provenance: str | None) -> None:
+    """Label real ClubElo ratings with when they were actually read.
+
+    Both compute paths build their own ``signal_stats``, so this is called
+    from each. A coefficient estimate gets no date: guessing one from the
+    season would be a fiction.
+    """
+    if elo_provenance != "clubelo":
+        return
+    refined = signal_stats.get("refined_elo")
+    if isinstance(refined, dict):
+        from competitions.ucl.src.elo_fetcher import elo_store_fetched_at
+        refined["as_of"] = elo_store_fetched_at()
+
+
 def _resolve_elo_ratings(team_names: list[str]) -> dict[str, float]:
     """Snapshot-safe Elo resolution.
 
@@ -1014,6 +1029,7 @@ def run_deterministic_compute(
         signal_stats["refined_elo"].update(
             compute_elo_coverage(team_names, elo_ratings, elo_provenance)
         )
+        _attach_elo_as_of(signal_stats, elo_provenance)
         if historical_file:
             # rolling_form keys off historical match results, not Elo rating
             # coverage; per-team ClubElo coverage does not apply to it.
@@ -1110,6 +1126,7 @@ def run_deterministic_compute(
     os.unlink(_results_tmp.name)
 
     signal_stats = _step("Evaluate signals", lambda: compute_signal_eval(results, engine, elo_ratings, elo_provenance=elo_provenance))
+    _attach_elo_as_of(signal_stats, elo_provenance)
 
     def _was_in_semis(t: str) -> bool:
         for m in knockout.get("rounds", {}).get("SF", []):

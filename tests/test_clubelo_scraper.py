@@ -381,3 +381,37 @@ def test_oversized_response_is_refused(monkeypatch):
     monkeypatch.setattr(clubelo.urllib.request, "urlopen", lambda *a, **k: _Huge())
     with pytest.raises(ClubEloUnavailable):
         clubelo.fetch_ranking()
+
+
+# ── Labelling ──────────────────────────────────────────────────────────────
+
+
+def test_as_of_is_attached_for_clubelo_only(monkeypatch):
+    """Only real ClubElo ratings get a date; a coefficient estimate never does.
+
+    Both compute paths rebuild their own signal stats, so this helper is what
+    keeps the label from silently disappearing on one of them.
+    """
+    from competitions.ucl.src import orchestrator
+
+    monkeypatch.setattr(
+        "competitions.ucl.src.elo_fetcher.elo_store_fetched_at",
+        lambda: "2026-09-30T08:28:01+00:00",
+    )
+
+    clubelo_stats = {"refined_elo": {"provenance": "clubelo"}}
+    orchestrator._attach_elo_as_of(clubelo_stats, "clubelo")
+    assert clubelo_stats["refined_elo"]["as_of"] == "2026-09-30T08:28:01+00:00"
+
+    coefficient_stats = {"refined_elo": {"provenance": "coefficient_derived"}}
+    orchestrator._attach_elo_as_of(coefficient_stats, "coefficient_derived")
+    assert "as_of" not in coefficient_stats["refined_elo"]
+
+
+def test_as_of_attach_survives_a_missing_refined_elo_block():
+    """A stats dict with no refined_elo entry is not a crash."""
+    from competitions.ucl.src.orchestrator import _attach_elo_as_of
+
+    stats: dict = {}
+    _attach_elo_as_of(stats, "clubelo")
+    assert stats == {}

@@ -17,7 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 ELO_KEYS = {"ratings", "source", "as_of"}
-ELO_SOURCES = {"seed", "live", "coefficient", "teams", "empty"}
+ELO_SOURCES = {"seed", "live", "clubelo", "coefficient", "teams", "empty"}
 BLEND_KEYS = {
     "n_signals_available",
     "available_signals",
@@ -71,7 +71,9 @@ def test_elo_empty_state_never_raises(competition: str, monkeypatch):
         "ratings": {}, "source": "empty", "as_of": ""}
 
 
-@pytest.mark.parametrize("competition, expected", [("ucl", "live"), ("laliga", "seed")])
+@pytest.mark.parametrize(
+    "competition, expected", [("ucl", "clubelo"), ("laliga", "seed")]
+)
 def test_elo_prefers_cache_ratings_over_seed(competition: str, expected: str, monkeypatch):
     """Boot-time ratings win and are labelled with the source they came from."""
     monkeypatch.setattr(_module(competition), "cache", {
@@ -80,6 +82,38 @@ def test_elo_prefers_cache_ratings_over_seed(competition: str, expected: str, mo
     payload = _client(competition).get("/api/elo").json()
     assert payload["ratings"] == {"Real Madrid": 1832.5, "Bayern": 1801.0}
     assert payload["source"] == expected
+
+
+def test_elo_reports_when_clubelo_ratings_were_read(monkeypatch):
+    """Real ClubElo values carry the store's fetch stamp, not a blank."""
+    import web.ucl_app as ucl
+
+    monkeypatch.setattr(ucl, "cache", {
+        "elo_ratings": {"Real Madrid": 1832.5},
+        "signals": {"refined_elo": {
+            "provenance": "clubelo",
+            "as_of": "2026-09-30T04:15:00+00:00",
+        }},
+    })
+    payload = TestClient(ucl.ucl_app).get("/api/elo").json()
+    assert payload["source"] == "clubelo"
+    assert payload["as_of"] == "2026-09-30T04:15:00+00:00"
+
+
+def test_elo_coefficient_fallback_has_no_as_of(monkeypatch):
+    """A coefficient estimate has no date, so it must not be given one."""
+    import web.ucl_app as ucl
+
+    monkeypatch.setattr(ucl, "cache", {
+        "elo_ratings": {"Real Madrid": 1832.5},
+        "signals": {"refined_elo": {
+            "provenance": "coefficient_derived",
+            "as_of": "2026-09-30T04:15:00+00:00",
+        }},
+    })
+    payload = TestClient(ucl.ucl_app).get("/api/elo").json()
+    assert payload["source"] == "coefficient"
+    assert payload["as_of"] == ""
 
 
 def test_elo_worldcup_reads_teams_cache(monkeypatch):
