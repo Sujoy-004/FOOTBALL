@@ -6,10 +6,12 @@ the UCL-specific alias path and re-exports for backward compatibility.
 
 import logging
 import os
+from pathlib import Path
 
 from football_core.elo_fetcher import (
     get_clubelo_snapshot_date,
     fetch_team_elos as _core_fetch_team_elos,
+    load_snapshot_elos as _core_load_snapshot_elos,
     resolve_clubelo_name as _core_resolve_clubelo_name,
 )
 
@@ -36,3 +38,14 @@ def fetch_team_elos(
 
 def resolve_clubelo_name(team_name: str, alias_path: str | None = None) -> str:
     return _core_resolve_clubelo_name(team_name, alias_path or _UCL_ALIAS_PATH)
+
+
+def load_snapshot_elos(
+    team_names: list[str],
+    alias_path: str | None = None,
+    snapshot_dir: Path | str | None = None,
+) -> dict[str, float]:
+    """Real ratings from the local eloratings TSV snapshot, UCL aliases."""
+    return _core_load_snapshot_elos(
+        team_names, alias_path or _UCL_ALIAS_PATH, snapshot_dir=snapshot_dir,
+    )

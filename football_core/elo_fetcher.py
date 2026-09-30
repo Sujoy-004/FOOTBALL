@@ -34,12 +34,19 @@ import time
 import unicodedata
 import urllib.request
 from datetime import date
+from pathlib import Path
 
 from football_core.constants import DEFAULT_ELO
+from football_core.elo_sync import parse_eloratings_tsv
 
 logger = logging.getLogger(__name__)
 
 _API_BASE = "http://api.clubelo.com"
+
+ELO_SNAPSHOT_DIR = Path(__file__).resolve().parent / "elo_ratings"
+"""Default home of the dated ``eloratings_YYYY-MM-DD.tsv`` snapshots."""
+
+_PLAUSIBLE_ELO_RANGE = (1000.0, 2500.0)
 
 
 @functools.lru_cache(maxsize=1)
@@ -158,3 +165,87 @@ def fetch_team_elos(
 
 def get_clubelo_snapshot_date() -> str:
     return date.today().isoformat()
+
+
+# ─── Local eloratings.net snapshot (network-free) ────────────────────────
+
+
+def _latest_snapshot_path(snapshot_dir: Path) -> Path | None:
+    """Newest ``eloratings_*.tsv`` in *snapshot_dir*; None if there is none.
+
+    ``eloratings_YYYY-MM-DD.tsv`` sorts lexicographically by date, so the last
+    entry is the newest. Only that one file is ever read.
+    """
+    try:
+        candidates = sorted(snapshot_dir.glob("eloratings_*.tsv"))
+    except OSError:
+        return None
+    return candidates[-1] if candidates else None
+
+
+@functools.lru_cache(maxsize=4)
+def _parse_snapshot_text(text: str) -> dict[str, float]:
+    """Normalized team name -> Elo, from one eloratings TSV snapshot body.
+
+    Column layout comes from the repo's single canonical TSV reader
+    (``elo_sync.parse_eloratings_tsv``: identifier at col 2, rating at col 3)
+    rather than a second opinion kept here. Identifiers outside a plausible
+    Elo band are dropped so a garbled snapshot cannot masquerade as ratings.
+    """
+    table: dict[str, float] = {}
+    for name, rating in parse_eloratings_tsv(text):
+        if name and _PLAUSIBLE_ELO_RANGE[0] <= rating <= _PLAUSIBLE_ELO_RANGE[1]:
+            table[_normalized_key(name)] = rating
+    return table
+
+
+def load_snapshot_ratings(
+    snapshot_dir: Path | str | None = None,
+) -> dict[str, float]:
+    """Newest on-disk eloratings snapshot as {normalized name: Elo}.
+
+    Network-free and total: a missing/unreadable directory, no snapshot, a
+    garbled file, or nothing parseable all return ``{}`` rather than raising.
+    """
+    directory = Path(snapshot_dir) if snapshot_dir is not None else ELO_SNAPSHOT_DIR
+    path = _latest_snapshot_path(directory)
+    if path is None:
+        return {}
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        logger.warning("Unreadable eloratings snapshot: %s", path)
+        return {}
+    return dict(_parse_snapshot_text(text))
+
+
+def load_snapshot_elos(
+    team_names: list[str],
+    alias_path: str,
+    snapshot_dir: Path | str | None = None,
+) -> dict[str, float]:
+    """Real Elo ratings for *team_names* from the local eloratings snapshot.
+
+    Matches the app's canonical team names through *alias_path* (the canonical
+    name itself and every alias variant are tried, accent-insensitively).
+    Returns ``{}`` when the snapshot is missing, unreadable, or matches no
+    requested team — the caller then falls through to the next source. Teams
+    the snapshot does not cover are simply absent, never invented.
+    """
+    table = load_snapshot_ratings(snapshot_dir)
+    if not table:
+        return {}
+    try:
+        aliases = _load_aliases(alias_path)
+    except (OSError, ValueError):
+        logger.warning("Unreadable alias file for snapshot matching: %s", alias_path)
+        return {}
+
+    matched: dict[str, float] = {}
+    for team in team_names:
+        for candidate in (team, *(aliases.get(team) or [])):
+            elo = table.get(_normalized_key(candidate))
+            if elo is not None:
+                matched[team] = elo
+                break
+    return matched
