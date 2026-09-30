@@ -1083,8 +1083,8 @@ async function loadModelViews(apiPrefix) {
   const unwrap = (j) => (j && typeof j === "object" && j.data != null ? j.data : (j || {}));
   const emptyElo = () => ({ ratings: {}, source: "empty", as_of: "" });
   const [elo, blend] = await Promise.all([
-    safeJson(apiPrefix + "/api/elo").then(unwrap).catch(() => emptyElo()),
-    safeJson(apiPrefix + "/api/blend").then(unwrap).catch(() => ({ calibration_status: "unavailable" })),
+    safeJson(apiPrefix + "/elo").then(unwrap).catch(() => emptyElo()),
+    safeJson(apiPrefix + "/blend").then(unwrap).catch(() => ({ calibration_status: "unavailable" })),
   ]);
   return { elo: elo || emptyElo(), blend: blend || { calibration_status: "unavailable" } };
 }

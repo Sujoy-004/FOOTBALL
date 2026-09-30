@@ -75,6 +75,24 @@ def test_every_competition_mounts_both_views_in_overview():
         assert "tab-validation" not in src, name
 
 
+def test_model_view_urls_do_not_double_the_api_segment():
+    """Regression: apiPrefix already ends in /api (e.g. "/worldcup/api").
+
+    Appending "/api/elo" requested "/worldcup/api/api/elo" -> 404, so the
+    views silently rendered empty states on every competition. Build the URL
+    from the prefix exactly like the sibling _startSim does.
+    """
+    body = SHARED.split("async function loadModelViews", 1)[1].split("\n}", 1)[0]
+    assert 'apiPrefix + "/elo"' in body
+    assert 'apiPrefix + "/blend"' in body
+    assert '"/api/elo"' not in body
+    assert '"/api/blend"' not in body
+    # The registered prefixes already carry the /api segment.
+    for src, name in ((WC, "wc.js"), (UCL, "ucl.js"), (LALIGA, "laliga.js")):
+        prefix = src.split("const API = ", 1)[1].split(";", 1)[0].strip('"')
+        assert prefix.endswith("/api"), (name, prefix)
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not available")
 @pytest.mark.parametrize("name", ["shared.js", "ucl.js", "wc.js", "laliga.js"])
 def test_esm_syntax_valid(name):
