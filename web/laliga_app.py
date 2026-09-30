@@ -474,6 +474,62 @@ def _simulation_state_block() -> dict:
             "request_state": request_state, "what_if": False}
 
 
+def _seed_as_of() -> str:
+    """The shipped seed file's own snapshot date, or "" when unreadable."""
+    try:
+        payload = json.loads((DATA_DIR / "elo_seed.json").read_text(encoding="utf-8"))
+        value = payload.get("snapshot_date") if isinstance(payload, dict) else None
+        return value if isinstance(value, str) else ""
+    except Exception:
+        return ""
+
+
+@laliga_app.get("/api/elo")
+def api_elo():
+    """Elo ratings for the Elo view: the loaded cache first, else the shipped
+    seed file. No fetch, no recompute, never a 500.
+    """
+    ratings = {
+        team: float(value)
+        for team, value in (cache.get("elo_ratings") or {}).items()
+        if isinstance(value, (int, float))
+    } or load_elo_ratings(DATA_DIR)
+    if not ratings:
+        return JSONResponse({"ratings": {}, "source": "empty", "as_of": ""})
+    # The cache itself is built from the shipped seed (compute_deterministic
+    # -> load_elo_ratings), so the seed's own snapshot_date is the real date.
+    return JSONResponse({"ratings": ratings, "source": "seed", "as_of": _seed_as_of()})
+
+
+def _cold_start_blend(n_matches: int) -> dict:
+    """Honest no-calibration payload (same shape as the World Cup route)."""
+    return {
+        "n_signals_available": 0,
+        "available_signals": [],
+        "blend_weights": {},
+        "backtest_briers": {},
+        "calibration_status": "cold_start",
+        "n_matches_for_calibration": int(n_matches),
+        "threshold": 30,
+    }
+
+
+@laliga_app.get("/api/blend")
+def api_blend():
+    """Blend/calibration view.
+
+    LaLiga ships no calibration artifact (config/signal_weights.json is the
+    ensemble's engine config, not a fit), so this is always the honest cold
+    start with a real match count — no weights are ever invented.
+    """
+    try:
+        n_matches = len(cache.get("_results") or _load_results_pipeline(DATA_DIR))
+        return JSONResponse(_cold_start_blend(n_matches))
+    except Exception:
+        logger.exception("[LaLiga] blend info unavailable")
+        return JSONResponse(_cold_start_blend(0))
+
+
 @laliga_app.post("/api/simulate")
 def api_simulate(req: dict = None):
     body = req or {}

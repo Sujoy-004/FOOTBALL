@@ -97,6 +97,10 @@ _BSD_TEAM_ALIASES: dict[str, str] = {
 
 DATA_DIR = Path(__file__).parent.parent / "competitions" / "ucl" / "data"
 UCL_DIR = Path(__file__).parent.parent / "competitions" / "ucl"
+#: Calibration artifact written by competitions.ucl.src.calibrate.
+_CALIBRATION_PATH = UCL_DIR / "config" / "signal_weights.json"
+#: Matches required before weights count as calibrated (mirrors World Cup).
+_CALIBRATION_THRESHOLD = 30
 
 cache: dict = {}
 sim_cache: dict = {}
@@ -712,6 +716,79 @@ def api_signals():
         "mode": _mode,
         "season": _active_season_token(),
     })
+
+
+@ucl_app.get("/api/elo")
+def api_elo():
+    """Elo ratings for the Elo view, read from the loaded cache only.
+
+    No fetch (ClubElo is boot-time work) and no provider load, so an
+    unbooted cache is reported as an explicit empty state.
+    """
+    ratings = {
+        team: float(value)
+        for team, value in (cache.get("elo_ratings") or {}).items()
+        if isinstance(value, (int, float))
+    }
+    if not ratings:
+        return JSONResponse({"ratings": {}, "source": "empty", "as_of": ""})
+    provenance = ((cache.get("signals") or {}).get("refined_elo") or {}).get("provenance")
+    return JSONResponse({
+        "ratings": ratings,
+        # Boot labels the ratings' own provenance; report that, not a guess.
+        "source": "coefficient" if provenance == "coefficient_derived" else "live",
+        "as_of": "",
+    })
+
+
+def _cold_start_blend(n_matches: int) -> dict:
+    """Honest no-calibration payload (same shape as the World Cup route)."""
+    return {
+        "n_signals_available": 0,
+        "available_signals": [],
+        "blend_weights": {},
+        "backtest_briers": {},
+        "calibration_status": "cold_start",
+        "n_matches_for_calibration": int(n_matches),
+        "threshold": _CALIBRATION_THRESHOLD,
+    }
+
+
+@ucl_app.get("/api/blend")
+def api_blend():
+    """Blend/calibration view.
+
+    Real weights come from the on-disk calibration artifact produced by
+    POST /api/calibrate. Without that artifact there is nothing to report,
+    so the answer is an honest cold start — never invented weights.
+    """
+    try:
+        config = (json.loads(_CALIBRATION_PATH.read_text(encoding="utf-8"))
+                  if _CALIBRATION_PATH.exists() else {})
+        weights = {
+            name: float(value)
+            for name, value in (config.get("weights") or {}).items()
+            if isinstance(value, (int, float))
+        }
+        n_matches = int(config.get("n_matches") or len(cache.get("_results") or []))
+        if not weights:
+            return JSONResponse(_cold_start_blend(n_matches))
+        return JSONResponse({
+            "n_signals_available": len(weights),
+            "available_signals": sorted(weights),
+            "blend_weights": weights,
+            # The artifact stores log-loss, not Brier: report no Brier
+            # rather than relabelling the metric.
+            "backtest_briers": {},
+            "calibration_status": (
+                "calibrated" if n_matches >= _CALIBRATION_THRESHOLD else "cold_start"),
+            "n_matches_for_calibration": n_matches,
+            "threshold": _CALIBRATION_THRESHOLD,
+        })
+    except Exception as exc:
+        import logging as _logging
+        _logging.getLogger(__name__).warning("[UCL] blend info unavailable: %s", exc)
+        return JSONResponse(_cold_start_blend(0))
 
 
 @ucl_app.post("/api/simulate")

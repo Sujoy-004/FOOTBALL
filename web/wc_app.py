@@ -546,6 +546,25 @@ def api_signal_detail(name: str):
     return JSONResponse(compute_signal_detail(name))
 
 
+@wc_app.get("/api/elo")
+def api_elo():
+    """Elo table for the Elo view.
+
+    Reads the booted team cache only: no fetch, no recompute, never a 500.
+    The cache carries no rating date, so ``as_of`` stays empty rather than
+    inventing one.
+    """
+    ratings = {
+        row["name"]: float(row["elo"])
+        for row in (cache.get("teams") or [])
+        if isinstance(row, dict) and row.get("name")
+        and isinstance(row.get("elo"), (int, float))
+    }
+    if not ratings:
+        return JSONResponse({"ratings": {}, "source": "empty", "as_of": ""})
+    return JSONResponse({"ratings": ratings, "source": "teams", "as_of": ""})
+
+
 @wc_app.get("/api/blend")
 def api_blend():
     return JSONResponse(compute_blend_info())
