@@ -60,6 +60,10 @@ from datetime import datetime, timezone
 
 import numpy as np
 
+from football_core.historical_backfill import cache_merge as shared_cache_merge
+from football_core.historical_backfill import ece_points as shared_ece_points
+from football_core.historical_backfill import per_match as shared_per_match
+
 from competitions.laliga.historical_backfill.evaluate import (
     HISTORICAL_DIR,
     SEASONS,
@@ -176,34 +180,11 @@ def freq_preds(target, season_data):
 
 # ─────────────────────── per-match arrays + bootstrap ───────────────────────
 
-
-def per_match(probs, actuals) -> dict:
-    n = len(actuals)
-    ll = np.empty(n)
-    br = np.empty(n)
-    conf = np.empty(n)
-    hit = np.zeros(n, dtype=bool)
-    for i, (p, a) in enumerate(zip(probs, actuals)):
-        ll[i] = -np.log(max(p[a], 1e-12))
-        br[i] = (1 - p[a]) ** 2 + sum(p[j] ** 2 for j in range(3) if j != a)
-        conf[i] = max(p)
-        hit[i] = int(np.argmax(np.asarray(p))) == a
-    return {"n": n, "ll": ll, "brier": br, "conf": conf, "hit": hit}
-
-
-def cache_merge(cache, name, probs, actuals):
-    pm = per_match(probs, actuals)
-    if name in cache:
-        prev = cache[name]
-        cache[name] = {
-            "n": prev["n"] + pm["n"],
-            "ll": np.concatenate([prev["ll"], pm["ll"]]),
-            "brier": np.concatenate([prev["brier"], pm["brier"]]),
-            "conf": np.concatenate([prev["conf"], pm["conf"]]),
-            "hit": np.concatenate([prev["hit"], pm["hit"]]),
-        }
-    else:
-        cache[name] = pm
+# per_match / cache_merge / ece_points are the shared resampling primitives
+# (identical in both competitions' investigation harnesses).
+per_match = shared_per_match
+cache_merge = shared_cache_merge
+ece_points = shared_ece_points
 
 
 def pooled_metrics(c) -> dict:
@@ -217,18 +198,6 @@ def pooled_metrics(c) -> dict:
         "mean_confidence": round(float(c["conf"].mean()), 6),
         "accuracy": round(float(c["hit"].mean()), 6),
     }
-
-
-def ece_points(conf, hit, n_bins=10):
-    ece = 0.0
-    for b in range(n_bins):
-        lo, hi = b / n_bins, (b + 1) / n_bins
-        mask = ((conf >= lo) & (conf < hi)) | ((b == n_bins - 1) & (conf == 1.0))
-        cnt = int(mask.sum())
-        if cnt == 0:
-            continue
-        ece += (cnt / conf.size) * abs(float(conf[mask].mean()) - float(hit[mask].sum() / cnt))
-    return ece
 
 
 def _ece_bulk(conf_all, hit_all, idx, n_bins=10):

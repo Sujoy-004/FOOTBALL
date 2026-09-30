@@ -38,6 +38,8 @@ from typing import Dict
 import pandas as pd
 import requests
 
+from football_core.historical_backfill import elo_snapshots, load_elo_frame
+
 from competitions.ucl.historical_backfill.contract import SEASONS
 from competitions.ucl.historical_backfill.team_map import canonical
 
@@ -109,65 +111,23 @@ def _first_match_date(season: str) -> date:
 
 
 def _load_elo_frame(path: str) -> pd.DataFrame:
-    df = pd.read_csv(path, dtype={"club": str}, parse_dates=["date"])
-    df["date"] = df["date"].dt.normalize()
-    df = df.dropna(subset=["club", "elo"])
-    df["club"] = df["club"].astype(str).str.strip()
-    df["elo"] = df["elo"].astype(float)
-    return df
+    return load_elo_frame(path)
 
 
 def fetch_elo_snapshots() -> Dict[str, Dict[str, float]]:
     global unresolved_clubs
     csv_path = _download(ELO_URL, ELO_CSV)
     frame = _load_elo_frame(csv_path)
-    all_dates = frame["date"].unique()
-    unresolved_clubs = []
 
-    print(
-        "season     first_match  snapshot      n_clubs  n_mapped  n_unresolved"
-    )
     def _resolve(club: str) -> str | None:
         try:
             return canonical(club)
         except KeyError:
             return None
 
-    snapshots: Dict[str, Dict[str, float]] = {}
-    for season in SEASONS:
-        first_match = _first_match_date(season)
-        first_ts = pd.Timestamp(first_match)
-        prior = all_dates[all_dates < first_ts]
-        if prior.size == 0:
-            raise RuntimeError(
-                f"{season}: no ClubElo date strictly before {first_match}"
-            )
-        snapshot_ts = pd.Timestamp(prior.max())
-        snapshot_date = snapshot_ts.date()
-
-        rows = frame[frame["date"] == snapshot_ts]
-        per_club = rows[["club", "elo"]].drop_duplicates(subset="club")
-        per_club["key"] = per_club["club"].map(_resolve)
-
-        unresolved = set(per_club.loc[per_club["key"].isna(), "club"])
-        resolved = per_club.dropna(subset=["key"])
-        mapped = dict(
-            resolved.drop_duplicates(subset="key", keep="first")[["key", "elo"]].to_numpy()
-        )
-
-        n_clubs = int(per_club["club"].nunique())
-        n_unresolved = len(unresolved)
-        n_mapped = n_clubs - n_unresolved
-        unresolved_clubs.extend(sorted(unresolved))
-        snapshots[season] = {k: float(v) for k, v in mapped.items()}
-
-        print(
-            f"{season:<10} {first_match.isoformat()}  {snapshot_date.isoformat()}  "
-            f"{n_clubs:>7d}  {n_mapped:>7d}  {n_unresolved:>11d}"
-        )
-        print(f"    -> {len(mapped)} canonical teams in snapshot")
-
-    unresolved_clubs = sorted(set(unresolved_clubs))
+    snapshots, unresolved_clubs = elo_snapshots(
+        frame, SEASONS, _first_match_date, _resolve
+    )
     return snapshots
 
 

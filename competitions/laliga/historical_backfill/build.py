@@ -6,6 +6,14 @@ snapshots), assembles the leak-free per-season dataset under
 counts / duplicates / team-key coverage / odds and Elo coverage before
 merging into a single evaluation-ready replay file.
 
+The per-season dataset layout (``matches.json`` + a FROZEN per-season
+``elo_ratings.json`` taken strictly before that season's first match) is
+what keeps the evaluation leak-free: nothing recomputes a rating with an
+in-season outcome, so no future data can reach a prediction. The generic
+part of that contract (validation, provenance writing, replay summary) lives
+once in ``football_core.historical_backfill``; this module is the LaLiga
+configuration of it.
+
 Adapter entrypoints (implemented by the source submodules):
 
     from competitions.laliga.historical_backfill.sources.results_fd import (
@@ -31,18 +39,23 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timezone
+
+from football_core.historical_backfill import (
+    assert_season_clean,
+    summarize_replay,
+    used_elo_map,
+    validate_season as _validate_season,
+    write_json,
+    write_season_dataset,
+)
 
 from competitions.laliga.historical_backfill.contract import (
     HISTORICAL_DIR,
+    SCHEMA,
     SEASONS,
-    duplicate_keys,
     match_id,
     season_dir,
-    write_json,
 )
-
-SCHEMA = 1
 
 
 def _retrieve() -> tuple[dict, dict]:
@@ -56,29 +69,6 @@ def _retrieve() -> tuple[dict, dict]:
     results = fetch_football_data_matches()
     elo = fetch_elo_snapshots()
     return results, elo
-
-
-def _validate_season(season: str, matches: list[dict], elo_map: dict[str, float]) -> dict:
-    dup = duplicate_keys(matches)
-    used_keys: set[str] = set()
-    for m in matches:
-        used_keys.add(m["team_a"])
-        used_keys.add(m["team_b"])
-    missing_elo = sorted(k for k in used_keys if k not in elo_map)
-    return {
-        "season": season,
-        "n_matches": len(matches),
-        "duplicate_match_ids": dup,
-        "n_teams": len(used_keys),
-        "elo_missing_teams": missing_elo,
-        "n_odds": sum(
-            1
-            for m in matches
-            if None not in (m.get("odds_home"), m.get("odds_draw"), m.get("odds_away"))
-        ),
-        "min_date": min(m["event_date"] for m in matches),
-        "max_date": max(m["event_date"] for m in matches),
-    }
 
 
 def build(verify_only: bool = False) -> dict:
@@ -95,44 +85,15 @@ def build(verify_only: bool = False) -> dict:
         elo_map = elo[season]
         check = _validate_season(season, ordered, elo_map)
         summary["seasons"][season] = check
-        if check["duplicate_match_ids"]:
-            raise AssertionError(f"{season}: duplicate match ids {check['duplicate_match_ids']}")
-        if check["elo_missing_teams"]:
-            print(
-                f"WARNING {season}: no ClubElo contributor for "
-                f"{check['elo_missing_teams']} — recorded in PROVENANCE "
-                "(RefinedEloSignal falls back to DEFAULT_ELO for these, "
-                "matching production semantics); coverage maintained for the "
-                "other participants"
-            )
+        assert_season_clean(season, check)
 
-        used_keys = {m["team_a"] for m in ordered} | {m["team_b"] for m in ordered}
-        elo_map_used = {k: elo_map[k] for k in sorted(used_keys) if k in elo_map}
+        elo_map_used = used_elo_map(elo_map, ordered)
 
         if not verify_only:
-            prov = {
-                "schema": SCHEMA,
-                "season": label,
-                "storage_deviation": (
-                    "stored under data/historical instead of the approved "
-                    "data/seasons path because that path is the gitignored "
-                    "runtime season store"
-                ),
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-                "checks": check,
-                "files": {
-                    "matches": write_json(
-                        os_season(season, "matches.json"),
-                        {"schema": SCHEMA, "season": label, "matches": ordered},
-                    ),
-                    "elo_ratings": write_json(
-                        os_season(season, "elo_ratings.json"), elo_map_used
-                    ),
-                },
-                "sources": _provenance_sources(season),
-            }
-            write_json(os_season(season, "PROVENANCE.json"), prov)
-            summary["provenance_hashes"][season] = prov["files"]
+            summary["provenance_hashes"][season] = write_season_dataset(
+                HISTORICAL_DIR, season, label, ordered, elo_map_used, check,
+                _provenance_sources(season),
+            )
         replay_matches.extend(ordered)
 
     merged = {
@@ -140,17 +101,7 @@ def build(verify_only: bool = False) -> dict:
         "seasons": list(SEASONS.values()),
         "matches": replay_matches,
     }
-    total = len(replay_matches)
-    total_odds = sum(
-        1
-        for m in replay_matches
-        if None not in (m.get("odds_home"), m.get("odds_draw"), m.get("odds_away"))
-    )
-    summary["replay"] = {
-        "n_matches": total,
-        "n_matches_with_odds": total_odds,
-        "odds_coverage": round(total_odds / total, 4) if total else None,
-    }
+    summary["replay"] = summarize_replay(replay_matches)
     if not verify_only:
         write_json(
             os.path.join(HISTORICAL_DIR, "replay_2019_20_2023_24.json"), merged

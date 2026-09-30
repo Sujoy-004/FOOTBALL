@@ -13,17 +13,28 @@ Data sources: results + closing odds from the football-data.co.uk SP1 archive
 pre-season Elo snapshots from the MIT-licensed ClubElo archive mirror.
 
 Storage deviation (documented in PROVENANCE.json): the approved plan's
-``data/seasons/<season>/`` path is the gitignored runtime season store, so the
-git-trackable backfill lives under ``data/historical/<season>/`` — the same
+``data/seasons/<season>/`` path is the gitignored runtime season store, so
+the git-trackable backfill lives under ``data/historical/<season>/`` — the same
 convention UCL established.
+
+The competition-agnostic helpers (atomic JSON writes, id/duplicate checks,
+season paths) live once in ``football_core.historical_backfill``; this module
+is the LaLiga-flavoured view of them.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
-from typing import Any
+from functools import partial
+
+from football_core.historical_backfill import (
+    PROVENANCE_SCHEMA as SCHEMA,
+    duplicate_keys,
+    read_json,
+    season_dir as _season_dir,
+    write_json,
+    year_key,
+)
 
 # Seasons to backfill: start year key -> label.
 SEASONS: dict[str, str] = {
@@ -50,41 +61,23 @@ DATA_DIR = os.path.join(
 HISTORICAL_DIR = os.path.join(DATA_DIR, "historical")
 
 
-def year_key(season: str) -> int:
-    return int(season.split("_")[0])
-
-
 def match_id(season: str, index: int) -> str:
     """Stable unique match id, e.g. '2019_20_m001' (1-based by event_date)."""
     return f"{season}_m{index:03d}"
 
 
-def season_dir(season: str) -> str:
-    return os.path.join(HISTORICAL_DIR, season)
+season_dir = partial(_season_dir, HISTORICAL_DIR)
 
-
-def write_json(path: str, data: Any) -> str:
-    """Atomically write JSON and return a content hash of the file."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    os.replace(tmp, path)
-    with open(path, "rb") as f:
-        return hashlib.sha256(f.read()).hexdigest()
-
-
-def read_json(path: str) -> Any:
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def duplicate_keys(matches: list[dict]) -> list[str]:
-    """match_ids appearing more than once, preserving first-seen order."""
-    seen: dict[str, int] = {}
-    for m in matches:
-        mid = m.get("match_id")
-        if mid is not None:
-            seen[mid] = seen.get(mid, 0) + 1
-    return [mid for mid, count in seen.items() if count > 1]
+__all__ = [
+    "DATA_DIR",
+    "FD_SEASON_URLS",
+    "HISTORICAL_DIR",
+    "SCHEMA",
+    "SEASONS",
+    "duplicate_keys",
+    "match_id",
+    "read_json",
+    "season_dir",
+    "write_json",
+    "year_key",
+]
