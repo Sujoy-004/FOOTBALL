@@ -11,6 +11,7 @@ structured validation reports with standardized metrics.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
@@ -32,6 +33,8 @@ from competitions.ucl.src.historical import (
     result_row,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ValidationResult:
@@ -44,6 +47,7 @@ class ValidationResult:
     metrics: dict  # log_loss, brier, ece
     details: dict | None = None  # Per-season or per-matchday breakdowns
     baseline: bool = False  # True if this is the uncalibrated baseline
+    skipped: int = 0  # Validation checks that threw and were skipped
 
 
 class ValidationSuite:
@@ -62,6 +66,12 @@ class ValidationSuite:
         self.engine = engine
         self.seasons = seasons_data
         self._season_ids = sorted(seasons_data.keys())
+        self._skipped = 0
+
+    def _skip(self, exc: Exception) -> None:
+        """Record a skipped validation check (never silently swallowed)."""
+        self._skipped += 1
+        logger.warning("validation check skipped: %s", exc)
 
     # ── Tier 2: Walk-Forward Match-Level Validation ─────────────────────
 
@@ -118,6 +128,7 @@ class ValidationSuite:
                 n_seasons=0,
                 metrics={"log_loss": 0.0, "brier": 0.0, "ece": 0.0},
                 details={"per_season": [], "n_folds": 0},
+                skipped=self._skipped,
             )
 
         all_probs: list[list[float]] = []
@@ -184,7 +195,8 @@ class ValidationSuite:
 
                 try:
                     bp = self.engine.evaluate(match, context)
-                except Exception:
+                except Exception as e:
+                    self._skip(e)
                     continue
 
                 probs = [bp.home_prob, bp.draw_prob, bp.away_prob]
@@ -225,6 +237,7 @@ class ValidationSuite:
                 n_seasons=len(splits),
                 metrics={"log_loss": 0.0, "brier": 0.0, "ece": 0.0},
                 details={"per_season": per_season, "n_folds": len(splits)},
+                skipped=self._skipped,
             )
 
         # Aggregate metrics across all seasons (macro-average of per-season)
@@ -246,6 +259,7 @@ class ValidationSuite:
                 "per_season": per_season,
                 "n_folds": len(splits),
             },
+            skipped=self._skipped,
         )
 
     # ── Tier 3: Replay Validation ────────────────────────────────────────
@@ -280,6 +294,7 @@ class ValidationSuite:
                 n_seasons=0,
                 metrics={"ece": 0.0, "n_decision_points": 0},
                 details={"per_matchday": [], "calibration_bins": []},
+                skipped=self._skipped,
             )
 
         all_confidences: list[float] = []
@@ -329,7 +344,8 @@ class ValidationSuite:
                     continue
                 try:
                     bp = self.engine.evaluate(match, context)
-                except Exception:
+                except Exception as e:
+                    self._skip(e)
                     continue
 
                 probs = [bp.home_prob, bp.draw_prob, bp.away_prob]
@@ -369,6 +385,7 @@ class ValidationSuite:
                 n_seasons=0,
                 metrics={"ece": 0.0, "n_decision_points": 0},
                 details={"per_matchday": per_matchday, "calibration_bins": []},
+                skipped=self._skipped,
             )
 
         # Compute overall calibration bins
@@ -419,6 +436,7 @@ class ValidationSuite:
                 "per_matchday": per_matchday,
                 "calibration_bins": bins,
             },
+            skipped=self._skipped,
         )
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -453,6 +471,7 @@ class ValidationSuite:
                 metrics={"trps": 0.0, "champion_accuracy": 0.0,
                          "stage_accuracy": 0.0, "n_seasons": len(ids)},
                 details={"per_season": [], "n_folds": 0},
+                skipped=self._skipped,
             )
 
         per_season: list[dict] = []
@@ -523,7 +542,8 @@ class ValidationSuite:
                 tb = match.get("team_b", "")
                 try:
                     bp = self.engine.evaluate(match, context)
-                except Exception:
+                except Exception as e:
+                    self._skip(e)
                     continue
                 if ta in team_strength:
                     team_strength[ta] += bp.home_prob + 0.5 * bp.draw_prob
@@ -603,6 +623,7 @@ class ValidationSuite:
                 metrics={"trps": 0.0, "champion_accuracy": 0.0,
                          "stage_accuracy": 0.0, "n_seasons": len(ids)},
                 details={"per_season": per_season, "n_folds": len(per_season)},
+                skipped=self._skipped,
             )
 
         return ValidationResult(
@@ -621,6 +642,7 @@ class ValidationSuite:
                 "n_seasons": len(all_trps),
             },
             details={"per_season": per_season, "n_folds": len(per_season)},
+            skipped=self._skipped,
         )
 
     @staticmethod
@@ -727,6 +749,7 @@ class ValidationSuite:
             "calibration": {},
             "n_matches_total": 0,
             "n_seasons": len(self._season_ids),
+            "skipped": 0,
         }
 
         # Tier 1: Cross-tournament
@@ -737,6 +760,7 @@ class ValidationSuite:
             "stage_accuracy": tier1.metrics.get("stage_accuracy", 0.0),
         }
         report["n_matches_total"] += tier1.n_matches
+        report["skipped"] += tier1.skipped
         if tier1.details:
             report["cross_tournament_details"] = tier1.details
 
@@ -748,6 +772,7 @@ class ValidationSuite:
             "ece": tier2.metrics.get("ece", 0.0),
         }
         report["n_matches_total"] += tier2.n_matches
+        report["skipped"] += tier2.skipped
         if tier2.details:
             report["walk_forward_details"] = tier2.details
 
@@ -759,8 +784,15 @@ class ValidationSuite:
                 "n_decision_points": tier3.metrics.get("n_decision_points", 0),
             }
             report["n_matches_total"] += tier3.n_matches
+            report["skipped"] += tier3.skipped
             if tier3.details:
                 report["replay_details"] = tier3.details
+
+        if report["skipped"]:
+            logger.warning(
+                "validation: %d check(s) skipped — metrics are partial",
+                report["skipped"],
+            )
 
         return report
 

@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 mimetypes.add_type('image/webp', '.webp')
 
 import fastapi
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import MutableHeaders
@@ -80,58 +81,80 @@ def _ensure_ucl_default_season() -> None:
         logger.info("[boot] UCL default season initialized from shipped draw: 2026/27")
 
 
+def _preload_registered_competitions() -> None:
+    """FOOTBALL_PRELOAD_ALL=1 hook: refresh every registered competition.
+
+    Blocking (network acquisition), so the lifespan runs it in a worker
+    thread. Each adapter's refresh() never raises; this loop is still
+    guarded by the caller so an adapter-level surprise cannot kill boot.
+    """
+    for _adapter in REGISTRY.list():
+        report = _adapter.refresh()  # never raises
+        consume_lazy_gate(_adapter.id)
+        logger.info("[boot] %s preload refresh: attempted=%s success=%s",
+                    _adapter.id, report.get("attempted"),
+                    report.get("success"))
+
+
+async def _boot_step(label: str, fn, *args):
+    """Run one boot step in a worker thread; a failure is logged, not fatal.
+
+    Returns the step's value, or None if it raised. The server must come
+    up even when one competition's data is unreadable — the tab that needs
+    it shows empty, the others serve normally.
+    """
+    try:
+        return await run_in_threadpool(fn, *args)
+    except Exception as exc:
+        logger.error("[boot] %s failed: %s", label, exc)
+        return None
+
+
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     from web.startup import apply_session_overrides, run_startup_flow
 
     # Startup decision (never prompts; normal modes are always
-    # fresh-first — see web.startup).
-    decision = run_startup_flow()
-    if decision.fdo_key:
-        apply_session_overrides(decision.fdo_key)
+    # fresh-first — see web.startup). Trivial env reads: stays sync.
+    try:
+        decision = run_startup_flow()
+        if decision.fdo_key:
+            apply_session_overrides(decision.fdo_key)
+    except Exception as exc:
+        logger.warning("[boot] startup flow skipped: %s", exc)
 
     import web.wc_app as _wc
     import web.ucl_app as _ucl
 
     # Self-bootstrap the shipped UCL draw as the default active season on a
     # fresh runtime. This is local-only and preserves any existing pointer.
-    try:
-        _ensure_ucl_default_season()
-    except Exception as exc:
-        logger.warning("[boot] UCL default-season bootstrap skipped: %s", exc)
+    # Disk IO — off the event loop.
+    await _boot_step("UCL default-season bootstrap", _ensure_ucl_default_season)
 
     # Optional eager preload (FOOTBALL_PRELOAD_ALL=1): restore warm-tab
     # behavior by refreshing every registered competition through its own
     # scoped adapter hook. Default (unset): ZERO provider calls at boot.
     if os.environ.get("FOOTBALL_PRELOAD_ALL", "").strip() == "1":
-        for _adapter in REGISTRY.list():
-            report = _adapter.refresh()  # never raises
-            consume_lazy_gate(_adapter.id)
-            logger.info("[boot] %s preload refresh: attempted=%s success=%s",
-                        _adapter.id, report.get("attempted"),
-                        report.get("success"))
+        await _boot_step("eager preload", _preload_registered_competitions)
 
     # Caches are computed from validated disk stores. No wrapper fetches
     # here: a crashing provider can no longer take down boot, and an
-    # unused tab never triggers another competition's provider.
-    _wc.cache = _wc.compute_overview()
-
+    # unused tab never triggers another competition's provider. All three
+    # are CPU/IO-bound (standings, bracket resolution, simulation prep), so
+    # they run in worker threads and are individually guarded — a broken
+    # competition degrades to an empty cache, never an aborted boot.
+    #
     # Route through compute_all so every on-disk state gets the truthful
     # boot: real results -> results view; no/partial results -> honest
     # simulation-available view (never an empty cache).
-    try:
-        _ucl.cache = _ucl.compute_all()
-    except Exception as e:
-        logger.error("[UCL] compute_all failed: %s", e)
-        _ucl.cache = {}
+    _wc.cache = await _boot_step("World Cup compute_overview",
+                                 _wc.compute_overview) or {}
+    _ucl.cache = await _boot_step("UCL compute_all", _ucl.compute_all) or {}
 
     import web.laliga_app as _laliga
 
-    try:
-        _laliga.cache = _laliga.compute_all()
-    except Exception as e:
-        logger.error("[LaLiga] compute_all failed: %s", e)
-        _laliga.cache = {}
+    _laliga.cache = await _boot_step("LaLiga compute_all",
+                                    _laliga.compute_all) or {}
     yield
 
 

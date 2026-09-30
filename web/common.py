@@ -32,6 +32,28 @@ def load_json(data_dir, name: str) -> dict:
         return dict(json.load(f))
 
 
+def error_response(
+    exc: Exception,
+    *,
+    status: int = 500,
+    context: str = "",
+    public: str = "Internal server error",
+):
+    """Log the real cause; return a generic message to the client (no leak).
+
+    Provider/internal exception text (URLs, tokens, file paths, upstream
+    error bodies) must never reach an HTTP client. The traceback goes to
+    the log; the caller gets a fixed ``public`` string.
+    """
+    import logging
+
+    from fastapi.responses import JSONResponse
+
+    logging.getLogger(__name__).exception(
+        "request failed (%s): %s", context or "?", exc)
+    return JSONResponse({"error": public}, status_code=status)
+
+
 def _usable_key(value: str | None) -> str | None:
     """Return the key when it is a real credential, else None.
 

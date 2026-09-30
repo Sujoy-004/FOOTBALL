@@ -85,8 +85,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -102,6 +100,7 @@ from football_core.fetcher import (
     note_unmatchable,
     summarize_ingestion,
 )
+from football_core.state import _atomic_write_json
 from competitions.ucl.src.seasons import (
     LOCAL_HISTORICAL_SEASON,
     derive_fixture_id,
@@ -144,24 +143,11 @@ BACKFILL_SOURCE_TAG = "bootstrap/2025_26_knockout_results.json (git 7cbc0f6)"
 
 
 # ── atomic JSON persistence ──────────────────────────────────────────────────
-
-
-def _atomic_write_json(data: dict | list, path: Path) -> None:
-    """Write *data* to *path* atomically (utf-8, indent=2, ensure_ascii=False)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), prefix=path.stem + ".", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_path, str(path))
-    except Exception:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+#
+# The writer itself lives in football_core.state (mkstemp + fsync +
+# os.replace, utf-8, indent=2, ensure_ascii=False) and is re-exported here
+# under the historical name so existing importers keep working — no second
+# copy of the write path lives in this module.
 
 
 # ── store schema v2 ──────────────────────────────────────────────────────────
@@ -1064,26 +1050,6 @@ def _load_league_rows_from_doc(doc: dict) -> list[dict]:
     return doc.get("matches", []) if isinstance(doc, dict) else []
 
 
-def _atomic_write_json_local(data: Any, path: Path) -> None:
-    """Write *data* to *path* atomically (utf-8, indent=2, ensure_ascii=False)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.stem + ".", suffix=".tmp"
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_path, str(path))
-    except Exception:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
-
-
 def _fixture_pair_key(home: str, away: str) -> tuple[str, str]:
     """Canonical exact-match key for the (home, away) fixture relationship.
 
@@ -1258,7 +1224,7 @@ def _upsert_season_fixtures(
         "partial": True,  # providers never declare a catalog complete
     }
 
-    _atomic_write_json_local(doc, fx_path)
+    _atomic_write_json(doc, fx_path)
     return fixtures_added, fixtures_updated, len(doc["fixtures"])
 
 
@@ -1373,7 +1339,7 @@ def _upsert_season_results(
             results_added += 1
 
     res_doc["matches"] = existing_matches
-    _atomic_write_json_local(res_doc, res_path)
+    _atomic_write_json(res_doc, res_path)
     return results_added, results_updated, skipped_no_target, skipped_missing_score
 
 

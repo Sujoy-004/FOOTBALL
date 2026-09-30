@@ -42,13 +42,20 @@ from competitions.laliga.src.simulation import run_mc_simulation as _run_mc_simu
 from competitions.laliga.src.state import build_competition_state as _build_state
 from football_core.elo import expected_score
 from football_core.signal import PredictionContext
-from web.common import ts
+from web.common import error_response, ts
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 logger = logging.getLogger(__name__)
 
-BSD_API_KEY: str = os.environ.get("BSD_API_KEY", "")
-FOOTBALL_DATA_ORG_KEY: str = os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
+# Credentials are read at CALL time, never frozen at import: os.environ can
+# be populated (or overridden) long after this module was imported, and a
+# frozen constant would keep resolving to the empty pre-import value.
+def _bsd_key() -> str:
+    return os.environ.get("BSD_API_KEY", "")
+
+
+def _football_data_org_key() -> str:
+    return os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
 
 cache: dict = {}
 sim_cache: dict = {}
@@ -187,13 +194,14 @@ def _fetch_live_data():
     from web.common import get_data_provider
     from competitions.laliga.src.pipeline import fetch_live_data as _brain_fetch
 
-    provider = get_data_provider(BSD_API_KEY, FOOTBALL_DATA_ORG_KEY, LALIGA_BSD_LEAGUE_ID)
+    provider = get_data_provider(
+        _bsd_key(), _football_data_org_key(), LALIGA_BSD_LEAGUE_ID)
     if provider is None:
         logger.warning(
             "[LaLiga] NOT_CONFIGURED - no data provider available "
             "(BSD key configured: %s, football-data key configured: %s, "
             "DATA_PROVIDER=%s); skipping live fetch",
-            bool(BSD_API_KEY), bool(FOOTBALL_DATA_ORG_KEY),
+            bool(_bsd_key()), bool(_football_data_org_key()),
             os.environ.get("DATA_PROVIDER", "") or "(unset)",
         )
         _store_refresh_report(False, "no data provider configured", None,
@@ -202,9 +210,9 @@ def _fetch_live_data():
     try:
         summary = _brain_fetch(
             str(DATA_DIR),
-            bsd_api_key=BSD_API_KEY,
+            bsd_api_key=_bsd_key(),
             provider=provider,
-            football_data_org_key=FOOTBALL_DATA_ORG_KEY,
+            football_data_org_key=_football_data_org_key(),
             league_id=LALIGA_BSD_LEAGUE_ID,
             fdo_competition_id=LALIGA_FDO_COMPETITION_ID,
         )
@@ -551,7 +559,7 @@ def api_reset():
         cache = compute_all()
         return JSONResponse({"status": "ok", "mode": _mode})
     except Exception as e:
-        return JSONResponse({"status": "error", "error": str(e)})
+        return error_response(e, context="laliga reset")
 
 
 @laliga_app.post("/api/refresh")
@@ -566,7 +574,9 @@ def api_refresh():
         cache = compute_all()
         return JSONResponse({"status": "ok", "mode": _mode, "refreshed": True})
     except Exception as e:
-        return JSONResponse({"status": "error", "error": str(e)})
+        return error_response(
+            e, status=503, context="laliga refresh",
+            public="Live refresh unavailable")
 
 
 @laliga_app.get("/api/validation")
@@ -612,7 +622,7 @@ def api_validation():
             "calibration_available": False,
         })
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return error_response(e, context="laliga validation")
 
 
 @laliga_app.get("/api/report")
@@ -624,7 +634,7 @@ def api_report():
         data = json.loads(snapshot_path.read_text(encoding="utf-8"))
         return JSONResponse(data)
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return error_response(e, context="laliga report")
 
 
 @laliga_app.get("/api/simulation/progress/{task_id}")

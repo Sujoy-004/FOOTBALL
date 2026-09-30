@@ -65,6 +65,7 @@ import requests
 from football_core.data_providers.bsd_provider import BSDDataProvider
 from football_core.fetcher import fold_team_key
 from football_core.predictors.odds import remove_vig
+from football_core.state import _atomic_write_json
 
 logger = logging.getLogger(__name__)
 
@@ -456,10 +457,13 @@ def _available_record(fixture: dict, event: dict, odds_home, odds_draw, odds_awa
 
 
 def _atomic_write_odds(store: dict, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.stem + ".tmp")
-    tmp.write_text(json.dumps(store, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(path)
+    """Persist the odds store atomically.
+
+    Thin alias over the canonical fsync-capable writer in
+    football_core.state; kept under this name because the competition
+    odds modules import it from here.
+    """
+    _atomic_write_json(store, path)
 
 
 def _aggregate_state(counts: dict, events_seen: bool) -> str:

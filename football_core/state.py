@@ -15,6 +15,14 @@ def _resolve_data_dir(data_dir: Path | str | None) -> Path:
 
 
 def _atomic_write_json(data: dict | list, path: Path) -> None:
+    """Write *data* to *path* atomically (utf-8, indent=2, ensure_ascii=False).
+
+    The canonical store writer: mkstemp in the destination directory +
+    fsync + os.replace, so a reader never sees a partial file and a crash
+    mid-write leaves the previous file intact. Every atomic JSON write in
+    the repo routes here (see competitions/ucl/src/ingest.py and
+    football_core/odds.py).
+    """
     dir_path = path.parent
     dir_path.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(
@@ -24,7 +32,7 @@ def _atomic_write_json(data: dict | list, path: Path) -> None:
     )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp_path, str(path))

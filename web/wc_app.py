@@ -20,7 +20,7 @@ from competitions.worldcup.src.groups import (
 
 from competitions.worldcup.src.insight import compute_ko_signal_probs, compute_match_insight
 from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
-from web.common import boot_step, load_json
+from web.common import boot_step, error_response, load_json
 from web.simulation_service import (
     SimulationTaskService, build_simulation_meta,
 )
@@ -30,8 +30,17 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-BSD_API_KEY = os.getenv("BSD_API_KEY", "")
-FOOTBALL_DATA_ORG_KEY = os.getenv("FOOTBALL_DATA_ORG_KEY", "")
+
+
+# Credentials are read at CALL time, never frozen at import: os.environ can
+# be populated (or overridden) long after this module was imported, and a
+# frozen constant would keep resolving to the empty pre-import value.
+def _bsd_key() -> str:
+    return os.environ.get("BSD_API_KEY", "")
+
+
+def _football_data_org_key() -> str:
+    return os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
 
 DATA_DIR = constants.DATA_DIR
 
@@ -405,10 +414,13 @@ def _fetch_live_data() -> dict:
     """
     from competitions.worldcup.src.pipeline import fetch_live_data as _pipeline_fetch
     try:
-        report = _pipeline_fetch(BSD_API_KEY, FOOTBALL_DATA_ORG_KEY, DATA_DIR)
-    except Exception as e:  # never let a refresh crash boot; mark stale
+        report = _pipeline_fetch(
+            _bsd_key(), _football_data_org_key(), DATA_DIR)
+    except Exception:  # never let a refresh crash boot; mark stale
+        logger.exception("worldcup live fetch failed")
         report = {"provider": None, "attempted": True, "success": False,
-                  "error": str(e), "stale": True, "finished": {}}
+                  "error": "live refresh failed", "stale": True,
+                  "finished": {}}
     cache["refresh"] = report
     return report
 
@@ -559,7 +571,7 @@ def _run_wc_simulation(progress_cb, count: int, seed: Optional[int],
     from competitions.worldcup.src.pipeline import run_simulation_compute
     return run_simulation_compute(
         DATA_DIR, iterations=count, seed=seed, weights=weights,
-        bsd_api_key=BSD_API_KEY, football_data_org_key=FOOTBALL_DATA_ORG_KEY,
+        bsd_api_key=_bsd_key(), football_data_org_key=_football_data_org_key(),
         progress_cb=progress_cb,
     )
 
@@ -643,7 +655,7 @@ def api_validation():
         )
         return JSONResponse(result)
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return error_response(e, context="worldcup validation")
 
 
 @wc_app.get("/api/report")
@@ -655,7 +667,7 @@ def api_report():
         data = json.loads(snapshot_path.read_text(encoding="utf-8"))
         return JSONResponse(data)
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return error_response(e, context="worldcup report")
 
 
 def _simulate_from_match_sync(match_id: str, iterations: int = 10000) -> dict:
@@ -698,7 +710,7 @@ def api_simulate_from_match(req: dict = None):
         result = _simulate_from_match_sync(match_id, iterations)
         return JSONResponse(result)
     except Exception as e:
-        return JSONResponse({"error": str(e)})
+        return error_response(e, context="worldcup simulate-from-match")
 
 
 @wc_app.get("/api/match/insight")
@@ -779,7 +791,7 @@ def api_match_what_if(req: dict = None):
         base_bp = _evaluate(baseline_elos)
         adj_bp = _evaluate(adjusted_elos)
     except Exception as e:
-        return JSONResponse({"error": f"what-if evaluation failed: {e}"})
+        return error_response(e, context="worldcup match what-if")
 
     def _entry(base_p, adj_p):
         return {"baseline": round(base_p, 4), "adjusted": round(adj_p, 4),
@@ -895,8 +907,8 @@ def _run_calibration_runner(progress_cb, count, seed):
     from competitions.worldcup.src.pipeline import run_calibration_compute
     return run_calibration_compute(
         DATA_DIR,
-        bsd_api_key=BSD_API_KEY,
-        football_data_org_key=FOOTBALL_DATA_ORG_KEY,
+        bsd_api_key=_bsd_key(),
+        football_data_org_key=_football_data_org_key(),
         progress_cb=progress_cb,
     )
 

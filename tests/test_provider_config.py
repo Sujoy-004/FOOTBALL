@@ -4,8 +4,9 @@ Pins:
 1. ``web.common.get_data_provider`` selects the right provider for the
    configured ``DATA_PROVIDER`` / credentials, and returns ``None`` when
    nothing usable is configured (placeholder/empty keys never select).
-2. The load-order fix in ``web/__init__.py``: laliga_app / ucl_app no longer
-   capture empty key constants at import time under the repo ``.env``.
+2. Credentials are read at CALL time by every app (``_bsd_key()`` /
+   ``_football_data_org_key()``): an ``os.environ`` value exported AFTER
+   import is honoured, and no frozen module constant can shadow it.
 3. The boot/refresh classification diagnostics (``NOT_CONFIGURED`` /
    ``CONNECTED`` / ``CONFIGURED_BUT_UNAVAILABLE``) exist in both refresh paths.
 
@@ -15,8 +16,6 @@ the network.
 
 from __future__ import annotations
 
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -79,71 +78,83 @@ def test_football_data_mode_without_fdo_key_falls_back_to_bsd(monkeypatch):
     assert isinstance(provider, BSDDataProvider)
 
 
-# ── Phase C: import-time capture fix (web/__init__ runs load_dotenv) ───────
+# ── Call-time credential reads (no import-time freeze) ─────────────────────
 
 
-def _import_probe_lines() -> list[str]:
-    probe = (
-        "import os, sys\n"
-        "sys.path.insert(0, {root!r})\n"
-        "for k in ('BSD_API_KEY', 'FOOTBALL_DATA_ORG_KEY', 'DATA_PROVIDER'):\n"
-        "    os.environ.pop(k, None)\n"
-        "import web.laliga_app as l\n"
-        "import web.ucl_app as u\n"
-        "print('L', bool(l.BSD_API_KEY), bool(l.FOOTBALL_DATA_ORG_KEY))\n"
-        "print('U', bool(u.BSD_API_KEY), bool(u.FOOTBALL_DATA_ORG_KEY))\n"
-    ).format(root=str(REPO_ROOT))
-    result = subprocess.run(
-        [sys.executable, "-c", probe],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        cwd=str(REPO_ROOT),
-    )
-    assert result.returncode == 0, result.stderr
-    return result.stdout.strip().splitlines()
-
-
-@pytest.mark.skipif(
-    not (REPO_ROOT / ".env").exists(), reason="no .env in the repo to load"
-)
-def test_laliga_and_ucl_capture_keys_at_import_after_fix():
-    """web/__init__ runs load_dotenv() so laliga_app/ucl_app import with
-    populated (non-empty) credential constants instead of pre-captured empty
-    strings. Regresses the 'No data provider' boot symptom."""
-    lines = _import_probe_lines()
-    assert "L True True" in lines
-    assert "U True True" in lines
-
-
-@pytest.mark.skipif(
-    not (REPO_ROOT / ".env").exists(), reason="no .env in the repo to load"
-)
-def test_live_env_constants_resolve_a_provider():
-    """Under the real .env, the module constants the refresh paths pass to
-    get_data_provider resolve to a non-None provider (instantiation only —
-    no network)."""
+@pytest.mark.parametrize(
+    "module_name", ["web.laliga_app", "web.ucl_app", "web.wc_app"])
+def test_accessors_read_env_at_call_time(monkeypatch, module_name):
+    """Keys are resolved when they are USED, not when the module is
+    imported. Setting os.environ after import must be visible."""
     import importlib
+
+    mod = importlib.import_module(module_name)
+    monkeypatch.delenv("BSD_API_KEY", raising=False)
+    monkeypatch.delenv("FOOTBALL_DATA_ORG_KEY", raising=False)
+    assert mod._bsd_key() == ""
+    assert mod._football_data_org_key() == ""
+
+    monkeypatch.setenv("BSD_API_KEY", "late-bsd")
+    monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "late-fdo")
+    assert mod._bsd_key() == "late-bsd"
+    assert mod._football_data_org_key() == "late-fdo"
+
+
+@pytest.mark.parametrize(
+    "module_name", ["web.laliga_app", "web.ucl_app", "web.wc_app"])
+def test_apps_hold_no_frozen_credential_constants(module_name):
+    """The import-time constants are gone — nothing can read a stale value."""
+    import importlib
+
+    mod = importlib.import_module(module_name)
+    assert not hasattr(mod, "BSD_API_KEY"), module_name
+    assert not hasattr(mod, "FOOTBALL_DATA_ORG_KEY"), module_name
+
+
+def test_late_env_resolves_a_provider(monkeypatch):
+    """The refresh path passes the call-time accessor values straight into
+    the provider factory, so a key exported after import selects a provider
+    (instantiation only — no network)."""
+    from web import laliga_app, ucl_app
+
+    monkeypatch.delenv("DATA_PROVIDER", raising=False)
+    monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "late-fdo-key")
+
+    assert get_data_provider(
+        laliga_app._bsd_key(), laliga_app._football_data_org_key(),
+        laliga_app.LALIGA_BSD_LEAGUE_ID,
+    ) is not None
+    assert get_data_provider(
+        ucl_app._bsd_key(), ucl_app._football_data_org_key(),
+        ucl_app.UCL_LEAGUE_ID,
+    ) is not None
+
+
+def test_real_env_resolves_a_provider(monkeypatch):
+    """With the repo .env loaded (even after import), the accessors return
+    a credential and the refresh path resolves a real provider."""
+    import importlib
+
+    from dotenv import load_dotenv
+
+    monkeypatch.delenv("DATA_PROVIDER", raising=False)
+    load_dotenv(str(REPO_ROOT / ".env"), override=True)
 
     import web.laliga_app as la
     import web.ucl_app as ua
-
-    # The autouse fixture wiped the env; reload the real .env and the modules
-    # so the import-time capture replays with the credentials present.
-    from dotenv import load_dotenv
-    load_dotenv(str(REPO_ROOT / ".env"))
     la = importlib.reload(la)
     ua = importlib.reload(ua)
 
-    laliga_provider = get_data_provider(
-        la.BSD_API_KEY, la.FOOTBALL_DATA_ORG_KEY, la.LALIGA_BSD_LEAGUE_ID
-    )
-    ucl_provider = get_data_provider(
-        ua.BSD_API_KEY, ua.FOOTBALL_DATA_ORG_KEY, ua.UCL_LEAGUE_ID
-    )
-    assert laliga_provider is not None
-    assert ucl_provider is not None
-    assert la.FOOTBALL_DATA_ORG_KEY and ua.FOOTBALL_DATA_ORG_KEY
+    keys = [la._football_data_org_key(), ua._football_data_org_key()]
+    if not any(keys):
+        pytest.skip("no FOOTBALL_DATA_ORG_KEY configured in the environment")
+
+    assert get_data_provider(
+        la._bsd_key(), la._football_data_org_key(), la.LALIGA_BSD_LEAGUE_ID
+    ) is not None
+    assert get_data_provider(
+        ua._bsd_key(), ua._football_data_org_key(), ua.UCL_LEAGUE_ID
+    ) is not None
 
 
 # ── Phase D: classification diagnostics present in the refresh paths ───────

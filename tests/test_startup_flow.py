@@ -7,9 +7,6 @@ reachable only via FOOTBALL_SNAPSHOT=1 or a forced decision (tests).
 
 from __future__ import annotations
 
-import sys
-import types
-
 import pytest
 
 from web.startup import (
@@ -86,21 +83,38 @@ def test_non_interactive_defaults_to_auto_acquisition():
 
 
 def test_apply_session_overrides_updates_process(monkeypatch):
+    """The session key lands in os.environ and the ALREADY-IMPORTED apps
+    see it immediately — because they read credentials at CALL time, with
+    no sys.modules patching of their globals."""
+    from web import ucl_app, wc_app
+
+    monkeypatch.delenv("FOOTBALL_DATA_ORG_KEY", raising=False)
+    assert wc_app._football_data_org_key() == ""
+    assert ucl_app._football_data_org_key() == ""
+
     import web.startup as startup
 
-    monkeypatch.setattr(startup.os, "environ", {})
-
-    fake_wc = types.ModuleType("web.wc_app")
-    fake_ucl = types.ModuleType("web.ucl_app")
-    fake_wc.FOOTBALL_DATA_ORG_KEY = ""
-    fake_ucl.FOOTBALL_DATA_ORG_KEY = ""
-    monkeypatch.setitem(sys.modules, "web.wc_app", fake_wc)
-    monkeypatch.setitem(sys.modules, "web.ucl_app", fake_ucl)
-
     startup.apply_session_overrides("sessionkey42")
+
     assert startup.os.environ["FOOTBALL_DATA_ORG_KEY"] == "sessionkey42"
-    assert fake_wc.FOOTBALL_DATA_ORG_KEY == "sessionkey42"
-    assert fake_ucl.FOOTBALL_DATA_ORG_KEY == "sessionkey42"
+    assert wc_app._football_data_org_key() == "sessionkey42"
+    assert ucl_app._football_data_org_key() == "sessionkey42"
+    assert not hasattr(wc_app, "FOOTBALL_DATA_ORG_KEY"), (
+        "frozen credential constants must not come back")
+    assert not hasattr(ucl_app, "FOOTBALL_DATA_ORG_KEY")
+
+
+def test_apply_session_overrides_does_not_patch_sys_modules(monkeypatch):
+    """Regression pin: the old write-back loop is gone — setting the key
+    never mutates an imported app module's globals."""
+    import web.startup as startup
+
+    monkeypatch.delenv("FOOTBALL_DATA_ORG_KEY", raising=False)
+    import web.ucl_app as ucl_app
+
+    before = dict(ucl_app.__dict__)
+    startup.apply_session_overrides("sessionkey42")
+    assert ucl_app.__dict__ == before
 
 
 def test_no_persistence_of_credentials(tmp_path, monkeypatch, capsys):

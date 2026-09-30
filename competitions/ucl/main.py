@@ -169,18 +169,25 @@ def main(argv: list[str] | None = None) -> int:
 
     # ── Evaluation gate warning ───────────────────────────────────────────
     from competitions.ucl.src.gate import load_gate_inputs, evaluate_matches, verdict_status
+    unverified = ""
     try:
         eval_matches, eval_squad = load_gate_inputs()
         evaluation = evaluate_matches(eval_matches, squad_values=eval_squad)
         if verdict_status(evaluation) != "PASS":
-            print(
-                "WARN: Champion probabilities UNVERIFIED — "
-                "match-level evaluation gate not passed; "
-                "treat outputs as unvalidated.",
-                file=sys.stderr,
+            unverified = (
+                "Champion probabilities UNVERIFIED — match-level evaluation "
+                "gate not passed; treat outputs as unvalidated."
             )
-    except Exception:
-        pass
+            for r in (evaluation.get("verdict") or {}).get("reasons") or []:
+                unverified += f"\n       - {r}"
+    except Exception as e:
+        unverified = f"gate evaluation failed ({e}) — outputs unvalidated."
+    if unverified:
+        # Surfaced AND recorded — never dropped into a silent discard.
+        if isinstance(report, dict):
+            report["unverified"] = unverified
+        print(f"WARN: {unverified}", file=sys.stderr)
+        print(f"  Unverified      : {unverified.splitlines()[0]}")
 
     # ── Per-season breakdown ─────────────────────────────────────────────
     if per_season:

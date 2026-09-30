@@ -32,7 +32,6 @@ Credentials live in the process environment only; nothing is persisted.
 from __future__ import annotations
 
 import os
-import sys
 from typing import Callable, NamedTuple
 
 SNAPSHOT_ENV_VAR = "FOOTBALL_SNAPSHOT"
@@ -91,14 +90,15 @@ def has_usable_fdo_key(key: str | None) -> bool:
 
 
 def apply_session_overrides(fdo_key: str) -> None:
-    """Propagate a session key into this process without persisting it."""
+    """Propagate a session key into this process without persisting it.
+
+    The competition apps read their credentials at CALL time (via
+    ``_bsd_key()`` / ``_football_data_org_key()``), so setting the env var
+    is enough — no ``sys.modules`` write-back patching of already-imported
+    app modules is needed (and none is correct: it would diverge from every
+    module that never got patched).
+    """
     os.environ["FOOTBALL_DATA_ORG_KEY"] = fdo_key
-    # Update already-imported app modules directly (sys.modules covers both
-    # the production case and any pre-imported state under test runners).
-    for name in ("web.wc_app", "web.ucl_app"):
-        mod = sys.modules.get(name)
-        if mod is not None and hasattr(mod, "FOOTBALL_DATA_ORG_KEY"):
-            mod.FOOTBALL_DATA_ORG_KEY = fdo_key
 
 
 def run_startup_flow(

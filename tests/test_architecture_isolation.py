@@ -75,8 +75,10 @@ def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
         wc_calls, wc_gp = au.recording_provider(wc_stub)
         monkeypatch.setattr("web.common.get_data_provider", wc_gp)
         monkeypatch.setattr(wc_app, "DATA_DIR", wc_dir)
-        monkeypatch.setattr(wc_app, "BSD_API_KEY", "")
-        monkeypatch.setattr(wc_app, "FOOTBALL_DATA_ORG_KEY", "")
+        # Credentials are read at CALL time: clear the env so no real key
+        # can leak into the isolated fetch.
+        monkeypatch.delenv("BSD_API_KEY", raising=False)
+        monkeypatch.delenv("FOOTBALL_DATA_ORG_KEY", raising=False)
 
         wc_report = wc_app._fetch_live_data()
         assert wc_report["success"] is True
