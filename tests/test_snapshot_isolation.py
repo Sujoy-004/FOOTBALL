@@ -217,7 +217,7 @@ def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch, tmp_path):
     import web.startup as startup
     startup._last_decision = startup.StartupDecision("snapshot", "")
     import competitions.ucl.src.elo_fetcher as ucl_ef
-    import football_core.elo_fetcher as core_ef
+    import football_core.clubelo as clubelo
 
     calls = {"clubelo": 0, "urlopen": 0}
 
@@ -225,14 +225,15 @@ def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch, tmp_path):
         calls["clubelo"] += 1
         raise AssertionError("ClubElo fetched during snapshot boot")
 
-    real_urlopen = core_ef.urllib.request.urlopen
+    real_urlopen = clubelo.urllib.request.urlopen
 
     def _counting_urlopen(*a, **k):
         calls["urlopen"] += 1
         return real_urlopen(*a, **k)
 
+    monkeypatch.setattr(ucl_ef, "refresh_elos_if_stale", _no_clubelo)
     monkeypatch.setattr(ucl_ef, "fetch_team_elos", _no_clubelo)
-    monkeypatch.setattr(core_ef.urllib.request, "urlopen", _counting_urlopen)
+    monkeypatch.setattr(clubelo.urllib.request, "urlopen", _counting_urlopen)
 
     from competitions.ucl.src.orchestrator import run_deterministic_compute
     data_dir = _historical_ucl_data(tmp_path)

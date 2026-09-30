@@ -39,14 +39,16 @@
     "Paris Saint-Germain FC"
   ],
   "Kairat": [
-    "Kairat",
-    "FK Kairat"
+    "fkkairat",
+    "FK Kairat",
+    "Kairat"
   ],
   "Benfica": [
     "Benfica",
     "Sport Lisboa e Benfica"
   ],
   "Bodo/Glimt": [
+    "BodoeGlimt",
     "Bodoe Glimt",
     "FK Bodø/Glimt"
   ],
@@ -99,8 +101,9 @@
     "Newcastle United FC"
   ],
   "Athletic Bilbao": [
-    "Bilbao",
-    "Athletic Club"
+    "athleticclub",
+    "Athletic Club",
+    "Bilbao"
   ],
   "Chelsea": [
     "Chelsea",
@@ -151,6 +154,7 @@
     "FC Bayern München"
   ],
   "Bodø/Glimt": [
+    "BodoeGlimt",
     "Bodoe Glimt"
   ],
   "Borussia Dortmund": [
@@ -234,7 +238,7 @@
     "Viking FK"
   ],
   "Sabah": [
-    "Sabah",
+    "sabah-fk",
     "Sabah FK"
   ],
   "Slovan Bratislava": [

@@ -1,51 +1,58 @@
-"""ClubElo API fetcher — competition-agnostic.
+"""ClubElo rating fetcher — competition-agnostic.
 
-Provides cached fetching of Elo ratings from api.clubelo.com for any
-list of team names.  Team name to ClubElo slug resolution uses a
-team_aliases.json file supplied by the caller.
+Provides cached fetching of Elo ratings from ClubElo for any list of team
+names.  Team name to ClubElo name resolution uses a team_aliases.json file
+supplied by the caller.
 
 Fetch strategy
 --------------
-Primary: issues a *single* request to the ClubElo date-based ranking endpoint:
+A *single* request to the ClubElo ranking page (see ``football_core.clubelo``)
+returns the whole world ranking as ``{normalized slug: Elo}``. The Elo for each
+team is extracted by looking up its alias (from the alias file) as a slug in
+that dict. Slugs, not display names, because two clubs can share a name —
+``Liverpool`` and ``LiverpoolUY`` both print as "Liverpool".
 
-    http://api.clubelo.com/YYYY-MM-DD
+The result is cached per snapshot date, so repeated lookups on the same day
+cost one request and the next day picks up a fresh ranking.
 
-which returns a CSV of all clubs ranked on that date.  The Elo for each team
-is extracted by looking up its ClubElo name (from the alias file) in the
-ranking dict.
+An earlier version used api.clubelo.com's dated CSV endpoint and fell back to
+its per-team history endpoint. Both are dead (HTTP 502), and the per-team
+fallback could only ever have masked a wrong alias anyway: with the full
+ranking in hand, a miss means "no club by that name", so the caller is told
+directly and falls through to its own labelled fallback.
 
-Fallback: if a team is not found in the daily snapshot (e.g. its ranking
-period has expired), the per-team history endpoint is queried:
+Persistence
+-----------
+:func:`refresh_elos_if_stale` is the entry point for anything that wants
+ratings over time rather than once: it reuses the stored snapshot while it is
+recent and complete, and logs the ratings that actually moved.
 
-    http://api.clubelo.com/{team_name}
-
-which returns the team's full historical CSV.  The most recent Elo rating
-is used.  This ensures teams with expired rankings still get a real value
-rather than the DEFAULT_ELO fallback.
+Refresh happens where a rating is actually needed — boot and recompute, both
+off the request path. There is no background timer: a server that stays up
+across a day boundary keeps serving yesterday's ratings until the next boot
+or recompute. Add a scheduled task if a long-lived process needs to track the
+daily ranking without being restarted.
 """
 
 from __future__ import annotations
 
-import csv
 import functools
 import json
 import logging
 import unicodedata
-import urllib.request
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
+from football_core.clubelo import fetch_ranking, slug_key
 from football_core.constants import DEFAULT_ELO
-from football_core.elo_sync import parse_eloratings_tsv
+from football_core.state import (
+    load_elo_cache,
+    load_elo_update_log,
+    save_elo_cache,
+    save_elo_update_log,
+)
 
 logger = logging.getLogger(__name__)
-
-_API_BASE = "http://api.clubelo.com"
-
-ELO_SNAPSHOT_DIR = Path(__file__).resolve().parent / "elo_ratings"
-"""Default home of the dated ``eloratings_YYYY-MM-DD.tsv`` snapshots."""
-
-_PLAUSIBLE_ELO_RANGE = (1000.0, 2500.0)
 
 
 @functools.lru_cache(maxsize=1)
@@ -82,45 +89,16 @@ def resolve_clubelo_name(team_name: str, alias_path: str) -> str:
 
 
 @functools.lru_cache(maxsize=1)
-def _fetch_ranking_csv(snapshot_date: str) -> str:
-    url = f"{_API_BASE}/{snapshot_date}"
-    logger.debug("Fetching ClubElo ranking from %s", url)
-    with urllib.request.urlopen(url, timeout=15) as resp:
-        return resp.read().decode("utf-8")
+def _fetch_ranking(snapshot_date: str) -> dict[str, float]:
+    """The whole ClubElo ranking as {normalized slug: Elo}.
 
-
-def _parse_ranking_csv(csv_text: str) -> dict[str, float]:
-    ranking: dict[str, float] = {}
-    reader = csv.DictReader(line for line in csv_text.splitlines() if line.strip())
-    for row in reader:
-        club = row.get("Club", "")
-        try:
-            ranking[club] = float(row["Elo"])
-        except (ValueError, KeyError):
-            continue
-    return ranking
-
-
-@functools.lru_cache(maxsize=128)
-def _fetch_team_history(clubelo_name: str) -> float | None:
-    """Hit the per-team ClubElo endpoint and return the most recent Elo."""
-    url = f"{_API_BASE}/{clubelo_name}"
-    logger.debug("Fetching ClubElo team history from %s", url)
-    try:
-        with urllib.request.urlopen(url, timeout=15) as resp:
-            csv_text = resp.read().decode("utf-8")
-    except Exception:
-        logger.warning("Failed to fetch ClubElo history for '%s'", clubelo_name)
-        return None
-
-    reader = csv.DictReader(line for line in csv_text.splitlines() if line.strip())
-    latest_elo = None
-    for row in reader:
-        try:
-            latest_elo = float(row["Elo"])
-        except (ValueError, KeyError):
-            continue
-    return latest_elo
+    *snapshot_date* is the cache key, not a request parameter: the ranking
+    page serves today's ranking regardless. Keying on the date is what
+    makes this a daily refresh — a new day is a new key, so the next call
+    re-fetches, while same-day callers share one request.
+    """
+    del snapshot_date
+    return fetch_ranking()
 
 
 def fetch_team_elos(
@@ -129,35 +107,25 @@ def fetch_team_elos(
     delay: float = 0.0,
 ) -> dict[str, float]:
     snapshot_date = get_clubelo_snapshot_date()
-    csv_text = _fetch_ranking_csv(snapshot_date)
-    ranking = _parse_ranking_csv(csv_text)
+    ranking = _fetch_ranking(snapshot_date)
 
     elos: dict[str, float] = {}
     for team_name in team_names:
         clubelo_name = resolve_clubelo_name(team_name, alias_path)
-        elo = ranking.get(clubelo_name)
+        elo = ranking.get(slug_key(clubelo_name))
         if elo is not None:
             elos[team_name] = elo
         else:
-            logger.info(
-                "ClubElo name '%s' (for team '%s') not found in daily snapshot — "
-                "trying per-team history endpoint",
-                clubelo_name, team_name,
+            # The ranking page already holds every rated club, so a miss means
+            # the alias does not name a real ClubElo entry — a data bug, not a
+            # coverage gap. Say so and hand the caller an explicit placeholder
+            # it can label, rather than inventing a plausible number.
+            logger.warning(
+                "ClubElo has no entry named '%s' (alias for team '%s') — "
+                "falling back to DEFAULT_ELO=%d",
+                clubelo_name, team_name, DEFAULT_ELO,
             )
-            hist_elo = _fetch_team_history(clubelo_name)
-            if hist_elo is not None:
-                logger.info(
-                    "Found historical Elo %.1f for '%s' (team '%s')",
-                    hist_elo, clubelo_name, team_name,
-                )
-                elos[team_name] = hist_elo
-            else:
-                logger.warning(
-                    "ClubElo name '%s' (for team '%s') not found in history either — "
-                    "falling back to DEFAULT_ELO=%d",
-                    clubelo_name, team_name, DEFAULT_ELO,
-                )
-                elos[team_name] = float(DEFAULT_ELO)
+            elos[team_name] = float(DEFAULT_ELO)
 
     return elos
 
@@ -166,85 +134,130 @@ def get_clubelo_snapshot_date() -> str:
     return date.today().isoformat()
 
 
-# ─── Local eloratings.net snapshot (network-free) ────────────────────────
+# ─── Stored ratings: fetch once, reuse until something changes ──────────────
+
+SOURCE_CLUBELO = "clubelo"
+
+_UPDATE_LOG_LIMIT = 500
+"""Most recent ``elo_update_log.json`` entries to keep."""
 
 
-def _latest_snapshot_path(snapshot_dir: Path) -> Path | None:
-    """Newest ``eloratings_*.tsv`` in *snapshot_dir*; None if there is none.
+def _is_fresh(cache: dict, team_names: list[str], max_age_hours: float) -> bool:
+    """True when *cache* is recent enough and covers every requested team.
 
-    ``eloratings_YYYY-MM-DD.tsv`` sorts lexicographically by date, so the last
-    entry is the newest. Only that one file is ever read.
+    Coverage matters as much as age. ClubElo rates a club from its first
+    top-flight appearance, so a team new to the competition has no entry
+    and would sit at ``DEFAULT_ELO`` forever inside a store that is still
+    "fresh". Requiring full coverage means a newly drawn team forces one
+    fetch instead of being served a placeholder.
+
+    A stored placeholder does not count as coverage either. ``fetch_team_elos``
+    returns ``DEFAULT_ELO`` for a name ClubElo does not have, and writing that
+    into the store would make the next call see the team present and stop
+    trying — turning a missing rating into a confident-looking 1500 for the
+    whole freshness window. Counting it as uncovered costs one fetch a day for
+    a genuinely unrated club, and recovers automatically once it is rated.
     """
+    values = cache.get("values") or {}
+    if not team_names:
+        return False
+    for team in team_names:
+        value = values.get(team)
+        if value is None or float(value) == float(DEFAULT_ELO):
+            return False
+    fetched_at = cache.get("fetched_at")
+    if not isinstance(fetched_at, str):
+        return False
     try:
-        candidates = sorted(snapshot_dir.glob("eloratings_*.tsv"))
-    except OSError:
-        return None
-    return candidates[-1] if candidates else None
+        stamp = datetime.fromisoformat(fetched_at)
+    except ValueError:
+        return False
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - stamp).total_seconds() < max_age_hours * 3600
 
 
-@functools.lru_cache(maxsize=4)
-def _parse_snapshot_text(text: str) -> dict[str, float]:
-    """Normalized team name -> Elo, from one eloratings TSV snapshot body.
+def elo_store_fetched_at(data_dir: Path | str | None = None) -> str:
+    """ISO stamp of the stored ratings, or ``""`` when nothing is stored.
 
-    Column layout comes from the repo's single canonical TSV reader
-    (``elo_sync.parse_eloratings_tsv``: identifier at col 2, rating at col 3)
-    rather than a second opinion kept here. Identifiers outside a plausible
-    Elo band are dropped so a garbled snapshot cannot masquerade as ratings.
+    Lets a caller label the numbers with when they were actually read, instead
+    of guessing a date from the season or leaving the field blank.
     """
-    table: dict[str, float] = {}
-    for name, rating in parse_eloratings_tsv(text):
-        if name and _PLAUSIBLE_ELO_RANGE[0] <= rating <= _PLAUSIBLE_ELO_RANGE[1]:
-            table[_normalized_key(name)] = rating
-    return table
+    fetched_at = (load_elo_cache(data_dir) or {}).get("fetched_at")
+    return fetched_at if isinstance(fetched_at, str) else ""
 
 
-def load_snapshot_ratings(
-    snapshot_dir: Path | str | None = None,
-) -> dict[str, float]:
-    """Newest on-disk eloratings snapshot as {normalized name: Elo}.
-
-    Network-free and total: a missing/unreadable directory, no snapshot, a
-    garbled file, or nothing parseable all return ``{}`` rather than raising.
-    """
-    directory = Path(snapshot_dir) if snapshot_dir is not None else ELO_SNAPSHOT_DIR
-    path = _latest_snapshot_path(directory)
-    if path is None:
-        return {}
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        logger.warning("Unreadable eloratings snapshot: %s", path)
-        return {}
-    return dict(_parse_snapshot_text(text))
-
-
-def load_snapshot_elos(
+def refresh_elos_if_stale(
     team_names: list[str],
     alias_path: str,
-    snapshot_dir: Path | str | None = None,
+    data_dir: Path | str | None = None,
+    max_age_hours: float = 24.0,
 ) -> dict[str, float]:
-    """Real Elo ratings for *team_names* from the local eloratings snapshot.
+    """Ratings for *team_names*, re-fetched only when the store goes stale.
 
-    Matches the app's canonical team names through *alias_path* (the canonical
-    name itself and every alias variant are tried, accent-insensitively).
-    Returns ``{}`` when the snapshot is missing, unreadable, or matches no
-    requested team — the caller then falls through to the next source. Teams
-    the snapshot does not cover are simply absent, never invented.
+    This is the entry point for anything that wants ClubElo numbers over
+    time rather than once. It reuses :func:`fetch_team_elos` for the actual
+    fetch and then:
+
+    * serves the stored snapshot while it is recent and complete;
+    * writes the new ratings to ``elo_cache.json`` (atomic);
+    * appends one ``elo_update_log.json`` entry per team whose rating
+      actually moved, which is the "new Elo is stored when it changes" part.
+
+    A failed fetch returns the stored ratings when there are any and raises
+    nothing, so a ClubElo outage degrades to slightly stale numbers instead
+    of to no numbers. With no stored ratings the error propagates and the
+    caller's own labelled fallback takes over.
+
+    The log is trimmed to :data:`_UPDATE_LOG_LIMIT` most recent entries.
+    It is otherwise append-only, which would grow by up to one entry per
+    team per day forever.
     """
-    table = load_snapshot_ratings(snapshot_dir)
-    if not table:
-        return {}
-    try:
-        aliases = _load_aliases(alias_path)
-    except (OSError, ValueError):
-        logger.warning("Unreadable alias file for snapshot matching: %s", alias_path)
-        return {}
+    cache = load_elo_cache(data_dir)
+    if _is_fresh(cache, team_names, max_age_hours):
+        values = cache["values"]
+        return {team: float(values[team]) for team in team_names}
 
-    matched: dict[str, float] = {}
-    for team in team_names:
-        for candidate in (team, *(aliases.get(team) or [])):
-            elo = table.get(_normalized_key(candidate))
-            if elo is not None:
-                matched[team] = elo
-                break
-    return matched
+    stored = cache.get("values") or {}
+    try:
+        ratings = fetch_team_elos(team_names, alias_path)
+    except Exception:
+        # Stale numbers beat no numbers, but only if they are numbers for the
+        # teams being asked about. Serving a partial set here would look like
+        # success to the caller (it labels anything non-empty as ClubElo) while
+        # quietly dropping a team, so re-raise and let the caller's own
+        # labelled fallback cover the whole set instead.
+        if all(team in stored for team in team_names):
+            logger.warning(
+                "ClubElo refresh failed; serving the %d stored ratings",
+                len(stored),
+            )
+            return {team: float(stored[team]) for team in team_names}
+        raise
+
+    stamp = datetime.now(timezone.utc).isoformat()
+    save_elo_cache(
+        {"fetched_at": stamp, "source": SOURCE_CLUBELO, "values": ratings},
+        data_dir,
+    )
+
+    log = load_elo_update_log(data_dir)
+    for team, value in ratings.items():
+        previous = stored.get(team)
+        if previous is not None and float(previous) != float(value):
+            log.append({
+                "timestamp": stamp,
+                "team": team,
+                "old_value": float(previous),
+                "new_value": float(value),
+                "source": SOURCE_CLUBELO,
+                "reason": "scheduled_refresh",
+                "drift_magnitude": round(float(value) - float(previous), 4),
+            })
+    if len(log) > _UPDATE_LOG_LIMIT:
+        log = log[-_UPDATE_LOG_LIMIT:]
+    if log:
+        # Only touch the file when there is something in it: a cold cache or an
+        # unchanged ranking should not leave behind an empty "log".
+        save_elo_update_log(log, data_dir)
+    return ratings

@@ -25,7 +25,7 @@ from competitions.ucl.src.pipeline import (
     run_mc_simulation as _run_mc_simulation_pipeline,
     run_calibration_task as _run_calibration_task_pipeline,
 )
-from competitions.ucl.src.elo_fetcher import fetch_team_elos, load_snapshot_elos
+from competitions.ucl.src.elo_fetcher import fetch_team_elos
 from competitions.ucl.src.provider import RepoFixtureProvider
 from football_core.elo import expected_score
 from football_core.signal import PredictionContext
@@ -721,18 +721,16 @@ def api_elo():
 
     Preference order, first tier that produces numbers wins:
       a) the boot cache, when it holds real ClubElo values;
-      b) the newest on-disk eloratings TSV snapshot, matched via the team
-         alias file;
-      c) the coefficient-derived boot ratings (the degraded tier, still shown
+      b) the coefficient-derived boot ratings (the degraded tier, still shown
          so the view is not blank, always labelled "coefficient");
-      d) nothing -> an explicit empty state.
+      c) nothing -> an explicit empty state.
 
     ``source`` names the tier the numbers actually came from. It is never
     "live" for coefficient-derived values.
-    """
-    import logging
-    logger = logging.getLogger(__name__)
 
+    A GET never fetches: the cache was populated at boot from the stored
+    ClubElo snapshot, and this handler only reads it.
+    """
     ratings = {
         team: float(value)
         for team, value in (cache.get("elo_ratings") or {}).items()
@@ -749,25 +747,12 @@ def api_elo():
     else:
         source = "empty"
 
-    if not ratings:
-        team_names = [
-            entry.get("team", "")
-            for entry in (cache.get("all_teams") or [])
-            if isinstance(entry, dict)
-        ]
-        try:
-            snapshot = load_snapshot_elos(team_names) if team_names else {}
-        except Exception as exc:  # a ratings view must never 500
-            logger.warning("[UCL] eloratings snapshot load failed: %s", exc)
-            snapshot = {}
-        if snapshot:
-            ratings, source = snapshot, "live"
-        elif coefficient_derived:
-            ratings = {
-                team: float(value)
-                for team, value in (cache.get("elo_ratings") or {}).items()
-                if isinstance(value, (int, float))
-            }
+    if not ratings and coefficient_derived:
+        ratings = {
+            team: float(value)
+            for team, value in (cache.get("elo_ratings") or {}).items()
+            if isinstance(value, (int, float))
+        }
 
     if not ratings:
         return JSONResponse({"ratings": {}, "source": "empty", "as_of": ""})

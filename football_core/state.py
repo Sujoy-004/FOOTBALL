@@ -108,6 +108,20 @@ def save_eloratings_cache(cache: dict, data_dir: Path | str | None = None) -> No
     _atomic_write_json(cache, path)
 
 
+def load_elo_cache(data_dir: Path | str | None = None) -> dict:
+    """Stored club Elo ratings: ``{fetched_at, source, values}``, or ``{}``."""
+    path = _resolve_data_dir(data_dir) / "elo_cache.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return dict(json.load(f))
+
+
+def save_elo_cache(cache: dict, data_dir: Path | str | None = None) -> None:
+    path = _resolve_data_dir(data_dir) / "elo_cache.json"
+    _atomic_write_json(cache, path)
+
+
 def load_elo_update_log(data_dir: Path | str | None = None) -> list[dict]:
     path = _resolve_data_dir(data_dir) / "elo_update_log.json"
     if not path.exists():

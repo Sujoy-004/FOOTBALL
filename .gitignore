@@ -49,6 +49,10 @@ competitions/worldcup/data/rolling_form_cache.json
 competitions/worldcup/data/squad_value_cache.json
 competitions/worldcup/data/team_synergy_cache.json
 
+# UCL — ClubElo rating snapshot + change log (regeneratable by re-fetching)
+competitions/ucl/data/elo_cache.json
+competitions/ucl/data/elo_update_log.json
+
 # Root-level generated caches (can be produced from any CWD)
 catboost_cache.json
 form_cache.json

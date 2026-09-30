@@ -241,15 +241,16 @@ def _resolve_elo_ratings(team_names: list[str]) -> dict[str, float]:
     """Snapshot-safe Elo resolution.
 
     Snapshot mode guarantees ZERO live requests, so ClubElo is skipped and
-    coefficient-derived ratings are used directly. Live mode attempts the
-    real fetch and degrades to coefficients on failure.
+    coefficient-derived ratings are used directly. Live mode goes through
+    the stored ClubElo snapshot, which re-fetches only when it is stale or
+    missing a team, and degrades to coefficients on failure.
     """
     from web.startup import is_snapshot_mode
 
     if not is_snapshot_mode():
-        from competitions.ucl.src.elo_fetcher import fetch_team_elos
+        from competitions.ucl.src.elo_fetcher import refresh_elos_if_stale
         try:
-            ratings = fetch_team_elos(team_names)
+            ratings = refresh_elos_if_stale(team_names)
         except Exception as exc:
             logger.warning("UCL Elo fetch failed (%s); using coefficient fallback", exc)
             ratings = {}

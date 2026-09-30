@@ -19,6 +19,7 @@ from competitions.ucl.src.elo_fetcher import (
     get_clubelo_snapshot_date,
     resolve_clubelo_name,
 )
+from football_core.constants import DEFAULT_ELO
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -31,17 +32,22 @@ from competitions.ucl.src.elo_fetcher import (
     reason="Skipped without --live flag",
 )
 class TestClubEloApiLive:
-    """Live ClubElo API integration test (requires ``--live`` flag).
+    """Live ClubElo integration test (requires ``--live`` flag).
 
-    Fetches the date-based ranking and verifies that all 36 UCL teams
-    resolve to a valid ClubElo entry.
+    Fetches the ranking page and verifies that all 36 UCL teams resolve to a
+    real ClubElo entry.
     """
 
     def test_clubelo_api(self, sample_36_teams):
-        """Fetch Elo for all 36 teams from the live ClubElo ranking API.
+        """Fetch Elo for all 36 teams from the live ClubElo ranking.
 
         This is primarily a name-resolution check — it verifies that
         every team's ``clubelo_name`` exists in the current ClubElo ranking.
+
+        The bar is exact: zero teams on the default. An earlier version
+        allowed two misses, which is how an alias pointing at the wrong
+        club survived — a plausible-looking number for the wrong team is
+        worse than a visible failure.
         """
         team_names = list(sample_36_teams.keys())
         elos = fetch_team_elos(team_names)
@@ -53,25 +59,19 @@ class TestClubEloApiLive:
         assert snapshot_date.count("-") == 2
         print(f"\nClubElo snapshot date: {snapshot_date}")
 
-        not_found_count = 0
-        low_elo_count = 0
+        not_found = []
         for name, elo in sorted(elos.items()):
-            if elo == 1500.0:
-                status = "NOT_FOUND"
-                not_found_count += 1
-            elif elo <= 1500.0:
-                status = "LOW_ELO"
-                low_elo_count += 1
-            else:
-                status = "OK"
+            status = "NOT_FOUND" if elo == float(DEFAULT_ELO) else "OK"
             print(f"  {name:25s}  {elo:8.1f}  {status}")
+            if status == "NOT_FOUND":
+                not_found.append(
+                    f"{name} -> {resolve_clubelo_name(name, None)}"
+                )
 
-        # Most teams should be found. A few low-Elo teams may be below 1500
-        # (legitimate, they have lower ratings). At most 2 alias mismatches
-        # are acceptable (data issue, not code issue).
-        assert not_found_count <= 2, (
-            f"{not_found_count} team(s) not found in ClubElo ranking. "
-            f"Check alias mappings in team_aliases.json."
+        assert not not_found, (
+            "Teams missing from the ClubElo ranking (alias must be the exact "
+            "href slug, e.g. 'BodoeGlimt', not the name the page prints): "
+            + "; ".join(not_found)
         )
 
 
@@ -178,18 +178,19 @@ class TestClubEloFetcher:
 
     # ── Ranking fetching (mocked) ───────────────────────────────────────
 
-    _RANKING_CSV = textwrap.dedent("""\
-        Rank,Club,Country,Level,Elo,From,To
-        1,Man City,ENG,1,1970.9,2026-06-01,2026-08-23
-        2,Bayern,GER,1,1956.0,2026-06-01,2026-08-23
-        3,Paris SG,FRA,1,1927.0,2026-06-01,2026-08-23
-    """)
+    # The ranking is keyed by normalized ClubElo slug, which is what
+    # football_core.clubelo.slug_key() produces for each team's alias.
+    _RANKING = {
+        "mancity": 1970.9,
+        "bayern": 1956.0,
+        "parissg": 1927.0,
+    }
 
     def test_fetch_team_elos_mocked(self, monkeypatch):
-        """Fetch from mocked ranking CSV returns correct dict."""
+        """Fetch from a mocked ranking returns correct dict."""
         monkeypatch.setattr(
-            "football_core.elo_fetcher._fetch_ranking_csv",
-            lambda *a: self._RANKING_CSV,
+            "football_core.elo_fetcher._fetch_ranking",
+            lambda *a: self._RANKING,
         )
 
         elos = fetch_team_elos(["Man City", "Bayern"])
@@ -200,7 +201,7 @@ class TestClubEloFetcher:
     def test_fetch_team_elos_cached(self, monkeypatch):
         """Same call returns cached result (no second HTTP request).
 
-        The ``_fetch_ranking_csv`` function has ``lru_cache(maxsize=1)``,
+        The ``_fetch_ranking`` function has ``lru_cache(maxsize=1)``,
         so requesting the same snapshot date twice should only hit the
         mock once.
         """
@@ -209,10 +210,10 @@ class TestClubEloFetcher:
         def _mock_fetch(*args):
             nonlocal call_count
             call_count += 1
-            return self._RANKING_CSV
+            return self._RANKING
 
         monkeypatch.setattr(
-            "football_core.elo_fetcher._fetch_ranking_csv",
+            "football_core.elo_fetcher._fetch_ranking",
             _mock_fetch,
         )
 
@@ -229,20 +230,18 @@ class TestClubEloFetcher:
         # (its lru_cache was also replaced).  We expect 2 calls.
         #
         # The real caching benefit (preventing HTTP calls) comes from the
-        # lru_cache on the unmocked _fetch_ranking_csv.  Here we verify that
-        # fetching the same teams twice gives identical values, and that the
-        # ranking CSV was indeed called twice (proving our mock worked).
+        # lru_cache on the unmocked _fetch_ranking.  Here we verify that
+        # fetching the same teams twice gives identical values, and that
+        # the ranking fetch was indeed called twice (proving our mock worked).
         assert result1 == result2
         assert call_count == 2, "Expected 2 calls (monkeypatched, no cache)"
 
     def test_fetch_team_elos_fallback_on_missing(self, monkeypatch):
         """Team not in ranking gets DEFAULT_ELO without crashing."""
         # Return a ranking that doesn't contain the team
-        empty_csv = "Rank,Club,Country,Level,Elo,From,To\n"
-
         monkeypatch.setattr(
-            "football_core.elo_fetcher._fetch_ranking_csv",
-            lambda *a: empty_csv,
+            "football_core.elo_fetcher._fetch_ranking",
+            lambda *a: {},
         )
 
         elos = fetch_team_elos(["UnknownTeam"])
@@ -254,11 +253,11 @@ class TestClubEloFetcher:
 
         # Clear cache on original function
         import football_core.elo_fetcher as _core_fetcher
-        _core_fetcher._fetch_ranking_csv.cache_clear()
+        _core_fetcher._fetch_ranking.cache_clear()
 
         def _mock_error(*args):
             raise urllib.error.HTTPError(
-                "http://api.clubelo.com/2026-06-27",
+                "https://clubelo.com/Ranking",
                 500,
                 "Server Error",
                 {},
@@ -266,7 +265,7 @@ class TestClubEloFetcher:
             )
 
         monkeypatch.setattr(
-            "football_core.elo_fetcher._fetch_ranking_csv",
+            "football_core.elo_fetcher._fetch_ranking",
             _mock_error,
         )
 
@@ -276,8 +275,8 @@ class TestClubEloFetcher:
     def test_fetch_team_elos_resolves_alias(self, monkeypatch):
         """Team with alias resolves correctly in ranking."""
         monkeypatch.setattr(
-            "football_core.elo_fetcher._fetch_ranking_csv",
-            lambda *a: self._RANKING_CSV,
+            "football_core.elo_fetcher._fetch_ranking",
+            lambda *a: self._RANKING,
         )
 
         elos = fetch_team_elos(["PSG"])

@@ -3,12 +3,13 @@
 
 The committed alias map ``competitions/ucl/data/team_aliases.json`` gained new
 keys for the full 2026/27 UCL draw identities, each mapped to a ClubElo slug
-that was verified live against api.clubelo.com.  These tests lock in that the
-new keys resolve correctly, that the legacy 2025/26 ASCII short keys are
-byte-identical as before, that the accent-insensitive fallback is still honest
-about its limits, that the mapped ClubElo data genuinely flows through
-``fetch_team_elos``, that no DEFAULT_ELO placeholder ever counts as covered,
-and that adding the 14 keys did not regress the stored 2025/26 schedule.
+that was verified live against the clubelo.com ranking page.  These tests lock
+in that the new keys resolve correctly, that the legacy 2025/26 ASCII short
+keys are byte-identical as before, that the accent-insensitive fallback is
+still honest about its limits, that the mapped ClubElo data genuinely flows
+through ``fetch_team_elos``, that no DEFAULT_ELO placeholder ever counts as
+covered, and that adding the 14 keys did not regress the stored 2025/26
+schedule.
 
 All tests are hermetic/deterministic: no network.  The live ClubElo parsing is
 mocked via ``monkeypatch`` on ``football_core.elo_fetcher`` and the real,
@@ -22,6 +23,7 @@ import os
 
 import pytest
 
+from football_core.clubelo import slug_key
 from football_core.elo_fetcher import _normalized_key
 from football_core.constants import DEFAULT_ELO
 from competitions.ucl.src.elo_fetcher import (
@@ -43,7 +45,7 @@ _VERIFIED_IDENTITY_SLUGS = [
     ("AEK Athens", "AEK"),
     ("Bayern Munich", "Bayern"),
     ("Borussia Dortmund", "Dortmund"),
-    ("Bodø/Glimt", "Bodoe Glimt"),
+    ("Bodø/Glimt", "BodoeGlimt"),
     ("Fenerbahçe", "Fenerbahce"),
     ("Inter Milan", "Inter"),
     ("Manchester City", "Man City"),
@@ -70,33 +72,32 @@ _LEGACY_2025_26_SHORT_KEYS = [
 ]
 
 # Distinct, realistic per-slug ClubElo values (deliberately never 1500.0) for
-# the mocked ranking CSV used in the fetch test.
+# the mocked ranking used in the fetch test. Keys are the normalized slugs
+# that football_core.clubelo produces from each team's href.
 _SLUG_ELOS = {
-    "AEK": 1640.66,
-    "Bayern": 2000.87,
-    "Dortmund": 1884.0,
-    "Bodoe Glimt": 1595.0,
-    "Fenerbahce": 1720.5,
-    "Inter": 1898.0,
-    "Man City": 1970.9,
-    "Man United": 1905.0,
-    "Paris SG": 1927.0,
-    "PSV": 1755.0,
-    "Betis": 1680.0,
-    "Shakhtar": 1660.0,
-    "Sporting": 1805.0,
-    "Stuttgart": 1760.5,
+    "aek": 1640.66,
+    "bayern": 2000.87,
+    "dortmund": 1884.0,
+    "bodoeglimt": 1595.0,
+    "fenerbahce": 1720.5,
+    "inter": 1898.0,
+    "mancity": 1970.9,
+    "manunited": 1905.0,
+    "parissg": 1927.0,
+    "psv": 1755.0,
+    "betis": 1680.0,
+    "shakhtar": 1660.0,
+    "sporting": 1805.0,
+    "stuttgart": 1760.5,
 }
 
 
-def _ranking_csv_for_slugs(slug_elos: dict[str, float]) -> str:
-    """Build a ClubElo daily-ranking CSV containing only the given slugs."""
-    lines = ["Rank,Club,Country,Level,Elo,From,To"]
-    for i, (slug, elo) in enumerate(slug_elos.items(), start=1):
-        lines.append(
-            f"{i},{slug},--,1,{elo:.2f},2026-06-01,2026-08-23"
-        )
-    return "\n".join(lines)
+def _expected_elos() -> dict[str, float]:
+    """The verified identity -> its slug's Elo, keyed the way the code keys it."""
+    return {
+        identity: _SLUG_ELOS[slug_key(slug)]
+        for identity, slug in _VERIFIED_IDENTITY_SLUGS
+    }
 
 
 class TestVerified2026_27IdentityMappings:
@@ -149,15 +150,11 @@ class TestFetch2026_27FlowsThroughSlugs:
     ):
         """Every 2026/27 identity resolves to its slug's Elo, none defaulting."""
         identities = [ident for ident, _ in _VERIFIED_IDENTITY_SLUGS]
-        csv_text = _ranking_csv_for_slugs(_SLUG_ELOS)
+        ranking = dict(_SLUG_ELOS)
 
         monkeypatch.setattr(
-            "football_core.elo_fetcher._fetch_ranking_csv",
-            lambda *a: csv_text,
-        )
-        monkeypatch.setattr(
-            "football_core.elo_fetcher._fetch_team_history",
-            lambda *a: None,
+            "football_core.elo_fetcher._fetch_ranking",
+            lambda *a: ranking,
         )
 
         elos = fetch_team_elos(identities)
@@ -165,10 +162,10 @@ class TestFetch2026_27FlowsThroughSlugs:
         # Every identity is present.
         assert set(elos.keys()) == set(identities)
         # No placeholder slipped in — every value is the VERIFIED slug's Elo.
-        for identity, slug in _VERIFIED_IDENTITY_SLUGS:
+        for identity, expected in _expected_elos().items():
             assert identity in elos
             assert elos[identity] != float(DEFAULT_ELO)
-            assert elos[identity] == _SLUG_ELOS[slug]
+            assert elos[identity] == expected
 
 
 class TestCoverageGuard:
@@ -177,10 +174,7 @@ class TestCoverageGuard:
     def test_no_default_elo_ever_counts_as_covered(self):
         """14 mappings count; four exact DEFAULT_ELO placeholders are excluded."""
         identities = [ident for ident, _ in _VERIFIED_IDENTITY_SLUGS]
-        ratings = {
-            ident: _SLUG_ELOS[slug]
-            for ident, slug in _VERIFIED_IDENTITY_SLUGS
-        }
+        ratings = dict(_expected_elos())
         # Four distinct placeholder teams set to exactly the default.
         placeholders = {
             "Placeholder Alpha": float(DEFAULT_ELO),
