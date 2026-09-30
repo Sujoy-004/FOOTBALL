@@ -1,0 +1,23 @@
+# FOOTBALL — tool configuration (no [project]: this repo is NOT an installable
+# package; the top-level `src` layouts in each competition would collide).
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["F"]
+# Mass dead-code cleanup deferred (244 F401, 46 F841, 14 F811, etc.). This
+# keeps the high-signal F821 (undefined names) enforced without a huge sweep.
+ignore = ["F401", "F841", "F811", "F541", "F601"]
+
+[tool.ruff.lint.per-file-ignores]
+# orchestrator.py F821 at line 1256 is a runtime locals() guard (the name is
+# only ever referenced when "active_season_value" is actually in scope).
+"competitions/ucl/src/orchestrator.py" = ["F821"]
+
+[tool.mypy]
+python_version = "3.11"
+explicit_package_bases = true

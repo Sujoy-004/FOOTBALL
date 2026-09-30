@@ -32,6 +32,7 @@ from competitions.ucl.src.elo_fetcher import fetch_team_elos
 from competitions.ucl.src.provider import RepoFixtureProvider
 from football_core.elo import expected_score
 from football_core.signal import PredictionContext
+from football_core.simulation import SimulationContractError
 
 from typing import Optional
 
