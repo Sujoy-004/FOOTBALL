@@ -13,6 +13,12 @@ COMP_DIR = SRC_DIR.parent
 DATA_DIR = COMP_DIR / "data"
 CONFIG_DIR = COMP_DIR / "config"
 
+# Fitted blend weights (schema-identical to competitions/ucl/config/signal_weights.json).
+# Kept apart from CONFIG_DIR/"signal_weights.json", which is the deployed
+# *engine* blend consumed by build_signal_engine and the backfill evaluation.
+BLEND_CALIBRATION_PATH = CONFIG_DIR / "blend_calibration.json"
+HISTORICAL_REPLAY_PATH = DATA_DIR / "historical" / "replay_2019_20_2023_24.json"
+
 LALIGA_BSD_LEAGUE_ID = 3
 LALIGA_FDO_COMPETITION_ID = "PD"
 

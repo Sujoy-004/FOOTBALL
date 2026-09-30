@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 
 from competitions.laliga.src import seasons as season_store
 from competitions.laliga.src.constants import (
+    BLEND_CALIBRATION_PATH,
     DATA_DIR,
     LALIGA_BSD_LEAGUE_ID,
     LALIGA_FDO_COMPETITION_ID,
@@ -46,6 +47,8 @@ from web.common import error_response, ts
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 logger = logging.getLogger(__name__)
+
+_CALIBRATION_THRESHOLD = 30
 
 # Credentials are read at CALL time, never frozen at import: os.environ can
 # be populated (or overridden) long after this module was imported, and a
@@ -510,7 +513,7 @@ def _cold_start_blend(n_matches: int) -> dict:
         "backtest_briers": {},
         "calibration_status": "cold_start",
         "n_matches_for_calibration": int(n_matches),
-        "threshold": 30,
+        "threshold": _CALIBRATION_THRESHOLD,
     }
 
 
@@ -518,13 +521,38 @@ def _cold_start_blend(n_matches: int) -> dict:
 def api_blend():
     """Blend/calibration view.
 
-    LaLiga ships no calibration artifact (config/signal_weights.json is the
-    ensemble's engine config, not a fit), so this is always the honest cold
-    start with a real match count — no weights are ever invented.
+    Real weights come from the on-disk artifact produced by
+    ``competitions.laliga.src.pipeline.run_calibration_task`` (schema
+    identical to UCL's). Without that artifact there is nothing to report,
+    so the answer is an honest cold start — never invented weights.
+
+    Note the artifact is deliberately NOT ``config/signal_weights.json``:
+    that file is the deployed *engine* blend, not a fit, so reporting it
+    as calibration output would relabel hand-set weights as fitted.
     """
     try:
-        n_matches = len(cache.get("_results") or _load_results_pipeline(DATA_DIR))
-        return JSONResponse(_cold_start_blend(n_matches))
+        config = (json.loads(BLEND_CALIBRATION_PATH.read_text(encoding="utf-8"))
+                  if BLEND_CALIBRATION_PATH.exists() else {})
+        weights = {
+            name: float(value)
+            for name, value in (config.get("weights") or {}).items()
+            if isinstance(value, (int, float))
+        }
+        n_matches = int(config.get("n_matches") or len(cache.get("_results") or []))
+        if not weights:
+            return JSONResponse(_cold_start_blend(n_matches))
+        return JSONResponse({
+            "n_signals_available": len(weights),
+            "available_signals": sorted(weights),
+            "blend_weights": weights,
+            # The artifact stores log-loss, not Brier: report no Brier
+            # rather than relabelling the metric.
+            "backtest_briers": {},
+            "calibration_status": (
+                "calibrated" if n_matches >= _CALIBRATION_THRESHOLD else "cold_start"),
+            "n_matches_for_calibration": n_matches,
+            "threshold": _CALIBRATION_THRESHOLD,
+        })
     except Exception:
         logger.exception("[LaLiga] blend info unavailable")
         return JSONResponse(_cold_start_blend(0))

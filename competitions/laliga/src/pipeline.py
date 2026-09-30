@@ -25,8 +25,10 @@ from football_core.insight import (
 
 from competitions.laliga.src import seasons as _season_store
 from competitions.laliga.src.constants import (
+    BLEND_CALIBRATION_PATH,
     CONFIG_DIR,
     DATA_DIR,
+    HISTORICAL_REPLAY_PATH,
     LALIGA_BSD_LEAGUE_ID,
     LALIGA_FDO_COMPETITION_ID,
     N_MATCHDAYS,
@@ -140,6 +142,73 @@ class LaligaReplayResultProvider:
                 })
         out.sort(key=lambda r: r["event_date"], reverse=True)
         return out[:limit]
+
+
+def run_calibration_task(
+    data_dir: str | Path | None = None,
+    replay_data: str | None = None,
+    progress_cb=None,
+) -> dict:
+    """Fit blend weights on the LaLiga historical replay and persist them.
+
+    Pure computation - no threading, no global state. Reuses the shared
+    calibrator (``competitions.ucl.src.calibrate.run_calibration``) so LaLiga
+    gets the same inverse-log-loss fit, the same chronological fit/OOS split
+    and the same honest PASS/UNVERIFIED gate as UCL, and emits the same
+    artifact schema.
+
+    Only signals the replay can honestly support are fitted: odds and dated
+    results give market_odds, rolling_form and rest_days. ``refined_elo``
+    needs a leak-free per-match Elo series (not available) and
+    ``squad_value`` needs LaLiga squad values (``data/squad_values.json`` is
+    empty), so both are reported as ``insufficient_data`` rather than
+    fabricated. ``squad_values_path`` is passed explicitly because the
+    shared calibrator otherwise defaults to the *UCL* squad-value file,
+    which yields a constant 1/3 signal and an inflated weight.
+
+    ``require_verified=True`` means an UNVERIFIED fit is returned but never
+    written, so good weights are never clobbered by a failed gate.
+
+    Returns {status, n_matches, weights, per_signal, verdict}.
+    """
+    from competitions.ucl.src.calibrate import run_calibration
+
+    dp = Path(data_dir) if data_dir else DATA_DIR
+    replay_path = replay_data or str(
+        dp / "historical" / HISTORICAL_REPLAY_PATH.name
+        if (dp / "historical" / HISTORICAL_REPLAY_PATH.name).exists()
+        else dp / "results.json"
+    )
+    if not os.path.exists(replay_path):
+        return {"status": "error", "error": f"no replay data at {replay_path}",
+                "n_matches": 0, "weights": {}, "per_signal": {},
+                "verdict": {"status": "UNVERIFIED",
+                            "reasons": ["no replay data"]}}
+    if progress_cb:
+        progress_cb(10, f"Loading replay data from {os.path.basename(replay_path)}...")
+
+    squad_values_path = str(dp / "squad_values.json")
+    if not os.path.exists(squad_values_path):
+        squad_values_path = None
+
+    config = run_calibration(
+        replay_data_path=replay_path,
+        output_path=str(BLEND_CALIBRATION_PATH),
+        require_verified=True,
+        squad_values_path=squad_values_path,
+    )
+    if progress_cb:
+        progress_cb(90, "Saving calibration weights...")
+        progress_cb(100, "Complete")
+
+    return {
+        "status": "ok",
+        "n_matches": config.get("n_matches", 0),
+        "weights": config.get("weights", {}),
+        "per_signal": config.get("per_signal", {}),
+        "verdict": config.get("verdict", {}),
+        "written": config.get("written", False),
+    }
 
 
 def build_signal_engine(

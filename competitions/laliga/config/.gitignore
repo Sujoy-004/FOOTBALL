@@ -1,0 +1,3 @@
+# Fitted blend weights: regenerable by run_calibration_task(), same convention
+# as competitions/ucl/config/. config.json stays tracked.
+blend_calibration.json

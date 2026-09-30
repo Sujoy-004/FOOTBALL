@@ -120,12 +120,20 @@ def test_blend_contract(competition: str):
         assert payload["n_signals_available"] == 0
 
 
-def test_blend_laliga_is_honest_cold_start():
+def test_blend_laliga_reports_real_weights_never_fabricated():
+    """LaLiga is calibrated once run_calibration_task() has run; either way
+    the payload is honest — real fitted weights, or an empty cold start."""
     payload = _client("laliga").get("/api/blend").json()
-    assert payload["calibration_status"] == "cold_start"
-    assert payload["blend_weights"] == {}
-    assert payload["available_signals"] == []
-    assert payload["n_matches_for_calibration"] > 0
+    if payload["calibration_status"] == "cold_start":
+        assert payload["blend_weights"] == {}
+        assert payload["available_signals"] == []
+        return
+    weights = payload["blend_weights"]
+    assert set(weights) == set(payload["available_signals"])
+    assert payload["n_signals_available"] == len(weights)
+    assert all(isinstance(w, (int, float)) and w >= 0 for w in weights.values())
+    assert abs(sum(weights.values()) - 1.0) < 1e-6
+    assert payload["n_matches_for_calibration"] >= payload["threshold"]
 
 
 def test_blend_ucl_weights_are_real_artifact_numbers():
