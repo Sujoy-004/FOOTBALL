@@ -3,6 +3,7 @@ import {
   buildTable, destroyModalCharts, modalCharts, renderBracketTree,
   updateStatusBar, competitions, renderLoading, currentCompetition,
   configureCompetitionRefresh, renderSimulationShell, bindSimulationShell,
+  renderEloView, renderBlendView, loadModelViews,
 } from "./shared.js";
 
 const API = "/worldcup/api";
@@ -144,6 +145,14 @@ async function renderOverview() {
   }
 
   tab.innerHTML = html;
+  // Elo + blend payloads are a second, independent fetch: paint a host
+  // immediately and fill it when they land (or show their honest empty state).
+  const modelHost = document.createElement("div");
+  tab.appendChild(modelHost);
+  loadModelViews(API).then(v => {
+    if (!document.body.contains(modelHost)) return;
+    modelHost.innerHTML = renderEloView(v.elo) + renderBlendView(v.blend);
+  });
 }
 
 function renderSignalEval(signalEval) {

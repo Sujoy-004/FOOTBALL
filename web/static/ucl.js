@@ -6,6 +6,7 @@ import {
   openIntelModal, renderLoading, currentCompetition,
   configureCompetitionRefresh,
   renderSimulationShell, bindSimulationShell,
+  renderEloView, renderBlendView, loadModelViews,
 } from "./shared.js";
 
 const API = "/ucl/api";
@@ -437,6 +438,14 @@ async function renderOverview() {
     loadAll({ season: seasonSelect.value });
   });
   renderAcquisitionPanel(document.getElementById("uclAcqPanel"), _buildAcquisition(d));
+  // Elo + blend payloads are a second, independent fetch: paint a host
+  // immediately and fill it when they land (or show their honest empty state).
+  const modelHost = document.createElement("div");
+  tab.appendChild(modelHost);
+  loadModelViews(API).then(v => {
+    if (!document.body.contains(modelHost)) return;
+    modelHost.innerHTML = renderEloView(v.elo) + renderBlendView(v.blend);
+  });
 }
 
 // ── Simulation tab (first-class; driven by the backend's availability /

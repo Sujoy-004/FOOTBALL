@@ -9,6 +9,7 @@ import {
   openIntelModal, renderLoading, currentCompetition,
   configureCompetitionRefresh,
   renderSimulationShell, bindSimulationShell,
+  renderEloView, renderBlendView, loadModelViews,
 } from "./shared.js";
 
 const API = "/laliga/api";
@@ -166,6 +167,17 @@ function render() {
   // onComplete callback below also re-binds after a completed run).
   const acqHost = document.getElementById("acqHost");
   if (acqHost) renderAcquisitionPanel(acqHost, _acquisition());
+  // Elo + blend payloads are a second, independent fetch: paint a host
+  // immediately and fill it when they land (or show their honest empty state).
+  const ovHost = document.getElementById("tab-overview");
+  if (ovHost) {
+    const modelHost = document.createElement("div");
+    ovHost.appendChild(modelHost);
+    loadModelViews(API).then(v => {
+      if (!document.body.contains(modelHost)) return;
+      modelHost.innerHTML = renderEloView(v.elo) + renderBlendView(v.blend);
+    });
+  }
   bindSimulation();
   updateStatusBar(
     _esc(appState.season || "") + " &middot; " + appState.n_played + "/"

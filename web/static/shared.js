@@ -115,6 +115,37 @@ document.addEventListener("visibilitychange", () => {
 // ── State ──
 let currentCompetition = null;
 let loadedModules = {};
+// Focus key captured from a [data-focus] activator (the landing Prediction
+// Engine cards) and replayed once the target view has actually mounted.
+// Empty = nothing pending.
+let pendingFocus = "";
+
+// Reveal the section named by the captured data-focus. The competition module
+// renders asynchronously, so a target that is not in the DOM yet is retried a
+// few times before the request is dropped. Every lookup is null-checked: a
+// missing view is a quiet no-op, never a throw.
+function applyPendingFocus(attempt) {
+  const focus = pendingFocus;
+  if (!focus) return;
+  const giveUp = () => { pendingFocus = ""; };
+  if (focus === "simulation") {
+    const simBtn = document.querySelector('.tab-btn[data-tab="simulation"]');
+    if (simBtn) { giveUp(); simBtn.click(); return; }
+  } else {
+    const target = document.getElementById(
+      focus === "elo" ? "viewElo" : focus === "blend" ? "viewBlend" : "");
+    if (target) {
+      const ovBtn = document.querySelector('.tab-btn[data-tab="overview"]');
+      if (ovBtn && !ovBtn.classList.contains("active")) ovBtn.click();
+      giveUp();
+      try { target.scrollIntoView({ block: "center" }); } catch { /* older engines */ }
+      return;
+    }
+  }
+  const n = attempt || 0;
+  if (n < 10) setTimeout(() => applyPendingFocus(n + 1), 150);
+  else giveUp();
+}
 
 // ── SPA Router ──
 function navigate(hash) {
@@ -126,6 +157,7 @@ function navigate(hash) {
   for (const [slug, comp] of Object.entries(competitions)) {
     if (route === comp.route) {
       loadCompetition(slug);
+      applyPendingFocus();
       return;
     }
   }
@@ -141,12 +173,28 @@ document.addEventListener("click", e => {
   const route = el.dataset.route;
   if (!route) return;
   if (el.tagName === "A" && el.getAttribute("href")) return;
+  pendingFocus = el.dataset.focus || "";
   window.location.hash = "#" + route;
+});
+
+// Keyboard parity for the card-style (div) activators: an element carrying
+// data-route behaves like a link for Enter/Space. Native controls are left to
+// the browser; the rest route through the same capture-then-hash path as a
+// click.
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+  const el = e.target.closest && e.target.closest("[data-route][data-focus]");
+  if (!el || el.dataset.disabled) return;
+  if (el.tagName === "A" || el.tagName === "BUTTON") return;
+  e.preventDefault();
+  pendingFocus = el.dataset.focus || "";
+  window.location.hash = "#" + el.dataset.route;
 });
 
 // ── Landing Page ──
 function renderLanding() {
   currentCompetition = null;
+  pendingFocus = "";
   stopAllCompetitionRefresh();
   document.body.className = "";
   document.getElementById("landingBackdrop").classList.add("show");
@@ -189,25 +237,29 @@ function renderLanding() {
     <div class="landing-section">
       <h2 class="ls-title">Prediction Engine</h2>
       <div class="lf-grid">
-        <div class="lf-card">
+        <div class="lf-card" role="link" tabindex="0" data-route="/worldcup" data-focus="elo">
           <div class="lfc-icon"><span class="lfc-dot"></span></div>
           <div class="lfc-name">Elo Ratings</div>
           <div class="lfc-desc">Dynamic team strength ratings updated with every match result, drawn from international and club competition history.</div>
+          <div class="lfc-cta">Open &rarr;</div>
         </div>
-        <div class="lf-card">
+        <div class="lf-card" role="link" tabindex="0" data-route="/worldcup" data-focus="blend">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">Multi-Signal Blending</div>
           <div class="lfc-desc">Refined Elo, market odds, rolling form, squad value, and rest days &mdash; blended by a transparent weighted ensemble.</div>
+          <div class="lfc-cta">Open &rarr;</div>
         </div>
-        <div class="lf-card">
+        <div class="lf-card" role="link" tabindex="0" data-route="/worldcup" data-focus="simulation">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">Monte Carlo Simulation</div>
           <div class="lfc-desc">Seeded tournament simulations projecting every knockout path, group outcome, and championship probability. You choose whether to simulate and how many runs to run.</div>
+          <div class="lfc-cta">Open &rarr;</div>
         </div>
-        <div class="lf-card">
+        <div class="lf-card" role="link" tabindex="0" data-route="/laliga" data-focus="simulation">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">What-If Analysis</div>
           <div class="lfc-desc">Adjust a team&rsquo;s Elo rating and re-run the seeded simulation &mdash; see exactly how championship probabilities shift.</div>
+          <div class="lfc-cta">Open &rarr;</div>
         </div>
       </div>
     </div>
@@ -952,6 +1004,91 @@ function bindSimulationShell(state, opts) {
   };
 }
 
+// ── Model views: Elo ratings + multi-signal blending (Overview sections) ──
+// Same contract as renderSimulationShell: pure string in / string out, no DOM,
+// no fetch, defensive on every field. Both views report ONLY what the payload
+// contains — an absent snapshot renders an honest "no data" line, never a
+// placeholder rating or an invented blend weight.
+const _ELO_EMPTY_LINE = "No Elo snapshot available yet.";
+
+function renderEloView(state) {
+  const st = state || {};
+  const ratings = (st.ratings && typeof st.ratings === "object") ? st.ratings : {};
+  const rows = Object.keys(ratings)
+    .map(t => ({ team: t, value: Number(ratings[t]) }))
+    .filter(r => isFinite(r.value))
+    .sort((a, b) => b.value - a.value);
+
+  let h = '<div class="chart-section" id="viewElo"><div class="title">Elo Ratings</div>';
+  if (rows.length) {
+    h += '<table class="eval-table"><tr><th>#</th><th>Team</th><th class="num">Elo</th></tr>';
+    rows.forEach((r, i) => {
+      h += '<tr><td class="num">' + (i + 1) + "</td><td>" + _esc(r.team)
+        + '</td><td class="num">' + r.value.toFixed(1) + "</td></tr>";
+    });
+    h += "</table>";
+  } else {
+    h += '<div class="dim">' + _esc(_ELO_EMPTY_LINE) + "</div>";
+  }
+  const prov = [];
+  if (st.source) prov.push("source: " + st.source);
+  if (st.as_of) prov.push("as of " + st.as_of);
+  if (prov.length) h += '<div class="dim" style="font-size:10px">' + _esc(prov.join(" · ")) + "</div>";
+  return h + "</div>";
+}
+
+function renderBlendView(state) {
+  const st = state || {};
+  const signals = Array.isArray(st.available_signals) ? st.available_signals : [];
+  const weights = (st.blend_weights && typeof st.blend_weights === "object") ? st.blend_weights : {};
+  const briers = (st.backtest_briers && typeof st.backtest_briers === "object") ? st.backtest_briers : {};
+  const status = st.calibration_status || "unknown";
+  const cold = !signals.length || status === "cold_start";
+
+  let h = '<div class="chart-section" id="viewBlend"><div class="title">Multi-Signal Blending</div>';
+  if (cold) {
+    // No calibrated weights exist yet — say so instead of showing fake ones.
+    h += "<div class=\"dim\">No calibrated signals yet";
+    if (st.threshold != null) {
+      h += " — needs " + _esc(String(st.threshold)) + " matches";
+      if (st.n_matches_for_calibration != null) {
+        h += " (have " + _esc(String(st.n_matches_for_calibration)) + ")";
+      }
+    }
+    h += ".</div>";
+  } else {
+    signals.forEach(sk => {
+      const w = Number(weights[sk]);
+      const pct = isFinite(w) ? w * 100 : null;
+      const b = Number(briers[sk]);
+      h += '<div class="chart-row"><div class="cname">'
+        + _esc(String(sk).replace(/_/g, " ")) + "</div>"
+        + '<div class="cbar-wrap"><div class="cbar" style="width:'
+        + (pct != null ? pct.toFixed(1) : "0") + '%"></div></div>'
+        + '<div class="cpct">' + (pct != null ? pct.toFixed(1) + "%" : "—") + "</div>"
+        + '<div class="dim" style="width:82px;text-align:right">'
+        + (isFinite(b) ? "Brier " + b.toFixed(4) : "Brier —") + "</div></div>";
+    });
+  }
+  const nAvail = st.n_signals_available != null ? st.n_signals_available : signals.length;
+  h += '<div class="dim" style="font-size:10px">'
+    + _esc(nAvail + " signal(s) available · calibration: " + status) + "</div>";
+  return h + "</div>";
+}
+
+// Optional Overview payloads. Both endpoints are best-effort: a 404 or a
+// network failure resolves to an explicit empty state so the views render
+// their honest "no data" line. Never throws, never rejects.
+async function loadModelViews(apiPrefix) {
+  const unwrap = (j) => (j && typeof j === "object" && j.data != null ? j.data : (j || {}));
+  const emptyElo = () => ({ ratings: {}, source: "empty", as_of: "" });
+  const [elo, blend] = await Promise.all([
+    safeJson(apiPrefix + "/api/elo").then(unwrap).catch(() => emptyElo()),
+    safeJson(apiPrefix + "/api/blend").then(unwrap).catch(() => ({ calibration_status: "unavailable" })),
+  ]);
+  return { elo: elo || emptyElo(), blend: blend || { calibration_status: "unavailable" } };
+}
+
 // ── Exports ──
 export {
   competitions,
@@ -967,6 +1104,9 @@ export {
   showSimPopup,
   renderSimulationShell,
   bindSimulationShell,
+  renderEloView,
+  renderBlendView,
+  loadModelViews,
   openIntelModal,
   safeJson,
   renderLoading,
