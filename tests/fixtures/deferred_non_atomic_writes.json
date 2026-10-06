@@ -19,25 +19,25 @@
   },
   {
     "path": "competitions/worldcup/src/pipeline.py",
-    "line": 129,
+    "line": 132,
     "symbol": "web/last_refresh.json (worldcup read-modify-write, failure branch)",
     "owner": "Phase 2"
   },
   {
     "path": "competitions/worldcup/src/pipeline.py",
-    "line": 210,
+    "line": 213,
     "symbol": "competitions/worldcup/data/played_groups.json",
     "owner": "Phase 2"
   },
   {
     "path": "competitions/worldcup/src/pipeline.py",
-    "line": 254,
+    "line": 257,
     "symbol": "competitions/worldcup/data/played.json",
     "owner": "Phase 2"
   },
   {
     "path": "competitions/worldcup/src/pipeline.py",
-    "line": 289,
+    "line": 292,
     "symbol": "web/last_refresh.json (worldcup read-modify-write, success branch)",
     "owner": "Phase 2"
   },
@@ -79,7 +79,7 @@
   },
   {
     "path": "web/wc_app.py",
-    "line": 340,
+    "line": 337,
     "symbol": "competitions/worldcup/data/snapshot.json",
     "owner": "Phase 2"
   }

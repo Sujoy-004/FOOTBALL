@@ -24,6 +24,9 @@ from src.state import (
     load_annex_c,
     load_groups,
 )
+# The brain owns its own evaluation module: this module no longer imports
+# from ``web`` (plan 01-06, D-13).
+from competitions.worldcup.src.evaluation import compute_signal_eval
 from football_core.signal import PredictionContext  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
@@ -703,9 +706,6 @@ def run_simulation_compute(
     )
 
     progress_cb(95, 100, "Evaluating prediction accuracy...")
-    # Phase 2 will move compute_signal_eval out of web.wc_app.
-    from web.wc_app import compute_signal_eval  # noqa: PLC0415
-
     eval_metrics = compute_signal_eval(
         teams_raw,
         played_raw,

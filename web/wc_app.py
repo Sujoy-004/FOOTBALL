@@ -18,10 +18,13 @@ from competitions.worldcup.src.groups import (
 )
 
 from competitions.worldcup.src.insight import compute_ko_signal_probs, compute_match_insight
-from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
-# Bracket and overview computation live in the World Cup brain; re-exported
-# here because the golden fixture, the truth-payload tests, the endpoints and
-# pipeline.py import these names from web.wc_app.
+from competitions.worldcup.src.evaluation import (
+    compute_signal_eval, compute_team_strengths_from_predictions,
+)
+# Bracket, overview and signal evaluation live in the World Cup brain;
+# re-exported here because the golden fixture, the truth-payload tests and the
+# endpoints import these names from web.wc_app. pipeline.py now imports the
+# evaluation module directly instead of reaching into web (plan 01-06, D-13).
 from competitions.worldcup.src.bracket import (
     _prob_availability,
     compute_full_bracket,
@@ -72,12 +75,6 @@ def build_knockout_tree() -> dict:
     """
     from competitions.worldcup.src.pipeline import build_knockout_tree as _pipeline_build
     return _pipeline_build(DATA_DIR)
-
-
-def compute_signal_eval(teams, played, played_groups, engine_predictions, all_matches):
-    """Evaluate signals from engine predictions — no ledger dependency."""
-    from competitions.worldcup.src.evaluation import compute_signal_eval as _eval
-    return _eval(teams, played, played_groups, engine_predictions, all_matches)
 
 
 def unplayed_match_count() -> int:

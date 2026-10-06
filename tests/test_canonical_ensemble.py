@@ -160,9 +160,10 @@ class TestWorldCupCanonicalIntegration:
             return {t: {"champion": 1 / len(teams)} for t in teams}
 
         monkeypatch.setattr(wc_pipeline, "run_full_simulation", spy_sim)
-        # compute_signal_eval still lives in web.wc_app; plan 01-06 moves it and
-        # deletes the predictors package, so this target is deliberate.
-        monkeypatch.setattr("web.wc_app.compute_signal_eval", lambda *a, **k: {})
+        # Plan 01-06 deleted the predictors package and repointed pipeline at
+        # src.evaluation, so compute_signal_eval is now bound into the pipeline
+        # namespace at import time -- patch the name pipeline actually calls.
+        monkeypatch.setattr(wc_pipeline, "compute_signal_eval", lambda *a, **k: {})
         # Plan 01-05 moved bracket/overview computation into the World Cup brain,
         # and pipeline now imports them from there at call time -- patching the
         # web re-export would no longer take effect.
