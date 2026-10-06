@@ -62,9 +62,12 @@ availability_cache.json
 defensive_cache.json
 manager_effect_cache.json
 
-# Root-level test artifacts (regeneratable by running tests)
-teams.json
-elo_update_log.json
+# Root-level test artifacts (regeneratable by running tests).
+# Anchored with a leading slash: an unanchored name matches at any depth and
+# would also swallow committed fixtures such as
+# tests/fixtures/wc_bracket/teams.json.
+/teams.json
+/elo_update_log.json
 
 # AI-generated responses, agent context files, and one-time reports
 /RESPONSE.md
