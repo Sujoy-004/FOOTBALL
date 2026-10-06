@@ -79,7 +79,7 @@
   },
   {
     "path": "web/wc_app.py",
-    "line": 472,
+    "line": 340,
     "symbol": "competitions/worldcup/data/snapshot.json",
     "owner": "Phase 2"
   }

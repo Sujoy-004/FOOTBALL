@@ -37,13 +37,18 @@ def test_wc_provider_exception_preserves_stores_and_reports_stale(
     assert au.snapshot_tree(wc_dir) == before_files
 
     from web import wc_app
+    from competitions.worldcup.src import overview as wc_overview
 
     cache_saved = au.snapshot_cache_state(wc_app)
     try:
-        monkeypatch.setattr(wc_app, "DATA_DIR", wc_dir)
+        # compute_overview moved to the World Cup brain, so its store path and
+        # signal probe are globals there now. wc_app.DATA_DIR still steers the
+        # store reads that the web layer performs itself.
+        monkeypatch.setattr(wc_overview, "DATA_DIR", wc_dir)
         monkeypatch.setattr(
-            wc_app, "compute_signals_meta", lambda: {"signals": [], "n_total": 0}
+            wc_overview, "compute_signals_meta", lambda: {"signals": [], "n_total": 0}
         )
+        monkeypatch.setattr(wc_app, "DATA_DIR", wc_dir)
         wc_app.cache.clear()
         overview = wc_app.compute_overview()
         assert isinstance(overview, dict) and overview.get("n_played", 0) >= 0

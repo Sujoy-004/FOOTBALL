@@ -47,11 +47,16 @@ def test_wc_end_to_end_ingestion_is_idempotent(tmp_path, monkeypatch):
     assert (wc_dir / "played_groups.json").read_bytes() == grp_bytes_after_1
 
     from web import wc_app
+    from competitions.worldcup.src import overview as wc_overview
 
     cache_saved = au.snapshot_cache_state(wc_app)
     try:
+        # compute_overview moved to the World Cup brain, so its store path and
+        # signal probe are globals there now. wc_app.DATA_DIR still steers the
+        # store reads that api_data() performs in the web layer.
+        monkeypatch.setattr(wc_overview, "DATA_DIR", wc_dir)
+        monkeypatch.setattr(wc_overview, "compute_signals_meta", lambda: {"signals": [], "n_total": 0})
         monkeypatch.setattr(wc_app, "DATA_DIR", wc_dir)
-        monkeypatch.setattr(wc_app, "compute_signals_meta", lambda: {"signals": [], "n_total": 0})
         wc_app.cache.clear()
         overview_after_1 = dict(wc_app.compute_overview())
         wc_app.cache.update(overview_after_1)
