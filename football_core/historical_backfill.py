@@ -29,6 +29,7 @@ import os
 import re
 import unicodedata
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, NamedTuple
 
 import numpy as np
@@ -43,6 +44,7 @@ from football_core.signals.market_odds import MarketOddsSignal
 from football_core.signals.refined_elo import RefinedEloSignal
 from football_core.signals.rest_days import RestDaysSignal
 from football_core.signals.rolling_form import RollingFormSignal
+from football_core.state import atomic_write_text
 
 # Provenance schema version written by every competition's build.
 PROVENANCE_SCHEMA = 1
@@ -64,13 +66,15 @@ def season_path(historical_dir: str, season: str, name: str) -> str:
 
 
 def write_json(path: str, data: Any) -> str:
-    """Atomically write JSON and return a content hash of the file."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    os.replace(tmp, path)
+    """Atomically write JSON and return a content hash of the file.
+
+    Routes through ``football_core.state.atomic_write_text`` (temp file in the
+    destination directory + fsync + ``os.replace``) rather than owning a local
+    temp+rename sequence. Serialisation and the trailing newline are unchanged,
+    so the bytes on disk -- and therefore the returned digest -- are identical.
+    """
+    text = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    atomic_write_text(Path(path), text)
     with open(path, "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()
 
