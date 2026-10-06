@@ -45,6 +45,11 @@ STALE_PATCH_PATTERNS = (
     "web.startup, 'is_snapshot_mode'",
     # direct global assignment instead of the explicit setter
     "_last_decision =",
+    # ...and the multi-line monkeypatch spelling of the same mistake
+    'setattr(startup, "_last_decision"',
+    "setattr(startup, '_last_decision'",
+    'startup, "_last_decision"',
+    "startup, '_last_decision'",
 )
 
 

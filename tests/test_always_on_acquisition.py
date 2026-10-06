@@ -72,7 +72,7 @@ def isolated_environment(tmp_path, monkeypatch):
     monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
     yield
-    startup._last_decision = None
+    startup.set_session_decision(None)
 
 
 # ── 1. default non-interactive path ──────────────────────────────────────
@@ -106,14 +106,13 @@ def test_usable_key_still_decides_live_configured(monkeypatch):
 @pytest.mark.parametrize("raw", ["1", "true", "YES", "on"])
 def test_football_snapshot_env_forces_zero_network(monkeypatch, raw):
     import competitions.worldcup.src.pipeline as wc_pipeline
-    import web.common
     import web.startup as startup
     import web.ucl_app as ucl_app
 
     prov = _CountingProvider()
     _CountingProvider.calls = 0
     monkeypatch.setenv("FOOTBALL_SNAPSHOT", raw)
-    monkeypatch.setattr(web.common, "get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: prov)
 
     # The override wins over every normal-mode path (there is no menu).
@@ -135,16 +134,15 @@ def test_forced_snapshot_decision_is_zero_network(monkeypatch):
     """A forced StartupDecision("snapshot") is an explicit OFFLINE session:
     wrappers self-gate and make zero provider calls."""
     import competitions.worldcup.src.pipeline as wc_pipeline
-    import web.common
     import web.startup as startup
     import web.ucl_app as ucl_app
 
     prov = _CountingProvider()
     _CountingProvider.calls = 0
-    monkeypatch.setattr(web.common, "get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: prov)
 
-    startup._last_decision = startup.StartupDecision("snapshot", "")
+    startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     assert startup.is_snapshot_mode() is True
 
     wc_pipeline.fetch_live_data("", "", WC_DATA)
@@ -175,15 +173,14 @@ def test_auto_empty_provider_reports_stale_and_preserves_stores(monkeypatch):
     """auto + provider returning [] => attempted/success=false/stale=true
     for BOTH apps, and every factual store byte-identical before/after."""
     import competitions.worldcup.src.pipeline as wc_pipeline
-    import web.common
     import web.startup as startup
     import web.ucl_app as ucl_app
 
-    startup._last_decision = startup.StartupDecision("auto", "")
+    startup.set_session_decision(startup.StartupDecision("auto", ""))
 
     prov = _CountingProvider(payload=[], last_error="provider down")
     _CountingProvider.calls = 0
-    monkeypatch.setattr(web.common, "get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: prov)
 
     before = {**_hash_json_dir(WC_DATA), **_hash_json_dir(UCL_DATA)}
@@ -210,11 +207,10 @@ def test_auto_empty_provider_reports_stale_and_preserves_stores(monkeypatch):
 def test_auto_raising_provider_never_touches_stores(monkeypatch):
     """auto + provider raising => no factual-store mutation from either app."""
     import competitions.worldcup.src.pipeline as wc_pipeline
-    import web.common
     import web.startup as startup
     import web.ucl_app as ucl_app
 
-    startup._last_decision = startup.StartupDecision("auto", "")
+    startup.set_session_decision(startup.StartupDecision("auto", ""))
 
     class _Raising:
         last_error = None
@@ -222,7 +218,7 @@ def test_auto_raising_provider_never_touches_stores(monkeypatch):
         def fetch_matches(self, *a, **k):
             raise RuntimeError("network unreachable")
 
-    monkeypatch.setattr(web.common, "get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: _Raising())
 
     before = {**_hash_json_dir(WC_DATA), **_hash_json_dir(UCL_DATA)}
@@ -246,11 +242,10 @@ def test_auto_succeeding_provider_ingests_into_tmp_store(tmp_path, monkeypatch):
     """auto + stub provider => ingest runs against the SANDBOX data dir:
     success report with stage checklist, results.json updated there, and
     the repository stores untouched."""
-    import web.common
     import web.startup as startup
     import web.ucl_app as ucl_app
 
-    startup._last_decision = startup.StartupDecision("auto", "")
+    startup.set_session_decision(startup.StartupDecision("auto", ""))
 
     tmp_data = tmp_path / "ucldata"
     shutil.copytree(UCL_DATA, tmp_data)
@@ -275,7 +270,7 @@ def test_auto_succeeding_provider_ingests_into_tmp_store(tmp_path, monkeypatch):
 
     provider = _CountingProvider(payload=[event])
     _CountingProvider.calls = 0
-    monkeypatch.setattr(web.common, "get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: provider)
     monkeypatch.setattr(ucl_app, "DATA_DIR", tmp_data)
 

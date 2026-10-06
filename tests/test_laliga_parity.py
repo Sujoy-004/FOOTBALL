@@ -302,12 +302,10 @@ class TestWebParity:
         assert rr["mode"] == "results"
 
     def test_snapshot_mode_skips_refresh(self, monkeypatch):
-        import web.startup as startup
         from web.server import app as server_app
 
         monkeypatch.setenv("FOOTBALL_SNAPSHOT", "1")
-        monkeypatch.setattr(startup, "_last_decision",
-                            startup.StartupDecision("snapshot", ""))
+        monkeypatch.setattr("football_core.runtime_support._snapshot_session", True)
         with TestClient(server_app) as client:
             r = client.post("/laliga/api/refresh").json()
             assert r["status"] == "skipped"

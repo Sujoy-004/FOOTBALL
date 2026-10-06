@@ -59,21 +59,20 @@ def isolated_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
     monkeypatch.setenv("FOOTBALL_PRELOAD_ALL", "")
     competitions.reset_lazy_gates()
-    startup._last_decision = None
+    startup.set_session_decision(None)
     yield
     competitions.reset_lazy_gates()
-    startup._last_decision = None
+    startup.set_session_decision(None)
 
 
 def _install_split_fakes(monkeypatch, ucl_prov, wc_prov):
     """Route provider selection by league id so each competition gets its
     own counting fake through the single shared factory."""
-    import web.common
 
     def _factory(bsd_key, fdo_key, league_id=None):
         return ucl_prov if league_id == UCL_LEAGUE_ID else wc_prov
 
-    monkeypatch.setattr(web.common, "get_data_provider", _factory)
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider", _factory)
 
 
 # ── 1. registry scoping: no cross-talk ───────────────────────────────────
@@ -252,5 +251,5 @@ def test_snapshot_env_still_forces_snapshot(monkeypatch):
 def test_forced_decision_snapshot_still_honored():
     import web.startup as startup
 
-    startup._last_decision = startup.StartupDecision("snapshot", "")
+    startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     assert startup.is_snapshot_mode() is True

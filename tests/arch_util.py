@@ -237,10 +237,9 @@ def recording_provider(stub):
 
 
 def patch_wc_offline(monkeypatch, tmp_path):
-    import web.startup
     from competitions.worldcup.src import pipeline as wc_pipeline
 
-    monkeypatch.setattr(web.startup, "is_snapshot_mode", lambda: False)
+    monkeypatch.setattr("football_core.runtime_support.is_snapshot_mode", lambda: False)
     leader = tmp_path / "freshness.json"
     monkeypatch.setattr(wc_pipeline, "_last_refresh_report_path", lambda: leader)
 

@@ -17,7 +17,7 @@ def _wc_run(wc_dir, groups, played, played_groups, monkeypatch, tmp_path):
     )
     _, get_data_provider = au.recording_provider(stub)
     au.patch_wc_offline(monkeypatch, tmp_path)
-    monkeypatch.setattr("web.common.get_data_provider", get_data_provider)
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider", get_data_provider)
     from competitions.worldcup.src.pipeline import fetch_live_data
 
     return fetch_live_data("", "", wc_dir)

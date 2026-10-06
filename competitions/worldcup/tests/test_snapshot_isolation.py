@@ -55,13 +55,12 @@ def snapshot_env(monkeypatch):
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
     prov = _CountingProvider()
     _CountingProvider.calls = 0
-    import web.common
-    monkeypatch.setattr(web.common, "get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: prov)
-    # force the startup decision without running interactive flow
-    import web.startup as startup
-    monkeypatch.setattr(startup, "_last_decision",
-                        startup.StartupDecision("snapshot", ""))
+    # Force the session snapshot flag without running the interactive flow.
+    # Patching the kernel flag (not web.startup._last_decision) is what makes
+    # the World Cup brain see it, and monkeypatch restores it on teardown.
+    monkeypatch.setattr("football_core.runtime_support._snapshot_session", True)
     return prov
 
 
@@ -87,12 +86,10 @@ def test_live_mode_still_reaches_provider(monkeypatch):
             calls["n"] += 1
             return []
 
-    monkeypatch.setattr("web.common.get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: LiveProv())
     # ensure NOT snapshot
-    import web.startup as startup
-    monkeypatch.setattr(startup, "_last_decision",
-                        startup.StartupDecision("live-configured", ""))
+    monkeypatch.setattr("football_core.runtime_support._snapshot_session", False)
     wc_pipeline.fetch_live_data("", "", WC_DATA)
     assert calls["n"] >= 1
 
@@ -114,11 +111,9 @@ def test_failed_refresh_persists_only_into_redirected_ledger(
         def fetch_matches(self, **k):
             return []
 
-    monkeypatch.setattr("web.common.get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: EmptyProv())
-    import web.startup as startup
-    monkeypatch.setattr(startup, "_last_decision",
-                        startup.StartupDecision("live-configured", ""))
+    monkeypatch.setattr("football_core.runtime_support._snapshot_session", False)
 
     import competitions.worldcup.src.pipeline as wc_pipeline
     report = wc_pipeline.fetch_live_data("", "", WC_DATA)
@@ -144,11 +139,9 @@ def test_unreadable_data_files_return_structured_report(
         def fetch_matches(self, **k):
             return [{"match_id": "stub"}]
 
-    monkeypatch.setattr("web.common.get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: StubProv())
-    import web.startup as startup
-    monkeypatch.setattr(startup, "_last_decision",
-                        startup.StartupDecision("live-configured", ""))
+    monkeypatch.setattr("football_core.runtime_support._snapshot_session", False)
 
     report = wc_pipeline.fetch_live_data("", "", tmp_path)
     assert isinstance(report, dict)

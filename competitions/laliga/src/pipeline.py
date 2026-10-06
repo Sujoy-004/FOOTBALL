@@ -1,7 +1,7 @@
 """LaLiga pipeline — acquisition, stores, deterministic compute, insight.
 
 Mirrors the UCL brain's responsibilities while staying league-only:
-the web layer owns transport selection (``web.common.get_data_provider``),
+the kernel owns transport selection (``football_core.runtime_support``),
 this module owns every normalization and store-write decision, and the
 shared generic season store (``football_core.seasons``) owns persistence.
 """

@@ -84,13 +84,13 @@ def isolated_season_refresh_state(tmp_path, monkeypatch):
     monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     monkeypatch.delenv("FOOTBALL_PRELOAD_ALL", raising=False)
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
-    startup._last_decision = startup.StartupDecision("auto", "")
+    startup.set_session_decision(startup.StartupDecision("auto", ""))
     competitions.reset_lazy_gates()
     ucl_app._refresh_report = {}
     ucl_app._refresh_reports = {}
     ucl_app._refresh_reports_seeded = False
     yield
-    startup._last_decision = None
+    startup.set_session_decision(None)
     competitions.reset_lazy_gates()
     ucl_app._refresh_report = {}
     ucl_app._refresh_reports = {}
@@ -139,7 +139,6 @@ def _write_pointer(data_dir: Path, season: str | None) -> None:
 class TestSeasonScopedServedRefresh:
     def test_active_2026_27_deferred_served_through_api(self, tmp_path, monkeypatch):
         """2026/27 active + HTTP 200 + 0 matches => deferred, still served."""
-        import web.common
         import web.ucl_app as ucl_app
         from fastapi.testclient import TestClient
 
@@ -148,7 +147,7 @@ class TestSeasonScopedServedRefresh:
         monkeypatch.setattr(ucl_app, "DATA_DIR", dp)
         provider = _EmptyProvider()
         monkeypatch.setattr(
-            web.common, "get_data_provider", lambda b, f, l=None: provider
+            "football_core.runtime_support.get_data_provider", lambda b, f, l=None: provider
         )
 
         with TestClient(ucl_app.ucl_app) as client:
@@ -171,7 +170,6 @@ class TestSeasonScopedServedRefresh:
         self, tmp_path, monkeypatch
     ):
         """2026/27 deferred -> 2025/26 store-truth -> back: statuses never mix."""
-        import web.common
         import web.ucl_app as ucl_app
         from fastapi.testclient import TestClient
 
@@ -179,7 +177,7 @@ class TestSeasonScopedServedRefresh:
         _write_pointer(dp, "2026/27")
         monkeypatch.setattr(ucl_app, "DATA_DIR", dp)
         monkeypatch.setattr(
-            web.common, "get_data_provider",
+            "football_core.runtime_support.get_data_provider",
             lambda b, f, l=None: _EmptyProvider(),
         )
 
@@ -220,7 +218,6 @@ class TestSeasonScopedServedRefresh:
         self, tmp_path, monkeypatch
     ):
         """A genuine transport failure stays stale — but only for ITS season."""
-        import web.common
         import web.ucl_app as ucl_app
         from fastapi.testclient import TestClient
 
@@ -228,7 +225,7 @@ class TestSeasonScopedServedRefresh:
         _write_pointer(dp, "2026/27")
         monkeypatch.setattr(ucl_app, "DATA_DIR", dp)
         monkeypatch.setattr(
-            web.common, "get_data_provider",
+            "football_core.runtime_support.get_data_provider",
             lambda b, f, l=None: _EmptyProvider(
                 last_error="HTTP 400: Your API token is invalid."
             ),
@@ -263,7 +260,7 @@ class TestSeasonScopedServedRefresh:
         dp = _seed_ucl_dir(tmp_path)
         _write_pointer(dp, "2025/26")
         monkeypatch.setattr(ucl_app, "DATA_DIR", dp)
-        startup._last_decision = startup.StartupDecision("snapshot", "")
+        startup.set_session_decision(startup.StartupDecision("snapshot", ""))
 
         with TestClient(ucl_app.ucl_app) as client:
             refresh = client.get("/api/data").json()["refresh"]
@@ -329,7 +326,6 @@ class TestLedgerSeeding:
 
     def test_inprocess_report_wins_over_file_state(self, tmp_path, monkeypatch):
         """A fetch recorded THIS process overrides seeded file state."""
-        import web.common
         import web.ucl_app as ucl_app
 
         dp = _seed_ucl_dir(tmp_path)
@@ -351,7 +347,7 @@ class TestLedgerSeeding:
         # An in-process successful fetch then wins.
         event = au.ucl_league_events(dp, n=1)[0]
         monkeypatch.setattr(
-            web.common, "get_data_provider",
+            "football_core.runtime_support.get_data_provider",
             lambda b, f, l=None: _SucceedingProvider(event),
         )
         ucl_app._fetch_live_data()

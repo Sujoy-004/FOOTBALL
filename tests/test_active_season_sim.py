@@ -27,9 +27,9 @@ def snapshot_mode(monkeypatch):
     import web.startup as startup
     # Pin snapshot through the server lifespan too: zero network.
     monkeypatch.setenv("FOOTBALL_SNAPSHOT", "1")
-    startup._last_decision = startup.StartupDecision("snapshot", "")
+    startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     yield
-    startup._last_decision = None
+    startup.set_session_decision(None)
 
 
 @pytest.fixture

@@ -11,7 +11,7 @@ def _wc_run(wc_dir, group_events, ko_events, monkeypatch, tmp_path):
     )
     _, get_data_provider = au.recording_provider(stub)
     au.patch_wc_offline(monkeypatch, tmp_path)
-    monkeypatch.setattr("web.common.get_data_provider", get_data_provider)
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider", get_data_provider)
     from competitions.worldcup.src.pipeline import fetch_live_data
 
     return fetch_live_data("", "", wc_dir)
@@ -26,7 +26,7 @@ def test_wc_provider_exception_preserves_stores_and_reports_stale(
     stub = au.StubProvider(raises=RuntimeError("provider crash"))
     _, get_data_provider = au.recording_provider(stub)
     leader = au.patch_wc_offline(monkeypatch, tmp_path)
-    monkeypatch.setattr("web.common.get_data_provider", get_data_provider)
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider", get_data_provider)
 
     from competitions.worldcup.src.pipeline import fetch_live_data
 
@@ -168,7 +168,6 @@ def test_ucl_stale_undecided_final_cannot_wipe_decided_tie(tmp_path):
 
 
 def test_ucl_web_raising_provider_records_stale_in_ledger(tmp_path, monkeypatch):
-    import web.startup
     from web import ucl_app
 
     ucl_dir = au.seed_ucl_dir(tmp_path / "ucl")
@@ -177,8 +176,8 @@ def test_ucl_web_raising_provider_records_stale_in_ledger(tmp_path, monkeypatch)
 
     stub = au.StubProvider(raises=RuntimeError("provider crash"), competition="CL")
     _, get_data_provider = au.recording_provider(stub)
-    monkeypatch.setattr(web.startup, "is_snapshot_mode", lambda: False)
-    monkeypatch.setattr("web.common.get_data_provider", get_data_provider)
+    monkeypatch.setattr("football_core.runtime_support.is_snapshot_mode", lambda: False)
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider", get_data_provider)
     monkeypatch.setattr(ucl_app, "DATA_DIR", ucl_dir)
     monkeypatch.setattr(ucl_app, "_refresh_report_path", lambda: leader)
 
@@ -198,7 +197,7 @@ def test_wc_web_raising_provider_records_stale_in_ledger(tmp_path, monkeypatch):
     stub = au.StubProvider(raises=RuntimeError("provider crash"), competition="WC")
     _, get_data_provider = au.recording_provider(stub)
     leader = au.patch_wc_offline(monkeypatch, tmp_path)
-    monkeypatch.setattr("web.common.get_data_provider", get_data_provider)
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider", get_data_provider)
     cache_saved = au.snapshot_cache_state(wc_app)
     try:
         wc_app.cache.clear()

@@ -49,9 +49,9 @@ def active_2026_runtime(tmp_path, monkeypatch):
     app._refresh_report = {}
     app._refresh_reports = {}
     app._refresh_reports_seeded = False
-    startup._last_decision = startup.StartupDecision("snapshot", "")
+    startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     yield app.ucl_app, data_dir
-    startup._last_decision = None
+    startup.set_session_decision(None)
     competitions.reset_lazy_gates()
 
 

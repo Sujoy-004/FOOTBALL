@@ -38,9 +38,9 @@ def snapshot_mode(monkeypatch, tmp_path):
     shutil.copytree(src, dst)
     set_current_season(dst, "2025/26", basis="pointer_local", provider=None)
     monkeypatch.setattr(app, "DATA_DIR", dst)
-    startup._last_decision = startup.StartupDecision("snapshot", "")
+    startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     yield
-    startup._last_decision = None
+    startup.set_session_decision(None)
 
 
 class TestInsightTiesRealData:

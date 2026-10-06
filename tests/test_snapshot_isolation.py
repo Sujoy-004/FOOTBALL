@@ -50,12 +50,11 @@ def snapshot_env(monkeypatch):
     monkeypatch.setenv("FOOTBALL_SNAPSHOT", "1")
     prov = _CountingProvider()
     _CountingProvider.calls = 0
-    import web.common
-    monkeypatch.setattr(web.common, "get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: prov)
     # force the startup decision without running interactive flow
     import web.startup as startup
-    startup._last_decision = startup.StartupDecision("snapshot", "")
+    startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     return prov
 
 
@@ -195,16 +194,16 @@ def test_live_mode_still_reaches_provider(monkeypatch):
             calls["n"] += 1
             return []
 
-    monkeypatch.setattr("web.common.get_data_provider",
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: LiveProv())
     # ensure NOT snapshot
     import web.startup as startup
-    startup._last_decision = startup.StartupDecision("live-configured", "")
+    startup.set_session_decision(startup.StartupDecision("live-configured", ""))
     try:
         wc_pipeline.fetch_live_data("", "", ROOT / "competitions" / "worldcup" / "data")
         assert calls["n"] >= 1
     finally:
-        startup._last_decision = None
+        startup.set_session_decision(None)
 
 
 def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch, tmp_path):
@@ -215,7 +214,7 @@ def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch, tmp_path):
     the provider-level counter looked clean.
     """
     import web.startup as startup
-    startup._last_decision = startup.StartupDecision("snapshot", "")
+    startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     import competitions.ucl.src.elo_fetcher as ucl_ef
     import football_core.clubelo as clubelo
 

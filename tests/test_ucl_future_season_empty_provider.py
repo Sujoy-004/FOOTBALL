@@ -78,9 +78,9 @@ def isolated_ledger(tmp_path, monkeypatch):
     monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
     ucl_app._refresh_report = {}
-    startup._last_decision = startup.StartupDecision("auto", "")
+    startup.set_session_decision(startup.StartupDecision("auto", ""))
     yield
-    startup._last_decision = None
+    startup.set_session_decision(None)
     ucl_app._refresh_report = {}
 
 
@@ -207,14 +207,13 @@ class TestWebLayer:
         """Route ucl_app at the WEB boundary onto a tmp future-season dir."""
 
         def _install(provider):
-            import web.common
             import web.ucl_app as ucl_app
 
             dp = _seed_ucl_dir(tmp_path)
             _write_pointer(dp, "2026/27")
             monkeypatch.setattr(ucl_app, "DATA_DIR", dp)
             monkeypatch.setattr(
-                web.common, "get_data_provider", lambda b, f, l=None: provider
+                "football_core.runtime_support.get_data_provider", lambda b, f, l=None: provider
             )
             return ucl_app
 
@@ -255,7 +254,6 @@ class TestWebLayer:
 
     def test_web_historical_success_report_ok(self, tmp_path, monkeypatch):
         """2025/26 successful live refresh keeps status="ok", non-stale."""
-        import web.common
         import web.ucl_app as ucl_app
 
         dp = _seed_ucl_dir(tmp_path)
@@ -263,7 +261,7 @@ class TestWebLayer:
         monkeypatch.setattr(ucl_app, "DATA_DIR", dp)
         event = au.ucl_league_events(dp, n=1)[0]
         monkeypatch.setattr(
-            web.common, "get_data_provider",
+            "football_core.runtime_support.get_data_provider",
             lambda b, f, l=None: _SucceedingProvider(event),
         )
         ucl_app._fetch_live_data()

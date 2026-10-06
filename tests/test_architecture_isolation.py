@@ -17,7 +17,7 @@ def test_wc_ingestion_never_writes_ucl_data(tmp_path, monkeypatch):
     )
     _, get_data_provider = au.recording_provider(stub)
     leader = au.patch_wc_offline(monkeypatch, tmp_path)
-    monkeypatch.setattr("web.common.get_data_provider", get_data_provider)
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider", get_data_provider)
 
     from competitions.worldcup.src.pipeline import fetch_live_data
 
@@ -66,14 +66,14 @@ def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
 
         groups, played, played_groups = au.wc_repo_snapshot()
         wc_leader = au.patch_wc_offline(monkeypatch, tmp_path)
-        monkeypatch.setattr("web.startup.is_snapshot_mode", lambda: False)
+        monkeypatch.setattr("football_core.runtime_support.is_snapshot_mode", lambda: False)
 
         wc_stub = au.StubProvider(
             au.wc_events_from_snapshot(groups, played, played_groups),
             competition="WC",
         )
         wc_calls, wc_gp = au.recording_provider(wc_stub)
-        monkeypatch.setattr("web.common.get_data_provider", wc_gp)
+        monkeypatch.setattr("football_core.runtime_support.get_data_provider", wc_gp)
         monkeypatch.setattr(wc_app, "DATA_DIR", wc_dir)
         # Credentials are read at CALL time: clear the env so no real key
         # can leak into the isolated fetch.
@@ -93,7 +93,7 @@ def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
         ucl_leader = tmp_path / "ucl_freshness.json"
         ucl_stub = au.StubProvider(au.ucl_league_events(ucl_dir, n=4), competition="CL")
         ucl_calls, ucl_gp = au.recording_provider(ucl_stub)
-        monkeypatch.setattr("web.common.get_data_provider", ucl_gp)
+        monkeypatch.setattr("football_core.runtime_support.get_data_provider", ucl_gp)
         monkeypatch.setattr(ucl_app, "DATA_DIR", ucl_dir)
         monkeypatch.setattr(ucl_app, "_refresh_report_path", lambda: ucl_leader)
         monkeypatch.setattr(

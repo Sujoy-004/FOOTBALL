@@ -133,8 +133,6 @@ def test_live_fetch_partitions_events_before_routing(monkeypatch, tmp_path):
     """fetch_live_data feeds each processor only its own stage events."""
     import src.fetcher as wc_fetcher
     import src.pipeline as wc_pipeline
-    import web.common
-    import web.startup
 
     class FakeProvider:
         last_error = None
@@ -160,9 +158,9 @@ def test_live_fetch_partitions_events_before_routing(monkeypatch, tmp_path):
     monkeypatch.setattr(wc_fetcher, "process_group_matches", _fake_group)
     monkeypatch.setattr(wc_fetcher, "process_matches", _fake_ko)
     monkeypatch.setattr(
-        web.common, "get_data_provider", lambda *a, **k: FakeProvider()
+        "football_core.runtime_support.get_data_provider", lambda *a, **k: FakeProvider()
     )
-    monkeypatch.setattr(web.startup, "is_snapshot_mode", lambda: False)
+    monkeypatch.setattr("football_core.runtime_support.is_snapshot_mode", lambda: False)
     monkeypatch.setattr(
         wc_pipeline, "_last_refresh_report_path",
         lambda: tmp_path / "last_refresh.json",
@@ -514,8 +512,6 @@ def test_live_run_on_complete_snapshot_is_stable(monkeypatch, tmp_path):
     """
     import src.fetcher as wc_fetcher
     import src.pipeline as wc_pipeline
-    import web.common
-    import web.startup
 
     played_groups, played, group_events, ko_events = _real_store_events()
 
@@ -526,9 +522,9 @@ def test_live_run_on_complete_snapshot_is_stable(monkeypatch, tmp_path):
             return group_events + ko_events
 
     monkeypatch.setattr(
-        web.common, "get_data_provider", lambda *a, **k: FakeProvider()
+        "football_core.runtime_support.get_data_provider", lambda *a, **k: FakeProvider()
     )
-    monkeypatch.setattr(web.startup, "is_snapshot_mode", lambda: False)
+    monkeypatch.setattr("football_core.runtime_support.is_snapshot_mode", lambda: False)
     monkeypatch.setattr(
         wc_pipeline, "_last_refresh_report_path",
         lambda: tmp_path / "last_refresh.json",

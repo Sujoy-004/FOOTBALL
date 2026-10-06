@@ -23,7 +23,7 @@ def clean_env(monkeypatch):
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
     monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     yield
-    startup._last_decision = None
+    startup.set_session_decision(None)
 
 
 def test_configured_key_no_prompt(monkeypatch, capsys):

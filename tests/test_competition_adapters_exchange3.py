@@ -21,9 +21,9 @@ UCL_DATA = ROOT / "competitions" / "ucl" / "data"
 @pytest.fixture
 def snapshot_mode(monkeypatch):
     import web.startup as startup
-    startup._last_decision = startup.StartupDecision("snapshot", "")
+    startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     yield
-    startup._last_decision = None
+    startup.set_session_decision(None)
 
 
 class TestAdapterDeterminism:

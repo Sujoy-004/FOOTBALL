@@ -67,7 +67,7 @@ class TestUnverifiedSurfacing:
         monkeypatch.setattr(cli, "_parse_args", lambda argv=None: type(
             "A", (), {"mode": "live", "once": True, "n_iterations": 1, "seed": 1},
         )())
-        monkeypatch.setattr("web.common.get_data_provider",
+        monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                             lambda *a, **k: type("P", (), {})())
         monkeypatch.setattr(cli, "load_dotenv", lambda *a, **k: None)
         monkeypatch.setattr("competitions.ucl.src.pipeline.fetch_live_data",

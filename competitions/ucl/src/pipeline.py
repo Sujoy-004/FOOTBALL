@@ -385,7 +385,7 @@ def fetch_live_data(
         set_current_season,
     )
 
-    # The web layer owns transport selection (web.common.get_data_provider)
+    # The kernel owns transport selection (runtime_support.get_data_provider)
     # and may pass a pre-selected provider; offline/backfill callers fall
     # back to the local key-based selection.
     if provider is None:
