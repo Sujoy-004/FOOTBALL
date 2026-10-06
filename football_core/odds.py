@@ -65,7 +65,7 @@ import requests
 from football_core.data_providers.bsd_provider import BSDDataProvider
 from football_core.fetcher import fold_team_key
 from football_core.predictors.odds import remove_vig
-from football_core.state import _atomic_write_json
+from football_core.state import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -456,16 +456,6 @@ def _available_record(fixture: dict, event: dict, odds_home, odds_draw, odds_awa
     }
 
 
-def _atomic_write_odds(store: dict, path: Path) -> None:
-    """Persist the odds store atomically.
-
-    Thin alias over the canonical fsync-capable writer in
-    football_core.state; kept under this name because the competition
-    odds modules import it from here.
-    """
-    _atomic_write_json(store, path)
-
-
 def _aggregate_state(counts: dict, events_seen: bool) -> str:
     if counts["available"] > 0:
         if counts["invalid"] > 0 or counts["missing"] > 0:
@@ -578,7 +568,9 @@ def acquire_odds_store(
              "iso_note": iso_note}
     store_path = Path(store_path)
     try:
-        _atomic_write_odds(store, store_path)
+        atomic_write_text(
+            store_path, json.dumps(store, indent=2, ensure_ascii=False)
+        )
     except OSError as exc:
         logger.warning("odds store write failed: %s", exc)
         store_path = None

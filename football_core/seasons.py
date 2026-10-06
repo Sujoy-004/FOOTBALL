@@ -10,7 +10,9 @@ Contract
 --------
 - ``derive_fixture_id(namespace, home, away)`` is deterministic and
   date-independent: a fixture's id never changes as kick-off time shifts.
-- Every store write is atomic (fsync + ``os.replace``) with UTF-8 JSON.
+- Every store write is atomic (fsync + ``os.replace``) with UTF-8 JSON,
+  routed through ``football_core.state.atomic_write_text`` -- the single
+  atomic text primitive in the repo, not a private copy of it.
 - ``data/current.json`` is the runtime season pointer; absence means the
   brain's shipped season is active (the caller provides the default).
 - Corrupt or missing reads degrade to empty payloads, never raise.
@@ -21,8 +23,6 @@ Layout
 ``<data_dir>/current.json``
 ``<dir_token>`` is the season token with ``/`` replaced by ``_``
 (``"2026/27"`` -> ``"2026_27"``).
-
-Stdlib only.
 """
 
 from __future__ import annotations
@@ -30,28 +30,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-
-def _atomic_write_json(data: dict | list, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.stem + ".", suffix=".tmp"
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_path, str(path))
-    except Exception:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+from football_core.state import atomic_write_text
 
 
 def normalize_season_dir(season_token: str) -> str:
@@ -120,7 +102,7 @@ def write_season_fixtures(
     payload.setdefault("schema", 1)
     payload["season"] = season_token
     path = season_dir(data_dir, season_token) / "fixtures.json"
-    _atomic_write_json(payload, path)
+    atomic_write_text(path, json.dumps(payload, indent=2, ensure_ascii=False))
     return path
 
 
@@ -131,7 +113,7 @@ def write_season_results(
     payload.setdefault("schema", 1)
     payload["season"] = season_token
     path = season_dir(data_dir, season_token) / "results.json"
-    _atomic_write_json(payload, path)
+    atomic_write_text(path, json.dumps(payload, indent=2, ensure_ascii=False))
     return path
 
 
@@ -162,7 +144,10 @@ def set_current_season(
         "provider": provider,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    _atomic_write_json(pointer, current_season_path(data_dir))
+    atomic_write_text(
+        current_season_path(data_dir),
+        json.dumps(pointer, indent=2, ensure_ascii=False),
+    )
     return dict(pointer)
 
 

@@ -17,8 +17,9 @@ seasons DISCOVERED from provider feeds (a new current season), so a fresh
 checkout never fabricates schedules for seasons nobody has observed yet.
 
 All writes are atomic (temp file + ``os.replace``, utf-8, indent=2,
-``ensure_ascii=False``). Every reader tolerates missing/corrupt files and
-returns ``None`` instead of raising.
+``ensure_ascii=False``) through ``football_core.state.atomic_write_text``.
+Every reader tolerates missing/corrupt files and returns ``None`` instead
+of raising.
 
 Stable fixture ids (documented contract used by the ingest router):
 
@@ -43,10 +44,11 @@ import json
 import logging
 import os
 import re
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from football_core.state import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -167,25 +169,10 @@ def season_dir(data_dir: str | Path, season: Any) -> Path:
 
 
 # ── atomic JSON persistence ──────────────────────────────────────────────────
-
-
-def _atomic_write_json(data: Any, path: Path) -> None:
-    """Write *data* to *path* atomically (utf-8, indent=2, ensure_ascii=False)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.stem + ".", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_path, str(path))
-    except Exception:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+#
+# No local writer: every store write below routes through
+# ``football_core.state.atomic_write_text``, the single atomic text primitive
+# in the repo. Do not re-implement temp-file + fsync + os.replace here.
 
 
 # ── current-season pointer ───────────────────────────────────────────────────
@@ -215,7 +202,10 @@ def set_current_season(
         "basis": basis,
         "provider": provider,
     }
-    _atomic_write_json(payload, _current_path(data_dir))
+    atomic_write_text(
+        _current_path(data_dir),
+        json.dumps(payload, indent=2, ensure_ascii=False),
+    )
     return payload
 
 
@@ -285,14 +275,14 @@ def read_season_results(data_dir: str | Path, season: Any) -> dict | None:
 def write_season_fixtures(data_dir: str | Path, season: Any, document: dict) -> str:
     """Persist a season fixtures document atomically; returns the path."""
     path = season_dir(data_dir, season) / FIXTURES_FILENAME
-    _atomic_write_json(document, path)
+    atomic_write_text(path, json.dumps(document, indent=2, ensure_ascii=False))
     return str(path)
 
 
 def write_season_results(data_dir: str | Path, season: Any, document: dict) -> str:
     """Persist a season results document atomically; returns the path."""
     path = season_dir(data_dir, season) / RESULTS_FILENAME
-    _atomic_write_json(document, path)
+    atomic_write_text(path, json.dumps(document, indent=2, ensure_ascii=False))
     return str(path)
 
 

@@ -34,10 +34,11 @@ import json
 import logging
 import math
 import os
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from football_core.state import atomic_write_text
 
 logger = logging.getLogger("ucl.shadow_eval")
 
@@ -144,27 +145,6 @@ def load_jsonl(path: str | os.PathLike) -> list[dict]:
     return out
 
 
-def _atomic_write_text(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.stem + ".", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(text)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, str(path))
-    except Exception:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-
-
-def _atomic_write_json(data: Any, path: Path) -> None:
-    _atomic_write_text(path, json.dumps(data, indent=2, ensure_ascii=False))
-
-
 def append_jsonl(path: str | os.PathLike, record: dict) -> None:
     """Append one canonical JSON line.
 
@@ -175,7 +155,7 @@ def append_jsonl(path: str | os.PathLike, record: dict) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
     if not p.exists() or p.stat().st_size == 0:
-        _atomic_write_text(p, line)
+        atomic_write_text(p, line)
     else:
         with open(p, "a", encoding="utf-8") as f:
             f.write(line)
@@ -221,7 +201,7 @@ def ensure_shadow_schema(season: str) -> str:
         "model_version": MODEL_VERSION,
         "strategies": list(SHADOW_STRATEGIES),
     }
-    _atomic_write_json(payload, path)
+    atomic_write_text(path, json.dumps(payload, indent=2, ensure_ascii=False))
     return str(path)
 
 
@@ -1119,14 +1099,14 @@ def _cmd_report(args: argparse.Namespace) -> int:
     )
     out = args.out or str(shadow_season_dir(args.season) / "report.json")
     out_path = Path(out)
-    _atomic_write_json(report, out_path)
+    atomic_write_text(out_path, json.dumps(report, indent=2, ensure_ascii=False))
     markdown = render_markdown(
         report,
         fixture_count=len(fixtures),
         score_counts={"attached": report["honesty"]["n_attached_results"]},
     )
     md_path = out_path.parent / "SHADOW_EVALUATION.md"
-    _atomic_write_text(md_path, markdown)
+    atomic_write_text(md_path, markdown)
     print(
         f"[report] season={args.season} predictions={len(prediction_records)} "
         f"results={len(result_records)} wrote={out_path} md={md_path}"
@@ -1401,7 +1381,7 @@ def refreeze_production(
     # Write predictions.jsonl atomically.
     if write:
         preds_path = out_predictions_path or _default_predictions_path(season)
-        _atomic_write_text(Path(preds_path), lines_text)
+        atomic_write_text(Path(preds_path), lines_text)
 
     # Build and write manifest.
     manifest = {
@@ -1427,7 +1407,10 @@ def refreeze_production(
         manifest_path = out_manifest_path or str(
             shadow_season_dir(season) / "refreeze_manifest.json"
         )
-        _atomic_write_json(manifest, Path(manifest_path))
+        atomic_write_text(
+            Path(manifest_path),
+            json.dumps(manifest, indent=2, ensure_ascii=False),
+        )
 
     return manifest
 

@@ -1,4 +1,4 @@
-"""Generic state persistence: JSON load/save with atomic writes, bracket validation, cache helpers."""
+"""Generic state persistence: JSON load/save via one atomic text primitive, bracket validation, cache helpers."""
 
 import json
 import os
@@ -14,14 +14,19 @@ def _resolve_data_dir(data_dir: Path | str | None) -> Path:
     return Path(data_dir) if isinstance(data_dir, str) else data_dir
 
 
-def _atomic_write_json(data: dict | list, path: Path) -> None:
-    """Write *data* to *path* atomically (utf-8, indent=2, ensure_ascii=False).
+def atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
+    """Write *text* to *path* atomically.
 
-    The canonical store writer: mkstemp in the destination directory +
-    fsync + os.replace, so a reader never sees a partial file and a crash
-    mid-write leaves the previous file intact. Every atomic JSON write in
-    the repo routes here (see competitions/ucl/src/ingest.py and
-    football_core/odds.py).
+    The single atomic text primitive in the repository: mkstemp in the
+    destination directory + write + flush + fsync + ``os.replace``, so a
+    reader never sees a partial file and a crash mid-write leaves the
+    previous file intact. The temp file is created in the destination
+    directory on purpose, so the rename can never cross a filesystem
+    boundary (where it would stop being atomic). On any failure the temp
+    file is unlinked and the exception propagates.
+
+    Every atomic store write in the repo routes through here. Do not
+    re-implement this sequence elsewhere; import it.
     """
     dir_path = path.parent
     dir_path.mkdir(parents=True, exist_ok=True)
@@ -31,8 +36,8 @@ def _atomic_write_json(data: dict | list, path: Path) -> None:
         suffix=".tmp",
     )
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        with os.fdopen(fd, "w", encoding=encoding) as f:
+            f.write(text)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp_path, str(path))
@@ -42,6 +47,17 @@ def _atomic_write_json(data: dict | list, path: Path) -> None:
         except OSError:
             pass
         raise
+
+
+def _atomic_write_json(data: dict | list, path: Path) -> None:
+    """Write *data* to *path* atomically (utf-8, indent=2, ensure_ascii=False).
+
+    Thin serialiser over :func:`atomic_write_text`; the JSON arguments are
+    unchanged from the previous in-place implementation, so written bytes are
+    identical (``json.dump(data, f, ...)`` and ``f.write(json.dumps(data, ...))``
+    emit the same character stream).
+    """
+    atomic_write_text(path, json.dumps(data, indent=2, ensure_ascii=False))
 
 
 def load_teams(data_dir: Path | str | None = None) -> dict[str, dict]:
