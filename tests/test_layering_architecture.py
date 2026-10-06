@@ -39,6 +39,27 @@ exists to prevent. The single exact-match expectation in this file is the D-14
 suppression ratchet in case 3 — the two intra-brain ``src.engine`` lazy imports
 plan 01-06 recorded as staying — and it governs the *count* of ``noqa: PLC0415``
 comments, not an exemption from the import scan.
+
+Non-vacuity (D-09)
+------------------
+
+A guard that has never been observed failing is a guard of unknown value, so
+this file was run against reproduced pre-move violations before it shipped.
+Both injections were added, observed to fail, and removed byte-wise; neither
+was ever committed, and ``git diff`` on the injected file came back empty:
+
+* ``from web.wc_app import compute_full_bracket`` re-inserted at module scope
+  in ``competitions/worldcup/src/pipeline.py`` — cases 2 and 4 fail and name
+  ``pipeline.py:14`` (4 passed);
+* ``from web.common import ts`` re-inserted at module scope in
+  ``competitions/ucl/src/orchestrator.py`` — cases 2 and 4 fail and name
+  ``orchestrator.py:12`` (run with ``-k "brain or baseline"``: 2 failed,
+  case 5 passed — an import it never touches — 3 deselected).
+
+To reproduce either one: add the line, run
+``python -m pytest tests/test_layering_architecture.py``, delete the line
+again. Case 1 (kernel upward) deliberately does not fire on either injection —
+both land in a brain, which is why case 2 exists.
 """
 
 from __future__ import annotations
