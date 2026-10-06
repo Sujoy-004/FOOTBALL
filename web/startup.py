@@ -13,8 +13,8 @@ Decision flow:
         ├─ yes ─▶ snapshot (explicit offline session, zero network)
         └─ no
            usable provider credential configured?
-            ├─ yes ─▶ live-configured (no prompt, no banner)
-            └─ no  ─▶ auto: acquisition will be attempted but no provider
+             ├─ yes ─▶ live-configured (no prompt, no banner)
+             └─ no  ─▶ auto: acquisition will be attempted but no provider
                        is configured - stored data will be used until
                        credentials are provided. Never blocks, never
                        prompts, interactive or not.
@@ -27,6 +27,12 @@ competition (see web.competitions.try_lazy_refresh); failed attempts
 never delete or overwrite existing factual stores.
 
 Credentials live in the process environment only; nothing is persisted.
+
+Layer rule: the snapshot *mode flag* and its environment predicate live in
+:mod:`football_core.runtime_support` so competition brains can ask whether the
+session is offline without importing the web layer. This module keeps the
+decision *type* and the decision *lifecycle*, which are web-session concerns,
+and ``is_snapshot_mode`` stays importable here as a delegating shim.
 """
 
 from __future__ import annotations
@@ -34,9 +40,10 @@ from __future__ import annotations
 import os
 from typing import Callable, NamedTuple
 
-SNAPSHOT_ENV_VAR = "FOOTBALL_SNAPSHOT"
+from football_core import runtime_support
 
-_FALSY_ENV_VALUES = ("", "0", "false", "no", "off")
+# Re-exported from the kernel so the documented constant keeps one definition.
+SNAPSHOT_ENV_VAR = runtime_support.SNAPSHOT_ENV_VAR
 
 # Required banner shown when normal execution proceeds without any usable
 # provider credential. Worded so nobody mistakes auto mode for offline.
@@ -55,26 +62,26 @@ class StartupDecision(NamedTuple):
 _last_decision: StartupDecision | None = None
 
 
-def _env_snapshot_forced() -> bool:
-    """True when FOOTBALL_SNAPSHOT explicitly requests an offline session."""
-    raw = os.environ.get(SNAPSHOT_ENV_VAR, "")
-    return raw.strip().lower() not in _FALSY_ENV_VALUES
-
-
 def is_snapshot_mode() -> bool:
-    """True ONLY for explicit offline-snapshot sessions.
+    """Compatibility shim; the implementation lives in football_core.runtime_support."""
+    return runtime_support.is_snapshot_mode()
 
-    Snapshot semantics require an explicit choice: the FOOTBALL_SNAPSHOT
-    env override or a forced decision of kind "snapshot" (tests). The
-    default "auto" decision attempts fresh acquisition and therefore is
-    NOT snapshot mode.
+
+def set_session_decision(decision: StartupDecision | None) -> None:
+    """Record this session's decision and sync the kernel's snapshot flag.
+
+    This is the ONLY writer of ``_last_decision``. Assigning the module global
+    directly would leave the kernel flag stale, and the failure would be silent:
+    an "offline" session would keep reaching the network.
     """
-    if _env_snapshot_forced():
-        return True
-    return _last_decision is not None and _last_decision.mode == "snapshot"
+    global _last_decision
+    _last_decision = decision
+    runtime_support.set_snapshot_session(
+decision is not None and decision.mode == "snapshot")
 
 
 def _is_placeholder(value: str) -> bool:
+
     v = value.strip().lower()
     return (not v) or v.startswith("your_")
 
@@ -112,16 +119,13 @@ def run_startup_flow(
     """
     echo = echo or print
 
-    global _last_decision
-
     def _decide(mode, key=''):
-        global _last_decision
-        _last_decision = StartupDecision(mode, key)
+        set_session_decision(StartupDecision(mode, key))
         return _last_decision
 
     # Explicit offline override wins over everything else this session
     # (documented in .env.example): zero scraping regardless of keys.
-    if _env_snapshot_forced():
+    if runtime_support.env_snapshot_forced():
         echo(f"{SNAPSHOT_ENV_VAR} is set — working offline with existing "
              "snapshot data (no scraping this session).")
         return _decide("snapshot", "")
