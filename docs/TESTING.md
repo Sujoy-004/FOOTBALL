@@ -43,9 +43,21 @@ python -m pytest tests            # cross-cutting regression tests
 
 ## Current baseline
 
-As measured (`python -m pytest --tb=short -q`): **1751 passed / 1 skipped**
-(no failing tests). The one skipped test is an environment-dependent provider
-test that exercises a graceful-degradation path. A minority of integration
-tests additionally need local match-result files produced by a live refresh
-- see GETTING-STARTED. Run `python -m pytest` to re-measure the count
-yourself; it grows as the suite does.
+As measured (`python -m pytest --tb=short -q`) after Phase 1: **1868 collected —
+1749 passed, 14 skipped, 103 failed, 2 errors**.
+
+The failures are not regressions. They are dominated by `FileNotFoundError` on
+runtime stores that git does not carry — chiefly
+`competitions/ucl/data/results.json`, which only a live refresh writes — plus a
+few order-dependent integration tests that depend on those same stores. The
+skips are environment-dependent provider tests exercising graceful-degradation
+paths. See GETTING-STARTED for producing the stores.
+
+Because the totals move with whatever data is on disk, the enforced gate is a
+**node-id set**, not a pass count: the 105 failing/error node ids captured in
+`.planning/phases/01-layering-inversion-deprecated-path-removal/01-01-BASELINE.md`
+must not grow. Diff against it with:
+
+```bash
+python -m pytest -q --tb=no -p no:cacheprovider 2>&1 | Select-String "^(FAILED|ERROR)"
+```

@@ -245,12 +245,21 @@ artifacts, not source of truth. Tests that need complete stores use
 
 ## Testing
 
-The current post-hardening suite passes cleanly: `python -m pytest
---tb=short -q` reports **1751 passed / 1 skipped** (no failures). The single
-skipped test is an environment-dependent provider test exercising a graceful
-degradation path; a minority of integration tests additionally require
-local match-result files produced by a live refresh; see
+`python -m pytest --tb=short -q` collects **1,868** tests. As of Phase 1 it reports
+**1,749 passed, 14 skipped, 103 failed, 2 errors**. The failures are not regressions:
+they are dominated by `FileNotFoundError` on runtime stores that git does not carry —
+chiefly `competitions/ucl/data/results.json`, which only a live refresh writes — plus a
+few order-dependent integration tests. Produce them with a refresh; see
 `docs/GETTING-STARTED.md`.
+
+Because those totals move with whatever data is on disk, the enforced regression gate is
+a **node-id set**, not a pass count: the 105 failing/error node ids recorded in
+`.planning/phases/01-layering-inversion-deprecated-path-removal/01-01-BASELINE.md` may
+not grow. Diff against it with:
+
+```bash
+python -m pytest -q --tb=no -p no:cacheprovider 2>&1 | Select-String "^(FAILED|ERROR)"
+```
 
 ## Known limitations
 
