@@ -466,9 +466,9 @@ def build_knockout_tree(data_dir: Path) -> dict:
         else {}
     )
 
-    # Lazy import to avoid circular dependency — web.wc_app is fully loaded
-    # by the time this function is called at runtime.
-    from web.wc_app import compute_full_bracket  # noqa: PLC0415
+    # Function-local: bracket.py resolves bracket_stage_order from this module
+    # at call time, so a module-scope import here would close an import cycle.
+    from competitions.worldcup.src.bracket import compute_full_bracket
 
     fb = compute_full_bracket(
         groups, teams_raw, bracket_raw, annex_c, played_raw, played_groups_raw
@@ -755,10 +755,8 @@ def run_simulation_compute(
     )
 
     progress_cb(97, 100, "Building full bracket tree...")
-    from web.wc_app import (  # noqa: PLC0415
-        compute_full_bracket,
-        compute_overview,
-    )
+    from competitions.worldcup.src.bracket import compute_full_bracket
+    from competitions.worldcup.src.overview import compute_overview
 
     full_bracket = compute_full_bracket(
         groups_raw,

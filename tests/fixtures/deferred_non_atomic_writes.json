@@ -43,7 +43,7 @@
   },
   {
     "path": "competitions/worldcup/src/pipeline.py",
-    "line": 914,
+    "line": 912,
     "symbol": "competitions/worldcup/config/signal_weights.json",
     "owner": "Phase 3"
   },
