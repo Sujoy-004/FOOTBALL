@@ -1,0 +1,434 @@
+{
+  "n_matchups": 23,
+  "rounds": {
+    "FINAL": [],
+    "QF": [
+      {
+        "match_id": "QF_1",
+        "played": true,
+        "prob_a": 0.0111,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "manual",
+        "round": "QF",
+        "score": {
+          "away": 1,
+          "home": 0
+        },
+        "signals": {},
+        "source_matches": [
+          "R16_1",
+          "R16_2"
+        ],
+        "status": "played",
+        "team_a": "A-First",
+        "team_b": "F-First",
+        "winner": "F-First"
+      },
+      {
+        "match_id": "QF_2",
+        "played": false,
+        "prob_a": 0.5,
+        "prob_available": false,
+        "prob_reason": "slot_unresolved",
+        "provenance": "official",
+        "round": "QF",
+        "score": null,
+        "signals": {},
+        "source_matches": [
+          "R16_3",
+          "R16_4"
+        ],
+        "status": "scheduled",
+        "team_a": null,
+        "team_b": "I-Third",
+        "winner": null
+      }
+    ],
+    "R16": [
+      {
+        "match_id": "R16_1",
+        "played": true,
+        "prob_a": 0.0698,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "manual",
+        "round": "R16",
+        "score": {
+          "away": 0,
+          "home": 1
+        },
+        "signals": {},
+        "source_matches": [
+          "M73",
+          "M74"
+        ],
+        "status": "played",
+        "team_a": "A-First",
+        "team_b": "F-Third",
+        "winner": "A-First"
+      },
+      {
+        "match_id": "R16_2",
+        "played": true,
+        "prob_a": 0.9865,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "manual",
+        "round": "R16",
+        "score": {
+          "away": 1,
+          "home": 2
+        },
+        "signals": {},
+        "source_matches": [
+          "M75",
+          "M76"
+        ],
+        "status": "played",
+        "team_a": "F-First",
+        "team_b": "C-First",
+        "winner": "F-First"
+      },
+      {
+        "match_id": "R16_4",
+        "played": true,
+        "prob_a": 0.5,
+        "prob_available": false,
+        "prob_reason": "no_elo_rating",
+        "provenance": "manual",
+        "round": "R16",
+        "score": {
+          "away": 3,
+          "home": 0
+        },
+        "signals": {},
+        "source_matches": [
+          "M79",
+          "M80"
+        ],
+        "status": "played",
+        "team_a": "Unrated XI",
+        "team_b": "I-Third",
+        "winner": "I-Third"
+      },
+      {
+        "match_id": "R16_3",
+        "played": false,
+        "prob_a": 0.5,
+        "prob_available": false,
+        "prob_reason": "slot_unresolved",
+        "provenance": "official",
+        "round": "R16",
+        "score": null,
+        "signals": {},
+        "source_matches": [
+          "M77",
+          "M78"
+        ],
+        "status": "scheduled",
+        "team_a": null,
+        "team_b": null,
+        "winner": null
+      }
+    ],
+    "R32": [
+      {
+        "match_id": "M73",
+        "played": true,
+        "prob_a": 0.4598,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": {
+          "away": 1,
+          "home": 2
+        },
+        "signals": {},
+        "source_matches": null,
+        "status": "played",
+        "team_a": "A-First",
+        "team_b": "B-Second",
+        "winner": "A-First"
+      },
+      {
+        "match_id": "M74",
+        "played": true,
+        "prob_a": 0.0973,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": {
+          "away": 2,
+          "home": 0
+        },
+        "signals": {},
+        "source_matches": null,
+        "status": "played",
+        "team_a": "E-First",
+        "team_b": "F-Third",
+        "winner": "F-Third"
+      },
+      {
+        "match_id": "M75",
+        "played": true,
+        "prob_a": 0.9859,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": {
+          "away": 0,
+          "home": 3
+        },
+        "signals": {},
+        "source_matches": null,
+        "status": "played",
+        "team_a": "F-First",
+        "team_b": "C-Second",
+        "winner": "F-First"
+      },
+      {
+        "match_id": "M76",
+        "played": true,
+        "prob_a": 0.4299,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": {
+          "away": 1,
+          "home": 1
+        },
+        "signals": {},
+        "source_matches": null,
+        "status": "played_pens",
+        "team_a": "C-First",
+        "team_b": "F-Second",
+        "winner": "C-First"
+      },
+      {
+        "match_id": "M77",
+        "played": false,
+        "prob_a": 0.1171,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "I-First",
+        "team_b": "D-Third",
+        "winner": null
+      },
+      {
+        "match_id": "M78",
+        "played": false,
+        "prob_a": 0.4201,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "E-Second",
+        "team_b": "I-Second",
+        "winner": null
+      },
+      {
+        "match_id": "M79",
+        "played": true,
+        "prob_a": 0.0993,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": {
+          "away": 0,
+          "home": 2
+        },
+        "signals": {},
+        "source_matches": null,
+        "status": "played",
+        "team_a": "A-Second",
+        "team_b": "B-Third",
+        "winner": "Unrated XI"
+      },
+      {
+        "match_id": "M80",
+        "played": true,
+        "prob_a": 0.1899,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": {
+          "away": 1,
+          "home": 0
+        },
+        "signals": {},
+        "source_matches": null,
+        "status": "played",
+        "team_a": "L-First",
+        "team_b": "I-Third",
+        "winner": "I-Third"
+      },
+      {
+        "match_id": "M81",
+        "played": false,
+        "prob_a": 0.0858,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "D-First",
+        "team_b": "E-Third",
+        "winner": null
+      },
+      {
+        "match_id": "M82",
+        "played": false,
+        "prob_a": 0.1244,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "G-First",
+        "team_b": "H-Third",
+        "winner": null
+      },
+      {
+        "match_id": "M83",
+        "played": false,
+        "prob_a": 0.4698,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "K-Second",
+        "team_b": "L-Second",
+        "winner": null
+      },
+      {
+        "match_id": "M84",
+        "played": false,
+        "prob_a": 0.4498,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "H-First",
+        "team_b": "J-Second",
+        "winner": null
+      },
+      {
+        "match_id": "M85",
+        "played": false,
+        "prob_a": 0.0665,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "B-First",
+        "team_b": "C-Third",
+        "winner": null
+      },
+      {
+        "match_id": "M86",
+        "played": false,
+        "prob_a": 0.5302,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "J-First",
+        "team_b": "H-Second",
+        "winner": null
+      },
+      {
+        "match_id": "M87",
+        "played": false,
+        "prob_a": 0.0032,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "K-First",
+        "team_b": "G-Third",
+        "winner": null
+      },
+      {
+        "match_id": "M88",
+        "played": false,
+        "prob_a": 0.4398,
+        "prob_available": true,
+        "prob_reason": null,
+        "provenance": "official",
+        "round": "R32",
+        "score": null,
+        "signals": {},
+        "source_matches": null,
+        "status": "scheduled",
+        "team_a": "D-Second",
+        "team_b": "G-Second",
+        "winner": null
+      }
+    ],
+    "SF": [
+      {
+        "match_id": "SF_1",
+        "played": false,
+        "prob_a": 0.5,
+        "prob_available": false,
+        "prob_reason": "slot_unresolved",
+        "provenance": "official",
+        "round": "SF",
+        "score": null,
+        "signals": {},
+        "source_matches": [
+          "QF_1",
+          "QF_2"
+        ],
+        "status": "scheduled",
+        "team_a": "F-First",
+        "team_b": null,
+        "winner": null
+      }
+    ],
+    "TPP": []
+  }
+}
