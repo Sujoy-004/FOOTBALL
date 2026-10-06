@@ -1,0 +1,400 @@
+{
+  "groups": {
+    "A": {
+      "teams": [
+        "A-First",
+        "A-Second",
+        "A-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_A_1",
+          "team_a": "A-First",
+          "team_b": "A-Second",
+          "winner": null,
+          "score_a": 1,
+          "score_b": 1
+        },
+        {
+          "match_id": "GS_A_2",
+          "team_a": "A-First",
+          "team_b": "A-Third",
+          "winner": "A-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_A_3",
+          "team_a": "A-Second",
+          "team_b": "A-Third",
+          "winner": "A-Second",
+          "score_a": 3,
+          "score_b": 1
+        }
+      ]
+    },
+    "B": {
+      "teams": [
+        "B-First",
+        "B-Second",
+        "B-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_B_1",
+          "team_a": "B-First",
+          "team_b": "B-Second",
+          "winner": "B-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_B_2",
+          "team_a": "B-First",
+          "team_b": "B-Third",
+          "winner": "B-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_B_3",
+          "team_a": "B-Second",
+          "team_b": "B-Third",
+          "winner": "B-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "C": {
+      "teams": [
+        "C-First",
+        "C-Second",
+        "C-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_C_1",
+          "team_a": "C-First",
+          "team_b": "C-Second",
+          "winner": "C-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_C_2",
+          "team_a": "C-First",
+          "team_b": "C-Third",
+          "winner": "C-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_C_3",
+          "team_a": "C-Second",
+          "team_b": "C-Third",
+          "winner": "C-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "D": {
+      "teams": [
+        "D-First",
+        "D-Second",
+        "D-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_D_1",
+          "team_a": "D-First",
+          "team_b": "D-Second",
+          "winner": "D-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_D_2",
+          "team_a": "D-First",
+          "team_b": "D-Third",
+          "winner": "D-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_D_3",
+          "team_a": "D-Second",
+          "team_b": "D-Third",
+          "winner": "D-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "E": {
+      "teams": [
+        "E-First",
+        "E-Second",
+        "E-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_E_1",
+          "team_a": "E-First",
+          "team_b": "E-Second",
+          "winner": "E-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_E_2",
+          "team_a": "E-First",
+          "team_b": "E-Third",
+          "winner": "E-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_E_3",
+          "team_a": "E-Second",
+          "team_b": "E-Third",
+          "winner": "E-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "F": {
+      "teams": [
+        "F-First",
+        "F-Second",
+        "F-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_F_1",
+          "team_a": "F-First",
+          "team_b": "F-Second",
+          "winner": "F-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_F_2",
+          "team_a": "F-First",
+          "team_b": "F-Third",
+          "winner": "F-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_F_3",
+          "team_a": "F-Second",
+          "team_b": "F-Third",
+          "winner": "F-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "G": {
+      "teams": [
+        "G-First",
+        "G-Second",
+        "G-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_G_1",
+          "team_a": "G-First",
+          "team_b": "G-Second",
+          "winner": "G-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_G_2",
+          "team_a": "G-First",
+          "team_b": "G-Third",
+          "winner": "G-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_G_3",
+          "team_a": "G-Second",
+          "team_b": "G-Third",
+          "winner": "G-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "H": {
+      "teams": [
+        "H-First",
+        "H-Second",
+        "H-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_H_1",
+          "team_a": "H-First",
+          "team_b": "H-Second",
+          "winner": "H-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_H_2",
+          "team_a": "H-First",
+          "team_b": "H-Third",
+          "winner": "H-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_H_3",
+          "team_a": "H-Second",
+          "team_b": "H-Third",
+          "winner": "H-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "I": {
+      "teams": [
+        "I-First",
+        "I-Second",
+        "I-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_I_1",
+          "team_a": "I-First",
+          "team_b": "I-Second",
+          "winner": "I-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_I_2",
+          "team_a": "I-First",
+          "team_b": "I-Third",
+          "winner": "I-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_I_3",
+          "team_a": "I-Second",
+          "team_b": "I-Third",
+          "winner": "I-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "J": {
+      "teams": [
+        "J-First",
+        "J-Second",
+        "J-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_J_1",
+          "team_a": "J-First",
+          "team_b": "J-Second",
+          "winner": "J-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_J_2",
+          "team_a": "J-First",
+          "team_b": "J-Third",
+          "winner": "J-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_J_3",
+          "team_a": "J-Second",
+          "team_b": "J-Third",
+          "winner": "J-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "K": {
+      "teams": [
+        "K-First",
+        "K-Second",
+        "K-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_K_1",
+          "team_a": "K-First",
+          "team_b": "K-Second",
+          "winner": "K-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_K_2",
+          "team_a": "K-First",
+          "team_b": "K-Third",
+          "winner": "K-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_K_3",
+          "team_a": "K-Second",
+          "team_b": "K-Third",
+          "winner": "K-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    },
+    "L": {
+      "teams": [
+        "L-First",
+        "L-Second",
+        "L-Third"
+      ],
+      "matches": [
+        {
+          "match_id": "GS_L_1",
+          "team_a": "L-First",
+          "team_b": "L-Second",
+          "winner": "L-First",
+          "score_a": 2,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_L_2",
+          "team_a": "L-First",
+          "team_b": "L-Third",
+          "winner": "L-First",
+          "score_a": 1,
+          "score_b": 0
+        },
+        {
+          "match_id": "GS_L_3",
+          "team_a": "L-Second",
+          "team_b": "L-Third",
+          "winner": "L-Second",
+          "score_a": 2,
+          "score_b": 1
+        }
+      ]
+    }
+  }
+}

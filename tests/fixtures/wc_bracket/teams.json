@@ -1,0 +1,110 @@
+{
+  "A-First": {
+    "elo": 1200
+  },
+  "A-Second": {
+    "elo": 1207
+  },
+  "A-Third": {
+    "elo": 1214
+  },
+  "B-First": {
+    "elo": 1221
+  },
+  "B-Second": {
+    "elo": 1228
+  },
+  "B-Third": {
+    "elo": 1590
+  },
+  "C-First": {
+    "elo": 1235
+  },
+  "C-Second": {
+    "elo": 1242
+  },
+  "C-Third": {
+    "elo": 1680
+  },
+  "D-First": {
+    "elo": 1249
+  },
+  "D-Second": {
+    "elo": 1256
+  },
+  "D-Third": {
+    "elo": 1670
+  },
+  "E-First": {
+    "elo": 1263
+  },
+  "E-Second": {
+    "elo": 1270
+  },
+  "E-Third": {
+    "elo": 1660
+  },
+  "F-First": {
+    "elo": 1980
+  },
+  "F-Second": {
+    "elo": 1284
+  },
+  "F-Third": {
+    "elo": 1650
+  },
+  "G-First": {
+    "elo": 1291
+  },
+  "G-Second": {
+    "elo": 1298
+  },
+  "G-Third": {
+    "elo": 1640
+  },
+  "H-First": {
+    "elo": 1305
+  },
+  "H-Second": {
+    "elo": 1312
+  },
+  "H-Third": {
+    "elo": 1630
+  },
+  "I-First": {
+    "elo": 1319
+  },
+  "I-Second": {
+    "elo": 1326
+  },
+  "I-Third": {
+    "elo": 1620
+  },
+  "J-First": {
+    "elo": 1333
+  },
+  "J-Second": {
+    "elo": 1340
+  },
+  "J-Third": {
+    "elo": 1510
+  },
+  "K-First": {
+    "elo": 640
+  },
+  "K-Second": {
+    "elo": 1354
+  },
+  "K-Third": {
+    "elo": 1361
+  },
+  "L-First": {
+    "elo": 1368
+  },
+  "L-Second": {
+    "elo": 1375
+  },
+  "L-Third": {
+    "elo": 690
+  }
+}

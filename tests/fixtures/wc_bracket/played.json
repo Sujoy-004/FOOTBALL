@@ -1,0 +1,78 @@
+{
+  "M73": {
+    "team_a": "A-First",
+    "team_b": "B-Second",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "A-First",
+    "kickoff_utc": "2026-07-06T19:00:00Z"
+  },
+  "M74": {
+    "team_a": "E-First",
+    "team_b": "F-Third",
+    "home_score": 0,
+    "away_score": 2,
+    "winner": "F-Third",
+    "kickoff_utc": "2026-07-06T19:00:00Z"
+  },
+  "M75": {
+    "team_a": "F-First",
+    "team_b": "C-Second",
+    "home_score": 3,
+    "away_score": 0,
+    "winner": "F-First",
+    "kickoff_utc": "2026-07-07T19:00:00Z"
+  },
+  "M76": {
+    "team_a": "C-First",
+    "team_b": "F-Second",
+    "home_score": 1,
+    "away_score": 1,
+    "winner": "C-First",
+    "kickoff_utc": "2026-07-05T19:00:00Z"
+  },
+  "M79": {
+    "team_a": "A-Second",
+    "team_b": "B-Third",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "Unrated XI",
+    "kickoff_utc": "2026-07-05T19:00:00Z"
+  },
+  "M80": {
+    "team_a": "L-First",
+    "team_b": "I-Third",
+    "home_score": 0,
+    "away_score": 1,
+    "winner": "I-Third",
+    "kickoff_utc": "2026-07-06T19:00:00Z"
+  },
+  "R16_1": {
+    "team_a": "A-First",
+    "team_b": "F-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "A-First"
+  },
+  "R16_2": {
+    "team_a": "F-First",
+    "team_b": "C-First",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "F-First"
+  },
+  "R16_4": {
+    "team_a": "Unrated XI",
+    "team_b": "I-Third",
+    "home_score": 0,
+    "away_score": 3,
+    "winner": "I-Third"
+  },
+  "QF_1": {
+    "team_a": "A-First",
+    "team_b": "F-First",
+    "home_score": 0,
+    "away_score": 1,
+    "winner": "F-First"
+  }
+}

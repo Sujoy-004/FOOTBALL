@@ -1,0 +1,26 @@
+{
+  "_meta": {
+    "source": "authored fixture, not a FIFA regulation extract",
+    "format": "group_winners_vs_third_place",
+    "qualifying_groups": [
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I"
+    ]
+  },
+  "B,C,D,E,F,G,H,I": {
+    "1A": "3B",
+    "1B": "3C",
+    "1D": "3E",
+    "1E": "3F",
+    "1G": "3H",
+    "1I": "3D",
+    "1K": "3G",
+    "1L": "3I"
+  }
+}

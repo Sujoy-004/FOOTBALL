@@ -1,0 +1,86 @@
+[
+  {
+    "match_id": "R16_1",
+    "code": "R16_1",
+    "round": "R16",
+    "teamA": null,
+    "teamB": null,
+    "source_matches": [
+      "M73",
+      "M74"
+    ],
+    "winner": null
+  },
+  {
+    "match_id": "R16_2",
+    "code": "R16_2",
+    "round": "R16",
+    "teamA": null,
+    "teamB": null,
+    "source_matches": [
+      "M75",
+      "M76"
+    ],
+    "winner": null
+  },
+  {
+    "match_id": "R16_3",
+    "code": "R16_3",
+    "round": "R16",
+    "teamA": null,
+    "teamB": null,
+    "source_matches": [
+      "M77",
+      "M78"
+    ],
+    "winner": null
+  },
+  {
+    "match_id": "R16_4",
+    "code": "R16_4",
+    "round": "R16",
+    "teamA": null,
+    "teamB": null,
+    "source_matches": [
+      "M79",
+      "M80"
+    ],
+    "winner": null
+  },
+  {
+    "match_id": "QF_1",
+    "code": "QF_1",
+    "round": "QF",
+    "teamA": null,
+    "teamB": null,
+    "source_matches": [
+      "R16_1",
+      "R16_2"
+    ],
+    "winner": null
+  },
+  {
+    "match_id": "QF_2",
+    "code": "QF_2",
+    "round": "QF",
+    "teamA": null,
+    "teamB": null,
+    "source_matches": [
+      "R16_3",
+      "R16_4"
+    ],
+    "winner": null
+  },
+  {
+    "match_id": "SF_1",
+    "code": "SF_1",
+    "round": "SF",
+    "teamA": null,
+    "teamB": null,
+    "source_matches": [
+      "QF_1",
+      "QF_2"
+    ],
+    "winner": null
+  }
+]

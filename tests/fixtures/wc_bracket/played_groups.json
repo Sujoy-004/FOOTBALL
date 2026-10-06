@@ -1,0 +1,254 @@
+{
+  "GS_A_1": {
+    "team_a": "A-First",
+    "team_b": "A-Second",
+    "home_score": 1,
+    "away_score": 1,
+    "winner": null
+  },
+  "GS_A_2": {
+    "team_a": "A-First",
+    "team_b": "A-Third",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "A-First"
+  },
+  "GS_A_3": {
+    "team_a": "A-Second",
+    "team_b": "A-Third",
+    "home_score": 3,
+    "away_score": 1,
+    "winner": "A-Second"
+  },
+  "GS_B_1": {
+    "team_a": "B-First",
+    "team_b": "B-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "B-First"
+  },
+  "GS_B_2": {
+    "team_a": "B-First",
+    "team_b": "B-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "B-First"
+  },
+  "GS_B_3": {
+    "team_a": "B-Second",
+    "team_b": "B-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "B-Second"
+  },
+  "GS_C_1": {
+    "team_a": "C-First",
+    "team_b": "C-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "C-First"
+  },
+  "GS_C_2": {
+    "team_a": "C-First",
+    "team_b": "C-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "C-First"
+  },
+  "GS_C_3": {
+    "team_a": "C-Second",
+    "team_b": "C-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "C-Second"
+  },
+  "GS_D_1": {
+    "team_a": "D-First",
+    "team_b": "D-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "D-First"
+  },
+  "GS_D_2": {
+    "team_a": "D-First",
+    "team_b": "D-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "D-First"
+  },
+  "GS_D_3": {
+    "team_a": "D-Second",
+    "team_b": "D-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "D-Second"
+  },
+  "GS_E_1": {
+    "team_a": "E-First",
+    "team_b": "E-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "E-First"
+  },
+  "GS_E_2": {
+    "team_a": "E-First",
+    "team_b": "E-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "E-First"
+  },
+  "GS_E_3": {
+    "team_a": "E-Second",
+    "team_b": "E-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "E-Second"
+  },
+  "GS_F_1": {
+    "team_a": "F-First",
+    "team_b": "F-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "F-First"
+  },
+  "GS_F_2": {
+    "team_a": "F-First",
+    "team_b": "F-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "F-First"
+  },
+  "GS_F_3": {
+    "team_a": "F-Second",
+    "team_b": "F-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "F-Second"
+  },
+  "GS_G_1": {
+    "team_a": "G-First",
+    "team_b": "G-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "G-First"
+  },
+  "GS_G_2": {
+    "team_a": "G-First",
+    "team_b": "G-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "G-First"
+  },
+  "GS_G_3": {
+    "team_a": "G-Second",
+    "team_b": "G-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "G-Second"
+  },
+  "GS_H_1": {
+    "team_a": "H-First",
+    "team_b": "H-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "H-First"
+  },
+  "GS_H_2": {
+    "team_a": "H-First",
+    "team_b": "H-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "H-First"
+  },
+  "GS_H_3": {
+    "team_a": "H-Second",
+    "team_b": "H-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "H-Second"
+  },
+  "GS_I_1": {
+    "team_a": "I-First",
+    "team_b": "I-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "I-First"
+  },
+  "GS_I_2": {
+    "team_a": "I-First",
+    "team_b": "I-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "I-First"
+  },
+  "GS_I_3": {
+    "team_a": "I-Second",
+    "team_b": "I-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "I-Second"
+  },
+  "GS_J_1": {
+    "team_a": "J-First",
+    "team_b": "J-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "J-First"
+  },
+  "GS_J_2": {
+    "team_a": "J-First",
+    "team_b": "J-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "J-First"
+  },
+  "GS_J_3": {
+    "team_a": "J-Second",
+    "team_b": "J-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "J-Second"
+  },
+  "GS_K_1": {
+    "team_a": "K-First",
+    "team_b": "K-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "K-First"
+  },
+  "GS_K_2": {
+    "team_a": "K-First",
+    "team_b": "K-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "K-First"
+  },
+  "GS_K_3": {
+    "team_a": "K-Second",
+    "team_b": "K-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "K-Second"
+  },
+  "GS_L_1": {
+    "team_a": "L-First",
+    "team_b": "L-Second",
+    "home_score": 2,
+    "away_score": 0,
+    "winner": "L-First"
+  },
+  "GS_L_2": {
+    "team_a": "L-First",
+    "team_b": "L-Third",
+    "home_score": 1,
+    "away_score": 0,
+    "winner": "L-First"
+  },
+  "GS_L_3": {
+    "team_a": "L-Second",
+    "team_b": "L-Third",
+    "home_score": 2,
+    "away_score": 1,
+    "winner": "L-Second"
+  }
+}
