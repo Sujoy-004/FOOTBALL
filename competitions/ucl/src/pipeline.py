@@ -913,7 +913,7 @@ def run_mc_simulation(
         elo_ratings = dict(elo_ratings_override)
     else:
         team_names = [t.name for t in provider.teams]
-        from web.startup import is_snapshot_mode
+        from football_core.runtime_support import is_snapshot_mode
         elo_ratings = {}
         if not is_snapshot_mode():
             try:

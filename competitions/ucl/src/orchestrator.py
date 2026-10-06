@@ -260,7 +260,7 @@ def _resolve_elo_ratings(team_names: list[str]) -> dict[str, float]:
     the stored ClubElo snapshot, which re-fetches only when it is stale or
     missing a team, and degrades to coefficients on failure.
     """
-    from web.startup import is_snapshot_mode
+    from football_core.runtime_support import is_snapshot_mode
 
     if not is_snapshot_mode():
         from competitions.ucl.src.elo_fetcher import refresh_elos_if_stale
@@ -925,7 +925,7 @@ def run_deterministic_compute(
         compute_elo_coverage,
     )
     from competitions.ucl.src.lifecycle import discover
-    from web.common import ts, boot_step
+    from football_core.runtime_support import ts, boot_step
 
     boot: list[dict] = []
 
@@ -1220,7 +1220,7 @@ def run_compute_all(
     seed, snapshot_date, show_ci, lifecycle.
     """
     from competitions.ucl.src.lifecycle import discover
-    from web.common import ts, boot_step
+    from football_core.runtime_support import ts, boot_step
 
     boot: list[dict] = []
 

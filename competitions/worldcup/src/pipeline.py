@@ -139,7 +139,7 @@ def fetch_live_data(
         logger.warning("fetch_live_data FAILED: %s — WC data may be STALE", reason)
         return report
 
-    from web.startup import is_snapshot_mode
+    from football_core.runtime_support import is_snapshot_mode
     if is_snapshot_mode():
         report = new_ingestion_stats()
         return {
@@ -151,7 +151,7 @@ def fetch_live_data(
             "skipped_reason": "snapshot mode selected at startup",
             "finished": report,
         }
-    from web.common import get_data_provider
+    from football_core.runtime_support import get_data_provider
     provider = get_data_provider(bsd_api_key, football_data_org_key, constants.DEFAULT_LEAGUE_ID)
     if provider is None:
         return _fail("no data provider configured")
