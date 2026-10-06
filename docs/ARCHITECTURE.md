@@ -205,6 +205,10 @@ Lifecycle states exposed by both competitions: `not_requested`,
 `running`, `completed`, `not_needed`, `unavailable`, `failed`,
 `validation_error`.
 
+Fixture identity is a separate contract: each competition derives its own
+fixture id, the three signatures are deliberately not unified, and the
+World Cup has none. See `docs/FIXTURE-IDENTITY.md`.
+
 ## Web layer
 
 - `web/competitions.py` — explicit `CompetitionRegistry`. Each adapter
