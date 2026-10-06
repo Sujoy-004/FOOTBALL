@@ -1,11 +1,16 @@
 """Tests for odds.py — vig removal, response parsing, cache pipeline.
 
 All file I/O tests use tmp_path to avoid modifying real data files.
+
+Imported from ``football_core.predictors.odds`` (the kernel package, kept per
+D-22) rather than the deleted world-cup adapter module: that adapter re-exported
+these three symbols verbatim, so the functions under test are the same objects
+and every assertion below is unchanged (plan 01-06, D-16).
 """
 from datetime import datetime
 
 
-from src.predictors.odds import (
+from football_core.predictors.odds import (
     fetch_and_cache_odds,
     parse_odds_response,
     remove_vig,

@@ -19,17 +19,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src import constants
-from src.constants import (
-    ODDS_CACHE_FILE,
-    REST_DAYS_CACHE_FILE,
-    ROLLING_FORM_CACHE_FILE,
-    SQUAD_VALUE_CACHE_FILE,
-)
 from src.knockout import run_full_simulation, resolve_knockout_slot_teams
 from src.state import (
     load_annex_c,
     load_groups,
-    save_signal_cache,
 )
 from football_core.signal import PredictionContext  # type: ignore[import-untyped]
 
@@ -275,39 +268,6 @@ def fetch_live_data(
         reason = f"match fetch failed: {e.__class__.__name__}: {e}"
         logger.warning("fetch_live_data: %s", reason)
         return _fail(reason, type(provider).__name__)
-
-    # 2. Fetch and cache signal predictors
-    #    BSD-dependent signals degrade gracefully (Phase 4) when BSD_API_KEY
-    #    is missing or the network blocks sports.bzzoiro.com.
-    try:
-        from src.predictors.odds import fetch_and_cache_odds
-        from src.predictors.rest_days import compute_rest_days_signal
-        from src.predictors.rolling_form import compute_rolling_form_signal
-        from src.predictors.squad_value import compute_squad_value_signal
-
-        odds_cache = fetch_and_cache_odds(
-            bsd_api_key, raw_matches, aliases, groups, bracket=bracket_raw
-        )
-        save_signal_cache(odds_cache, ODDS_CACHE_FILE, data_dir)
-
-        rolling_form_cache = compute_rolling_form_signal(
-            teams, groups, bracket=bracket_raw
-        )
-        save_signal_cache(
-            rolling_form_cache, ROLLING_FORM_CACHE_FILE, data_dir
-        )
-
-        squad_value_cache = compute_squad_value_signal(
-            groups, bracket=bracket_raw
-        )
-        save_signal_cache(squad_value_cache, SQUAD_VALUE_CACHE_FILE, data_dir)
-
-        rest_days_cache = compute_rest_days_signal(
-            groups, bracket=bracket_raw
-        )
-        save_signal_cache(rest_days_cache, REST_DAYS_CACHE_FILE, data_dir)
-    except Exception as e:
-        logger.warning("fetch_live_data: signal fetch failed: %s", e)
 
     # Success report — persisted so stale data can't masquerade as fresh.
     report = {

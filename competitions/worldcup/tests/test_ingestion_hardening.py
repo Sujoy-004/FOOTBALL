@@ -165,22 +165,10 @@ def test_live_fetch_partitions_events_before_routing(monkeypatch, tmp_path):
         wc_pipeline, "_last_refresh_report_path",
         lambda: tmp_path / "last_refresh.json",
     )
-    # Signal fetchers: no-op to keep the test offline + isolated.
-    monkeypatch.setattr(wc_pipeline, "save_signal_cache", lambda *a, **k: None)
-    monkeypatch.setattr(
-        "src.predictors.odds.fetch_and_cache_odds", lambda *a, **k: {}
-    )
-    monkeypatch.setattr(
-        "src.predictors.rest_days.compute_rest_days_signal", lambda *a, **k: {}
-    )
-    monkeypatch.setattr(
-        "src.predictors.rolling_form.compute_rolling_form_signal",
-        lambda *a, **k: {},
-    )
-    monkeypatch.setattr(
-        "src.predictors.squad_value.compute_squad_value_signal",
-        lambda *a, **k: {},
-    )
+    # The signal-fetch stage and its four predictor fetchers (odds / rest_days /
+    # rolling_form / squad_value) were deleted with the predictor package (plan
+    # 01-06): fetch_live_data no longer writes any signal cache, so there is
+    # nothing left to no-op.
 
     report = wc_pipeline.fetch_live_data("", "", WC_DATA)
     assert report["success"] is True, report
@@ -529,21 +517,7 @@ def test_live_run_on_complete_snapshot_is_stable(monkeypatch, tmp_path):
         wc_pipeline, "_last_refresh_report_path",
         lambda: tmp_path / "last_refresh.json",
     )
-    monkeypatch.setattr(wc_pipeline, "save_signal_cache", lambda *a, **k: None)
-    monkeypatch.setattr(
-        "src.predictors.odds.fetch_and_cache_odds", lambda *a, **k: {}
-    )
-    monkeypatch.setattr(
-        "src.predictors.rest_days.compute_rest_days_signal", lambda *a, **k: {}
-    )
-    monkeypatch.setattr(
-        "src.predictors.rolling_form.compute_rolling_form_signal",
-        lambda *a, **k: {},
-    )
-    monkeypatch.setattr(
-        "src.predictors.squad_value.compute_squad_value_signal",
-        lambda *a, **k: {},
-    )
+    # Signal-fetch stage deleted with the predictors package (plan 01-06).
 
     pg_before = (WC_DATA / "played_groups.json").read_text(encoding="utf-8")
     pl_before = (WC_DATA / "played.json").read_text(encoding="utf-8")

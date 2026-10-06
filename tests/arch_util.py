@@ -242,25 +242,10 @@ def patch_wc_offline(monkeypatch, tmp_path):
     monkeypatch.setattr("football_core.runtime_support.is_snapshot_mode", lambda: False)
     leader = tmp_path / "freshness.json"
     monkeypatch.setattr(wc_pipeline, "_last_refresh_report_path", lambda: leader)
-
-    def _no_signal(*a, **k):
-        return {}
-
-    monkeypatch.setattr(
-        "competitions.worldcup.src.predictors.odds.fetch_and_cache_odds", _no_signal
-    )
-    monkeypatch.setattr(
-        "competitions.worldcup.src.predictors.rest_days.compute_rest_days_signal",
-        _no_signal,
-    )
-    monkeypatch.setattr(
-        "competitions.worldcup.src.predictors.rolling_form.compute_rolling_form_signal",
-        _no_signal,
-    )
-    monkeypatch.setattr(
-        "competitions.worldcup.src.predictors.squad_value.compute_squad_value_signal",
-        _no_signal,
-    )
+    # The four signal-predictor no-op stubs (odds / rest_days / rolling_form /
+    # squad_value) that used to live here were deleted along with the predictor
+    # package itself (plan 01-06, D-22): they stubbed calls the pipeline no
+    # longer makes.
     return leader
 
 
