@@ -10,7 +10,7 @@ BEFORE the ucl directory on sys.path.
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 
 _wc = str(ROOT / "competitions" / "worldcup")
 _ucl = str(ROOT / "competitions" / "ucl")
