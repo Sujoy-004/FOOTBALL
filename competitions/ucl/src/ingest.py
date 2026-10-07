@@ -92,6 +92,7 @@ from football_core.domain import is_semantically_empty
 from football_core.fetcher import (
     IngestReport,
     count_finished,
+    derive_success,
     fold_pair_key,
     new_ingestion_stats,
     note_missing_score,
@@ -773,7 +774,10 @@ def ingest_ucl_events(
     """
     dp = Path(data_dir) if isinstance(data_dir, str) else data_dir
     stats = new_ingestion_stats()
-    report = IngestReport(provider=provider_name or "unknown", attempted=True, success=True, error=None)
+    # Placeholder only — success is DERIVED from the finished counters once
+    # they are assembled (D-13: never declared, always derived).
+    report = IngestReport(provider=provider_name or "unknown", attempted=True,
+                          success=False, error=None)
 
     n_league_changed = 0
     n_playoff_changed = 0
@@ -961,7 +965,20 @@ def ingest_ucl_events(
         "skipped_unmatchable": stats["skipped_unmatchable"],
         "skipped_no_target": stats["skipped_no_target"],
     }
-    report.last_success_at = datetime.now(timezone.utc).isoformat()
+    # D-13: success derives from the COMPLETE internal counter set. The
+    # display shape above omits ``skipped_missing_score`` and is pinned by
+    # competitions/ucl/tests/test_ingest.py::test_report_counters_invariant
+    # (see SUMMARY deviation note); the derivation never reads a partial view.
+    full_counters = dict(report.finished)
+    full_counters["skipped_missing_score"] = stats["skipped_missing_score"]
+    success, reason = derive_success(provider_name or "unknown", True,
+                                     full_counters)
+    report.success = success
+    report.reason = reason
+    if not success:
+        report.stale = True
+    else:
+        report.last_success_at = datetime.now(timezone.utc).isoformat()
     report.written_files = written_files
 
     resolved = stats["normalized"] == stats["received"]
@@ -1470,6 +1487,16 @@ def ingest_ucl_events_multi_season(
             )
             total_skipped_no_target += skipped
 
+            # Events with blank team names are silently dropped by the
+            # upsert (no_target's lookups can never resolve them); they were
+            # still counted as received/normalized, so they must land in the
+            # skipped bucket for the counter invariant to hold.
+            n_no_team = sum(
+                1 for ev in finished
+                if not str(ev.get("home_team", "")).strip()
+                or not str(ev.get("away_team", "")).strip()
+            )
+
             # Record written files
             fx_path = season_dir(dp, season_display) / "fixtures.json"
             res_path = season_dir(dp, season_display) / "results.json"
@@ -1489,31 +1516,54 @@ def ingest_ucl_events_multi_season(
                 "skipped_missing_score": (
                     skipped_missing_score + season_skipped_missing_score
                 ),
+                # D-13 counter view: every received finished event lands in
+                # exactly one bucket — ingested, no-target, unmatchable team
+                # (blank names dropped by the upsert), or missing score.
+                "ingested": (
+                    len(finished) - skipped - skipped_missing_score - n_no_team
+                ),
+                "skipped_unmatchable": n_no_team,
             }
 
-    # Build combined report
+    # Build combined report. D-13: success is DERIVED from the combined
+    # finished counters (never declared), so a run whose buckets don't add
+    # up — or that ingested nothing — success is never declared here, only
+    # DERIVED from the combined counters below.
     combined_report = IngestReport(
-        provider=provider_name or "unknown", attempted=True, success=True, error=None
+        provider=provider_name or "unknown", attempted=True, success=False, error=None
     )
     combined_report.finished = {
         "received": stats["received"],
         "normalized": stats["normalized"],
         "ingested": sum(
-            s.get("results_added", 0) + s.get("results_updated", 0)
-            + (s.get("report", {}).get("finished", {}).get("ingested", 0) if s.get("legacy") else 0)
+            s.get("report", {}).get("finished", {}).get("ingested", 0) if s.get("legacy")
+            else s.get("ingested", 0)
             for s in per_season_summary.values()
         ),
-        "skipped_unmatchable": stats["skipped_unmatchable"],
+        "skipped_unmatchable": stats["skipped_unmatchable"] + sum(
+            s.get("report", {}).get("finished", {}).get("skipped_unmatchable", 0) if s.get("legacy")
+            else s.get("skipped_unmatchable", 0)
+            for s in per_season_summary.values()
+        ),
         "skipped_no_target": total_skipped_no_target
-            + sum(s.get("report", {}).get("skipped_no_target", 0) if s.get("legacy") else 0
-                  for s in per_season_summary.values()),
+            + sum(
+                s.get("report", {}).get("finished", {}).get("skipped_no_target", 0)
+                if s.get("legacy") else 0
+                for s in per_season_summary.values()
+            ),
         "skipped_missing_score": stats["skipped_missing_score"] + sum(
             s.get("report", {}).get("finished", {}).get("skipped_missing_score", 0)
             if s.get("legacy") else 0
             for s in per_season_summary.values()
         ),
     }
-    combined_report.last_success_at = datetime.now(timezone.utc).isoformat()
+    combined_success, combined_reason = derive_success(
+        provider_name or "unknown", True, combined_report.finished)
+    combined_report.success = combined_success
+    combined_report.reason = combined_reason
+    combined_report.stale = not combined_success
+    if combined_success:
+        combined_report.last_success_at = datetime.now(timezone.utc).isoformat()
     combined_report.written_files = written_files
 
     # Exchange 5: propagate stages from per-season reports (especially legacy)

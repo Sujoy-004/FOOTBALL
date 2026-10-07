@@ -367,6 +367,7 @@ def fetch_live_data(
         IngestReport,
         _build_alias_lookup,
         count_finished,
+        derive_success,
         fold_team_key,
         new_ingestion_stats,
         note_fixture_unmatchable,
@@ -392,9 +393,13 @@ def fetch_live_data(
         provider = _select_provider(bsd_api_key, football_data_org_key, ucl_league_id)
     if provider is None:
         logger.warning("[UCL] No data provider — skipping live fetch")
-        report = IngestReport(provider="none", attempted=False, success=True, error=None, stale=True)
+        # D-13: attempted=False derives to (False, "deferred") — never True.
+        success, reason = derive_success("none", False, {})
+        report = IngestReport(provider="none", attempted=False, success=success,
+                              error=None, stale=True, reason=reason)
         return {"status": "skip", "n_raw": 0, "n_updated": 0,
-                "provider_name": "none", "report": report.to_dict()}
+                "provider_name": "none", "report": report.to_dict(),
+                "reason": reason}
 
     provider_label = type(provider).__name__
 
@@ -434,29 +439,39 @@ def fetch_live_data(
     if not raw:
         err = getattr(provider, "last_error", None)
         if requested_season is not None and not err:
-            # Benign provider-empty: an explicitly active NON-historical season
-            # was requested and the provider answered successfully (HTTP 200)
-            # with zero published matches. This is NOT a refresh failure — the
-            # draw-derived fixtures remain authoritative until the season's
-            # match data is published. Distinct from real transport/provider
-            # failures (which set ``last_error``) so the UI can present it as
-            # "not published yet" instead of "stale".
+            # HTTP 200 with zero published matches: an explicitly active
+            # NON-historical season was requested and the provider answered
+            # successfully with nothing published yet. D-13 decision: this
+            # DERIVES to (success=False, stale=True,
+            # reason="deferred/provider-empty") — a zero-match fetch is never
+            # reported as success, and the draw-derived fixtures remain
+            # authoritative until the season's match data is published.
+            # ``deferred`` stays True so the UI presents "not published yet"
+            # rather than a transport/provider failure.
+            success, reason = derive_success(
+                provider_label, True, new_ingestion_stats())
             report = IngestReport(provider=provider_label, attempted=True,
-                                  success=True, error=None, stale=False,
-                                  deferred=True, reason="provider_empty")
+                                  success=success, error=None, stale=True,
+                                  deferred=True, reason=reason)
             logger.info(
                 "[UCL] No published match data yet for season %d (%s returned 0 "
-                "matches) — deferred", requested_season, provider_label)
+                "matches) — deferred (success=%s)", requested_season,
+                provider_label, success)
             return {"status": "deferred", "n_raw": 0, "n_updated": 0,
                     "provider_name": provider_label, "report": report.to_dict(),
-                    "reason": "provider_empty", "deferred": True,
+                    "reason": reason, "deferred": True,
                     "requested_season": requested_season}
         err = err or "provider returned 0 matches"
         logger.warning("[UCL] No matches returned from provider: %s", err)
-        report = IngestReport(provider=provider_label, attempted=True, success=False,
-                              error=err, stale=True)
+        # D-13: a zero-match answer with no active-season request also
+        # derives to (False, "deferred/provider-empty"); the transport error
+        # (if any) still travels in ``error``.
+        success, reason = derive_success(provider_label, True, new_ingestion_stats())
+        report = IngestReport(provider=provider_label, attempted=True,
+                              success=success, error=err, stale=True, reason=reason)
         return {"status": "skip", "n_raw": 0, "n_updated": 0,
-                "provider_name": provider_label, "report": report.to_dict()}
+                "provider_name": provider_label, "report": report.to_dict(),
+                "reason": reason}
 
     logger.info("[UCL] Fetched %d raw matches from %s", len(raw), provider_label)
 
@@ -596,7 +611,9 @@ def fetch_live_data(
         report = _IR(
             provider=report_dict.get("provider", provider_label),
             attempted=report_dict.get("attempted", True),
-            success=report_dict.get("success", True),
+            # Placeholder only — success is RE-DERIVED from the merged
+            # counters below (D-13: never declared, always derived).
+            success=False,
             error=report_dict.get("error"),
         )
         report.stale = report_dict.get("stale", False)
@@ -604,8 +621,10 @@ def fetch_live_data(
         report.finished = report_dict.get("finished", report.finished)
         report.stages = report_dict.get("stages", [])
         report.written_files = report_dict.get("written_files", [])
+        report.deferred = bool(report_dict.get("deferred", False))
+        report.reason = report_dict.get("reason")
     else:
-        report = _IR(provider=provider_label, attempted=True, success=True, error=None)
+        report = _IR(provider=provider_label, attempted=True, success=False, error=None)
 
     # Fold normalization-side skips back in so the global invariant holds.
     merged_finished = dict(report.finished)
@@ -622,6 +641,19 @@ def fetch_live_data(
         merged_finished.get("skipped_missing_score", 0) + n_missing_score
     )
     report.finished = merged_finished
+
+    # D-13: success is derived from the MERGED counters (storage-side
+    # counters plus normalization-side skips), so a partial or inconsistent
+    # run can never be reported as success. A derived failure is always stale;
+    # the deferred/reason vocabulary is preserved for the provider-empty case.
+    derived_success, derived_reason = derive_success(
+        provider_label, report.attempted, merged_finished)
+    report.success = derived_success
+    report.stale = report.stale or (not derived_success)
+    if derived_reason is not None:
+        report.reason = derived_reason
+    elif not report.deferred:
+        report.reason = None
 
     # Exchange 5: activate a newly-discovered season when it has sufficient data.
     _maybe_activate_new_season(data_dir_path, per_season, provider_label)
@@ -643,12 +675,17 @@ def fetch_live_data(
             n_updated += sv.get("results_added", 0) + sv.get("results_updated", 0)
     logger.info("[UCL] Updated %d matches — files saved", n_updated)
 
+    # `status` is the transport vocabulary ("ok" = the fetch + ingest pipeline
+    # ran to completion; "skip"/"deferred" = it did not run / has no data yet).
+    # D-13 success lives in the report's derived counters, and the web ledger
+    # reads success from the report, never from this status literal.
     return {
         "status": "ok",
         "n_raw": len(raw),
         "n_updated": n_updated,
         "provider_name": provider_label,
         "report": report.to_dict(),
+        "reason": report.reason,
         "per_season": per_season,
     }
 

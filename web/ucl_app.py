@@ -28,6 +28,7 @@ from competitions.ucl.src.pipeline import (
 from competitions.ucl.src.elo_fetcher import fetch_team_elos
 from competitions.ucl.src.provider import RepoFixtureProvider
 from football_core.elo import expected_score
+from football_core.fetcher import derive_success
 from football_core.signal import PredictionContext
 from football_core.simulation import SimulationContractError
 
@@ -178,20 +179,33 @@ def _synthesize_season_report(season: str) -> dict:
     """Store-truthful standby report for a season nobody refreshed this process.
 
     A settled season (e.g. completed historical 2025/26, 144/144 matches
-    played) is neither deferred nor stale — it is the canonical shipped
-    dataset. No claim about a provider is made (``attempted=False``) because
-    no fetch happened for THIS season in this process.
+    played) derives success from its store counts. An empty store
+    derives a non-success verdict with reason "deferred": nothing was
+    published yet (no provider was asked, so never "provider-empty").
+    ``stale=False`` always — the shipped store IS the evidence, and no
+    claim about a provider is made (``attempted=False``) because no fetch
+    happened for THIS season in this process.
     """
     n_unplayed, n_total = _match_counts()
     played = n_total - n_unplayed
+    # D-13: success is DERIVED from the store's own counts — the shipped
+    # store is the evidence, so a started/settled season derives True and an
+    # empty store derives a deferred verdict. No provider was ever asked in
+    # this process, so a non-success verdict is never "provider-empty".
+    counters = {"received": played, "normalized": played, "ingested": played,
+                "skipped_unmatchable": 0, "skipped_no_target": 0,
+                "skipped_missing_score": 0}
+    success, reason = derive_success(None, n_total > 0, counters)
+    if not success:
+        reason = "deferred"
     return {
         "provider": None,
         "attempted": False,
-        "success": True,
+        "success": success,
         "error": None,
         "stale": False,
         "deferred": False,
-        "reason": None,
+        "reason": reason,
         "status": "ok",
         "active_season": season,
         "last_refresh": datetime.now(timezone.utc).isoformat(),
@@ -285,8 +299,10 @@ def _fetch_live_data() -> None:
                                "output": f"[{ts()}] Snapshot mode - live refresh skipped"})
         # Parity with WC: record WHY no live fetch happened so the frontend
         # can disclose snapshot data instead of silently looking live-fresh.
+        # D-13: nothing was attempted, so nothing succeeded (reclassify).
         globals()["_refresh_report"] = {
-            "provider": None, "attempted": False, "success": True,
+            "provider": None, "attempted": False, "success": False,
+            "reason": "deferred",
             "stale": True,
             "skipped_reason": "snapshot mode selected at startup",
         }
@@ -328,7 +344,10 @@ def _fetch_live_data() -> None:
         return
     report = summary.get("report") or {}
     status = summary.get("status")
-    ok = status == "ok"
+    # D-13: the ledger verdict comes from the report's DERIVED success, not
+    # from the transport status — a run that completed (status "ok") while
+    # ingesting nothing (e.g. a fixtures-only refresh) is not success.
+    ok = bool(report.get("success")) if isinstance(report, dict) else status == "ok"
     deferred = status == "deferred"
     reason = summary.get("reason")
     provider_name = summary.get("provider_name") or type(provider).__name__
@@ -346,7 +365,10 @@ def _fetch_live_data() -> None:
     else:
         logger.info("[UCL] CONNECTED via %s: %s raw matches, %s updated",
                     provider_name, n_raw, n_updated)
-    _store_refresh_report(ok or deferred, error, provider_name,
+    # D-13: the ledger verdict is `ok` alone — a deferred fetch is NOT
+    # recorded as success (decision 1/2 of 02-02); `deferred`/`reason` still
+    # travel through so the UI can present "not published yet".
+    _store_refresh_report(ok, error, provider_name,
                           n_matches=n_raw, n_updated=n_updated,
                           finished=report.get("finished"),
                           stages=report.get("stages"),

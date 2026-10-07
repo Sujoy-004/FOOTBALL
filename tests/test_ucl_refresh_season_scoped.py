@@ -138,7 +138,7 @@ def _write_pointer(data_dir: Path, season: str | None) -> None:
 
 class TestSeasonScopedServedRefresh:
     def test_active_2026_27_deferred_served_through_api(self, tmp_path, monkeypatch):
-        """2026/27 active + HTTP 200 + 0 matches => deferred, still served."""
+        """2026/27 active + HTTP 200 + 0 matches => deferred (derived failure), still served."""
         import web.ucl_app as ucl_app
         from fastapi.testclient import TestClient
 
@@ -160,8 +160,11 @@ class TestSeasonScopedServedRefresh:
             assert refresh["attempted"] is True
             assert refresh["deferred"] is True
             assert refresh["status"] == "deferred"
-            assert refresh["reason"] == "provider_empty"
-            assert refresh["stale"] is False
+            # D-13 (02-02): zero received matches derive to (False,
+            # "deferred/provider-empty"); deferred marks the UI copy, not
+            # the verdict — success is False and the data is stale.
+            assert refresh["reason"] == "deferred/provider-empty"
+            assert refresh["stale"] is True
 
         assert provider.calls >= 1, "lazy acquisition actually fired"
         assert provider.season == 2026, "the future season was requested explicitly"

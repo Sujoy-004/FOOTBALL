@@ -105,7 +105,7 @@ def fetch_live_data(
     into <repo>/web/last_refresh.json under "worldcup" so a failed or
     stale refresh is never mistaken for fresh data.
     """
-    from football_core.fetcher import new_ingestion_stats
+    from football_core.fetcher import derive_success, new_ingestion_stats
 
     last_refresh_path = _last_refresh_report_path()
 
@@ -123,6 +123,7 @@ def fetch_live_data(
             "success": False,
             "error": reason,
             "stale": True,
+            "reason": None,
             "last_success_at": prev.get("last_success_at"),
             "finished": new_ingestion_stats(),
         }
@@ -138,10 +139,14 @@ def fetch_live_data(
     from football_core.runtime_support import is_snapshot_mode
     if is_snapshot_mode():
         report = new_ingestion_stats()
+        # D-13: nothing was attempted, so nothing succeeded — the deferred
+        # verdict is DERIVED from the (zeroed) counters, never declared.
+        success, reason = derive_success(None, False, report)
         return {
             "provider": None,
             "attempted": False,
-            "success": True,
+            "success": success,
+            "reason": reason,
             "error": None,
             "stale": True,
             "skipped_reason": "snapshot mode selected at startup",
@@ -273,19 +278,39 @@ def fetch_live_data(
         return _fail(reason, type(provider).__name__)
 
     # Success report — persisted so stale data can't masquerade as fresh.
+    # D-13: success is DERIVED from the finished-result counters. The two
+    # per-stage stat objects are summed into one flat counter dict for the
+    # derivation (the helper stays flat-only); the report keeps its nested
+    # per-stage display form.
+    flat_counters = {
+        key: group_stats.get(key, 0) + ko_stats.get(key, 0)
+        for key in ("received", "normalized", "ingested",
+                    "skipped_unmatchable", "skipped_no_target",
+                    "skipped_missing_score")
+    }
+    success, reason = derive_success(type(provider).__name__, True, flat_counters)
     report = {
         "provider": type(provider).__name__,
         "attempted": True,
-        "success": True,
+        "success": success,
         "error": None,
-        "stale": False,
-        "last_success_at": datetime.now(timezone.utc)
-            .isoformat().replace("+00:00", "Z"),
+        "stale": not success,
+        "reason": reason,
+        "last_success_at": (
+            datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            if success
+            else _read_prev().get("worldcup", {}).get("last_success_at")
+        ),
         "finished": {
             "group_stage": group_stats,
             "knockout": ko_stats,
         },
     }
+    if not success:
+        logger.warning(
+            "fetch_live_data derived success=False (%s) — counters: %r",
+            reason, flat_counters,
+        )
     try:
         payload = _read_prev()
         payload["worldcup"] = report

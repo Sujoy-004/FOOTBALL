@@ -1,19 +1,23 @@
 """UCL future-season empty-provider UX — benign "deferred" vs real staleness.
 
-Regression suite for the "Provider has no published match data yet" state:
+Regression suite for the "Provider has no published match data yet" state
+under the D-13 truthfulness contract (02-02):
 
 - an explicitly active NON-historical season (2026/27) requested from a
   provider that answers SUCCESSFULLY with zero matches (HTTP 200, empty
-  body) is a BENIGN outcome: ``status="deferred"``,
-  ``reason="provider_empty"``, ``success=True``, ``stale=False``, no
-  factual store touched. The draw-derived 144 fixtures stay authoritative;
+  body) is a BENIGN outcome but NEVER a success: zero received matches
+  DERIVE to ``success=False``, ``stale=True``, ``reason="deferred/provider-empty"``.
+  ``status="deferred"`` tells the UI "not published yet" instead of
+  "transport failure", and no factual store is touched. The draw-derived
+  144 fixtures stay authoritative;
 - a REAL transport/provider failure (``last_error`` set) keeps the legacy
   stale/error contract exactly (``status="skip"``, ``stale=True``);
 - an empty result with NO pointer (or a historical pointer) is UNCHANGED
   ``"skip"``/stale — future-season deferral requires an explicitly active
   non-historical season;
-- the web layer maps "deferred" to a non-failure refresh report and the
-  UI carrier copy renders the accurate message in both cases.
+- the web layer maps "deferred" to a ledger entry whose success is False
+  and stale is True (the derived verdict travels through the ledger), and
+  the UI carrier copy renders the accurate message in both cases.
 
 No test mutates the repository's real data — every scenario runs against a
 fresh tmp copy of the UCL data dir.
@@ -41,7 +45,8 @@ class _EmptyProvider:
 
     ``last_error`` stays None on the benign path; the pipeline only treats
     it as deferred when BOTH the season was explicitly requested AND no
-    transport/provider error was recorded.
+    transport/provider error was recorded. Either way, the D-13 derivation
+    reports success=False (zero received matches are never "success").
     """
 
     def __init__(self, last_error: Optional[str] = None):
@@ -115,7 +120,7 @@ class TestPipelineDeferred:
     def test_future_season_200_empty_is_deferred_and_preserves_stores(
         self, tmp_path
     ):
-        """Active 2026/27 + successful-empty => deferred, non-stale, no writes."""
+        """Active 2026/27 + successful-empty => deferred, derived failure, no writes."""
         dp = _seed_ucl_dir(tmp_path)
         _write_pointer(dp, "2026/27")
         before = au.snapshot_tree(dp)
@@ -124,17 +129,18 @@ class TestPipelineDeferred:
         summary = _run_fetch(dp, provider)
 
         assert summary["status"] == "deferred"
-        assert summary["reason"] == "provider_empty"
+        assert summary["reason"] == "deferred/provider-empty"
         assert summary["deferred"] is True
         assert summary["n_raw"] == 0
         assert provider.season == 2026, "the future season was requested explicitly"
         report = summary["report"]
         assert report["attempted"] is True
-        assert report["success"] is True
-        assert report["stale"] is False
+        # D-13: zero received matches derive to failure, never success.
+        assert report["success"] is False
+        assert report["stale"] is True
         assert report["error"] is None
         assert report["deferred"] is True
-        assert report["reason"] == "provider_empty"
+        assert report["reason"] == "deferred/provider-empty"
         # Root 2025/26 stores AND the future-season 2026/27 store are untouched.
         assert au.snapshot_tree(dp) == before
 
@@ -165,7 +171,8 @@ class TestPipelineDeferred:
         assert summary["status"] == "skip"
         assert summary["report"]["success"] is False
         assert summary["report"]["stale"] is True
-        assert summary.get("reason") is None
+        # Zero received matches derive to provider-empty here as well.
+        assert summary["reason"] == "deferred/provider-empty"
         assert au.snapshot_tree(dp) == before
 
     def test_historical_pointer_empty_unchanged_skip(self, tmp_path):
@@ -178,7 +185,7 @@ class TestPipelineDeferred:
 
         assert summary["status"] == "skip"
         assert summary["report"]["stale"] is True
-        assert summary.get("reason") is None
+        assert summary["reason"] == "deferred/provider-empty"
         assert au.snapshot_tree(dp) == before
 
     def test_historical_success_still_ok(self, tmp_path):
@@ -227,10 +234,12 @@ class TestWebLayer:
 
         rep = ucl_app._refresh_report
         assert rep["attempted"] is True
-        assert rep["success"] is True
-        assert rep["stale"] is False
+        # D-13: the derived failure travels through the ledger — the UI reads
+        # `deferred` to render "not published yet" instead of "refresh failed".
+        assert rep["success"] is False
+        assert rep["stale"] is True
         assert rep["deferred"] is True
-        assert rep["reason"] == "provider_empty"
+        assert rep["reason"] == "deferred/provider-empty"
         assert rep["status"] == "deferred"
         assert rep["error"] is None
         assert rep["active_season"] == "2026/27"

@@ -42,6 +42,7 @@ from competitions.laliga.src.pipeline import (
 from competitions.laliga.src.simulation import run_mc_simulation as _run_mc_simulation_pipeline
 from competitions.laliga.src.state import build_competition_state as _build_state
 from football_core.elo import expected_score
+from football_core.fetcher import derive_success
 from football_core.signal import PredictionContext
 from web.common import error_response, ts
 from web.simulation_service import SimulationTaskService, build_simulation_meta
@@ -113,18 +114,28 @@ def _active_season_token() -> str:
 def _synthesize_season_report(season: str) -> dict:
     fixtures = _load_fixtures_pipeline(DATA_DIR, season)
     results = _load_results_pipeline(DATA_DIR, season)
+    # D-13: success is DERIVED from the store's own counts — the shipped
+    # store is the evidence. No provider was asked in this process, so a
+    # non-success verdict is never "provider-empty".
+    n_played = len(results)
+    counters = {"received": n_played, "normalized": n_played,
+                "ingested": n_played, "skipped_unmatchable": 0,
+                "skipped_no_target": 0, "skipped_missing_score": 0}
+    success, reason = derive_success(None, bool(fixtures), counters)
+    if not success:
+        reason = "deferred"
     return {
         "provider": None,
         "attempted": False,
-        "success": True,
+        "success": success,
         "error": None,
         "stale": False,
         "deferred": False,
-        "reason": None,
+        "reason": reason,
         "status": "ok",
         "active_season": season,
         "last_refresh": datetime.now(timezone.utc).isoformat(),
-        "n_matches": len(results),
+        "n_matches": n_played,
         "synth": True,
         "fixtures": len(fixtures),
     }
@@ -186,8 +197,10 @@ def _fetch_live_data():
 
     if is_snapshot_mode():
         logger.warning("[LaLiga] snapshot mode - live refresh skipped")
+        # D-13: nothing was attempted, so nothing succeeded (reclassify).
         globals()["_refresh_report"] = {
-            "provider": None, "attempted": False, "success": True,
+            "provider": None, "attempted": False, "success": False,
+            "reason": "deferred",
             "stale": True,
             "skipped_reason": "snapshot mode selected at startup",
         }
@@ -227,7 +240,10 @@ def _fetch_live_data():
 
     report = summary.get("report") or {}
     status = summary.get("status")
-    ok = status == "ok"
+    # D-13: the ledger verdict comes from the report's DERIVED success, not
+    # the transport status — a run that completed (status "ok") while
+    # ingesting nothing is not success (mirrors web/ucl_app.py).
+    ok = bool(report.get("success")) if isinstance(report, dict) else status == "ok"
     deferred = status == "deferred"
     reason = summary.get("reason")
     provider_name = summary.get("provider_name") or type(provider).__name__
@@ -240,7 +256,10 @@ def _fetch_live_data():
     elif not ok:
         logger.warning("[LaLiga] CONFIGURED_BUT_UNAVAILABLE - refresh failed: %s",
                        error or "no ingestable matches")
-    _store_refresh_report(ok or deferred, error, provider_name,
+    # D-13: the ledger verdict is `ok` alone — a deferred fetch is NOT
+    # recorded as success (decision 1/2 of 02-02); `reason` still travels
+    # through so the UI can present "not published yet".
+    _store_refresh_report(ok, error, provider_name,
                           n_matches=n_raw, n_updated=n_updated,
                           active_season=active_season,
                           deferred=deferred, reason=reason, status=status,

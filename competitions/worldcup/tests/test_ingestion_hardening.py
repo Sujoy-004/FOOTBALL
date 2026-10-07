@@ -171,7 +171,12 @@ def test_live_fetch_partitions_events_before_routing(monkeypatch, tmp_path):
     # nothing left to no-op.
 
     report = wc_pipeline.fetch_live_data("", "", WC_DATA)
-    assert report["success"] is True, report
+    # D-13 (02-02): the group/ko processors above are MOCKED to return []
+    # (this test only verifies routing), so nothing was ingested this run —
+    # zero received matches derive to (success=False, deferred/provider-empty)
+    # instead of a hardcoded True.
+    assert report["success"] is False, report
+    assert report["reason"] == "deferred/provider-empty"
     # Group processor received only group-stage events.
     assert captured["group"] and all(m.get("group_name") for m in captured["group"])
     # Knockout processor received only knockout events (no group_name).

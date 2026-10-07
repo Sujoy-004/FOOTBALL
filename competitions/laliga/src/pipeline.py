@@ -15,7 +15,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from football_core.blender import EnsembleEngine
-from football_core.fetcher import IngestReport, fold_team_key
+from football_core.fetcher import (
+    IngestReport,
+    derive_success,
+    fold_team_key,
+    new_ingestion_stats,
+)
 from football_core.insight import (
     form_trend as _core_form_trend,
     head_to_head as _core_head_to_head,
@@ -440,11 +445,9 @@ def fetch_live_data(
     the shipped canonical team vocabulary and written to the season store.
     Returns the truth-ingestion summary the web layer records.
     """
-    report = IngestReport(provider=None, attempted=True, success=True, error=None)
     if provider is None:
-        report.attempted = False
-        report.success = False
-        report.error = "no data provider configured"
+        report = IngestReport(provider=None, attempted=False, success=False,
+                              error="no data provider configured", reason="deferred")
         return {"report": report.to_dict(), "status": "error", "reason": "no_provider",
                 "provider_name": None, "n_raw": 0, "n_updated": 0, "per_season": {}}
 
@@ -474,9 +477,9 @@ def fetch_live_data(
             events = provider.fetch_matches(competition_id=fdo_competition_id)
     except Exception as exc:
         logger.warning("LaLiga provider fetch raised: %s", exc)
-        report.success = False
-        report.error = f"{exc.__class__.__name__}: {exc}"
-        report.stale = True
+        report = IngestReport(
+            provider=type(provider).__name__, attempted=True, success=False,
+            error=f"{exc.__class__.__name__}: {exc}", stale=True)
         return {"report": report.to_dict(), "status": "error", "reason": "fetch_error",
                 "provider_name": type(provider).__name__, "n_raw": 0, "n_updated": 0,
                 "per_season": {}}
@@ -485,16 +488,20 @@ def fetch_live_data(
     fixtures: list[dict] = []
     results: list[dict] = []
     canonical = set(alias_lookup.values())
-    n_unmatchable = 0
+    n_unmatchable_finished = 0
+    n_finished_raw = 0
+    n_missing_score = 0
     for e in events:
         if not isinstance(e, dict):
             continue
         home = alias_lookup.get(fold_team_key(str(e.get("home_team", ""))), str(e.get("home_team", "")))
         away = alias_lookup.get(fold_team_key(str(e.get("away_team", ""))), str(e.get("away_team", "")))
-        if home not in canonical or away not in canonical:
-            n_unmatchable += 1
-            continue
         status = str(e.get("status") or "scheduled")
+        if home not in canonical or away not in canonical:
+            if status == STATUS_FINISHED:
+                n_finished_raw += 1
+                n_unmatchable_finished += 1
+            continue
         try:
             matchday = int(e.get("round_number") or 0)
         except (TypeError, ValueError):
@@ -510,9 +517,10 @@ def fetch_live_data(
         }
         fixtures.append(row)
         if status == STATUS_FINISHED:
+            n_finished_raw += 1
             hs, aws = e.get("home_score"), e.get("away_score")
             if hs is None or aws is None:
-                report.finished["skipped_missing_score"] += 1
+                n_missing_score += 1
                 continue
             winner = home if hs > aws else (away if aws > hs else None)
             results.append({
@@ -535,16 +543,30 @@ def fetch_live_data(
     odds_summary = acquire_laliga_odds(data_dir, SHIPPED_SEASON, bsd_api_key)
     odds_public = {k: v for k, v in odds_summary.items() if k != "matches"}
 
-    report.provider = type(provider).__name__
-    report.finished["received"] = sum(1 for r in results if r.get("status") == STATUS_FINISHED)
-    report.finished["normalized"] = len(results)
-    report.finished["ingested"] = len(results)
-    if n_unmatchable:
-        report.finished["skipped_unmatchable"] = n_unmatchable
+    # D-13: the success report is built AFTER the fetch, with success DERIVED
+    # from the finished-result counters. Every received finished event lands
+    # in exactly one bucket (ingested, unmatchable team, missing score), so
+    # ``received == normalized == ingested + skipped_*`` holds by construction.
+    provider_label = type(provider).__name__
+    finished = new_ingestion_stats()
+    finished["received"] = n_finished_raw
+    finished["normalized"] = n_finished_raw
+    finished["ingested"] = len(results)
+    finished["skipped_unmatchable"] = n_unmatchable_finished
+    finished["skipped_missing_score"] = n_missing_score
+    success, reason = derive_success(provider_label, True, finished)
+    report = IngestReport(provider=provider_label, attempted=True, success=success,
+                          error=None, stale=not success, reason=reason)
+    report.finished = finished
+    if not success:
+        logger.warning(
+            "LaLiga refresh derived success=False (%s) — counters: %r",
+            reason, finished)
 
     return {
         "report": report.to_dict(),
         "status": "ok",
+        "reason": reason,
         "provider_name": type(provider).__name__,
         "n_raw": len(events),
         "n_updated": len(results),
