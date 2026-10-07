@@ -955,7 +955,7 @@ def ingest_ucl_events(
     summarize_ingestion(stats, logger, "UCL")
 
     report.finished = {
-        "received": stats["finished_received"],
+        "received": stats["received"],
         "normalized": stats["normalized"],
         "ingested": stats["ingested"],
         "skipped_unmatchable": stats["skipped_unmatchable"],
@@ -964,14 +964,14 @@ def ingest_ucl_events(
     report.last_success_at = datetime.now(timezone.utc).isoformat()
     report.written_files = written_files
 
-    resolved = stats["normalized"] == stats["finished_received"]
+    resolved = stats["normalized"] == stats["received"]
     report.stages = [
         {
             "key": "teams",
             "label": "Team/stage resolution",
-            "state": "pending" if not stats["finished_received"] else ("ok" if resolved else "error"),
+            "state": "pending" if not stats["received"] else ("ok" if resolved else "error"),
             "count": stats["normalized"],
-            "detail": f"{stats['normalized']}/{stats['finished_received']} finished events resolved"
+            "detail": f"{stats['normalized']}/{stats['received']} finished events resolved"
                       + (f"; skipped={stats['skipped_unmatchable'] + stats['skipped_no_target']}" if not resolved else ""),
         },
         {
@@ -1496,7 +1496,7 @@ def ingest_ucl_events_multi_season(
         provider=provider_name or "unknown", attempted=True, success=True, error=None
     )
     combined_report.finished = {
-        "received": stats["finished_received"],
+        "received": stats["received"],
         "normalized": stats["normalized"],
         "ingested": sum(
             s.get("results_added", 0) + s.get("results_updated", 0)

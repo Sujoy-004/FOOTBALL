@@ -42,13 +42,17 @@ def fold_pair_key(home: str, away: str) -> tuple[str, str]:
 def new_ingestion_stats() -> dict:
     """Create a zeroed result-ingestion stats dict (truth-ingestion contract).
 
-    Invariant: finished_received == normalized == ingested +
+    Invariant: received == normalized == ingested +
     skipped_unmatchable + skipped_no_target + skipped_missing_score.
     Any finished match that is not ingested must appear in exactly one
     skipped_* bucket and be logged at WARNING level.
+
+    D-14: ``received`` is the ONE name for the finished-result bucket —
+    the historical ``finished_received`` spelling was retired so this dict
+    and ``IngestReport.finished`` share a single vocabulary.
     """
     return {
-        "finished_received": 0,
+        "received": 0,
         "normalized": 0,
         "ingested": 0,
         "skipped_unmatchable": 0,
@@ -58,7 +62,7 @@ def new_ingestion_stats() -> dict:
 
 
 def count_finished(stats: dict) -> None:
-    stats["finished_received"] += 1
+    stats["received"] += 1
 
 
 def note_unmatchable(stats: dict, log: logging.Logger,
@@ -123,10 +127,60 @@ def summarize_ingestion(stats: dict, log: logging.Logger, context: str) -> None:
         logging.WARNING if lost else logging.INFO,
         "Ingestion summary [%s]: finished=%d normalized=%d ingested=%d "
         "skipped_unmatchable=%d skipped_no_target=%d skipped_missing_score=%d",
-        context, stats["finished_received"], stats["normalized"],
+        context, stats["received"], stats["normalized"],
         stats["ingested"], stats["skipped_unmatchable"], stats["skipped_no_target"],
         stats.get("skipped_missing_score", 0),
     )
+
+
+def derive_success(provider: str | None, attempted: bool,
+                   finished: dict) -> tuple[bool, str | None]:
+    """D-13: ``success`` is derived from the counters, never declared.
+
+    Args:
+        provider: Provider label used only for the counter-inconsistency
+            warning, so a broken run is traceable to its source.
+        attempted: Whether an acquisition attempt actually happened.
+        finished: The report's finished-result counters
+            (``received``/``normalized``/``ingested``/``skipped_*``).
+
+    Returns:
+        ``(success, reason)`` where reason is one of ``None`` (real,
+        consistent work was ingested), ``"deferred"`` (nothing was
+        attempted), ``"deferred/provider-empty"`` (attempted but zero
+        matches came back) or ``"counter_inconsistent"`` (the invariant
+        broke — fails closed, never raises into the request path).
+    """
+    if not attempted:
+        return False, "deferred"
+    if not isinstance(finished, dict) or int(finished.get("received") or 0) == 0:
+        # Attempted but nothing came back (HTTP 200 with an empty body).
+        return False, "deferred/provider-empty"
+    skipped = (
+        "skipped_unmatchable",
+        "skipped_no_target",
+        "skipped_missing_score",
+    )
+    try:
+        received = int(finished["received"])
+        normalized = int(finished["normalized"])
+        ingested = int(finished["ingested"])
+        skips = [int(finished[key]) for key in skipped]
+    except (KeyError, TypeError, ValueError):
+        logger.warning(
+            "Counter check [%s]: finished counters incomplete — %r; "
+            "treating the run as counter_inconsistent",
+            provider or "unknown", finished,
+        )
+        return False, "counter_inconsistent"
+    if received != normalized or normalized != ingested + sum(skips):
+        logger.warning(
+            "Counter check [%s]: invariant broken — received=%d normalized=%d "
+            "ingested=%d skipped=%d; report fails closed as counter_inconsistent",
+            provider or "unknown", received, normalized, ingested, sum(skips),
+        )
+        return False, "counter_inconsistent"
+    return True, None
 
 
 def fetch_raw_matches(api_key: str, api_url: str, league_id: int, timeout: int = 10) -> list[dict]:

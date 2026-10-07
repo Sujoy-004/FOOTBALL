@@ -82,7 +82,7 @@ def test_finished_unmatchable_is_visible_and_counted(caplog):
         out = process_group_matches(raw, teams, groups_raw, aliases,
                                     set(), set(), ingestion_stats=stats)
     assert out == []
-    assert stats["finished_received"] == 1
+    assert stats["received"] == 1
     assert stats["skipped_unmatchable"] == 1
     assert any("RESULT INGESTION SKIP" in r.message for r in caplog.records)
 
