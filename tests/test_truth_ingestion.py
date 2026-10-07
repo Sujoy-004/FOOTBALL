@@ -14,6 +14,9 @@ Guarantees:
 7. UCL live ingestion normalizes the raw BSD provider spellings that were
    logged as "unmatchable team names", and refuses finished events that
    carry no score evidence instead of fabricating a 0-0.
+8. Roadmap criterion 3 end-to-end: a run that was ATTEMPTED and completes
+   with ZEROED finished counters builds a report whose ``success`` is
+   False — success is derived from counters (D-13), never declared.
 """
 
 from __future__ import annotations
@@ -371,3 +374,45 @@ def test_finished_scored_event_without_fixture_is_skipped_no_target(tmp_path):
         (ucl_dir / "seasons" / "2026_27" / "results.json").read_text(encoding="utf-8"))
     assert not (res.get("matches") or []), \
         "an event with no matching fixture must not be recorded as a result"
+
+
+def test_zero_counter_report_derives_success_false_end_to_end(tmp_path):
+    """8/criterion-3. A run that is ATTEMPTED and completes with ZEROED
+    finished counters builds a report whose ``success`` is False — the
+    end-to-end shape of roadmap criterion 3 ("success is derived from those
+    counters"). The pipeline itself runs to completion (status ``ok``): only
+    the derived verdict is a failure, because nothing finished was received.
+    """
+    import arch_util as au
+    from competitions.ucl.src.pipeline import fetch_live_data
+
+    ucl_dir = _seed_active_season_dir(tmp_path)
+    events = [{
+        "status": "scheduled",
+        "home_team": "Club Brugge KV",
+        "away_team": "Aston Villa FC",
+        "home_score": None,
+        "away_score": None,
+        "season": "2026/27",
+        "event_date": "2026-09-16T19:00:00Z",
+        "stage": "LEAGUE_STAGE",
+    }]
+    summary = fetch_live_data(
+        ucl_dir, "", "", provider=au.StubProvider(events, competition="CL"))
+    report = summary["report"]
+
+    # The provider WAS asked and the pipeline ran to completion...
+    assert report["attempted"] is True, report
+    assert summary["status"] == "ok", summary
+    # ...but every finished-result counter is zero (only a fixture arrived).
+    finished = report.get("finished", {})
+    assert finished.get("received", 0) == 0, finished
+    assert sum(
+        finished.get(k, 0)
+        for k in ("ingested", "skipped_unmatchable", "skipped_no_target",
+                  "skipped_missing_score")
+    ) == 0, finished
+    # Derived verdict: zero received after a real attempt is never success.
+    assert report["success"] is False, report
+    assert report["reason"] == "deferred/provider-empty", report
+    assert report["stale"] is True, report
