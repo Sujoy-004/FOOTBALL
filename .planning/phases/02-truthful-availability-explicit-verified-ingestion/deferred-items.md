@@ -39,3 +39,18 @@ Discovered during execution, explicitly NOT fixed here (out of scope per executo
 - **Issue:** `tests/test_always_on_acquisition.py::test_auto_succeeding_provider_ingests_into_tmp_store` (IN `02-01-BASELINE.md`, fails at line 82: missing temp `ucldata/results.json`) and `tests/test_scoped_acquisition.py::test_lazy_acquisition_is_per_competition_and_once` (IN baseline; order-dependent — fails alone, passes in the plan sweep) remain red/green exactly as recorded in the baseline.
 - **Impact:** None on this plan's gates; recorded so a future sweep can compare against the same reference set.
 - **Deferred to:** the phase's baseline-reduction work (plan 02-01 owns the failure list).
+
+## 6. 02-06 status update on items 4 and 5, plus the current reference failure set
+
+- **Found during:** 02-06 task 3 (regression sweep)
+- **Item 4 is RESOLVED by 02-06:** `install_lazy_acquisition_hook`, `try_lazy_refresh` and the `@subapp.middleware("http")` lazy shim were deleted in commit `a95f122`, so the post-start `RuntimeError` hazard no longer exists and no test has to disarm `try_lazy_refresh` any more. The remaining advice still stands — audit TestClient tests so starting an app cannot fire a real provider refresh — and 02-06's new tests go further by sandboxing each app's `DATA_DIR` (throwaway copy in `tmp_path`) for the same reason.
+- **Item 5 partially superseded:** `tests/test_scoped_acquisition.py::test_lazy_acquisition_is_per_competition_and_once` no longer exists (rewritten as `test_plain_reads_make_zero_provider_calls`, green). `tests/test_always_on_acquisition.py::test_auto_succeeding_provider_ingests_into_tmp_store` still fails and is still in the reference set.
+- **Current reference set:** `fails_current_full.txt` at the repo root — 84 entries (82 `FAILED` + 2 `ERROR`), all consequences of missing gitignored runtime stores. The full suite after 02-06 has exactly the same 84 members (0 new, 0 gone), so plan gates in this environment must be reconciled **by set comparison, not by pytest exit code**.
+- **Deferred to:** 02-01 (owns the failure list) and the phase gate in 02-10.
+
+## 7. STATE.md velocity block is stale (bookkeeping, untouched by the state handlers)
+
+- **Found during:** 02-06 state updates
+- **Issue:** `## Performance Metrics → **Velocity:**` still reads "Total plans completed: 7 / Average duration: 53min / Total execution time: 6.2 hours", and the By-Phase row for phase 2 reads "2 | TBD" while 6 phase-02 summaries exist (frontmatter progress now says 13/17, 76%). A stray "| 01 | 7 | - | - |" row sits under the phase table. `state.record-metric` only appends to the per-plan table and `state.update-progress` only touches the frontmatter, so nothing maintains this block.
+- **Suggested fix (future):** recompute the velocity block and By-Phase rows from the per-plan table when the phase closes.
+- **Deferred to:** 02-10 (phase gate) or a bookkeeping pass.
