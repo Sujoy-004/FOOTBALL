@@ -12,17 +12,20 @@ payloads - those stay in the brains. All callables read module attributes
 dynamically at call time because the apps rebind globals (cache/sim_cache)
 during refreshes.
 
-Acquisition (Exchange 4 v2): each adapter exposes ``refresh()``, a
-competition-scoped acquisition entry point that attempts fresh data for
-THIS competition only and never raises. Server boot makes ZERO provider
-calls; acquisition is lazy — a competition's first data-API request fires
-its own refresh at most once per process (``try_lazy_refresh``). Why lazy
+Acquisition (Exchange 4 v2, plan 02-06): each adapter exposes
+``refresh()``, a competition-scoped acquisition entry point that attempts
+fresh data for THIS competition only and never raises. Server boot makes
+ZERO provider calls and reads are pure: ingestion happens only via
+``adapter.refresh()`` — an explicit per-competition refresh endpoint, the
+``FOOTBALL_PRELOAD_ALL=1`` preload, or a test driving it directly. Why
 per competition: the user may never open the other tab, so unrelated
 providers must not fire merely because the server started; eager scraping
 of every registered competition on boot wasted quota and coupled
-competitions that share nothing. Deployments that want warm tabs can set
-``FOOTBALL_PRELOAD_ALL=1`` to restore eager preloading via
-``adapter.refresh()`` in web.server's lifespan.
+competitions that share nothing. There is deliberately NO read-path
+trigger: a plain ``GET /api/data`` never acquires (roadmap criterion 2).
+Deployments that want warm tabs can set ``FOOTBALL_PRELOAD_ALL=1`` to
+preload every competition via ``adapter.refresh()`` in web.server's
+lifespan.
 
 Status contract (identical shape for every competition):
 
@@ -139,61 +142,24 @@ class CompetitionRegistry:
         return list(self._adapters.keys())
 
 
-# ── Lazy, competition-scoped acquisition (Exchange 4 v2) ────────────────
+# ── Once-per-process preload gates (Exchange 4 v2 / plan 02-06) ──────────
 #
-# Server boot performs ZERO provider calls. Each competition's fresh
-# acquisition fires at most ONCE PER PROCESS, on its first data-API
-# request. Rationale: the user may never open the other tab, so
-# unrelated providers must not fire merely because the server started;
-# boot stays instant and offline-safe while every tab still warms itself
-# on first open.
+# Server boot performs ZERO provider calls and every read is pure. The
+# only sanctioned acquisition triggers are adapter.refresh() called from
+# an explicit refresh endpoint, the FOOTBALL_PRELOAD_ALL=1 preload, or a
+# test. These gates record WHICH competitions eager preloading already
+# consumed so the state stays observable and resettable; nothing on the
+# read path consults them.
 
 _LAZY_FIRED: set[str] = set()
 _LAZY_LOCK = threading.Lock()
 
 
-def _registry_adapter(competition_id: str) -> Optional[CompetitionAdapter]:
-    try:
-        return REGISTRY.get(competition_id)
-    except UnknownCompetitionError:
-        return None
-
-
-def try_lazy_refresh(competition_id: str) -> Optional[dict]:
-    """Fire THIS competition's acquisition at most once per process.
-
-    Called at the top of each sub-app's primary read endpoint. Honors
-    explicit offline mode: when ``is_snapshot_mode()`` is true nothing is
-    attempted — but the once-slot IS consumed and the wrapper's truthful
-    attempted=False skipped report is recorded exactly once (wrappers
-    self-gate: zero network), so the first data response still discloses
-    WHY no live fetch happened instead of silently looking live-fresh.
-    """
-    with _LAZY_LOCK:
-        if competition_id in _LAZY_FIRED:
-            return None
-        _LAZY_FIRED.add(competition_id)
-
-    from web.startup import is_snapshot_mode
-
-    adapter = _registry_adapter(competition_id)
-    if adapter is None:
-        return None
-
-    if is_snapshot_mode():
-        # Explicit offline => never attempt. Invoke refresh() purely to
-        # record the wrapper's snapshot-skipped report; wrappers make
-        # zero network requests in this mode (tested guarantee).
-        adapter.refresh()
-        return None
-    return adapter.refresh()
-
-
 def consume_lazy_gate(competition_id: str) -> None:
-    """Mark a competition's lazy slot as fired WITHOUT attempting.
+    """Mark a competition's once-per-process slot as consumed.
 
-    Used by eager preloading (FOOTBALL_PRELOAD_ALL=1) so the first data
-    request does not re-attempt after boot already refreshed.
+    Used by eager preloading (FOOTBALL_PRELOAD_ALL=1) so boot records that
+    this competition has already been refreshed this process.
     """
     with _LAZY_LOCK:
         _LAZY_FIRED.add(competition_id)
@@ -208,32 +174,6 @@ def reset_lazy_gates() -> None:
     """Test seam: clear all once-per-process gates."""
     with _LAZY_LOCK:
         _LAZY_FIRED.clear()
-
-
-def install_lazy_acquisition_hook(subapp: FastAPI, competition_id: str,
-                                  api_path: str = "/api/data") -> None:
-    """Route-level lazy-acquisition shim for sub-apps owned elsewhere.
-
-    wc_app.py belongs to another agent, so the worldcup hook is installed
-    here as an HTTP middleware that fires try_lazy_refresh immediately
-    before the primary data endpoint runs (mounted scope: Starlette strips
-    the mount prefix before sub-app middleware sees the path). The one-
-    line follow-up for web/wc_app.py is a direct try_lazy_refresh call at
-    the top of api_data, after which this shim can be dropped.
-    """
-    from starlette.concurrency import run_in_threadpool
-
-    # Registries may be rebuilt repeatedly (tests) against the shared
-    # sub-app objects; install the middleware exactly once.
-    if getattr(subapp.state, "_lazy_hook_installed_for", None) == competition_id:
-        return
-    subapp.state._lazy_hook_installed_for = competition_id
-
-    @subapp.middleware("http")
-    async def _fire_lazy_acquisition(request, call_next):
-        if request.url.path.endswith(api_path):
-            await run_in_threadpool(try_lazy_refresh, competition_id)
-        return await call_next(request)
 
 
 def build_default_registry() -> CompetitionRegistry:
@@ -285,9 +225,6 @@ def build_default_registry() -> CompetitionRegistry:
             competition_id="worldcup", **kw),
         refresh_fn=wc_refresh,
     ))
-    # wc_app.py is owned by another agent: install the lazy hook here for
-    # now (see install_lazy_acquisition_hook docstring).
-    install_lazy_acquisition_hook(wc_app.wc_app, "worldcup")
 
     def ucl_status() -> dict[str, Any]:
         counts = ucl_app._match_counts()

@@ -46,6 +46,44 @@ def load_json(data_dir, name: str) -> dict:
         return dict(json.load(f))
 
 
+#: Refresh-block ``reason`` for "this process never refreshed this
+#: competition" (plan 02-06): a first-ever plain read must never read as
+#: fresh or successful without evidence.
+NOT_ATTEMPTED_REASON = "not_attempted"
+
+#: Verbatim disclosure an explicit offline session carries (kept in one
+#: place so the API surface, the pipeline report and the dashboard all
+#: agree on the wording).
+SNAPSHOT_SKIP_REASON = "snapshot mode selected at startup"
+
+
+def not_attempted_report() -> dict:
+    """Truthful refresh block for "nothing has been attempted".
+
+    Always ``attempted=False``/``success=False``/``stale=True``. In an
+    explicit offline session (``FOOTBALL_SNAPSHOT=1`` or ``--offline``) it
+    also carries ``skipped_reason``, so the very first read can disclose
+    "snapshot (offline)" instead of implying a live fetch happened —
+    reads stay pure while the session's provenance stays visible.
+
+    Returns:
+        A fresh dict each call (callers merge it into their own blocks).
+    """
+    block: dict[str, Any] = {
+        "provider": None,
+        "attempted": False,
+        "success": False,
+        "error": None,
+        "stale": True,
+        "reason": NOT_ATTEMPTED_REASON,
+    }
+    from web.startup import is_snapshot_mode
+
+    if is_snapshot_mode():
+        block["skipped_reason"] = SNAPSHOT_SKIP_REASON
+    return block
+
+
 def error_response(
     exc: Exception,
     *,

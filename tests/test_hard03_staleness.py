@@ -363,16 +363,9 @@ def test_api_data_serves_stale_when_the_store_outgrew_the_ledger(
     _touch(stores / "played.json", NOW + timedelta(minutes=5))
     _touch(stores / "played_groups.json", NOW + timedelta(minutes=5))
 
-    # Build the registry BEFORE the app first starts: web.competitions installs
-    # the lazy-acquisition middleware at import, and Starlette freezes the
-    # middleware stack on first start, so the order matters for later tests.
-    import web.competitions as competitions
-
-    # …and once it is installed, disarm it: this test reads the served block,
-    # it must not fire a real refresh into the repo store (the middleware
-    # would call the pipeline with the unpatched repo paths).
-    monkeypatch.setattr(competitions, "try_lazy_refresh", lambda _cid: None)
-
+    # Reads are pure (plan 02-06): GET /api/data never acquires, so this
+    # test reads the served block without any disarm — and without the
+    # risk of a real refresh into the repo store (unpatched paths).
     with TestClient(wc_app.wc_app) as client:
         payload = client.get("/api/data").json()
 

@@ -92,7 +92,20 @@ def _load_refresh_ledger(refresh_path: Path | None = None) -> dict:
     return read_ledger(refresh_path)
 
 
-_refresh_report: dict = {}
+#: Truthful default when this process has never recorded a refresh
+#: (plan 02-06): a first-ever plain read must not read as fresh/success
+#: without evidence. ``_refresh_report_for`` still serves the
+#: season-scoped store-truthful entry; this is the umbrella/boot default.
+_NOT_ATTEMPTED: dict = {
+    "provider": None,
+    "attempted": False,
+    "success": False,
+    "error": None,
+    "stale": True,
+    "reason": "not_attempted",
+}
+
+_refresh_report: dict = dict(_NOT_ATTEMPTED)
 _refresh_reports_seeded: bool = False
 
 
@@ -158,6 +171,14 @@ def _refresh_report_for(season: str) -> dict:
     """
     if _refresh_report.get("skipped_reason"):
         return _refresh_report
+    # Session truth: an explicit offline session attempted NOTHING, so no
+    # recorded or synthesized "ok" entry may imply a live fetch happened
+    # (plan 02-06). Season context survives on the synthesized entry.
+    from web.common import not_attempted_report
+
+    offline = not_attempted_report()
+    if offline.get("skipped_reason"):
+        return {**_synthesize_season_report(season), **offline}
     report = _season_refresh_reports().get(season)
     if report is not None:
         return _freshness(report, _freshness_store_paths(season))
@@ -397,8 +418,9 @@ async def _json_error_handler(request, exc):
 
 @laliga_app.get("/api/data")
 def api_data():
-    from web.competitions import try_lazy_refresh
-    try_lazy_refresh("laliga")
+    # Reads are pure (plan 02-06): no acquisition fires here. Ingestion
+    # happens only through the explicit POST /api/refresh endpoint, the
+    # FOOTBALL_PRELOAD_ALL preload, or a test driving adapter.refresh().
     n_unplayed, n_total = _match_counts()
     return JSONResponse({
         "refresh": _refresh_report_for(_active_season_token()),

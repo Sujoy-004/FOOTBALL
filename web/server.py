@@ -3,12 +3,14 @@
 Mounts competition sub-apps under /worldcup and /ucl.
 Serves the SPA shell from /static and the landing page at /.
 
-Boot policy (Exchange 4 v2): the lifespan performs ZERO provider calls.
-Caches are computed from validated on-disk stores only; acquisition is
-lazy and competition-scoped — each sub-app attempts its own fresh fetch
-at most once per process, on its first data-API request (see
-web.competitions.try_lazy_refresh). Explicit offline sessions
-(FOOTBALL_SNAPSHOT=1, or the --offline CLI flag) never attempt.
+Boot policy (Exchange 4 v2, plan 02-06): the lifespan performs ZERO
+provider calls and every read is pure. Caches are computed from validated
+on-disk stores only; ingestion happens exclusively through
+``adapter.refresh()`` — an explicit per-competition POST /api/refresh,
+the FOOTBALL_PRELOAD_ALL preload below, or a test. A plain data-API
+request never acquires (see web.competitions). Explicit offline sessions
+(FOOTBALL_SNAPSHOT=1, or the --offline CLI flag) never attempt: the
+fetch wrappers self-gate with zero network.
 
 Environment flags:
     FOOTBALL_SNAPSHOT=1     explicit OFFLINE execution mode: acquisition

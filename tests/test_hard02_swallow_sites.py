@@ -238,16 +238,10 @@ def test_api_data_refresh_block_carries_the_unreadable_marker(
     ledger = _write_corrupt_ledger(tmp_path)
     monkeypatch.setattr(wc_app, "_refresh_report_path", lambda: ledger)
 
-    # Build the registry BEFORE the app first starts: web.competitions installs
-    # the lazy-acquisition middleware at import, and Starlette freezes the
-    # middleware stack on first start ("Cannot add middleware after an
-    # application has started"), so the order matters for later tests —
-    # and once installed, disarm it: this test only reads the served block,
-    # it must not fire a real refresh into the repo store (unpatched paths).
-    import web.competitions as competitions
-
-    monkeypatch.setattr(competitions, "try_lazy_refresh", lambda _cid: None)
-
+    # Reads are pure (plan 02-06): no acquisition fires on GET /api/data,
+    # so this test can read the served block without arming any disarm —
+    # and without risking a real refresh into the repo store (unpatched
+    # paths).
     with TestClient(wc_app.wc_app) as client:
         payload = client.get("/api/data").json()
 

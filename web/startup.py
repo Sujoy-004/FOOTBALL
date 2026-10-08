@@ -22,8 +22,9 @@ Decision flow:
 "snapshot" mode is EXPLICIT only: the FOOTBALL_SNAPSHOT override or a
 forced StartupDecision("snapshot") (tests). In snapshot mode the fetch
 wrappers self-gate and make ZERO network requests. Every other decision
-kind ("auto", "live-configured") lets acquisition happen lazily per
-competition (see web.competitions.try_lazy_refresh); failed attempts
+kind ("auto", "live-configured") lets acquisition happen on the explicit
+per-competition refresh trigger (POST /api/refresh, FOOTBALL_PRELOAD_ALL
+preload, or a test — see web.competitions); failed attempts
 never delete or overwrite existing factual stores.
 
 Credentials live in the process environment only; nothing is persisted.
@@ -139,9 +140,9 @@ def run_startup_flow(
         return _decide("live-configured", existing)
 
     # No usable credential: informational banner, then the normal
-    # fresh-first policy. Acquisition stays lazy per competition
-    # (web.competitions.try_lazy_refresh); with no provider configured
-    # each attempt resolves to a truthful "no data provider configured"
-    # report instead of network traffic.
+    # fresh-first policy. Acquisition stays on the explicit trigger
+    # (POST /api/refresh, FOOTBALL_PRELOAD_ALL preload, or a test); with
+    # no provider configured each attempt resolves to a truthful "no data
+    # provider configured" report instead of network traffic.
     echo(NO_PROVIDER_BANNER)
     return _decide("auto", "")

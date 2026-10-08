@@ -134,6 +134,19 @@ def _write_pointer(data_dir: Path, season: str | None) -> None:
     set_current_season(data_dir, season, basis="draw", provider="test")
 
 
+def _explicit_refresh() -> dict:
+    """The ONLY sanctioned acquisition trigger (plan 02-06).
+
+    Reads are pure: ``GET /api/data`` never acquires, so a scenario that
+    needs a RECORDED refresh outcome drives the registry's explicit
+    ``refresh()`` — the same entry point ``POST /ucl/api/refresh``
+    delegates to. Returns the report the trigger recorded.
+    """
+    from web.competitions import REGISTRY
+
+    return dict(REGISTRY.get("ucl").refresh())
+
+
 # ── served API: the future-season deferral stays on the future season ───────
 
 class TestSeasonScopedServedRefresh:
@@ -151,6 +164,9 @@ class TestSeasonScopedServedRefresh:
         )
 
         with TestClient(ucl_app.ucl_app) as client:
+            # Explicit acquisition (reads are pure): the deferral is
+            # RECORDED by the trigger, then served by the read.
+            _explicit_refresh()
             r = client.get("/api/data")
             assert r.status_code == 200
             payload = r.json()
@@ -166,7 +182,7 @@ class TestSeasonScopedServedRefresh:
             assert refresh["reason"] == "deferred/provider-empty"
             assert refresh["stale"] is True
 
-        assert provider.calls >= 1, "lazy acquisition actually fired"
+        assert provider.calls >= 1, "the explicit refresh actually fired"
         assert provider.season == 2026, "the future season was requested explicitly"
 
     def test_switch_2026_27_to_2025_26_never_inherits_deferred(
@@ -185,7 +201,9 @@ class TestSeasonScopedServedRefresh:
         )
 
         with TestClient(ucl_app.ucl_app) as client:
-            # 2026/27 active: the deferred state belongs here.
+            # 2026/27 active: the deferred state belongs here (recorded by
+            # the explicit refresh, not by the read).
+            _explicit_refresh()
             first = client.get("/api/data").json()["refresh"]
             assert first["status"] == "deferred"
             assert first["active_season"] == "2026/27"
@@ -235,6 +253,7 @@ class TestSeasonScopedServedRefresh:
         )
 
         with TestClient(ucl_app.ucl_app) as client:
+            _explicit_refresh()
             r = client.get("/api/data")
             assert r.status_code == 200
             refresh = r.json()["refresh"]
@@ -266,6 +285,9 @@ class TestSeasonScopedServedRefresh:
         startup.set_session_decision(startup.StartupDecision("snapshot", ""))
 
         with TestClient(ucl_app.ucl_app) as client:
+            # The explicit trigger self-gates on zero network and records
+            # WHY nothing was attempted; the read serves that disclosure.
+            _explicit_refresh()
             refresh = client.get("/api/data").json()["refresh"]
             assert refresh.get("skipped_reason") == "snapshot mode selected at startup"
             assert refresh.get("attempted") is False

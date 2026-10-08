@@ -32,7 +32,7 @@ from competitions.worldcup.src.bracket import (
     compute_full_bracket,
 )
 from competitions.worldcup.src.overview import compute_overview
-from web.common import boot_step, error_response, load_json
+from web.common import boot_step, error_response, load_json, not_attempted_report
 from web.simulation_service import (
     SimulationTaskService, build_simulation_meta,
 )
@@ -206,12 +206,17 @@ def _current_refresh_report() -> dict:
     Healthy file: the ``worldcup`` sub-dict, unchanged. Unreadable file: the
     explicit ``{"ledger": "unreadable", "detail": ...}`` marker, which is the
     failure signal the dashboard renders — never ``{}``, which would read as
-    "no refresh has ever run".
+    "no refresh has ever run". No entry at all (a process that never
+    refreshed): the truthful ``not_attempted`` block — which additionally
+    discloses an explicit offline session — instead of ``{}``.
     """
     ledger = read_ledger(_refresh_report_path())
     if ledger.get("ledger") == UNREADABLE:
         return ledger
-    return _freshness(ledger.get("worldcup", {}), _freshness_store_paths())
+    entry = ledger.get("worldcup") or {}
+    if not entry:
+        return not_attempted_report()
+    return _freshness(entry, _freshness_store_paths())
 
 
 @wc_app.get("/api/overview")

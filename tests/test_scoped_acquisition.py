@@ -1,13 +1,15 @@
-"""Exchange 4 v2: competition-scoped lazy acquisition.
+"""Competition-scoped acquisition with pure reads (Exchange 4 v2, plan 02-06).
 
 Locks down:
 
+- boot makes ZERO provider calls (roadmap criterion 2, "during boot");
+- plain data reads on ALL THREE apps make ZERO provider calls — reads are
+  pure; ingestion happens only via adapter.refresh() (explicit endpoint,
+  FOOTBALL_PRELOAD_ALL preload, or a test);
 - adapter.refresh() is competition-scoped: refreshing ucl touches ONLY
   the UCL provider (worldcup counter stays 0) and vice versa;
 - refresh() never raises, even when the provider raises — it returns a
   truthful attempted/success/error report;
-- server boot performs ZERO provider calls; acquisition fires lazily,
-  at most once per process, on each competition's first data request;
 - explicit offline (FOOTBALL_SNAPSHOT=1) never attempts anything;
 - run_startup_flow has no prompt path that disables scraping in normal
   mode; env override and forced decisions still pin snapshot.
@@ -58,9 +60,17 @@ def isolated_environment(tmp_path, monkeypatch):
     monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
     monkeypatch.setenv("FOOTBALL_PRELOAD_ALL", "")
+    # UCL refresh state is module-level: reset it so one scenario's
+    # explicit refresh cannot leak into another's served report.
+    ucl_app._refresh_report = {}
+    ucl_app._refresh_reports = {}
+    ucl_app._refresh_reports_seeded = False
     competitions.reset_lazy_gates()
     startup.set_session_decision(None)
     yield
+    ucl_app._refresh_report = {}
+    ucl_app._refresh_reports = {}
+    ucl_app._refresh_reports_seeded = False
     competitions.reset_lazy_gates()
     startup.set_session_decision(None)
 
@@ -146,10 +156,14 @@ def test_adapter_without_hook_reports_honestly():
     assert report["error"]
 
 
-# ── 3. lazy scoped acquisition through the served API ────────────────────
+# ── 3. reads are pure: acquisition happens only on an explicit trigger ───
 
-def test_lazy_acquisition_is_per_competition_and_once(monkeypatch):
+def test_plain_reads_make_zero_provider_calls(monkeypatch):
+    """Roadmap criterion 2 (plan 02-06): boot AND plain reads make ZERO
+    provider calls on every app; the only trigger is an explicit
+    adapter.refresh(), and that trigger stays competition-scoped."""
     from web.server import app as server_app
+    from web.competitions import REGISTRY
 
     ucl_prov = _CountingProvider()
     wc_prov = _CountingProvider()
@@ -160,25 +174,24 @@ def test_lazy_acquisition_is_per_competition_and_once(monkeypatch):
         assert ucl_prov.calls == 0
         assert wc_prov.calls == 0
 
-        # First UCL data request: ONLY the UCL provider may fire.
-        r = client.get("/ucl/api/data")
-        assert r.status_code == 200
-        assert r.json().get("error") is None or True  # body always parses
-        ucl_after_first = ucl_prov.calls
-        assert ucl_after_first >= 1
+        # Plain reads on all three apps: still zero. Reads never acquire.
+        reads = ("/worldcup/api/data", "/ucl/api/data", "/laliga/api/data")
+        for path in reads:
+            assert client.get(path).status_code == 200
+        assert ucl_prov.calls == 0
         assert wc_prov.calls == 0
 
-        # First WC data request: WC fires once; UCL untouched further.
-        r = client.get("/worldcup/api/data")
-        assert r.status_code == 200
-        assert wc_prov.calls == 1
+        # The ONLY trigger: explicit refresh, scoped to its competition.
+        REGISTRY.get("ucl").refresh()
+        assert ucl_prov.calls >= 1
+        assert wc_prov.calls == 0
 
-        # Repeat hits never re-attempt (once-per-process guard).
+        # Repeated plain reads still never re-attempt.
         for _ in range(3):
-            client.get("/ucl/api/data")
-            client.get("/worldcup/api/data")
-        assert ucl_prov.calls == ucl_after_first
-        assert wc_prov.calls == 1
+            for path in reads:
+                client.get(path)
+        assert ucl_prov.calls >= 1
+        assert wc_prov.calls == 0
 
 
 def test_boot_makes_zero_provider_calls_without_preload(monkeypatch):
