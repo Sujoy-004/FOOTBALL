@@ -924,6 +924,53 @@ body {
 .competition-worldcup .acq-detail { color: #FFF2DF88; }
 .competition-worldcup .acq-stage { border-top-color: rgba(140,110,99,0.25); }
 
+/* Phase 02-08 — Refresh results button (C1) */
+.refresh-btn {
+  min-height: 32px; min-width: 96px; margin-left: 8px;
+  background: #16A085; color: #140C30; border: 1px solid #16A085; border-radius: 6px;
+  font-family: inherit; font-size: 12px; font-weight: bold; cursor: pointer;
+  letter-spacing: 0.5px; transition: background 0.15s, border-color 0.15s;
+}
+.refresh-btn:hover { background: #1ABC9C; border-color: #1ABC9C; }
+.refresh-btn:disabled { background: rgba(22,160,133,0.45); border-color: rgba(22,160,133,0.45); cursor: progress; }
+.refresh-btn:focus { outline: 2px solid #16A085; outline-offset: 2px; }
+
+/* Phase 02-08 — blocking availability placeholder (C3) */
+.avail-panel {
+  border: 1px solid rgba(21,61,76,0.3); border-radius: 8px;
+  padding: 32px 16px;
+  background: rgba(20,12,48,0.65); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  margin-bottom: 12px; text-align: center;
+}
+.avail-head { color: #F6DBC0; font-size: 16px; font-weight: bold; line-height: 1.2; margin-bottom: 8px; }
+.avail-body { color: #F6DBC0; font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
+.avail-meta { color: #15565B; font-size: 11px; line-height: 1.4; }
+
+/* Phase 02-08 — counter-bucket caption (C4) */
+.acq-caption {
+  color: #F6DBC0; font-size: 11px; line-height: 1.5; padding-top: 4px;
+  border-top: 1px solid rgba(21,61,76,0.25); margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Phase 02-08 — WC earth-tone overrides (mirrors the .competition-worldcup
+   acq-* block above) */
+.competition-worldcup .refresh-btn { background: #D3A376; border-color: #D3A376; color: #3E2522; }
+.competition-worldcup .refresh-btn:hover { background: #FFE0B2; border-color: #FFE0B2; }
+.competition-worldcup .refresh-btn:disabled { background: rgba(211,163,118,0.45); border-color: rgba(211,163,118,0.45); }
+.competition-worldcup .refresh-btn:focus { outline-color: #D3A376; }
+.competition-worldcup .avail-panel { background: rgba(62,37,34,0.65); border-color: rgba(140,110,99,0.3); }
+.competition-worldcup .avail-head { color: #FFF2DF; }
+.competition-worldcup .avail-body { color: #FFF2DF; }
+.competition-worldcup .avail-meta { color: #8C6E63; }
+.competition-worldcup .acq-caption { color: #FFF2DF; border-top-color: rgba(140,110,99,0.25); }
+
+/* Phase 02-08 — ≤800px: status-bar single column, C1 above content, C2 wraps */
+@media (max-width: 800px) {
+  .status-bar { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .refresh-btn { margin-left: 0; margin-top: 4px; }
+}
+
 /* ── Match/Tie Intelligence modal (Exchange 3, additive) ── */
 .intel-sec { margin-top: 10px; }
 .intel-note { font-size: 10px; font-style: italic; color: #F6DBC088; padding: 2px 0; }

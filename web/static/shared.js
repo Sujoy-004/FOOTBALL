@@ -721,8 +721,97 @@ function renderAcquisitionPanel(el, acq) {
       + (detail ? '<span class="acq-detail">' + detail + "</span>" : "")
       + "</div>";
   });
+  const caption = _acqCaptionHtml(acq);
+  if (caption) h += caption;
   h += "</div>";
   el.innerHTML = h;
+}
+
+// ── Availability banner / placeholder / refresh button (Phase 02-08) ──
+// DOM-free string builders: node-testable, every dynamic value passes _esc().
+
+// One availability line for the status-bar right slot (C2 + I7).
+// state ∈ {live, success, refreshing, stale, snapshot, deferred,
+// zero_provider, failed, unavailable}; anything else renders "".
+// Legacy SNAPSHOT/STALE/DEFERRED strings are byte-identical to the ones
+// previously inlined in ucl.js:244/:246/:248 (hyphens, no em-dash).
+function renderAvailabilityBanner(state, ctx) {
+  const c = ctx || {};
+  const line = (color, cls, text) =>
+    '<span class="acq-notice-line avail-banner ' + cls + '" role="status" aria-live="polite"'
+    + (color ? ' style="color:' + color + '"' : '') + ">" + _esc(text) + "</span>";
+  switch (state) {
+    case "live":
+    case "success":
+      return line("#16A085", "", "LIVE — refreshed " + (c.timestamp || "") + " · " + (c.nIngested != null ? c.nIngested : 0) + " ingested");
+    case "refreshing":
+      return line("#e6a817", "", "Refreshing " + (c.comp || "") + " results…");
+    case "stale":
+      return line("#e6a817", "", "STALE - live refresh failed; showing last known data");
+    case "snapshot":
+      return line("#e6a817", "", "SNAPSHOT - showing stored data (live refresh skipped)");
+    case "deferred":
+      return line("#168777", "", "Provider has no published match data yet - showing draw-derived fixtures");
+    case "zero_provider":
+      return line("#e6a817", "", "Provider returned no matches — deferred (not a successful refresh)");
+    case "failed":
+      return '<span class="acq-error-line avail-banner" role="status" aria-live="polite">'
+        + _esc("Refresh failed — see report") + "</span>";
+    case "unavailable":
+      return line("#e6a817", "", "No data yet — tap Refresh to fetch results");
+    default:
+      return "";
+  }
+}
+
+// Blocking availability placeholder (C3 + I6 + I7). Replaces the results
+// table — never overlays it. Unknown/available → "".
+function renderAvailPanel(opts) {
+  const o = opts || {};
+  const state = o.state;
+  if (state !== "missing" && state !== "empty" && state !== "unavailable") return "";
+  const provider = o.provider != null && o.provider !== "" ? _esc(o.provider) : "unknown";
+  const lastRefresh = o.lastRefresh != null && o.lastRefresh !== "" ? _esc(o.lastRefresh) : "unknown";
+  let body;
+  if (state === "missing") {
+    body = "No data yet — tap Refresh to fetch results";
+  } else if (state === "empty") {
+    body = "The " + _esc(o.comp || "") + " store is present but contains no finished matches. Provider: " + provider + ". Last refresh: " + lastRefresh + ".";
+  } else {
+    body = "Store unavailable: " + _esc(o.reason || "unknown reason") + ". Provider: " + provider + ". Last refresh: " + lastRefresh + ". Try Refresh results.";
+  }
+  const meta = [];
+  if (o.provider) meta.push(_esc(o.provider));
+  if (o.reason) meta.push(_esc(o.reason));
+  if (o.lastRefresh) meta.push("last refresh " + _esc(o.lastRefresh));
+  return '<aside class="avail-panel" role="status" aria-live="polite">'
+    + '<div class="avail-head">No data yet</div>'
+    + '<div class="avail-body">' + _esc(body) + "</div>"
+    + (meta.length ? '<div class="avail-meta">' + meta.join(" · ") + "</div>" : "")
+    + "</aside>";
+}
+
+// C1 refresh button — idle or in-flight (I2, I7).
+function refreshButtonHtml(comp, inFlight) {
+  if (inFlight) {
+    return '<button type="button" class="refresh-btn" data-comp="' + _esc(comp) + '" disabled aria-busy="true">Refreshing…</button>';
+  }
+  return '<button type="button" class="refresh-btn" data-comp="' + _esc(comp) + '">Refresh results</button>';
+}
+
+// Counter-bucket caption for the acquisition report (C4, OQ8). Renders only
+// when the report carries ingestion counters; never fabricates zeros.
+function _acqCaptionHtml(acq) {
+  const f = acq && acq.finished;
+  if (!f || typeof f !== "object") return "";
+  const n = (v) => (typeof v === "number" && isFinite(v) ? v : null);
+  const ingested = n(f.ingested);
+  if (ingested === null) return "";
+  const skipped = (n(f.skipped_unmatchable) || 0) + (n(f.skipped_no_target) || 0)
+    + (n(f.skipped_missing_score) || 0) + (n(f.skipped_no_change) || 0);
+  const notFinished = n(f.not_finished) != null ? n(f.not_finished)
+    : (n(f.skipped_not_finished) != null ? n(f.skipped_not_finished) : 0);
+  return '<div class="acq-caption">Ingested ' + ingested + " · Skipped " + skipped + " · Not finished " + notFinished + "</div>";
 }
 
 // ── Status bar helpers ──
@@ -730,7 +819,7 @@ function updateStatusBar(left, right) {
   const leftEl = document.getElementById("statusLeft");
   const rightEl = document.getElementById("statusRight");
   if (leftEl) leftEl.innerHTML = left;
-  if (rightEl && right) rightEl.innerHTML = right;
+  if (rightEl && typeof right === "string") rightEl.innerHTML = right;
 }
 
 // ── Shared Simulation Popup ──
@@ -1100,6 +1189,9 @@ export {
   renderBracketTree,
   renderAcquisitionPanel,
   updateStatusBar,
+  renderAvailabilityBanner,
+  renderAvailPanel,
+  refreshButtonHtml,
   createSimPopup,
   showSimPopup,
   renderSimulationShell,
