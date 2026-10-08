@@ -11,6 +11,9 @@ Locks down:
 - refresh() never raises, even when the provider raises — it returns a
   truthful attempted/success/error report;
 - explicit offline (FOOTBALL_SNAPSHOT=1) never attempts anything;
+- FOOTBALL_PRELOAD_ALL=1 preload refreshes each registered competition
+  exactly once and consumes its once-per-process gate (the sanctioned
+  boot-time exception);
 - run_startup_flow has no prompt path that disables scraping in normal
   mode; env override and forced decisions still pin snapshot.
 """
@@ -45,18 +48,43 @@ class _CountingProvider:
         return list(self.payload)
 
 
+def _sandbox_data_dir(monkeypatch, tmp_path, module, name: str) -> None:
+    """Point a competition app at a THROWAWAY copy of its data dir.
+
+    A refresh may re-serialise the tracked runtime stores even when the
+    provider returns nothing, so a test that refreshes must never write the
+    repository's own data (same guard as test_refresh_endpoint_contract).
+    """
+    import shutil
+
+    src = Path(module.DATA_DIR)
+    dst = tmp_path / name
+    if src.exists():
+        shutil.copytree(src, dst, dirs_exist_ok=True)
+    else:
+        dst.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(module, "DATA_DIR", dst)
+
+
 @pytest.fixture(autouse=True)
 def isolated_environment(tmp_path, monkeypatch):
     """Sandbox ledgers + neutral decision state + clean lazy gates."""
     import competitions.worldcup.src.pipeline as wc_pipeline
     import web.competitions as competitions
+    import web.laliga_app as laliga_app
     import web.startup as startup
     import web.ucl_app as ucl_app
+    import web.wc_app as wc_app
 
     monkeypatch.setattr(wc_pipeline, "_last_refresh_report_path",
                         lambda: tmp_path / "last_refresh.json")
     monkeypatch.setattr(ucl_app, "_refresh_report_path",
                         lambda: tmp_path / "last_refresh.json")
+    monkeypatch.setattr(laliga_app, "_refresh_report_path",
+                        lambda: tmp_path / "last_refresh.json")
+    _sandbox_data_dir(monkeypatch, tmp_path, wc_app, "wcdata")
+    _sandbox_data_dir(monkeypatch, tmp_path, ucl_app, "ucldata")
+    _sandbox_data_dir(monkeypatch, tmp_path, laliga_app, "laligadata")
     monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     monkeypatch.setenv("FOOTBALL_DATA_ORG_KEY", "")
     monkeypatch.setenv("FOOTBALL_PRELOAD_ALL", "")
@@ -266,3 +294,52 @@ def test_forced_decision_snapshot_still_honored():
 
     startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     assert startup.is_snapshot_mode() is True
+
+
+# ── 6. FOOTBALL_PRELOAD_ALL eager preload (the sanctioned boot exception) ─
+
+def test_preload_all_refreshes_each_adapter_once_and_consumes_gates(monkeypatch):
+    """Plan 02-06 verification: ``_preload_registered_competitions`` (the
+    FOOTBALL_PRELOAD_ALL=1 hook, web/server.py:86-99) still works after the
+    lazy read path was removed — every registered competition is refreshed
+    exactly once and its once-per-process gate is marked consumed, so the
+    preload stays the only sanctioned boot-time acquisition.
+
+    Adapters are wrapped (not mocked away): the real scoped refresh runs
+    against the counting fakes, so the test also proves scoping holds under
+    preload (each provider is reached by its own competition only).
+    """
+    import web.competitions as competitions
+    import web.server as server
+
+    ucl_prov = _CountingProvider()
+    wc_prov = _CountingProvider()
+    _install_split_fakes(monkeypatch, ucl_prov, wc_prov)
+
+    ids = competitions.REGISTRY.ids()
+    assert set(ids) == {"worldcup", "ucl", "laliga"}, f"unexpected registry: {ids}"
+
+    calls: dict[str, int] = {cid: 0 for cid in ids}
+    real_refresh = competitions.CompetitionAdapter.refresh
+
+    def _counted(adapter_self):
+        # Class-level patch: the adapters are frozen dataclasses, so the
+        # counter wraps the real method instead of an instance attribute.
+        calls[adapter_self.id] += 1
+        return real_refresh(adapter_self)
+
+    monkeypatch.setattr(competitions.CompetitionAdapter, "refresh", _counted)
+
+    server._preload_registered_competitions()
+
+    assert calls == {cid: 1 for cid in ids}, (
+        f"preload must refresh each registered competition exactly once: {calls}"
+    )
+    for cid in ids:
+        assert competitions.lazy_gate_fired(cid), (
+            f"{cid}: preload must consume the once-per-process gate"
+        )
+    # Scoped acquisition still holds under preload: UCL's fake was reached
+    # (by UCL alone) and the non-UCL fake was reached (WC + LaLiga).
+    assert ucl_prov.calls >= 1, "preload never touched the UCL provider"
+    assert wc_prov.calls >= 1, "preload never touched the WC/LaLiga provider"
