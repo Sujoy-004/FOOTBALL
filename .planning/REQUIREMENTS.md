@@ -9,9 +9,9 @@
 
 ### Truthful Data Availability
 
-- [ ] **TRUTH-01**: Every competition view reports explicit `DataAvailability` (`AVAILABLE` / `EMPTY` / `MISSING` / `UNAVAILABLE`); absent data never renders as an empty table, zero, or "nothing has happened yet"
-- [ ] **TRUTH-02**: The World Cup web path stops defaulting a missing `played.json` / `played_groups.json` to `{}` (`web/wc_app.py:356-357`) and instead reports the store as unavailable
-- [ ] **TRUTH-03**: A view with no data states the reason together with provider and last-refresh context, rather than showing blanks
+- [x] **TRUTH-01**: Every competition view reports explicit `DataAvailability` (`AVAILABLE` / `EMPTY` / `MISSING` / `UNAVAILABLE`); absent data never renders as an empty table, zero, or "nothing has happened yet"
+- [x] **TRUTH-02**: The World Cup web path stops defaulting a missing `played.json` / `played_groups.json` to `{}` (`web/wc_app.py:356-357`) and instead reports the store as unavailable
+- [x] **TRUTH-03**: A view with no data states the reason together with provider and last-refresh context, rather than showing blanks
 
 ### Layering Prerequisite
 
@@ -109,9 +109,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LAYR-02 | Phase 1 | Complete |
 | LAYR-03 | Phase 1 | Complete |
 | HARD-01 | Phase 1 | Complete |
-| TRUTH-01 | Phase 2 | Pending |
-| TRUTH-02 | Phase 2 | Pending |
-| TRUTH-03 | Phase 2 | Pending |
+| TRUTH-01 | Phase 2 | Complete |
+| TRUTH-02 | Phase 2 | Complete |
+| TRUTH-03 | Phase 2 | Complete |
 | INGEST-01 | Phase 2 | Complete |
 | INGEST-02 | Phase 2 | Complete |
 | INGEST-03 | Phase 2 | Complete |

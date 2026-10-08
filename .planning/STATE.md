@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 02-06-PLAN.md (3 tasks, 3 commits a95f122..58dbec5; gates green modulo the 84 pre-existing baseline failures - full-suite failure set identical to baseline)
-last_updated: "2026-10-08T11:24:15.089Z"
+last_updated: "2026-10-08T13:42:04.161Z"
 last_activity: 2026-10-08
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 17
-  completed_plans: 13
-  percent: 76
+  completed_plans: 14
+  percent: 82
 ---
 
 # Project State
@@ -28,7 +28,7 @@ and the engine's accuracy **measured** against naive baselines instead of claime
 ## Current Position
 
 Phase: 02 (truthful-availability-explicit-verified-ingestion) — EXECUTING
-Plan: 7 of 10
+Plan: 2 of 10
 Status: Ready to execute
 Last activity: 2026-10-08
 
@@ -38,7 +38,7 @@ proven; one `atomic_write_text` in `football_core/state.py`; `web/wc_app.py` red
 961 -> 673 lines; `tests/test_layering_architecture.py` enforces both forbidden directions.
 Gate held at 105 -> 105 node ids against `01-01-BASELINE.md` in every one of the 7 plans.
 
-Progress: [████████░░] 76%
+Progress: [████████░░] 82%
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Progress: [████████░░] 76%
 | Phase 02-truthful-availability-explicit-verified-ingestion P04 | 45 | 3 tasks | 6 files |
 | Phase 02 P05 | 80min | 3 tasks | 9 files |
 | Phase 02 P06 | 175min | 3 tasks | 14 files |
+| Phase 02 P07 | 50min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -176,6 +177,10 @@ Decisions are logged in the PROJECT.md Key Decisions table. Roadmap-specific:
 - [Phase 02]: 02-06: Status is derived, never forwarded: not attempted -> skipped, success -> ok, attempted+failed+deferred -> deferred, else error; a brain-supplied transport status is discarded because it can contradict success (D-13)
 - [Phase 02]: 02-06: OQ7 stage rows added to WC and LaLiga only - the UCL stages (teams/league/playoff/knockout/champion) are untouched, so contract tests assert a results row for WC/LaLiga only
 - [Phase 02]: 02-06: Contract-test success-path scoping - genuine UCL/LaLiga success needs gitignored runtime stores absent here, so success is proven end-to-end for WC over HTTP plus a refresh_response_body unit test
+- [Phase ?]: WC n_played/n_unplayed derive LIVE from load_json_store at serve time (never the booted cache) — a deleted store must be reflected on the very next read; formulas preserve previously served semantics
+- [Phase ?]: availability_reason carries MISSING/UNAVAILABLE entries only (EMPTY is honest readable state, no reason); the key is omitted entirely when all stores are healthy
+- [Phase ?]: UCL/LaLiga served availability now truthful from load_json_store (was hardcoded EMPTY/AVAILABLE in UCL, list-truthiness in LaLiga); laliga_app.compute_all passes its own DATA_DIR
+- [Phase ?]: WC /api/simulate, /api/simulate-from-match, /api/what-if return 409 with store-naming error on MISSING/UNAVAILABLE played stores; EMPTY still allows a legitimate no-results-yet run
 
 ### Pending Todos
 
@@ -279,6 +284,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-08T11:24:15.067Z
+Last session: 2026-10-08T13:42:04.143Z
 Stopped at: Completed 02-06-PLAN.md (3 tasks, 3 commits a95f122..58dbec5; gates green modulo the 84 pre-existing baseline failures - full-suite failure set identical to baseline)
 Resume file: None
