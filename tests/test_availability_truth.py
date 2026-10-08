@@ -248,8 +248,10 @@ class TestWCTruthPayloadParity:
         monkeypatch.setenv("FOOTBALL_SNAPSHOT", "1")
         startup.set_session_decision(startup.StartupDecision("snapshot", ""))
         try:
+            import web.wc_app as wc_mod
             from web.wc_app import cache, compute_overview, wc_app
 
+            wc_mod.sim_cache = {}
             cache.update(compute_overview())
             with TestClient(wc_app) as client:
                 overview = client.get("/api/overview").json()

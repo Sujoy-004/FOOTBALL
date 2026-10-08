@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 from football_core.freshness import UNREADABLE, read_ledger, served_stale, store_mtime
 from football_core.state import atomic_write_text
+from football_core.domain import DataAvailability, load_json_store
 from competitions.worldcup.src import constants, elo
 from competitions.worldcup.src.knockout import run_full_simulation, resolve_knockout_slot_teams
 from competitions.worldcup.src.state import load_groups, load_annex_c
@@ -62,6 +63,69 @@ def _football_data_org_key() -> str:
 
 DATA_DIR = constants.DATA_DIR
 
+DATA_DIR = constants.DATA_DIR
+
+#: WC factual stores the truth layer classifies (mirrors the store set
+#: ``compute_competition_phase`` tracks: played_groups.json + played.json).
+_WC_FACTUAL_STORE_PATHS = {
+    "played_groups": "played_groups.json",
+    "played": "played.json",
+}
+
+
+def _availability_block(data_dir: Path | None = None) -> tuple[dict, dict]:
+    """``(availability_map, reason_map)`` from ``load_json_store`` — live,
+    not cached. The reason map carries MISSING/UNAVAILABLE entries only;
+    EMPTY needs no reason (the file exists and parses)."""
+    ddir = Path(data_dir) if data_dir is not None else DATA_DIR
+    availability: dict = {}
+    reasons: dict = {}
+    for key, fname in _WC_FACTUAL_STORE_PATHS.items():
+        _payload, state, detail = load_json_store(ddir / fname)
+        availability[key] = state.value
+        if state in (DataAvailability.MISSING, DataAvailability.UNAVAILABLE):
+            reasons[key] = detail or f"store file missing: {ddir / fname}"
+    return availability, reasons
+
+
+def _factual_counts() -> tuple[int | None, int | None]:
+    """``(n_played, n_unplayed)`` derived live from the two played stores.
+
+    ``(None, None)`` when either store is MISSING/UNAVAILABLE — absence is
+    never laundered into a zero. EMPTY stores are honest, readable state and
+    yield real integers. Formulas match the previously-served semantics:
+    ``n_played`` counts winner-carrying entries; ``n_unplayed`` counts
+    group+bracket ids absent from both played stores.
+    """
+    pg_payload, pg_state, _ = load_json_store(DATA_DIR / "played_groups.json")
+    p_payload, p_state, _ = load_json_store(DATA_DIR / "played.json")
+    unreadable = (DataAvailability.MISSING, DataAvailability.UNAVAILABLE)
+    if pg_state in unreadable or p_state in unreadable:
+        return None, None
+    played = p_payload if isinstance(p_payload, dict) else {}
+    played_groups = pg_payload if isinstance(pg_payload, dict) else {}
+    n_played = sum(
+        1 for m in played.values()
+        if isinstance(m, dict) and m.get("winner"))
+    n_played += sum(
+        1 for m in played_groups.values()
+        if isinstance(m, dict) and m.get("winner"))
+    teams_raw = load_json(DATA_DIR, "teams.json")
+    groups_raw = load_groups(DATA_DIR, teams=teams_raw)
+    bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
+    played_ids = set(played.keys()) | set(played_groups.keys())
+    all_ids: set = set()
+    groups_data = groups_raw.get("groups", groups_raw) if isinstance(groups_raw, dict) else groups_raw
+    for g in groups_data.values():
+        for m in g.get("matches", []):
+            if m.get("match_id"):
+                all_ids.add(m["match_id"])
+    for m in bracket_raw:
+        if m.get("match_id"):
+            all_ids.add(m["match_id"])
+    return n_played, len(all_ids - played_ids)
+
+
 cache: dict = {}
 sim_cache: dict = {}
 service = SimulationTaskService()
@@ -85,24 +149,13 @@ def build_knockout_tree() -> dict:
     return _pipeline_build(DATA_DIR)
 
 
-def unplayed_match_count() -> int:
-    """Count matches that have neither played nor played_groups results."""
-    teams_raw = load_json(DATA_DIR, "teams.json")
-    groups_raw = load_groups(DATA_DIR, teams=teams_raw)
-    bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
-    played_raw = json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {}
-    played_groups_raw = json.loads((DATA_DIR / "played_groups.json").read_text(encoding="utf-8")) if (DATA_DIR / "played_groups.json").exists() else {}
-    played_ids = set(played_raw.keys()) | set(played_groups_raw.keys())
-    all_ids = set()
-    groups_data = groups_raw.get("groups", groups_raw) if isinstance(groups_raw, dict) else groups_raw
-    for g in groups_data.values():
-        for m in g.get("matches", []):
-            if m.get("match_id"):
-                all_ids.add(m["match_id"])
-    for m in bracket_raw:
-        if m.get("match_id"):
-            all_ids.add(m["match_id"])
-    return len(all_ids - played_ids)
+def unplayed_match_count() -> int | None:
+    """Count matches that have neither played nor played_groups results.
+
+    Returns ``None`` when either played store is MISSING/UNAVAILABLE — a
+    deleted/unreadable store is absence, not a zero.
+    """
+    return _factual_counts()[1]
 
 
 def compute_signal_stats():
@@ -147,15 +200,23 @@ wc_app = fastapi.FastAPI()
 
 @wc_app.get("/api/data")
 def api_data():
-    return JSONResponse({
+    availability, reasons = _availability_block()
+    n_played, n_unplayed = _factual_counts()
+    payload = {
         "refresh": _current_refresh_report(),
         "teams": cache.get("teams", []),
         "n_teams": cache.get("n_teams", 0),
-        "n_played": cache.get("n_played", 0),
         "phase": cache.get("phase", {}),
         "simulation": _simulation_state_block(),
-        "n_unplayed": unplayed_match_count(),
-    })
+        "availability": availability,
+    }
+    if reasons:
+        payload["availability_reason"] = reasons
+    if n_played is not None:
+        payload["n_played"] = n_played
+    if n_unplayed is not None:
+        payload["n_unplayed"] = n_unplayed
+    return JSONResponse(payload)
 
 
 @wc_app.post("/api/refresh")
@@ -259,32 +320,49 @@ def _current_refresh_report() -> dict:
 @wc_app.get("/api/overview")
 def api_overview():
     has_sim = has_simulation()
-    return JSONResponse({
+    availability, reasons = _availability_block()
+    n_played, n_unplayed = _factual_counts()
+    payload = {
         "refresh": _current_refresh_report(),
         "standings": cache.get("standings", []),
         "teams": cache.get("teams", []),
         "n_teams": cache.get("n_teams", 0),
-        "n_played": cache.get("n_played", 0),
         "signals_meta": cache.get("signals_meta", {"signals": [], "n_total": 0}),
         "phase": cache.get("phase", {}),
 
         "has_simulation": has_sim,
-        "n_unplayed": unplayed_match_count(),
         "lifecycle": cache.get("lifecycle", {}),
-    })
+        "availability": availability,
+    }
+    if reasons:
+        payload["availability_reason"] = reasons
+    if n_played is not None:
+        payload["n_played"] = n_played
+    if n_unplayed is not None:
+        payload["n_unplayed"] = n_unplayed
+    return JSONResponse(payload)
 
 
 @wc_app.get("/api/simulation")
 def api_simulation():
-    return JSONResponse({
+    payload = {
         "top_teams": sim_cache.get("top_teams", []),
         "signal_eval": sim_cache.get("signal_eval", {}),
         "simulation_meta": sim_cache.get("simulation_meta"),
         "status": sim_cache.get("status", "not_requested"),
         "message": sim_cache.get("message"),
-        "n_unplayed": sim_cache.get("n_unplayed", unplayed_match_count()),
         "full_bracket": sim_cache.get("full_bracket"),
-    })
+    }
+    # n_unplayed comes from the completed sim's own record; absent that,
+    # derive it live — and omit the key entirely when the stores are
+    # unreadable rather than emitting a synthesised 0/None.
+    if "n_unplayed" in sim_cache:
+        payload["n_unplayed"] = sim_cache["n_unplayed"]
+    else:
+        live = unplayed_match_count()
+        if live is not None:
+            payload["n_unplayed"] = live
+    return JSONResponse(payload)
 
 
 @wc_app.get("/api/boot")
@@ -362,6 +440,10 @@ def api_blend():
 def simulation_eligibility() -> tuple[bool, Optional[str], str]:
     """Shared eligibility truth (adapter + handler both use this)."""
     remaining = unplayed_match_count()
+    if remaining is None:
+        return False, "store_unavailable", (
+            "Played-result stores are unavailable; cannot evaluate "
+            "simulation eligibility.")
     if remaining == 0:
         return False, "no_unplayed_matches", (
             "All competition results are already known from real match "
@@ -390,6 +472,14 @@ def _store_wc_sim_result(result: dict, count: int, seed: Optional[int],
     remaining = unplayed_match_count()
     sim_meta = result.get("simulation_meta", {})
     overview = result["overview"]
+    extra = {
+        "weights": weights,
+        "show_ci": show_ci,
+        "n_top_teams": len(result["top_teams"]),
+        "n_signals_evaluated": len(result["eval_metrics"]),
+    }
+    if remaining is not None:
+        extra["unplayed_matches"] = remaining
     sim_cache = {
         "top_teams": result["top_teams"][:20],
         "signal_eval": result["eval_metrics"],
@@ -399,26 +489,24 @@ def _store_wc_sim_result(result: dict, count: int, seed: Optional[int],
             seed=sim_meta.get("seed"),
             provenance_extra=sim_meta.get("provenance") or {},
             engine_version=sim_meta.get("engine_version"),
-            extra={
-                "weights": weights,
-                "show_ci": show_ci,
-                "n_top_teams": len(result["top_teams"]),
-                "n_signals_evaluated": len(result["eval_metrics"]),
-                "unplayed_matches": remaining,
-            },
+            extra=extra,
         ),
         "full_bracket": result["full_bracket"],
         "sim_result": result.get("sim_result"),
-        "n_unplayed": remaining,
         "status": "completed",
     }
+    if remaining is not None:
+        sim_cache["n_unplayed"] = remaining
     snapshot = result["snapshot"]
     snapshot["show_ci"] = show_ci
     atomic_write_text(
         DATA_DIR / "snapshot.json",
         json.dumps(snapshot, indent=2, default=str, ensure_ascii=False),
     )
-    return {"n_unplayed": remaining}
+    ack = {}
+    if remaining is not None:
+        ack["n_unplayed"] = remaining
+    return ack
 
 
 @wc_app.post("/api/simulate")
@@ -440,7 +528,7 @@ def api_simulate(req: dict = None):
         on_result=lambda res, count, seed_: _store_wc_sim_result(
             res, count, seed_, weights, show_ci),
         options={"weights": weights, "show_ci": show_ci},
-        extra_ack={"n_unplayed": unplayed_match_count()},
+        extra_ack=ack,
     )
     return JSONResponse(payload, status_code=http_status)
 
@@ -494,6 +582,8 @@ def api_simulate_from_match(req: dict = None):
     if not req:
         return JSONResponse({"error": "request body required"})
     match_id = req.get("match_id", "")
+    if not match_id:
+        return JSONResponse({"error": "match_id required"})
     raw_iterations = req.get("iterations", 10000)
     if raw_iterations is None:
         raw_iterations = 10000
