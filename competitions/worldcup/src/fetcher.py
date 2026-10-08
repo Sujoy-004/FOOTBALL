@@ -278,6 +278,10 @@ def process_matches(
             for field in _WC_FACTUAL_FIELDS:
                 existing[field] = entry[field]
             _maybe_merge_provider_metadata(existing, entry)
+            # An applied correction IS a store-side change (02-03): count it
+            # as ingested so received == normalized == ingested + skipped_*
+            # holds when a provider re-sends a corrected finished result.
+            istats["ingested"] += 1
             continue
 
         # New result.

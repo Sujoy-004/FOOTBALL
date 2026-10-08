@@ -27,7 +27,13 @@ from src.state import (
 # The brain owns its own evaluation module: this module no longer imports
 # from ``web`` (plan 01-06, D-13).
 from competitions.worldcup.src.evaluation import compute_signal_eval
+from football_core.fetcher import new_ingestion_stats  # type: ignore[import-untyped]
 from football_core.signal import PredictionContext  # type: ignore[import-untyped]
+
+# Pathological pass cap: the retry-set breaks (no unresolved events, or a
+# pass that changed nothing) are the real stop; 8 comfortably exceeds the
+# 5-round bracket depth.
+MAX_KNOCKOUT_PASSES = 8  # pathological cap; the retry breaks are the real stop
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +69,75 @@ def bracket_stage_labels() -> dict[str, str]:
         "TPP": "Third-place play-off",
         "FINAL": "Final",
     }
+
+
+def _wc_stats() -> dict:
+    """Zeroed WC finished-result counters for ONE processing scope.
+
+    The shared ingestion vocabulary (``football_core.fetcher.new_ingestion_stats``)
+    plus the D-14 re-offer bucket ``skipped_no_change``, so every branch of
+    the WC processors can land a received event in exactly one bucket.
+    """
+    stats = new_ingestion_stats()
+    stats["skipped_no_change"] = 0
+    return stats
+
+
+def _dedupe_events(events: list[dict]) -> list[dict]:
+    """D-14: provider receipts are unique per run — first payload item wins.
+
+    Collapses duplicate provider event ids inside ONE payload before any
+    counting happens, so no event can be received twice (the processors'
+    in-call dedup would otherwise count the duplicate as an extra receipt).
+    Events without an id pass through untouched — the processors already
+    treat those as never-seen.
+    """
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for ev in events:
+        eid = str(ev.get("id", "") or "")
+        if eid and eid in seen:
+            continue
+        if eid:
+            seen.add(eid)
+        unique.append(ev)
+    return unique
+
+
+def _unresolved_ko_indices(
+    ko_events: list[dict],
+    aliases: dict,
+    resolved_bracket: list[dict],
+) -> tuple[set[int], set[int]]:
+    """Classify finished payload events against ONE resolved bracket pass.
+
+    Returns ``(matched, unresolved)`` index sets: ``matched`` events have a
+    resolvable slot target (terminal once seen — never re-processed), while
+    ``unresolved`` events have none yet and form the next retry batch.
+    Unnormalizable team names belong to neither set: they were counted
+    ``skipped_unmatchable`` and can never match on any pass.
+    """
+    from football_core.fetcher import (
+        _build_alias_lookup,
+        find_bracket_match,
+        normalize_team,
+    )
+
+    lookup = _build_alias_lookup(aliases, resolved_bracket)
+    matched: set[int] = set()
+    unresolved: set[int] = set()
+    for idx, ev in enumerate(ko_events):
+        if ev.get("status") != "finished":
+            continue
+        home = normalize_team(str(ev.get("home_team", "")), lookup)
+        away = normalize_team(str(ev.get("away_team", "")), lookup)
+        if home is None or away is None:
+            continue
+        if find_bracket_match(home, away, resolved_bracket) is None:
+            unresolved.add(idx)
+        else:
+            matched.add(idx)
+    return matched, unresolved
 
 
 def build_blend_params(engine_predictions: list, all_matches: list[dict], engine) -> dict:
@@ -179,8 +254,8 @@ def fetch_live_data(
         }
 
     # 1. Fetch and process match results via provider
-    group_stats = new_ingestion_stats()
-    ko_stats = new_ingestion_stats()
+    group_stats = _wc_stats()
+    ko_stats = _wc_stats()
     try:
         from src.fetcher import (
             partition_events_by_stage, process_group_matches, process_matches,
@@ -199,6 +274,11 @@ def fetch_live_data(
         # group_name are group-stage; the rest are knockout.  This prevents
         # cross-stage routing that produced noisy "no matching fixture/slot"
         # warnings and wasted work in each processor.
+        #
+        # D-14: receipts are unique per run — collapse duplicate payload
+        # items (same provider id) before counting, so one event can never
+        # be received twice across retry passes.
+        raw_matches = _dedupe_events(raw_matches)
         group_events, ko_events = partition_events_by_stage(raw_matches)
 
         played_groups_path = data_dir / "played_groups.json"
@@ -228,10 +308,27 @@ def fetch_live_data(
             else {}
         )
 
-        # Multi-pass: resolve, match, save — repeat up to 3 times.
-        # Downstream bracket slots (SF, TPP, FINAL) depend on winners
-        # from earlier rounds, which only become known after each pass.
-        for _ in range(3):
+        # Multi-pass with per-event retry accounting (02-03): downstream
+        # bracket slots (SF, TPP, FINAL) only resolve once earlier rounds
+        # land in the store, so each pass re-resolves the bracket and
+        # re-processes ONLY the finished events that still have no slot
+        # target.  Receipts are still counted exactly once per event:
+        #
+        #   * pass 0 processes (and counts) every payload event;
+        #   * later passes count into a fresh scratch dict whose buckets
+        #     REPLACE the previous counted pass's ``skipped_no_target``
+        #     receipts for exactly the retried events (the fold below);
+        #   * ``matched_once`` events are terminal — once an event has
+        #     found a slot target it is never re-counted, even if a
+        #     correction later reshuffles the bracket.
+        #
+        # The fold is exact because every retried event was counted
+        # ``skipped_no_target`` in the immediately preceding counted pass
+        # (payload dedup guarantees one receipt per event), and unmatched
+        # events that stay unmatched simply re-land in the same bucket.
+        matched_once: set[int] = set()   # found a slot target at least once
+        unresolved: set[int] = set()     # counted no_target in last counted pass
+        for pass_no in range(MAX_KNOCKOUT_PASSES):
             known_winners = {
                 mid: d["winner"] for mid, d in played.items() if d.get("winner")
             }
@@ -248,10 +345,18 @@ def fetch_live_data(
                 for mid, st in slot_teams.items()
                 if st.get("team_a") and st.get("team_b")
             ]
+            if pass_no == 0:
+                batch, pass_stats = ko_events, ko_stats
+            else:
+                retry = sorted(unresolved - matched_once)
+                if not retry:
+                    break  # nothing left to retry: every event resolved or died
+                batch = [ko_events[i] for i in retry]
+                pass_stats = _wc_stats()
             ko_before = json.dumps(played, sort_keys=True, ensure_ascii=False)
             new_ko = process_matches(
-                ko_events, teams, resolved_bracket, aliases, played,
-                ingestion_stats=ko_stats,
+                batch, teams, resolved_bracket, aliases, played,
+                ingestion_stats=pass_stats,
             )
             for m in new_ko:
                 played[m["match_id"]] = m
@@ -263,9 +368,30 @@ def fetch_live_data(
                     json.dumps(played, indent=2, ensure_ascii=False),
                     encoding="utf-8",
                 )
+            if pass_no > 0:
+                # Fold this pass's scratch receipts into the run totals: the
+                # batch events were counted skipped_no_target last pass, so
+                # refund exactly len(batch) of those receipts before adding
+                # this pass's outcomes for the same events.
+                ko_stats["skipped_no_target"] -= len(batch)
+                for key in (
+                    "ingested", "skipped_unmatchable",
+                    "skipped_missing_score", "skipped_no_change",
+                    "skipped_no_target",
+                ):
+                    ko_stats[key] += pass_stats[key]
+            # Reclassify every payload event against THIS pass's bracket so
+            # the next batch only contains still-unresolved slots.
+            matched_now, unresolved_now = _unresolved_ko_indices(
+                ko_events, aliases, resolved_bracket
+            )
+            matched_once |= matched_now
+            unresolved = unresolved_now - matched_once
             # Stop only when nothing new AND nothing corrected: a score
             # correction may change downstream knockout winners, so the
             # bracket must be re-resolved once more when updates occurred.
+            # A pass with no store change re-resolves to the identical
+            # bracket, so retrying can never produce anything new.
             if not new_ko and not ko_changed:
                 break
     except Exception as e:
