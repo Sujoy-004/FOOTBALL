@@ -39,6 +39,7 @@ from competitions.laliga.src.constants import (
     N_MATCHDAYS,
     SHIPPED_SEASON,
 )
+from football_core.domain import DataAvailability, load_json_store
 from competitions.laliga.src.groups import compute_laliga_standings, played_map_from_rows
 from competitions.laliga.src.odds import acquire_laliga_odds, load_odds, odds_status_summary
 
@@ -384,10 +385,14 @@ def compute_deterministic(data_dir=DATA_DIR, season_token=None) -> dict:
         for s in standings
     ]
 
+    season_dir = _season_store.season_dir(data_dir, season_token)
+    _, fx_state, _ = load_json_store(season_dir / "fixtures.json")
+    _, rs_state, _ = load_json_store(season_dir / "results.json")
+    _, elo_state, _ = load_json_store(Path(data_dir) / "elo_seed.json")
     availability = {
-        "fixtures": "available" if fixtures else "missing",
-        "results": "available" if results else "empty",
-        "elo_ratings": "available" if elo_ratings else "missing",
+        "fixtures": fx_state.value,
+        "results": rs_state.value,
+        "elo_ratings": elo_state.value,
     }
     current_md = (
         max(_matchday_of(f) for f in fixtures if f["match_id"] in finished_ids)

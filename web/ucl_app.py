@@ -50,7 +50,7 @@ from web.common import (
     refresh_response_body,
     ts,
 )
-from football_core.domain import load_json_store
+from football_core.domain import DataAvailability, load_json_store
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 UCL_LEAGUE_ID: int = 7
@@ -111,6 +111,35 @@ _BSD_TEAM_ALIASES: dict[str, str] = {
 }
 
 DATA_DIR = Path(__file__).parent.parent / "competitions" / "ucl" / "data"
+
+#: Store→file mapping for the availability map the UCL payloads serve.
+_UCL_STORE_FILES = {
+    "league_results": "results.json",
+    "fixtures": "fixtures.json",
+    "knockout_results": "knockout_results.json",
+}
+
+
+def _live_availability() -> tuple[dict, dict]:
+    """``(map, reasons)`` from ``load_json_store`` over the active season dir.
+
+    Reasons carry MISSING/UNAVAILABLE entries only; the pair is the live
+    truth used as fallback when the cache was never built, and the reasons
+    are always served alongside the (cache-preferred) availability map.
+    """
+    from competitions.ucl.src.orchestrator import resolve_active_data_dir
+
+    adir = Path(resolve_active_data_dir(DATA_DIR))
+    mapping: dict = {}
+    reasons: dict = {}
+    for key, fname in _UCL_STORE_FILES.items():
+        _payload, state, detail = load_json_store(adir / fname)
+        mapping[key] = state.value
+        if state in (DataAvailability.MISSING, DataAvailability.UNAVAILABLE):
+            reasons[key] = detail or f"store file missing: {adir / fname}"
+    return mapping, reasons
+
+
 UCL_DIR = Path(__file__).parent.parent / "competitions" / "ucl"
 #: Calibration artifact written by competitions.ucl.src.calibrate.
 _CALIBRATION_PATH = UCL_DIR / "config" / "signal_weights.json"
@@ -603,7 +632,11 @@ def api_data():
     # FOOTBALL_PRELOAD_ALL preload, or a test driving adapter.refresh().
     n_unplayed, n_total = _match_counts()
     lifecycle = _lifecycle_view()
-    return JSONResponse({
+    availability = cache.get("availability") or None
+    live_map, reasons = _live_availability()
+    if not availability:
+        availability = live_map
+    payload = {
         "refresh": _refresh_report_for(_active_season_token()),
         "teams": cache.get("teams", []),
         "all_teams": cache.get("all_teams", []),
@@ -612,7 +645,7 @@ def api_data():
         "snapshot_date": cache.get("snapshot_date", ""),
         "champion": cache.get("champion"),
         "mode": _mode,
-        "availability": cache.get("availability", {}),
+        "availability": availability,
         "phase": cache.get("phase", {}),
         "lifecycle": lifecycle,
         "season": lifecycle.get("season"),
@@ -620,7 +653,10 @@ def api_data():
         "simulation": _simulation_state_block(),
         "n_unplayed": n_unplayed,
         "n_played": n_total - n_unplayed,
-    })
+    }
+    if reasons:
+        payload["availability_reason"] = reasons
+    return JSONResponse(payload)
 
 
 @ucl_app.get("/api/seasons")

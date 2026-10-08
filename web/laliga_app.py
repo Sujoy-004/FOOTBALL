@@ -137,6 +137,34 @@ def _active_season_token() -> str:
     return season_store.active_season(DATA_DIR)
 
 
+#: Store→file mapping for the availability map the LaLiga payloads serve.
+_LALIGA_STORE_FILES = {
+    "fixtures": "fixtures.json",
+    "results": "results.json",
+}
+_LALIGA_ELO_FILE = "elo_seed.json"
+
+
+def _live_availability() -> tuple[dict, dict]:
+    """``(map, reasons)`` from ``load_json_store`` over the active season dir."""
+    from football_core.domain import DataAvailability, load_json_store
+
+    adir = Path(season_store.season_dir(DATA_DIR, _active_season_token()))
+    mapping: dict = {}
+    reasons: dict = {}
+    for key, fname in _LALIGA_STORE_FILES.items():
+        _payload, state, detail = load_json_store(adir / fname)
+        mapping[key] = state.value
+        if state in (DataAvailability.MISSING, DataAvailability.UNAVAILABLE):
+            reasons[key] = detail or f"store file missing: {adir / fname}"
+    _payload, elo_state, elo_detail = load_json_store(DATA_DIR / _LALIGA_ELO_FILE)
+    mapping["elo_ratings"] = elo_state.value
+    if elo_state in (DataAvailability.MISSING, DataAvailability.UNAVAILABLE):
+        reasons["elo_ratings"] = (
+            elo_detail or f"store file missing: {DATA_DIR / _LALIGA_ELO_FILE}")
+    return mapping, reasons
+
+
 def _synthesize_season_report(season: str) -> dict:
     fixtures = _load_fixtures_pipeline(DATA_DIR, season)
     results = _load_results_pipeline(DATA_DIR, season)
@@ -387,7 +415,7 @@ def compute_all() -> dict:
     global boot_log_local, _mode
     boot_log_local = []
     from competitions.laliga.src.pipeline import compute_deterministic
-    result = compute_deterministic()
+    result = compute_deterministic(data_dir=DATA_DIR)
     if result.get("error"):
         _mode = "results"
         boot_log_local.append({"step": "LaLiga compute", "status": "error", "elapsed": 0.0,
@@ -436,7 +464,9 @@ def api_data():
     # happens only through the explicit POST /api/refresh endpoint, the
     # FOOTBALL_PRELOAD_ALL preload, or a test driving adapter.refresh().
     n_unplayed, n_total = _match_counts()
-    return JSONResponse({
+    live_map, reasons = _live_availability()
+    availability = cache.get("availability") or live_map
+    payload = {
         "refresh": _refresh_report_for(_active_season_token()),
         "teams": cache.get("teams", []),
         "all_teams": cache.get("all_teams", []),
@@ -446,7 +476,7 @@ def api_data():
         "snapshot_date": cache.get("snapshot_date", ""),
         "champion": cache.get("champion"),
         "mode": _mode,
-        "availability": cache.get("availability", {}),
+        "availability": availability,
         "phase": cache.get("phase", {}),
         "season": _active_season_token(),
         "n_total_fixtures": n_total,
@@ -455,7 +485,10 @@ def api_data():
         "simulation": _simulation_state_block(),
         "n_unplayed": n_unplayed,
         "n_played": n_total - n_unplayed,
-    })
+    }
+    if reasons:
+        payload["availability_reason"] = reasons
+    return JSONResponse(payload)
 
 
 @laliga_app.get("/api/seasons")

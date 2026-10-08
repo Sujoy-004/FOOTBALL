@@ -936,6 +936,8 @@ def run_deterministic_compute(
     _active_data_dir = resolve_active_data_dir(data_dir)
 
     results = _step("Load real results", lambda: load_results(_active_data_dir))
+    _, league_availability, _ = load_json_store(
+        Path(_active_data_dir) / "results.json")
 
     knockout = _step("Load knockout results", lambda: load_knockout_results(_active_data_dir))
     _, ko_availability, ko_detail = load_json_store(
@@ -969,6 +971,8 @@ def run_deterministic_compute(
     # upcoming matches and keep the real simulation path available.
     if not results:
         from competitions.ucl.src.seasons import LOCAL_HISTORICAL_SEASON, get_current_season
+        _, league_shell_availability, _ = load_json_store(
+            Path(_active_data_dir) / "results.json")
         team_names = [t.name for t in provider.teams]
         elo_ratings = _resolve_elo_ratings(team_names)
         elo_provenance = "clubelo" if elo_ratings else None
@@ -1058,7 +1062,7 @@ def run_deterministic_compute(
         return {
             "mode": "results",
             "availability": {
-                "league_results": DataAvailability.EMPTY.value,
+                "league_results": league_shell_availability.value,
                 "fixtures": DataAvailability.AVAILABLE.value,
                 "knockout_results": ko_availability.value,
             },
@@ -1177,7 +1181,7 @@ def run_deterministic_compute(
     return {
         "mode": "results",
         "availability": {
-            "league_results": DataAvailability.AVAILABLE.value,
+            "league_results": league_availability.value,
             "knockout_results": ko_availability.value,
         },
         "phase": compute_competition_phase(_active_data_dir),

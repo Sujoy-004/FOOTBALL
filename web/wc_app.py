@@ -517,6 +517,20 @@ def api_simulate(req: dict = None):
     # invalid regardless of competition state (no silent clamping).
     weights = req.get("weights")
     show_ci = str(req.get("show_ci", "auto"))
+    # Never simulate over absence: a MISSING/UNAVAILABLE played store is a
+    # truthful refusal, not an empty-store run (02-07 D-07).
+    availability, _ = _availability_block()
+    bad = [k for k, s in availability.items()
+           if s in ("missing", "unavailable")]
+    if bad:
+        return JSONResponse(
+            {"error": f"played store unavailable ({', '.join(bad)}) — cannot simulate"},
+            status_code=409,
+        )
+    ack: dict = {}
+    live_count = unplayed_match_count()
+    if live_count is not None:
+        ack["n_unplayed"] = live_count
     http_status, payload = service.start(
         competition_id="worldcup",
         raw_count=req.get("iterations"),
@@ -600,8 +614,15 @@ def api_simulate_from_match(req: dict = None):
         return JSONResponse({"status": "validation_error",
                              "error": f"iterations must be an integer: {raw_iterations!r}"},
                             status_code=400)
-    if not match_id:
-        return JSONResponse({"error": "match_id required"})
+    # Never simulate over absence (02-07 D-07): MISSING/UNAVAILABLE → 409.
+    availability, _ = _availability_block()
+    bad = [k for k, s in availability.items()
+           if s in ("missing", "unavailable")]
+    if bad:
+        return JSONResponse(
+            {"error": f"played store unavailable ({', '.join(bad)}) — cannot simulate"},
+            status_code=409,
+        )
 
     try:
         result = _simulate_from_match_sync(match_id, iterations)
@@ -742,6 +763,17 @@ def api_what_if(req: dict = None):
     if elo_delta == 0:
         return JSONResponse({"error": "elo_delta must be non-zero"})
     elo_delta = max(-600, min(600, elo_delta))
+    # Never run a what-if over absence (02-07 D-07): refuse before any
+    # bracket lookup so the truthful refusal is never masked by a
+    # "match not found".
+    availability, _ = _availability_block()
+    bad = [k for k, s in availability.items()
+           if s in ("missing", "unavailable")]
+    if bad:
+        return JSONResponse(
+            {"error": f"played store unavailable ({', '.join(bad)}) — cannot simulate"},
+            status_code=409,
+        )
 
     fb = cache.get("full_bracket", {})
     match_data = None
@@ -763,9 +795,11 @@ def api_what_if(req: dict = None):
     groups_raw = load_groups(DATA_DIR, teams=teams_raw)
     bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
     annex_c = load_annex_c(DATA_DIR)
-    played_raw = json.loads((DATA_DIR / "played.json").read_text(encoding="utf-8")) if (DATA_DIR / "played.json").exists() else {}
-    played_groups_raw = (DATA_DIR / "played_groups.json").read_text(encoding="utf-8")
-    played_groups = json.loads(played_groups_raw) if played_groups_raw.strip() else {}
+    p_payload, _, _ = load_json_store(DATA_DIR / "played.json")
+    pg_payload, _, _ = load_json_store(DATA_DIR / "played_groups.json")
+    played_raw = p_payload if isinstance(p_payload, dict) else {}
+    played_groups = (
+        pg_payload if isinstance(pg_payload, dict) else {})
 
     def _sim(teams):
         return run_full_simulation(
