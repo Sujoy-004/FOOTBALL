@@ -431,6 +431,20 @@ def compute_deterministic(data_dir=DATA_DIR, season_token=None) -> dict:
 # ── acquisition (live refresh) ───────────────────────────────────────────
 
 
+def _results_stage_row(state: str, count: int, detail: str) -> dict:
+    """OQ7 stage row for the laliga result-ingestion step (plan 02-06).
+
+    Row vocabulary is fixed by the ``IngestReport`` contract
+    (``football_core/fetcher.py``): ``{key, label, state, count, detail}``
+    with ``state ∈ ok | pending | error | unavailable``. ``unavailable``
+    is used when nothing was attempted (no provider configured) so the
+    dashboard shows an honest gap instead of an invented error; the
+    signal-cache rows are appended by a later plan.
+    """
+    return {"key": "results", "label": "Match results", "state": state,
+            "count": int(count), "detail": detail}
+
+
 def fetch_live_data(
     data_dir=DATA_DIR,
     bsd_api_key: str = "",
@@ -448,6 +462,8 @@ def fetch_live_data(
     if provider is None:
         report = IngestReport(provider=None, attempted=False, success=False,
                               error="no data provider configured", reason="deferred")
+        report.stages = [
+            _results_stage_row("unavailable", 0, "no data provider configured")]
         return {"report": report.to_dict(), "status": "error", "reason": "no_provider",
                 "provider_name": None, "n_raw": 0, "n_updated": 0, "per_season": {}}
 
@@ -480,6 +496,8 @@ def fetch_live_data(
         report = IngestReport(
             provider=type(provider).__name__, attempted=True, success=False,
             error=f"{exc.__class__.__name__}: {exc}", stale=True)
+        report.stages = [
+            _results_stage_row("error", 0, f"{exc.__class__.__name__}: {exc}")]
         return {"report": report.to_dict(), "status": "error", "reason": "fetch_error",
                 "provider_name": type(provider).__name__, "n_raw": 0, "n_updated": 0,
                 "per_season": {}}
@@ -558,6 +576,12 @@ def fetch_live_data(
     report = IngestReport(provider=provider_label, attempted=True, success=success,
                           error=None, stale=not success, reason=reason)
     report.finished = finished
+    report.stages = [
+        _results_stage_row(
+            "ok" if success else "error",
+            finished["ingested"] if success else 0,
+            provider_label if success else (reason or "refresh failed"),
+        )]
     if not success:
         logger.warning(
             "LaLiga refresh derived success=False (%s) — counters: %r",

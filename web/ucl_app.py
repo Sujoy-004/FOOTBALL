@@ -44,7 +44,12 @@ from football_core.simulation import SimulationContractError
 
 from typing import Optional
 
-from web.common import error_response, ts
+from web.common import (
+    error_response,
+    offline_refresh_report,
+    refresh_response_body,
+    ts,
+)
 from football_core.domain import load_json_store
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
@@ -373,12 +378,9 @@ def _fetch_live_data() -> None:
         # Parity with WC: record WHY no live fetch happened so the frontend
         # can disclose snapshot data instead of silently looking live-fresh.
         # D-13: nothing was attempted, so nothing succeeded (reclassify).
-        globals()["_refresh_report"] = {
-            "provider": None, "attempted": False, "success": False,
-            "reason": "deferred",
-            "stale": True,
-            "skipped_reason": "snapshot mode selected at startup",
-        }
+        # Full IngestReport schema (plan 02-06): the offline outcome must
+        # answer an explicit refresh with the SAME key set as a real run.
+        globals()["_refresh_report"] = offline_refresh_report()
         return
 
     # Season-scoped freshness: every outcome (including genuine failures)
@@ -1082,19 +1084,26 @@ def api_reset():
 
 @ucl_app.post("/api/refresh")
 def api_refresh():
+    """Explicit acquisition trigger for the UCL (plan 02-06).
+
+    No snapshot short-circuit here: the wrapper self-gates, so an explicit
+    offline session records its truthful ``attempted=False`` +
+    ``skipped_reason`` report on ZERO network instead of returning an
+    opaque ``{"status": "skipped"}``. The body is the full report (stages,
+    counters, season, staleness); HTTP stays 200 because a truthful
+    failure is data, not an HTTP error.
+    """
     global cache, _mode
-    from web.startup import is_snapshot_mode
-    if is_snapshot_mode():
-        return JSONResponse({"status": "skipped",
-                             "reason": "snapshot mode selected at startup"})
+    from web.competitions import REGISTRY
+
     try:
-        _fetch_live_data()
+        report = dict(REGISTRY.get("ucl").refresh())
         cache = compute_all()
-        return JSONResponse({"status": "ok", "mode": _mode, "refreshed": True})
     except Exception as e:
         return error_response(
             e, status=503, context="ucl refresh",
             public="Live refresh unavailable")
+    return JSONResponse(refresh_response_body(report, mode=_mode))
 
 
 def _ucl_calibration_runner(progress_cb, count, seed):

@@ -279,7 +279,15 @@ def build_default_registry() -> CompetitionRegistry:
         return laliga_app._simulation_state_block()
 
     def laliga_refresh() -> dict[str, Any]:
-        return dict(laliga_app._fetch_live_data() or {})
+        """LaLiga-scoped acquisition: exactly the laliga_app ingest path.
+
+        The wrapper records its outcome in ``laliga_app._refresh_report``
+        and returns None, so the report is read back from module state —
+        returning the wrapper's own return value would serve ``{}`` and
+        hide the outcome (Rule 1, plan 02-06).
+        """
+        laliga_app._fetch_live_data()
+        return dict(getattr(laliga_app, "_refresh_report", {}) or {})
 
     registry.register(CompetitionAdapter(
         id="laliga",

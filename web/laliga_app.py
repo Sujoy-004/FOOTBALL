@@ -52,7 +52,12 @@ from competitions.laliga.src.state import build_competition_state as _build_stat
 from football_core.elo import expected_score
 from football_core.fetcher import derive_success
 from football_core.signal import PredictionContext
-from web.common import error_response, ts
+from web.common import (
+    error_response,
+    offline_refresh_report,
+    refresh_response_body,
+    ts,
+)
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 logger = logging.getLogger(__name__)
@@ -220,10 +225,18 @@ def _freshness(entry: dict, store_paths: list[Path]) -> dict:
 def _store_refresh_report(
     ok: bool, error: str | None, provider_name: str | None,
     n_matches: int | None = None, n_updated: int | None = None,
+    finished: dict | None = None, stages: list | None = None,
     active_season: str | None = None, deferred: bool = False,
     reason: str | None = None, status: str | None = None,
     odds_status: dict | None = None,
 ) -> dict:
+    """Record the LaLiga refresh outcome for the API surface + ledger.
+
+    ``finished``/``stages`` mirror ``web.ucl_app._store_refresh_report``:
+    the brain's IngestReport counters and OQ7 stage rows must survive into
+    the entry, otherwise ``POST /laliga/api/refresh`` (plan 02-06, INGEST-02)
+    cannot serve the full report contract.
+    """
     global _refresh_report
     _refresh_report = {
         "provider": provider_name,
@@ -234,6 +247,8 @@ def _store_refresh_report(
         "last_refresh": datetime.now(timezone.utc).isoformat(),
         **({"n_matches": n_matches} if n_matches is not None else {}),
         **({"n_updated": n_updated} if n_updated is not None else {}),
+        **({"finished": finished} if finished is not None else {}),
+        **({"stages": stages} if stages is not None else {}),
         **({"active_season": active_season} if active_season is not None else {}),
         **({"deferred": deferred} if deferred else {}),
         **({"reason": reason} if reason is not None else {}),
@@ -267,12 +282,9 @@ def _fetch_live_data():
     if is_snapshot_mode():
         logger.warning("[LaLiga] snapshot mode - live refresh skipped")
         # D-13: nothing was attempted, so nothing succeeded (reclassify).
-        globals()["_refresh_report"] = {
-            "provider": None, "attempted": False, "success": False,
-            "reason": "deferred",
-            "stale": True,
-            "skipped_reason": "snapshot mode selected at startup",
-        }
+        # Full IngestReport schema (plan 02-06): the offline outcome must
+        # answer an explicit refresh with the SAME key set as a real run.
+        globals()["_refresh_report"] = offline_refresh_report()
         return None
 
     active_season = _active_season_token()
@@ -330,6 +342,8 @@ def _fetch_live_data():
     # through so the UI can present "not published yet".
     _store_refresh_report(ok, error, provider_name,
                           n_matches=n_raw, n_updated=n_updated,
+                          finished=report.get("finished"),
+                          stages=report.get("stages"),
                           active_season=active_season,
                           deferred=deferred, reason=reason, status=status,
                           odds_status=summary.get("odds"))
@@ -738,19 +752,26 @@ def api_reset():
 
 @laliga_app.post("/api/refresh")
 def api_refresh():
+    """Explicit acquisition trigger for LaLiga (plan 02-06).
+
+    No snapshot short-circuit here: the wrapper self-gates, so an explicit
+    offline session records its truthful ``attempted=False`` +
+    ``skipped_reason`` report on ZERO network instead of returning an
+    opaque ``{"status": "skipped"}``. The body is the full report (stages,
+    counters, season, staleness); HTTP stays 200 because a truthful
+    failure is data, not an HTTP error.
+    """
     global cache, _mode
-    from web.startup import is_snapshot_mode
-    if is_snapshot_mode():
-        return JSONResponse({"status": "skipped",
-                             "reason": "snapshot mode selected at startup"})
+    from web.competitions import REGISTRY
+
     try:
-        _fetch_live_data()
+        report = dict(REGISTRY.get("laliga").refresh())
         cache = compute_all()
-        return JSONResponse({"status": "ok", "mode": _mode, "refreshed": True})
     except Exception as e:
         return error_response(
             e, status=503, context="laliga refresh",
             public="Live refresh unavailable")
+    return JSONResponse(refresh_response_body(report, mode=_mode))
 
 
 @laliga_app.get("/api/validation")

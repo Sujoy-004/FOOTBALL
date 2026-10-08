@@ -32,7 +32,13 @@ from competitions.worldcup.src.bracket import (
     compute_full_bracket,
 )
 from competitions.worldcup.src.overview import compute_overview
-from web.common import boot_step, error_response, load_json, not_attempted_report
+from web.common import (
+    boot_step,
+    error_response,
+    load_json,
+    not_attempted_report,
+    refresh_response_body,
+)
 from web.simulation_service import (
     SimulationTaskService, build_simulation_meta,
 )
@@ -150,6 +156,37 @@ def api_data():
         "simulation": _simulation_state_block(),
         "n_unplayed": unplayed_match_count(),
     })
+
+
+@wc_app.post("/api/refresh")
+def api_refresh():
+    """Explicit acquisition trigger for the World Cup (plan 02-06).
+
+    Delegates to the competition-scoped adapter — the SAME path the
+    ``FOOTBALL_PRELOAD_ALL`` preload uses — so per-competition scoping
+    stays the adapter's job (never a cross-app private import). The
+    pipeline self-gates on an explicit offline session (FOOTBALL_SNAPSHOT /
+    --offline): zero network, truthful ``attempted=False`` +
+    ``skipped_reason`` report. The response is the full IngestReport body;
+    HTTP stays 200 because a truthful failure is data, not an HTTP error.
+
+    Side effects: the wrapper persists the report to the freshness ledger
+    (attempted runs only) and the cache is rebuilt from disk so subsequent
+    ``GET /api/data`` shows the freshly ingested facts.
+    """
+    global cache
+    from web.competitions import REGISTRY
+
+    try:
+        report = dict(REGISTRY.get("worldcup").refresh())
+        cache = compute_overview() or {}
+    except Exception as e:
+        return error_response(
+            e, status=503, context="worldcup refresh",
+            public="Live refresh unavailable")
+    # WC has no results/simulation switch in its data payload: the served
+    # overview is always the real-results view, so mode is constant truth.
+    return JSONResponse(refresh_response_body(report, mode="results"))
 
 
 def _simulation_state_block() -> dict:

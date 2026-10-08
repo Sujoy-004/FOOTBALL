@@ -84,6 +84,131 @@ def not_attempted_report() -> dict:
     return block
 
 
+def offline_refresh_report() -> dict:
+    """Full IngestReport-schema report for an explicit offline session (plan 02-06).
+
+    The refresh wrappers' snapshot branch previously recorded a four-key
+    ad-hoc dict, so ``POST /api/refresh`` answered with a *partial* body in
+    offline mode — exactly the shape the plan forbids. This helper keeps the
+    whole disclosure on the SAME schema every other outcome uses: zeroed
+    finished counters, ``stages: []`` (no row may invent work that never
+    happened), ``deferred: True`` with ``reason="deferred"``, and the
+    verbatim ``skipped_reason`` wording the dashboard reads.
+
+    Returns:
+        A fresh full-schema dict, always ``attempted=False``/``success=False``.
+    """
+    from football_core.fetcher import IngestReport
+
+    report = IngestReport(
+        provider=None,
+        attempted=False,
+        success=False,
+        error=None,
+        stale=True,
+        deferred=True,
+        reason="deferred",
+    ).to_dict()
+    report["skipped_reason"] = SNAPSHOT_SKIP_REASON
+    return report
+
+
+def _utc_z(value: str | None) -> str | None:
+    """Normalize an ISO-8601 UTC instant to the contract's ``Z`` suffix.
+
+    Older app-level entries record ``last_refresh`` with the ``+00:00``
+    offset; the IngestReport contract spells the same instant with ``Z``.
+    Anything that is not already UTC (``+00:00`` / ``Z``) is left verbatim —
+    an unparseable instant must never be silently rewritten.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    if value.endswith("+00:00"):
+        return value[:-6] + "Z"
+    return value
+
+
+def refresh_response_body(report: dict, mode: str | None = None) -> dict:
+    """Full IngestReport-shaped ``POST /api/refresh`` body (plan 02-06).
+
+    The report IS the outcome: ``attempted``/``success``/``error``/``stale``
+    /``reason``/``stages``/``provider``/``last_success_at`` all ride along
+    verbatim, so a consumer never has to infer anything from a status string.
+    HTTP stays 200 — the acquisition wrapper never raises, and a truthful
+    failure is data, not an HTTP error (503 is reserved for the unexpected
+    exception path via :func:`error_response`).
+
+    Two normalizations happen here because the ADAPTER returns each app's
+    own ledger-shaped report, which historically omitted keys the IngestReport
+    contract guarantees (CS-3):
+
+    1. **Key-set completeness** — every ``IngestReport.to_dict`` key is
+       present. Absent keys are filled with honest defaults (nothing
+       attempted → ``attempted=False``, no recorded rows → ``stages=[]``);
+       counters fall back to the contract's zeroed ``finished`` shape, never
+       to a fabricated success.
+    2. **``status`` shim** — the legacy key now MIRRORS the report instead of
+       meaning "no exception was raised". A brain-supplied transport status
+       (e.g. UCL's ``"deferred"``) is preserved; otherwise it is derived as
+       ``ok`` (attempted and succeeded), ``error`` (attempted and failed) or
+       ``skipped`` (nothing attempted).
+
+    ``refreshed`` and ``mode`` are kept for the existing dashboard contract.
+    """
+    from football_core.fetcher import _zero_finished_counters
+
+    body = dict(report)
+    success = bool(report.get("success"))
+
+    # 1. Full IngestReport key set (missing ≠ "nothing happened" — the
+    #    defaults describe "no evidence", they never assert a fresh run).
+    body.setdefault("provider", None)
+    body.setdefault("attempted", False)
+    body.setdefault("success", False)
+    body.setdefault("error", None)
+    body.setdefault("stale", not success)
+    body.setdefault("finished", _zero_finished_counters())
+    body.setdefault("stages", [])
+    body.setdefault("written_files", [])
+    body.setdefault("deferred", False)
+    body.setdefault("reason", None)
+    if not body.get("last_success_at"):
+        # A successful run IS the last success; the adapter entries record
+        # `last_refresh` (attempt instant), which equals it for that run.
+        body["last_success_at"] = (
+            _utc_z(report.get("last_refresh")) if success else None
+        )
+    else:
+        body["last_success_at"] = _utc_z(body["last_success_at"])
+    if success and not body["last_success_at"]:
+        from datetime import datetime, timezone
+
+        body["last_success_at"] = datetime.now(timezone.utc).isoformat().replace(
+            "+00:00", "Z")
+
+    # 2. Legacy `status`: derived FROM the report, never asserted beside it,
+    #    so the shim cannot contradict `success`/`attempted`/`deferred`
+    #    (D-13: a transport "ok" that ingested nothing reads as an error,
+    #    a configured-but-unpublished provider reads as `deferred`, an
+    #    offline session as `skipped`).
+    attempted = bool(body.get("attempted"))
+    reason = str(body.get("reason") or "")
+    deferred = bool(body.get("deferred")) or reason.startswith("deferred")
+    body["deferred"] = deferred  # one truth: the flag and `status` agree
+    if not attempted:
+        body["status"] = "skipped"
+    elif success:
+        body["status"] = "ok"
+    elif deferred:
+        body["status"] = "deferred"
+    else:
+        body["status"] = "error"
+    body["refreshed"] = success
+    if mode is not None:
+        body["mode"] = mode
+    return body
+
+
 def error_response(
     exc: Exception,
     *,

@@ -96,6 +96,19 @@ def _read_prev_ledger() -> dict:
     return read_ledger(_last_refresh_report_path())
 
 
+def _results_stage_row(state: str, count: int, detail: str) -> dict:
+    """OQ7 stage row for the worldcup result-ingestion step (plan 02-06).
+
+    Row vocabulary is fixed by the ``IngestReport`` contract
+    (``football_core/fetcher.py``): ``{key, label, state, count, detail}``
+    with ``state ∈ ok | pending | error | unavailable``. The signal-cache
+    rows are appended by a later plan — this one reports ONLY the results
+    step, never an invented value for work that has not happened.
+    """
+    return {"key": "results", "label": "Match results", "state": state,
+            "count": int(count), "detail": detail}
+
+
 def _build_report(
     provider,
     *,
@@ -107,6 +120,7 @@ def _build_report(
     last_success_at,
     finished: dict,
     skipped_reason=None,
+    stages=None,
 ) -> dict:
     """Single refresh-report shape for EVERY fetch_live_data exit path (02-03).
 
@@ -129,7 +143,7 @@ def _build_report(
         "reason": reason,
         "last_success_at": last_success_at,
         "finished": finished,
-        "stages": [],
+        "stages": [dict(stage) for stage in (stages or [])],
         "written_files": [],
         "deferred": reason in ("deferred", "deferred/provider-empty"),
     }
@@ -260,6 +274,7 @@ def fetch_live_data(
             reason=None,
             last_success_at=prev.get("last_success_at"),
             finished={"group_stage": _wc_stats(), "knockout": _wc_stats()},
+            stages=[_results_stage_row("error", 0, reason)],
         )
         logger.warning("fetch_live_data FAILED: %s — WC data may be STALE", reason)
         return report
@@ -484,6 +499,11 @@ def fetch_live_data(
             else _read_prev_ledger().get("worldcup", {}).get("last_success_at")
         ),
         finished={"group_stage": group_stats, "knockout": ko_stats},
+        stages=[_results_stage_row(
+            "ok" if success else "error",
+            flat_counters["ingested"] if success else 0,
+            type(provider).__name__ if success else (reason or "refresh failed"),
+        )],
     )
     if not success:
         logger.warning(
