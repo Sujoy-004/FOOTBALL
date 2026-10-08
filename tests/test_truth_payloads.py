@@ -101,6 +101,13 @@ class TestUCLTruthPayloads:
             assert overview["phase"]["champion"]
             assert set(overview["phase"]["stores"].values()) <= {
                 "available", "empty", "missing", "unavailable"}
+            # Phase 02-07: the primary state payload carries the flat
+            # four-state availability map; healthy snapshot data omits the
+            # reason block entirely.
+            assert set(overview["availability"]) == {"played", "played_groups"}
+            assert set(overview["availability"].values()) <= {
+                "available", "empty", "missing", "unavailable"}
+            assert "availability_reason" not in overview
 
             full = client.get("/api/bracket/full").json()
             sample = full["rounds"]["R32"][0]
