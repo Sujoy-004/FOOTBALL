@@ -225,9 +225,17 @@ def process_matches(
         if match.get("status") != "finished":
             continue
         count_finished(istats)
+        # D-14: every receipt is normalized exactly once — BEFORE any
+        # early-exit branch — so received == normalized == ingested +
+        # skipped_* always holds for the run's single count of the event.
+        istats["normalized"] += 1
 
         match_id = str(match.get("id", ""))
         if match_id and (match_id in played_event_ids_local or match_id in legacy_ids):
+            # Re-offered receipt: already counted this run; the earlier
+            # receipt drove the store change (or the event is legacy-
+            # excluded), so landing here is a true no-op for the store.
+            istats["skipped_no_change"] = istats.get("skipped_no_change", 0) + 1
             continue
         played_event_ids_local.add(match_id)
 
@@ -242,13 +250,12 @@ def process_matches(
                              (match.get("home_score"), match.get("away_score")))
             continue
 
-        istats["normalized"] += 1
-
         bracket_id = find_bracket_match(home_norm, away_norm, bracket)
         if bracket_id is None:
             note_no_target(istats, logger, home_norm, away_norm)
             continue
         if bracket_id in legacy_ids:
+            istats["skipped_no_change"] = istats.get("skipped_no_change", 0) + 1
             continue
 
         entry = _build_match_entry(
@@ -261,6 +268,7 @@ def process_matches(
             if all(existing.get(f) == entry[f] for f in _WC_FACTUAL_FIELDS):
                 # Exactly equivalent result — true no-op.  New provider
                 # metadata (stats, context, ai_preview) is NOT mixed in.
+                istats["skipped_no_change"] = istats.get("skipped_no_change", 0) + 1
                 continue
             if not _should_apply_wc_update(existing, entry):
                 logger.warning(
@@ -269,6 +277,7 @@ def process_matches(
                     existing.get("home_score"), existing.get("away_score"),
                     entry["winner"], entry["home_score"], entry["away_score"],
                 )
+                istats["skipped_no_change"] = istats.get("skipped_no_change", 0) + 1
                 continue
             logger.warning(
                 "RESULT UPDATE: %s %d-%d -> %d-%d",
@@ -333,6 +342,10 @@ def process_group_matches(
         if match.get("status") != "finished":
             continue
         count_finished(istats)
+        # D-14: every receipt is normalized exactly once — BEFORE any
+        # early-exit branch — so received == normalized == ingested +
+        # skipped_* always holds for the run's single count of the event.
+        istats["normalized"] += 1
 
         group_name = match.get("group_name")
         if not group_name:
@@ -343,6 +356,10 @@ def process_group_matches(
 
         bsd_id = str(match.get("id", ""))
         if bsd_id in played_bsd_event_ids:
+            # Re-offered receipt: already counted this run; the earlier
+            # receipt drove the store change, so landing here is a true
+            # no-op for the store.
+            istats["skipped_no_change"] = istats.get("skipped_no_change", 0) + 1
             continue
         played_bsd_event_ids.add(bsd_id)
 
@@ -365,8 +382,6 @@ def process_group_matches(
                              (match.get("home_score"), match.get("away_score")))
             continue
 
-        istats["normalized"] += 1
-
         round_number = match.get("round_number", 0)
         match_id = find_group_match(
             home_norm, away_norm, group_letter, round_number, groups
@@ -376,6 +391,7 @@ def process_group_matches(
             continue
 
         if match_id in legacy_ids:
+            istats["skipped_no_change"] = istats.get("skipped_no_change", 0) + 1
             continue
 
         entry = _build_match_entry(
@@ -388,6 +404,7 @@ def process_group_matches(
             if all(existing.get(f) == entry[f] for f in _WC_FACTUAL_FIELDS):
                 # Exactly equivalent result — true no-op.  New provider
                 # metadata (stats, context, ai_preview) is NOT mixed in.
+                istats["skipped_no_change"] = istats.get("skipped_no_change", 0) + 1
                 continue
             if not _should_apply_wc_update(existing, entry):
                 logger.warning(
@@ -396,6 +413,7 @@ def process_group_matches(
                     existing.get("home_score"), existing.get("away_score"),
                     entry["winner"], entry["home_score"], entry["away_score"],
                 )
+                istats["skipped_no_change"] = istats.get("skipped_no_change", 0) + 1
                 continue
             logger.warning(
                 "RESULT UPDATE: %s %d-%d -> %d-%d",
@@ -405,6 +423,10 @@ def process_group_matches(
             for field in _WC_FACTUAL_FIELDS:
                 existing[field] = entry[field]
             _maybe_merge_provider_metadata(existing, entry)
+            # An applied correction IS a store-side change (02-03): count it
+            # as ingested so the counter invariant holds for corrected
+            # re-offers too (mirrors the knockout processor).
+            istats["ingested"] += 1
             continue
 
         results.append(entry)

@@ -166,6 +166,11 @@ def derive_success(provider: str | None, attempted: bool,
         normalized = int(finished["normalized"])
         ingested = int(finished["ingested"])
         skips = [int(finished[key]) for key in skipped]
+        # D-14 re-offer bucket: optional so callers on the legacy 6-key
+        # vocabulary stay valid; a PRESENT key still fails closed on bad
+        # values (no silent coercion).
+        if "skipped_no_change" in finished:
+            skips.append(int(finished["skipped_no_change"]))
     except (KeyError, TypeError, ValueError):
         logger.warning(
             "Counter check [%s]: finished counters incomplete — %r; "

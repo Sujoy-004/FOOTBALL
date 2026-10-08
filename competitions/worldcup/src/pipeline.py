@@ -83,6 +83,65 @@ def _wc_stats() -> dict:
     return stats
 
 
+def _read_prev_ledger() -> dict:
+    """Parse the shared freshness ledger, never raising."""
+    try:
+        return json.loads(_last_refresh_report_path().read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _build_report(
+    provider,
+    *,
+    attempted: bool,
+    success: bool,
+    error,
+    stale: bool,
+    reason,
+    last_success_at,
+    finished: dict,
+    skipped_reason=None,
+) -> dict:
+    """Single refresh-report shape for EVERY fetch_live_data exit path (02-03).
+
+    Elevates the invariant: an attempt must surface with the same key set
+    whether it succeeded or failed. ``deferred`` is only ever true for the
+    deliberate no-op verdicts (``"deferred"`` / ``"deferred/provider-empty"``)
+    — a genuine failure is NOT a deferral, and ``skipped_reason`` is only
+    present when the refresh never reached the provider at all.
+
+    Attempted reports are persisted to the shared freshness ledger
+    (best-effort, never raising) so stale data can't masquerade as fresh;
+    deferred/snapshot exits don't write.
+    """
+    report = {
+        "provider": provider,
+        "attempted": attempted,
+        "success": success,
+        "error": error,
+        "stale": stale,
+        "reason": reason,
+        "last_success_at": last_success_at,
+        "finished": finished,
+        "stages": [],
+        "written_files": [],
+        "deferred": reason in ("deferred", "deferred/provider-empty"),
+    }
+    if skipped_reason is not None:
+        report["skipped_reason"] = skipped_reason
+    if attempted:
+        try:
+            payload = _read_prev_ledger()
+            payload["worldcup"] = report
+            _last_refresh_report_path().write_text(
+                json.dumps(payload, indent=2), encoding="utf-8"
+            )
+        except Exception:
+            pass
+    return report
+
+
 def _dedupe_events(events: list[dict]) -> list[dict]:
     """D-14: provider receipts are unique per run — first payload item wins.
 
@@ -176,57 +235,45 @@ def fetch_live_data(
     """Fetch live match data + signal caches from the configured provider.
 
     Returns a refresh report {provider, attempted, success, error, stale,
-    finished: <ingestion counters>, last_success_at} which is also merged
-    into <repo>/web/last_refresh.json under "worldcup" so a failed or
+    finished: <nested per-stage counters>, reason, last_success_at,
+    stages, written_files, deferred} which is also merged into
+    <repo>/web/last_refresh.json under "worldcup" so a failed or
     stale refresh is never mistaken for fresh data.
     """
-    from football_core.fetcher import derive_success, new_ingestion_stats
-
-    last_refresh_path = _last_refresh_report_path()
-
-    def _read_prev() -> dict:
-        try:
-            return json.loads(last_refresh_path.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
+    from football_core.fetcher import derive_success
 
     def _fail(reason: str, provider_name=None) -> dict:
-        prev = _read_prev().get("worldcup", {})
-        report = {
-            "provider": provider_name,
-            "attempted": True,
-            "success": False,
-            "error": reason,
-            "stale": True,
-            "reason": None,
-            "last_success_at": prev.get("last_success_at"),
-            "finished": new_ingestion_stats(),
-        }
-        try:
-            payload = _read_prev()
-            payload["worldcup"] = report
-            last_refresh_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        except Exception:
-            pass
+        prev = _read_prev_ledger().get("worldcup", {})
+        report = _build_report(
+            provider_name,
+            attempted=True,
+            success=False,
+            error=reason,
+            stale=True,
+            reason=None,
+            last_success_at=prev.get("last_success_at"),
+            finished={"group_stage": _wc_stats(), "knockout": _wc_stats()},
+        )
         logger.warning("fetch_live_data FAILED: %s — WC data may be STALE", reason)
         return report
 
     from football_core.runtime_support import is_snapshot_mode
     if is_snapshot_mode():
-        report = new_ingestion_stats()
+        report = _wc_stats()
         # D-13: nothing was attempted, so nothing succeeded — the deferred
         # verdict is DERIVED from the (zeroed) counters, never declared.
         success, reason = derive_success(None, False, report)
-        return {
-            "provider": None,
-            "attempted": False,
-            "success": success,
-            "reason": reason,
-            "error": None,
-            "stale": True,
-            "skipped_reason": "snapshot mode selected at startup",
-            "finished": report,
-        }
+        return _build_report(
+            None,
+            attempted=False,
+            success=success,
+            error=None,
+            stale=True,
+            reason=reason,
+            last_success_at=None,
+            finished=report,
+            skipped_reason="snapshot mode selected at startup",
+        )
     from football_core.runtime_support import get_data_provider
     provider = get_data_provider(bsd_api_key, football_data_org_key, constants.DEFAULT_LEAGUE_ID)
     if provider is None:
@@ -243,15 +290,17 @@ def fetch_live_data(
         )
     except Exception as e:
         logger.warning("fetch_live_data: failed to load data files: %s", e)
-        return {
-            "provider": None,
-            "attempted": False,
-            "success": False,
-            "error": f"failed to load data files: {e}",
-            "stale": True,
-            "skipped_reason": "local competition data files unreadable",
-            "finished": new_ingestion_stats(),
-        }
+        return _build_report(
+            None,
+            attempted=False,
+            success=False,
+            error=f"failed to load data files: {e}",
+            stale=True,
+            reason=None,
+            last_success_at=None,
+            finished=_wc_stats(),
+            skipped_reason="local competition data files unreadable",
+        )
 
     # 1. Fetch and process match results via provider
     group_stats = _wc_stats()
@@ -412,37 +461,28 @@ def fetch_live_data(
         key: group_stats.get(key, 0) + ko_stats.get(key, 0)
         for key in ("received", "normalized", "ingested",
                     "skipped_unmatchable", "skipped_no_target",
-                    "skipped_missing_score")
+                    "skipped_missing_score", "skipped_no_change")
     }
     success, reason = derive_success(type(provider).__name__, True, flat_counters)
-    report = {
-        "provider": type(provider).__name__,
-        "attempted": True,
-        "success": success,
-        "error": None,
-        "stale": not success,
-        "reason": reason,
-        "last_success_at": (
+    report = _build_report(
+        type(provider).__name__,
+        attempted=True,
+        success=success,
+        error=None,
+        stale=not success,
+        reason=reason,
+        last_success_at=(
             datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
             if success
-            else _read_prev().get("worldcup", {}).get("last_success_at")
+            else _read_prev_ledger().get("worldcup", {}).get("last_success_at")
         ),
-        "finished": {
-            "group_stage": group_stats,
-            "knockout": ko_stats,
-        },
-    }
+        finished={"group_stage": group_stats, "knockout": ko_stats},
+    )
     if not success:
         logger.warning(
             "fetch_live_data derived success=False (%s) — counters: %r",
             reason, flat_counters,
         )
-    try:
-        payload = _read_prev()
-        payload["worldcup"] = report
-        last_refresh_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    except Exception:
-        pass
     return report
 
 
