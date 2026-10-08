@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from dotenv import load_dotenv
 
+from football_core.state import atomic_write_text
 from competitions.worldcup.src import constants, elo
 from competitions.worldcup.src.knockout import run_full_simulation, resolve_knockout_slot_teams
 from competitions.worldcup.src.state import load_groups, load_annex_c
@@ -334,9 +335,9 @@ def _store_wc_sim_result(result: dict, count: int, seed: Optional[int],
     }
     snapshot = result["snapshot"]
     snapshot["show_ci"] = show_ci
-    (DATA_DIR / "snapshot.json").write_text(
+    atomic_write_text(
+        DATA_DIR / "snapshot.json",
         json.dumps(snapshot, indent=2, default=str, ensure_ascii=False),
-        encoding="utf-8",
     )
     return {"n_unplayed": remaining}
 

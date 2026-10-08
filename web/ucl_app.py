@@ -1,6 +1,7 @@
 """UEFA Champions League — FastAPI sub-app mounted under /ucl."""
 
 from __future__ import annotations
+from football_core.state import atomic_write_text
 
 import json
 import os
@@ -991,9 +992,9 @@ def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
     if bracket is not None:
         snapshot_data["bracket"] = bracket
     snapshot_path = DATA_DIR / "snapshot.json"
-    snapshot_path.write_text(
+    atomic_write_text(
+        snapshot_path,
         json.dumps(snapshot_data, indent=2, default=str, ensure_ascii=False),
-        encoding="utf-8",
     )
     return {"champion": result.get("champion"),
             "count": result.get("n_iterations")}

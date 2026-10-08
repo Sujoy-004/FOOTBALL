@@ -9,6 +9,7 @@ service.
 """
 
 from __future__ import annotations
+from football_core.state import atomic_write_text
 
 import json
 import logging
@@ -647,9 +648,9 @@ def _store_laliga_sim_result(result: dict, count: int, seed) -> dict:
         "elo_ratings": result.get("elo_ratings", {}),
     }
     snapshot_path = DATA_DIR / "snapshot.json"
-    snapshot_path.write_text(
+    atomic_write_text(
+        snapshot_path,
         json.dumps(snapshot_data, indent=2, default=str, ensure_ascii=False),
-        encoding="utf-8",
     )
     return {"champion": result.get("champion"),
             "count": result.get("n_iterations")}

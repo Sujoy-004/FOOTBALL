@@ -143,32 +143,58 @@ def _violations_in(path: pathlib.Path, source: str) -> list[dict]:
         tree = ast.parse(source, filename=str(path))
     except SyntaxError:  # pragma: no cover - a broken file fails the suite anyway
         return found
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        func = node.func
-        reason: str | None = None
-        if isinstance(func, ast.Name) and func.id == "open":
-            mode = _mode_of(node)
-            if mode in WRITE_MODES or mode == DYNAMIC_MODE:
-                reason = f"open(mode={mode})"
-        elif isinstance(func, ast.Attribute):
-            if func.attr in _PATH_WRITE_ATTRS:
-                reason = f"Path.{func.attr}"
-            elif (
-                func.attr == "write"
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "os"
-            ):
-                reason = "os.write"
-        if reason is not None:
-            found.append(
-                {
-                    "path": _rel(path) if path.is_absolute() else path.as_posix(),
-                    "line": node.lineno,
-                    "reason": reason,
-                }
-            )
+
+    class SymbolVisitor(ast.NodeVisitor):
+        def __init__(self, path):
+            self.path = path
+            self.symbol_stack = ["<module>"]
+            self.found = []
+
+        def visit_FunctionDef(self, node: ast.FunctionDef):
+            self.symbol_stack.append(node.name)
+            self.generic_visit(node)
+            self.symbol_stack.pop()
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
+            self.symbol_stack.append(node.name)
+            self.generic_visit(node)
+            self.symbol_stack.pop()
+
+        def visit_ClassDef(self, node: ast.ClassDef):
+            self.symbol_stack.append(node.name)
+            self.generic_visit(node)
+            self.symbol_stack.pop()
+
+        def visit_Call(self, node: ast.Call):
+            func = node.func
+            reason: str | None = None
+            if isinstance(func, ast.Name) and func.id == "open":
+                mode = _mode_of(node)
+                if mode in WRITE_MODES or mode == DYNAMIC_MODE:
+                    reason = f"open(mode={mode})"
+            elif isinstance(func, ast.Attribute):
+                if func.attr in _PATH_WRITE_ATTRS:
+                    reason = f"Path.{func.attr}"
+                elif (
+                    func.attr == "write"
+                    and isinstance(func.value, ast.Name)
+                    and func.value.id == "os"
+                ):
+                    reason = "os.write"
+            if reason is not None:
+                self.found.append(
+                    {
+                        "path": _rel(self.path) if self.path.is_absolute() else self.path.as_posix(),
+                        "line": node.lineno,
+                        "symbol": self.symbol_stack[-1],
+                        "reason": reason,
+                    }
+                )
+            self.generic_visit(node)
+
+    visitor = SymbolVisitor(path)
+    visitor.visit(tree)
+    found = visitor.found
     return found
 
 
@@ -191,8 +217,8 @@ def _deferred() -> list[dict]:
 
 def test_write_ban_matches_deferred_list():
     """Case 1: discovered offender set == committed deferred list, exactly."""
-    found = {f"{v['path']}:{v['line']}" for v in _all_violations()}
-    known = {f"{d['path']}:{d['line']}" for d in _deferred()}
+    found = {f"{v['path']}::{v.get('symbol', '<module>')}" for v in _all_violations()}
+    known = {f"{d['path']}::{d.get('symbol', '<module>')}" for d in _deferred()}
     print("\ndeferred non-atomic store writes (Phase 2 worklist):")
     for entry in _deferred():
         print(

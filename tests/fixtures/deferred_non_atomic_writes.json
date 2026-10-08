@@ -1,86 +1,50 @@
 [
   {
+    "path": "competitions/worldcup/src/pipeline.py",
+    "line": 137,
+    "symbol": "_build_report",
+    "owner": "Phase 2"
+  },
+  {
+    "path": "web/laliga_app.py",
+    "line": 188,
+    "symbol": "_store_refresh_report",
+    "owner": "Phase 2"
+  },
+  {
+    "path": "web/ucl_app.py",
+    "line": 277,
+    "symbol": "_store_refresh_report",
+    "owner": "Phase 2"
+  },
+  {
     "path": "competitions/ucl/src/analysis.py",
     "line": 352,
-    "symbol": "UCL validation baseline JSON (save_validation_baseline baseline_path)",
+    "symbol": "save_validation_baseline",
     "owner": "Phase 3"
   },
   {
     "path": "competitions/ucl/src/shadow_eval.py",
     "line": 160,
-    "symbol": "competitions/ucl/data/shadow/<season>/predictions.jsonl (append mode)",
+    "symbol": "append_jsonl",
     "owner": "Phase 3"
   },
   {
     "path": "competitions/ucl/src/validation_suite.py",
     "line": 825,
-    "symbol": "competitions/ucl/data/baseline_uncalibrated.json",
+    "symbol": "save_baseline",
     "owner": "Phase 3"
   },
   {
     "path": "competitions/worldcup/src/pipeline.py",
-    "line": 132,
-    "symbol": "web/last_refresh.json (worldcup read-modify-write, failure branch)",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "competitions/worldcup/src/pipeline.py",
-    "line": 213,
-    "symbol": "competitions/worldcup/data/played_groups.json",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "competitions/worldcup/src/pipeline.py",
-    "line": 257,
-    "symbol": "competitions/worldcup/data/played.json",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "competitions/worldcup/src/pipeline.py",
-    "line": 292,
-    "symbol": "web/last_refresh.json (worldcup read-modify-write, success branch)",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "competitions/worldcup/src/pipeline.py",
-    "line": 872,
-    "symbol": "competitions/worldcup/config/signal_weights.json",
+    "line": 1063,
+    "symbol": "run_calibration_compute",
     "owner": "Phase 3"
   },
   {
     "path": "football_core/historical_backfill.py",
     "line": 650,
-    "symbol": "<OUT_DIR>/eval_results.json (run_evaluation out_path)",
+    "symbol": "run_evaluation",
     "owner": "Phase 3"
-  },
-  {
-    "path": "web/laliga_app.py",
-    "line": 177,
-    "symbol": "web/last_refresh.json (laliga read-modify-write)",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "web/laliga_app.py",
-    "line": 631,
-    "symbol": "competitions/laliga/data/snapshot.json",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "web/ucl_app.py",
-    "line": 263,
-    "symbol": "web/last_refresh.json (ucl read-modify-write)",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "web/ucl_app.py",
-    "line": 972,
-    "symbol": "competitions/ucl/data/snapshot.json",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "web/wc_app.py",
-    "line": 337,
-    "symbol": "competitions/worldcup/data/snapshot.json",
-    "owner": "Phase 2"
   }
 ]

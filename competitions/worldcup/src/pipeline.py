@@ -24,6 +24,7 @@ from src.state import (
     load_annex_c,
     load_groups,
 )
+from football_core.state import atomic_write_text
 # The brain owns its own evaluation module: this module no longer imports
 # from ``web`` (plan 01-06, D-13).
 from competitions.worldcup.src.evaluation import compute_signal_eval
@@ -344,9 +345,9 @@ def fetch_live_data(
         for m in new_grp:
             played_groups[m["match_id"]] = m
         if json.dumps(played_groups, sort_keys=True, ensure_ascii=False) != grp_before:
-            played_groups_path.write_text(
+            atomic_write_text(
+                played_groups_path,
                 json.dumps(played_groups, indent=2, ensure_ascii=False),
-                encoding="utf-8",
             )
 
         annex_c = load_annex_c(data_dir)
@@ -413,9 +414,9 @@ def fetch_live_data(
                 json.dumps(played, sort_keys=True, ensure_ascii=False) != ko_before
             )
             if ko_changed:
-                played_path.write_text(
+                atomic_write_text(
+                    played_path,
                     json.dumps(played, indent=2, ensure_ascii=False),
-                    encoding="utf-8",
                 )
             if pass_no > 0:
                 # Fold this pass's scratch receipts into the run totals: the
