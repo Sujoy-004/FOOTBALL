@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from football_core.freshness import update_ledger
+from football_core.freshness import read_ledger, update_ledger
 from football_core.state import atomic_write_text
 
 import json
@@ -120,15 +120,15 @@ def _refresh_report_path() -> Path:
 
 
 def _load_refresh_ledger(refresh_path: Path | None = None) -> dict:
-    """Read the freshness ledger file; always returns a dict."""
+    """Read the shared freshness ledger — one definition of "unreadable".
+
+    ``{}`` still means "the file has never been written"; a corrupt or
+    unreadable ledger returns the explicit ``{"ledger": "unreadable",
+    "detail": ...}`` marker instead (D-11 — an I/O failure must not look like
+    "no refresh has ever run").
+    """
     refresh_path = refresh_path if refresh_path is not None else _refresh_report_path()
-    if not refresh_path.exists():
-        return {}
-    try:
-        data = json.loads(refresh_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
+    return read_ledger(refresh_path)
 
 
 _refresh_report: dict = {}

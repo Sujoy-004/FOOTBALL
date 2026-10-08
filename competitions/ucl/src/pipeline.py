@@ -493,8 +493,13 @@ def fetch_live_data(
             fixtures = json.loads(root_fixtures_path.read_text(encoding="utf-8"))
             for team in fixtures.get("schedule", {}).get("teams", []):
                 alias_lookup[team["name"].strip().lower()] = team["name"]
-        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+            # Optional file, but the failure is NOT silent (D-11): alias
+            # registration quietly degrades, ops still sees why.
+            logger.warning(
+                "[UCL] fixtures.json unreadable for alias registration (%s)",
+                exc.__class__.__name__,
+            )
 
     # Also register the ACTIVE season's fixture teams through a SEASON-SCOPED
     # lookup so provider activity on the active season resolves to the draw's

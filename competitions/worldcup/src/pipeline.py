@@ -24,7 +24,7 @@ from src.state import (
     load_annex_c,
     load_groups,
 )
-from football_core.freshness import update_ledger
+from football_core.freshness import read_ledger, update_ledger
 from football_core.state import atomic_write_text
 # The brain owns its own evaluation module: this module no longer imports
 # from ``web`` (plan 01-06, D-13).
@@ -86,11 +86,14 @@ def _wc_stats() -> dict:
 
 
 def _read_prev_ledger() -> dict:
-    """Parse the shared freshness ledger, never raising."""
-    try:
-        return json.loads(_last_refresh_report_path().read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+    """Parse the shared freshness ledger, never raising.
+
+    Delegates to :func:`football_core.freshness.read_ledger` so a corrupt
+    ledger logs a traceback and comes back as the explicit ``unreadable``
+    marker (D-11) instead of a silent ``{}`` that reads as "never refreshed".
+    Callers pull ``["worldcup"]``, which is simply absent from the marker.
+    """
+    return read_ledger(_last_refresh_report_path())
 
 
 def _build_report(

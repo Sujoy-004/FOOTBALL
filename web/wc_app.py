@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from dotenv import load_dotenv
 
+from football_core.freshness import read_ledger
 from football_core.state import atomic_write_text
 from competitions.worldcup.src import constants, elo
 from competitions.worldcup.src.knockout import run_full_simulation, resolve_knockout_slot_teams
@@ -167,14 +168,23 @@ def _simulation_state_block() -> dict:
     }
 
 
+def _refresh_report_path() -> Path:
+    """Seam for tests: location of the shared freshness ledger."""
+    return Path(__file__).parent / "last_refresh.json"
+
+
 def _current_refresh_report() -> dict:
-    try:
-        lr = json.loads(
-            (Path(__file__).parent / "last_refresh.json").read_text(encoding="utf-8")
-        )
-        return lr.get("worldcup", {})
-    except Exception:
-        return {}
+    """World Cup entry of the shared ledger — loud on failure (D-11).
+
+    Healthy file: the ``worldcup`` sub-dict, unchanged. Unreadable file: the
+    explicit ``{"ledger": "unreadable", "detail": ...}`` marker, which is the
+    failure signal the dashboard renders — never ``{}``, which would read as
+    "no refresh has ever run".
+    """
+    ledger = read_ledger(_refresh_report_path())
+    if ledger.get("ledger") == "unreadable":
+        return ledger
+    return ledger.get("worldcup", {})
 
 
 @wc_app.get("/api/overview")
