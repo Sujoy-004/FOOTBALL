@@ -60,7 +60,7 @@
 ### Hardening & Quality Gate
 
 - [x] **HARD-01**: The deprecated `competitions/worldcup/src/predictors/` (485 LOC, still on the live ingest path) is removed with no change to any canonical computed number
-- [ ] **HARD-02**: The five bare `pass` branches that swallow errors become loud and reported
+- [x] **HARD-02**: The five bare `pass` branches that swallow errors become loud and reported
 - [x] **HARD-03**: The freshness ledger never reports stale data as fresh
 - [ ] **HARD-04**: A coverage floor is enforced and `pytest` runs in CI
 
@@ -116,7 +116,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INGEST-02 | Phase 2 | Complete |
 | INGEST-03 | Phase 2 | Complete |
 | INGEST-04 | Phase 2 | Pending |
-| HARD-02 | Phase 2 | Pending |
+| HARD-02 | Phase 2 | Complete |
 | HARD-03 | Phase 2 | Complete |
 | EVAL-01 | Phase 3 | Pending |
 | EVAL-02 | Phase 3 | Pending |

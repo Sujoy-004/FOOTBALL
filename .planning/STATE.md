@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-03-PLAN.md (tasks 1-3 committed, gate held at 101 baseline ids)
-last_updated: "2026-10-08T06:34:12.759Z"
+stopped_at: Completed 02-05-PLAN.md (3 tasks, 5 commits 2a73954..1d959fb; gates green except 1 stash-proved pre-existing data-drift failure)
+last_updated: "2026-10-08T08:14:52.785Z"
 last_activity: 2026-10-08
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 17
-  completed_plans: 11
-  percent: 65
+  completed_plans: 12
+  percent: 71
 ---
 
 # Project State
@@ -28,7 +28,7 @@ and the engine's accuracy **measured** against naive baselines instead of claime
 ## Current Position
 
 Phase: 02 (truthful-availability-explicit-verified-ingestion) — EXECUTING
-Plan: 3 of 10
+Plan: 6 of 10
 Status: Ready to execute
 Last activity: 2026-10-08
 
@@ -38,7 +38,7 @@ proven; one `atomic_write_text` in `football_core/state.py`; `web/wc_app.py` red
 961 -> 673 lines; `tests/test_layering_architecture.py` enforces both forbidden directions.
 Gate held at 105 -> 105 node ids against `01-01-BASELINE.md` in every one of the 7 plans.
 
-Progress: [███████░░░] 65%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [███████░░░] 65%
 | Phase 02 P02 | 500min | 3 tasks | 12 files |
 | Phase 02-truthful-availability-explicit-verified-ingestion P03 | 45min | 3 tasks | 5 files |
 | Phase 02-truthful-availability-explicit-verified-ingestion P04 | 45 | 3 tasks | 6 files |
+| Phase 02 P05 | 80min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -162,6 +163,10 @@ Decisions are logged in the PROJECT.md Key Decisions table. Roadmap-specific:
 - [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-03: Applied score corrections count as ingested (store-side change) in both WC processors
 - [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-03: skipped_no_change is an optional 7th counter key added via .get() increments; derive_success honors it only when present — legacy 6-key vocabulary and KeyError fail-closed stay intact
 - [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-03: _build_report is the single report schema for all four fetch_live_data exits; skipped_reason only when provider never reached; ledger written only on attempted runs
+- [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-05: football_core/freshness.py is the ONLY writer of web/last_refresh.json - update_ledger()/read_ledger() under one module threading.Lock + atomic_write_text, logger.exception then re-raise; all four former lock-less RMW sites route through it
+- [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-05: an unreadable ledger is DATA, not silence - the served report carries {ledger: "unreadable", detail: <exception class name only>} (no message, no tokens), the marker is never persisted, and a missing file stays {} because an empty ledger is not an error
+- [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-05: D-12 staleness is served, not stored - served_stale(entry, store_mtimes) uses last_success_at OR last_refresh (UCL/LaLiga schema has no last_success_at) and is applied by each app at _current_refresh_report/_refresh_report_for/api_boot; store-path knowledge stays in the apps: played*/results/fixtures only, snapshot.json (simulated) and odds.json (refetched on demand) excluded
+- [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-05: a TestClient test that starts a mounted sub-app must import web.competitions BEFORE first start (middleware stack freezes) and monkeypatch try_lazy_refresh to a no-op - otherwise a read-only test fires a real FootballDataOrgProvider refresh into the gitignored repo store (deferred-items.md item 4 covers the defensive install)
 
 ### Pending Todos
 
@@ -265,6 +270,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-08T06:34:12.740Z
-Stopped at: Completed 02-03-PLAN.md (tasks 1-3 committed, gate held at 101 baseline ids)
+Last session: 2026-10-08T08:14:52.763Z
+Stopped at: Completed 02-05-PLAN.md (3 tasks, 5 commits 2a73954..1d959fb; gates green except 1 stash-proved pre-existing data-drift failure)
 Resume file: None

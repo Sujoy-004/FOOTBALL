@@ -168,12 +168,12 @@ predictor path is gone — with every canonical computed number provably unchang
      and the freshness ledger never reports a stale store as fresh — a missing or
      non-advancing `last_success_at` reads as stale.
 **UI hint**: yes
-**Plans**: 10 plans
+**Plans**: 5/10 plans executed
 - [x] `02-01-PLAN.md` — Freeze the Phase 2 failing-node-id baseline and answer the runnable open questions (provider probes, twelve success-site classification, ledger home, caption decision)
 - [x] `02-02-PLAN.md` — Make `success` a derived fact (`derive_success()`), convert all twelve hardcoded `success=True` sites, rewrite the empty-provider landmine test
 - [x] `02-03-PLAN.md` — Raise the knockout ingest pass cap to 8 with counter-integrity tests and make failure/success reports the same shape
-- [ ] `02-04-PLAN.md` — Re-key the write ratchet `path:line` → `path::symbol` and convert the five non-atomic snapshot/result writers (fixture 14 → 9)
-- [ ] `02-05-PLAN.md` — Build the freshness ledger (`football_core/freshness.py`), convert the four lock-less RMW sites to single-writer, wire the D-12 staleness rule (fixture → 5 Phase 3 entries)
+- [x] `02-04-PLAN.md` — Re-key the write ratchet `path:line` → `path::symbol` and convert the five non-atomic snapshot/result writers (fixture 14 → 9)
+- [x] `02-05-PLAN.md` — Build the freshness ledger (`football_core/freshness.py`), convert the four lock-less RMW sites to single-writer, wire the D-12 staleness rule (fixture → 5 Phase 3 entries)
 - [ ] `02-06-PLAN.md` — Delete the auto-refresh middleware/direct calls, add `POST /worldcup/api/refresh`, normalize all three refresh endpoints onto the IngestReport shape with OQ7 stage rows
 - [ ] `02-07-PLAN.md` — Truthful availability payloads: live four-state block, key omission instead of `0`/`{}` defaults, MISSING guards on sim/what-if reads
 - [ ] `02-08-PLAN.md` — UI: shared refresh button, availability banner/panel, counter caption, notice parity, Node tests — ends in a human-verify checkpoint (execution blocks on approval)
@@ -379,7 +379,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Layering Inversion & Deprecated-Path Removal | 7/7 | Complete | 2026-10-06 |
-| 2. Truthful Availability & Explicit Verified Ingestion | 2/10 | In Progress | - |
+| 2. Truthful Availability & Explicit Verified Ingestion | 5/10 | In Progress | - |
 | 3. Measured Skill — All Three Competitions | 0/TBD | Not started | - |
 | 4. Race-Free Derived State & Simulation Lifecycle | 0/TBD | Not started | - |
 | 5. Real↔Simulated Reconciliation | 0/TBD | Not started | - |
