@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-05-PLAN.md (3 tasks, 5 commits 2a73954..1d959fb; gates green except 1 stash-proved pre-existing data-drift failure)
-last_updated: "2026-10-08T08:14:52.785Z"
+stopped_at: Completed 02-06-PLAN.md (3 tasks, 3 commits a95f122..58dbec5; gates green modulo the 84 pre-existing baseline failures - full-suite failure set identical to baseline)
+last_updated: "2026-10-08T11:24:15.089Z"
 last_activity: 2026-10-08
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 17
-  completed_plans: 12
-  percent: 71
+  completed_plans: 13
+  percent: 76
 ---
 
 # Project State
@@ -28,7 +28,7 @@ and the engine's accuracy **measured** against naive baselines instead of claime
 ## Current Position
 
 Phase: 02 (truthful-availability-explicit-verified-ingestion) — EXECUTING
-Plan: 6 of 10
+Plan: 7 of 10
 Status: Ready to execute
 Last activity: 2026-10-08
 
@@ -38,7 +38,7 @@ proven; one `atomic_write_text` in `football_core/state.py`; `web/wc_app.py` red
 961 -> 673 lines; `tests/test_layering_architecture.py` enforces both forbidden directions.
 Gate held at 105 -> 105 node ids against `01-01-BASELINE.md` in every one of the 7 plans.
 
-Progress: [███████░░░] 71%
+Progress: [████████░░] 76%
 
 ## Performance Metrics
 
@@ -81,6 +81,7 @@ Progress: [███████░░░] 71%
 | Phase 02-truthful-availability-explicit-verified-ingestion P03 | 45min | 3 tasks | 5 files |
 | Phase 02-truthful-availability-explicit-verified-ingestion P04 | 45 | 3 tasks | 6 files |
 | Phase 02 P05 | 80min | 3 tasks | 9 files |
+| Phase 02 P06 | 175min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,14 @@ Decisions are logged in the PROJECT.md Key Decisions table. Roadmap-specific:
 - [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-05: an unreadable ledger is DATA, not silence - the served report carries {ledger: "unreadable", detail: <exception class name only>} (no message, no tokens), the marker is never persisted, and a missing file stays {} because an empty ledger is not an error
 - [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-05: D-12 staleness is served, not stored - served_stale(entry, store_mtimes) uses last_success_at OR last_refresh (UCL/LaLiga schema has no last_success_at) and is applied by each app at _current_refresh_report/_refresh_report_for/api_boot; store-path knowledge stays in the apps: played*/results/fixtures only, snapshot.json (simulated) and odds.json (refetched on demand) excluded
 - [Phase 02-truthful-availability-explicit-verified-ingestion]: 02-05: a TestClient test that starts a mounted sub-app must import web.competitions BEFORE first start (middleware stack freezes) and monkeypatch try_lazy_refresh to a no-op - otherwise a read-only test fires a real FootballDataOrgProvider refresh into the gitignored repo store (deferred-items.md item 4 covers the defensive install)
+- [Phase 02]: 02-06: All three refresh endpoints answer HTTP 200 for both success and failure - the report body carries success/error (plan allowed 200 or 503; no consumer relied on 503)
+- [Phase 02]: 02-06: Endpoint bodies are derived by refresh_response_body() FROM the IngestReport itself - status, refreshed, deferred and last_success_at come from report fields, never a parallel ad-hoc shape
+- [Phase 02]: 02-06: Endpoints delegate through REGISTRY.get(id).refresh() with function-level imports - never a direct private _fetch_live_data import across app modules; per-competition scoping stays with the adapter
+- [Phase 02]: 02-06: written_files stays [] at the endpoint layer - passing through brain-written file lists would disclose absolute paths to untrusted clients; wire-up owner 02-09/02-10
+- [Phase 02]: 02-06: No endpoint-level snapshot short-circuit - the adapter wrappers already self-gate, so a second gate would be a second source of truth
+- [Phase 02]: 02-06: Status is derived, never forwarded: not attempted -> skipped, success -> ok, attempted+failed+deferred -> deferred, else error; a brain-supplied transport status is discarded because it can contradict success (D-13)
+- [Phase 02]: 02-06: OQ7 stage rows added to WC and LaLiga only - the UCL stages (teams/league/playoff/knockout/champion) are untouched, so contract tests assert a results row for WC/LaLiga only
+- [Phase 02]: 02-06: Contract-test success-path scoping - genuine UCL/LaLiga success needs gitignored runtime stores absent here, so success is proven end-to-end for WC over HTTP plus a refresh_response_body unit test
 
 ### Pending Todos
 
@@ -270,6 +279,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-08T08:14:52.763Z
-Stopped at: Completed 02-05-PLAN.md (3 tasks, 5 commits 2a73954..1d959fb; gates green except 1 stash-proved pre-existing data-drift failure)
+Last session: 2026-10-08T11:24:15.067Z
+Stopped at: Completed 02-06-PLAN.md (3 tasks, 3 commits a95f122..58dbec5; gates green modulo the 84 pre-existing baseline failures - full-suite failure set identical to baseline)
 Resume file: None

@@ -21,7 +21,7 @@
 
 ### Explicit Verified Ingestion
 
-- [ ] **INGEST-01**: A user can trigger a per-competition results refresh explicitly; no ingestion occurs at boot or on page load
+- [x] **INGEST-01**: A user can trigger a per-competition results refresh explicitly; no ingestion occurs at boot or on page load
 - [x] **INGEST-02**: A completed refresh reports the provider, the match counts actually ingested, and a timestamp
 - [x] **INGEST-03**: A provider returning HTTP 200 with zero matches reports `deferred/provider-empty` — never success
 - [ ] **INGEST-04**: World Cup 2026 real results are ingested into the canonical World Cup stores as the validation corpus
@@ -112,7 +112,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRUTH-01 | Phase 2 | Pending |
 | TRUTH-02 | Phase 2 | Pending |
 | TRUTH-03 | Phase 2 | Pending |
-| INGEST-01 | Phase 2 | Pending |
+| INGEST-01 | Phase 2 | Complete |
 | INGEST-02 | Phase 2 | Complete |
 | INGEST-03 | Phase 2 | Complete |
 | INGEST-04 | Phase 2 | Pending |
