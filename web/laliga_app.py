@@ -7,8 +7,9 @@ All tournament logic stays in ``competitions.laliga.src``; this module
 only wires transport, the freshness ledger, and the simulation task
 service.
 """
-
 from __future__ import annotations
+
+from football_core.freshness import update_ledger
 from football_core.state import atomic_write_text
 
 import json
@@ -178,17 +179,19 @@ def _store_refresh_report(
         cache_entry[str(active_season)] = _refresh_report
     try:
         refresh_path = _refresh_report_path()
-        refresh_data = _load_refresh_ledger(refresh_path)
         entry = dict(_refresh_report)
         entry["mode"] = provider_name
         entry["n_matches"] = n_matches or 0
         entry["n_updated"] = n_updated or 0
-        refresh_data["laliga"] = entry
+        # Single-writer ledger (D-18): football_core.freshness owns the lock,
+        # the atomic write and the loud failure — no hand-rolled RMW here.
+        update_ledger(refresh_path, "laliga", entry)
         if active_season:
-            refresh_data.setdefault("laliga_seasons", {})[str(active_season)] = entry
-        refresh_path.write_text(json.dumps(refresh_data, indent=2), encoding="utf-8")
+            update_ledger(refresh_path, ("laliga_seasons", str(active_season)), entry)
     except Exception:
-        pass
+        logger.exception(
+            "[LaLiga] refresh outcome could NOT be persisted to the freshness ledger"
+        )
     return _refresh_report
 
 

@@ -24,6 +24,7 @@ from src.state import (
     load_annex_c,
     load_groups,
 )
+from football_core.freshness import update_ledger
 from football_core.state import atomic_write_text
 # The brain owns its own evaluation module: this module no longer imports
 # from ``web`` (plan 01-06, D-13).
@@ -132,14 +133,16 @@ def _build_report(
     if skipped_reason is not None:
         report["skipped_reason"] = skipped_reason
     if attempted:
+        # Single-writer ledger (D-18): football_core.freshness owns the lock,
+        # the atomic write and the loud failure. A report path never crashes
+        # the request, but the failure IS logged — never swallowed with pass.
         try:
-            payload = _read_prev_ledger()
-            payload["worldcup"] = report
-            _last_refresh_report_path().write_text(
-                json.dumps(payload, indent=2), encoding="utf-8"
-            )
+            update_ledger(_last_refresh_report_path(), "worldcup", report)
         except Exception:
-            pass
+            logger.exception(
+                "freshness ledger write FAILED — worldcup refresh outcome "
+                "was not persisted"
+            )
     return report
 
 

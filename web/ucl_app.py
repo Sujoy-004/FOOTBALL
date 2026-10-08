@@ -1,6 +1,9 @@
 """UEFA Champions League — FastAPI sub-app mounted under /ucl."""
-
 from __future__ import annotations
+
+import logging
+
+from football_core.freshness import update_ledger
 from football_core.state import atomic_write_text
 
 import json
@@ -40,6 +43,8 @@ from football_core.domain import load_json_store
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 UCL_LEAGUE_ID: int = 7
+
+logger = logging.getLogger(__name__)
 
 
 # Credentials are read at CALL time, never frozen at import: os.environ can
@@ -265,19 +270,21 @@ def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None
         _refresh_reports[str(active_season)] = _refresh_report
     try:
         refresh_path = _refresh_report_path()
-        refresh_data = _load_refresh_ledger(refresh_path)
         entry = dict(_refresh_report)
         entry["mode"] = provider_name
         entry["n_matches"] = n_matches or 0
         entry["n_updated"] = n_updated or 0
+        # Single-writer ledger (D-18): football_core.freshness owns the lock,
+        # the atomic write and the loud failure — no hand-rolled RMW here.
         # Legacy single-entry slot stays the latest report (backward
         # compatible with existing readers of last_refresh.json["ucl"]).
-        refresh_data["ucl"] = entry
+        update_ledger(refresh_path, "ucl", entry)
         if active_season:
-            refresh_data.setdefault("ucl_seasons", {})[str(active_season)] = entry
-        refresh_path.write_text(json.dumps(refresh_data, indent=2), encoding="utf-8")
+            update_ledger(refresh_path, ("ucl_seasons", str(active_season)), entry)
     except Exception:
-        pass
+        logger.exception(
+            "[UCL] refresh outcome could NOT be persisted to the freshness ledger"
+        )
     return _refresh_report
 
 

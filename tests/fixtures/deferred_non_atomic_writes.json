@@ -1,23 +1,5 @@
 [
   {
-    "path": "competitions/worldcup/src/pipeline.py",
-    "line": 137,
-    "symbol": "_build_report",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "web/laliga_app.py",
-    "line": 188,
-    "symbol": "_store_refresh_report",
-    "owner": "Phase 2"
-  },
-  {
-    "path": "web/ucl_app.py",
-    "line": 277,
-    "symbol": "_store_refresh_report",
-    "owner": "Phase 2"
-  },
-  {
     "path": "competitions/ucl/src/analysis.py",
     "line": 352,
     "symbol": "save_validation_baseline",
