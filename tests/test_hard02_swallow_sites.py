@@ -22,15 +22,18 @@ Every remaining default-shape ``return {}`` is sanctioned **by exact
 discovered set exactly, so a new swallow fails and a fixed one fails too
 (remove the entry when you fix the site).
 
-This is the RED counterpart of ``tests/test_hard03_staleness.py``: the four
-freshness readers still swallow into ``{}`` and the UCL alias-registration
-block in ``fetch_live_data`` still swallows with ``pass``.
+This file was the RED counterpart of ``tests/test_hard03_staleness.py`` and
+went green in task 2: the four freshness readers now delegate to
+``freshness.read_ledger`` (loud marker) and the UCL alias-registration block
+logs instead of ``pass``. It now runs as a ratchet — reintroducing a swallow
+on this surface fails here.
 """
 
 from __future__ import annotations
 
 import ast
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -235,6 +238,16 @@ def test_api_data_refresh_block_carries_the_unreadable_marker(
     ledger = _write_corrupt_ledger(tmp_path)
     monkeypatch.setattr(wc_app, "_refresh_report_path", lambda: ledger)
 
+    # Build the registry BEFORE the app first starts: web.competitions installs
+    # the lazy-acquisition middleware at import, and Starlette freezes the
+    # middleware stack on first start ("Cannot add middleware after an
+    # application has started"), so the order matters for later tests —
+    # and once installed, disarm it: this test only reads the served block,
+    # it must not fire a real refresh into the repo store (unpatched paths).
+    import web.competitions as competitions
+
+    monkeypatch.setattr(competitions, "try_lazy_refresh", lambda _cid: None)
+
     with TestClient(wc_app.wc_app) as client:
         payload = client.get("/api/data").json()
 
@@ -247,14 +260,20 @@ def test_api_data_refresh_block_carries_the_unreadable_marker(
 
 
 def test_healthy_ledger_still_serves_the_worldcup_entry(tmp_path, monkeypatch):
-    """Control: the loud reader keeps the healthy-path shape unchanged."""
+    """Control: the loud reader keeps the healthy-path shape unchanged.
+
+    The entry carries a real ``last_success_at`` because D-12 (task 3) now
+    serves it too: a timestamp-less entry would legitimately render as stale,
+    and the store dir is empty so no mtime can age this one.
+    """
     from web import wc_app
 
+    fresh = datetime.now(timezone.utc).isoformat()
+    entry = {"success": True, "stale": False, "last_success_at": fresh}
     ledger = tmp_path / "last_refresh.json"
-    ledger.write_text(
-        json.dumps({"worldcup": {"success": True, "stale": False}}), encoding="utf-8"
-    )
+    ledger.write_text(json.dumps({"worldcup": entry}), encoding="utf-8")
     monkeypatch.setattr(wc_app, "_refresh_report_path", lambda: ledger)
+    monkeypatch.setattr(wc_app, "DATA_DIR", tmp_path / "stores")
 
     report = wc_app._current_refresh_report()
-    assert report == {"success": True, "stale": False}
+    assert report == entry

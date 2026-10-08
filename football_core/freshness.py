@@ -14,7 +14,10 @@ reader:
   ``{}`` (which is indistinguishable from "no refresh has ever run"). ``detail``
   carries the exception *class* only, never the message, so a path or token
   inside an OSError string cannot leak into an API payload;
-* :func:`is_stale` — the D-12 staleness rule as a tested predicate.
+* :func:`is_stale` — the D-12 staleness rule as a tested predicate;
+* :func:`served_stale` — the same rule applied to a report that is about to
+  be served, so a "fresh" claim a store has outgrown is never rendered;
+* :func:`store_mtime` — the mtime probe apps feed into :func:`served_stale`.
 
 Ground rules: stdlib + ``football_core.state`` only — no ``web`` imports and no
 repo-path knowledge. Callers pass the ledger path (each keeps its own derivation
@@ -61,6 +64,8 @@ __all__ = [
     "UNREADABLE",
     "is_stale",
     "read_ledger",
+    "served_stale",
+    "store_mtime",
     "update_ledger",
 ]
 
@@ -233,3 +238,50 @@ def is_stale(ledger_entry: dict, *, previous_last_success_at: str | None,
     if store_mtime is not None and store_mtime - current.timestamp() > MTIME_TOLERANCE_SECONDS:
         return True  # clause 3: store moved on without the ledger
     return False
+
+
+def store_mtime(path: PathLike) -> float | None:
+    """mtime of one factual store, or ``None`` when it cannot be stat'ed.
+
+    ``None`` is an explicit "nothing to compare against" that the caller folds
+    into :func:`served_stale` (clause 3 is skipped, the timestamp clauses still
+    decide) — the freshness decision is never silently assumed either way.
+
+    Args:
+        path: Store file path, supplied by the caller (path knowledge about a
+            competition's own stores stays in its app / brain).
+
+    Returns:
+        The file's mtime as an epoch float, or ``None`` when absent or
+        unreadable.
+    """
+    try:
+        return _as_path(path).stat().st_mtime
+    except OSError:
+        return None
+
+
+def served_stale(ledger_entry: dict, store_mtimes: Sequence[float | None]) -> bool:
+    """D-12 gate for a refresh report that is about to be served.
+
+    The recorded instant is ``last_success_at`` (World Cup schema) or, when a
+    schema only records the refresh instant (UCL / LaLiga), ``last_refresh`` —
+    both mean "the moment the ledger last vouched for this store". An entry
+    carrying neither, or an unparseable one, is stale (clause 1): it can never
+    render as fresh.
+
+    Args:
+        ledger_entry: The refresh report / ledger entry being served.
+        store_mtimes: mtimes of the factual stores the refresh writes, as
+            :func:`store_mtime` produced them. ``None`` entries (store absent)
+            and an empty sequence skip clause 3; which files to pass is the
+            calling app's knowledge, not this kernel's.
+
+    Returns:
+        ``True`` when the entry must be served as stale.
+    """
+    entry = ledger_entry if isinstance(ledger_entry, dict) else {}
+    recorded = entry.get("last_success_at") or entry.get("last_refresh")
+    probe = {"last_success_at": recorded}
+    newest = max((m for m in store_mtimes if isinstance(m, (int, float))), default=None)
+    return is_stale(probe, previous_last_success_at=None, store_mtime=newest)

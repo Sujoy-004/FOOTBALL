@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from dotenv import load_dotenv
 
-from football_core.freshness import read_ledger
+from football_core.freshness import UNREADABLE, read_ledger, served_stale, store_mtime
 from football_core.state import atomic_write_text
 from competitions.worldcup.src import constants, elo
 from competitions.worldcup.src.knockout import run_full_simulation, resolve_knockout_slot_teams
@@ -173,6 +173,33 @@ def _refresh_report_path() -> Path:
     return Path(__file__).parent / "last_refresh.json"
 
 
+#: Factual stores the World Cup refresh writes. ``snapshot.json`` is
+#: deliberately excluded — it is a simulated artifact (02-04) and must never
+#: age the freshness ledger.
+_WC_FACTUAL_STORES = ("played.json", "played_groups.json")
+
+
+def _freshness_store_paths() -> list[Path]:
+    """Which World Cup stores D-12 compares against (path knowledge: the app)."""
+    return [DATA_DIR / name for name in _WC_FACTUAL_STORES]
+
+
+def _freshness(entry: dict, store_paths: list[Path]) -> dict:
+    """Serve D-12: a "fresh" claim the store has outgrown becomes stale.
+
+    The rule itself is :func:`football_core.freshness.served_stale` (shared
+    and unit-tested); this is only the store-path wiring, and the returned
+    dict is a *served* copy — the ledger file is never rewritten here.
+    The unreadable marker is passed through untouched: it already IS the
+    failure signal and must keep its exact shape.
+    """
+    if not entry or entry.get("stale") or entry.get("ledger") == UNREADABLE:
+        return entry
+    if served_stale(entry, [store_mtime(p) for p in store_paths]):
+        return {**entry, "stale": True}
+    return entry
+
+
 def _current_refresh_report() -> dict:
     """World Cup entry of the shared ledger — loud on failure (D-11).
 
@@ -182,9 +209,9 @@ def _current_refresh_report() -> dict:
     "no refresh has ever run".
     """
     ledger = read_ledger(_refresh_report_path())
-    if ledger.get("ledger") == "unreadable":
+    if ledger.get("ledger") == UNREADABLE:
         return ledger
-    return ledger.get("worldcup", {})
+    return _freshness(ledger.get("worldcup", {}), _freshness_store_paths())
 
 
 @wc_app.get("/api/overview")

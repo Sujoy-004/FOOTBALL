@@ -30,6 +30,7 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import os
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -273,6 +274,143 @@ def test_is_stale_fresh_when_everything_agrees():
         )
         is False
     )
+
+
+# ── D-12 as served: an app never claims fresh what it cannot prove ──────────
+
+
+def _touch(path: Path, when: datetime) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text("{}", encoding="utf-8")
+    stamp = when.timestamp()
+    os.utime(path, (stamp, stamp))
+
+
+def _seed_wc_stores(stores: Path) -> None:
+    """Valid World Cup store set in a tmp dir (repo data; skips on a clone)."""
+    import arch_util as au
+
+    au.seed_wc_dir(stores)
+
+
+def _wc_ledger(tmp_path: Path, entry: dict) -> Path:
+    ledger = tmp_path / "last_refresh.json"
+    ledger.write_text(json.dumps({"worldcup": entry}), encoding="utf-8")
+    return ledger
+
+
+def test_served_stale_uses_last_refresh_and_skips_absent_stores():
+    """UCL/LaLiga record ``last_refresh`` — the same rule must apply there."""
+    old = NOW.timestamp() - 30
+    ahead = NOW.timestamp() + 30
+
+    # fresh record + store untouched since => fresh
+    assert freshness.served_stale({"last_refresh": _iso(NOW)}, [old]) is False
+    # store written after the recorded refresh => stale
+    assert freshness.served_stale({"last_refresh": _iso(NOW)}, [ahead]) is True
+    # no store to compare (absent file) => the timestamp alone decides
+    assert freshness.served_stale({"last_refresh": _iso(NOW)}, [None, None]) is False
+    # neither timestamp at all => never fresh (clause 1)
+    assert freshness.served_stale({}, [None]) is True
+    assert freshness.served_stale({"stale": False}, []) is True
+    # when both fields exist, ``last_success_at`` is the recorded instant
+    both = {
+        "last_success_at": _iso(NOW),
+        "last_refresh": _iso(NOW - timedelta(days=1)),
+    }
+    assert freshness.served_stale(both, [old]) is False
+    assert freshness.served_stale(both, [ahead]) is True
+
+
+def test_wc_served_report_goes_stale_when_the_store_moved_on(tmp_path, monkeypatch):
+    """Ledger claims fresh, store written afterwards => served as stale (D-12)."""
+    from web import wc_app
+
+    stores = tmp_path / "wc"
+    _seed_wc_stores(stores)
+    entry = {"success": True, "stale": False, "last_success_at": _iso(NOW)}
+    ledger = _wc_ledger(tmp_path, entry)
+    monkeypatch.setattr(wc_app, "_refresh_report_path", lambda: ledger)
+    monkeypatch.setattr(wc_app, "DATA_DIR", stores)
+
+    # control: both factual stores predate the recorded success => still fresh
+    _touch(stores / "played.json", NOW - timedelta(minutes=5))
+    _touch(stores / "played_groups.json", NOW - timedelta(minutes=5))
+    assert wc_app._current_refresh_report()["stale"] is False
+
+    # out-of-band write the ledger never saw => stale, success untouched
+    _touch(stores / "played.json", NOW + timedelta(minutes=5))
+    report = wc_app._current_refresh_report()
+    assert report["stale"] is True
+    assert report["success"] is True, "D-12 only upgrades the stale flag"
+
+
+def test_api_data_serves_stale_when_the_store_outgrew_the_ledger(
+    tmp_path, monkeypatch
+):
+    """/api/data flips refresh.stale for a store write the ledger never saw."""
+    from fastapi.testclient import TestClient
+
+    from web import wc_app
+
+    stores = tmp_path / "wc"
+    _seed_wc_stores(stores)
+    entry = {"success": True, "stale": False, "last_success_at": _iso(NOW)}
+    ledger = _wc_ledger(tmp_path, entry)
+    monkeypatch.setattr(wc_app, "_refresh_report_path", lambda: ledger)
+    monkeypatch.setattr(wc_app, "DATA_DIR", stores)
+    _touch(stores / "played.json", NOW + timedelta(minutes=5))
+    _touch(stores / "played_groups.json", NOW + timedelta(minutes=5))
+
+    # Build the registry BEFORE the app first starts: web.competitions installs
+    # the lazy-acquisition middleware at import, and Starlette freezes the
+    # middleware stack on first start, so the order matters for later tests.
+    import web.competitions as competitions
+
+    # …and once it is installed, disarm it: this test reads the served block,
+    # it must not fire a real refresh into the repo store (the middleware
+    # would call the pipeline with the unpatched repo paths).
+    monkeypatch.setattr(competitions, "try_lazy_refresh", lambda _cid: None)
+
+    with TestClient(wc_app.wc_app) as client:
+        payload = client.get("/api/data").json()
+
+    refresh = payload.get("refresh")
+    assert isinstance(refresh, dict), payload
+    assert refresh["stale"] is True
+    assert refresh["success"] is True
+
+
+def test_ucl_served_refresh_goes_stale_when_the_store_moved_on(tmp_path, monkeypatch):
+    """The UCL serving path applies the same D-12 gate (``last_refresh``)."""
+    from web import ucl_app
+
+    season = "2026/27"
+    data_dir = tmp_path / "ucl"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    results = data_dir / "results.json"
+    results.write_text(json.dumps({"matches": []}), encoding="utf-8")
+
+    entry = {"success": True, "stale": False, "last_refresh": _iso(NOW)}
+    ledger = tmp_path / "last_refresh.json"
+    ledger.write_text(json.dumps({"ucl_seasons": {season: entry}}), encoding="utf-8")
+
+    monkeypatch.setattr(ucl_app, "_refresh_report_path", lambda: ledger)
+    monkeypatch.setattr(ucl_app, "DATA_DIR", data_dir)
+    monkeypatch.setattr(ucl_app, "_refresh_report", {})
+    monkeypatch.setattr(ucl_app, "_refresh_reports", {})
+    monkeypatch.setattr(ucl_app, "_refresh_reports_seeded", False)
+
+    # control: store older than the recorded refresh => fresh
+    _touch(results, NOW - timedelta(minutes=5))
+    assert ucl_app._refresh_report_for(season)["stale"] is False
+
+    # out-of-band write after the recorded refresh => served stale
+    _touch(results, NOW + timedelta(minutes=5))
+    report = ucl_app._refresh_report_for(season)
+    assert report["stale"] is True
+    assert report["success"] is True
 
 
 # ── D-18: no hand-rolled read-modify-write survives ─────────────────────────

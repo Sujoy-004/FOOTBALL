@@ -3,7 +3,13 @@ from __future__ import annotations
 
 import logging
 
-from football_core.freshness import read_ledger, update_ledger
+from football_core.freshness import (
+    UNREADABLE,
+    read_ledger,
+    served_stale,
+    store_mtime,
+    update_ledger,
+)
 from football_core.state import atomic_write_text
 
 import json
@@ -227,13 +233,50 @@ def _refresh_report_for(season: str) -> dict:
     season) and is served as-is. Otherwise the active season receives its
     OWN recorded entry; a season with no recorded report gets a synthesized
     store-truthful entry instead of inheriting another season's.
+
+    Every branch except process truth goes through D-12 (:func:`_freshness`):
+    a ledger entry claiming fresh while the store has moved on is served stale.
     """
     if _refresh_report.get("skipped_reason"):
         return _refresh_report
     report = _season_refresh_reports().get(season)
     if report is not None:
-        return report
-    return _synthesize_season_report(season)
+        return _freshness(report, _freshness_store_paths(season))
+    return _freshness(_synthesize_season_report(season),
+                      _freshness_store_paths(season))
+
+
+def _freshness_store_paths(season: str) -> list[Path]:
+    """Which UCL stores D-12 compares against (path knowledge: the app).
+
+    Root files are the legacy layout, season files the current one; whichever
+    is absent simply contributes no mtime (a store that does not exist cannot
+    make a report stale).
+    """
+    from competitions.ucl.src.seasons import season_dir
+
+    sd = season_dir(DATA_DIR, season)
+    return [
+        DATA_DIR / "results.json",
+        DATA_DIR / "knockout_results.json",
+        sd / "results.json",
+        sd / "fixtures.json",
+    ]
+
+
+def _freshness(entry: dict, store_paths: list[Path]) -> dict:
+    """Serve D-12: a "fresh" claim the store has outgrown becomes stale.
+
+    :func:`football_core.freshness.served_stale` holds the rule (shared,
+    unit-tested); this is only the store-path wiring. The returned dict is a
+    *served* copy — the ledger file is not rewritten — and the unreadable
+    marker keeps its exact shape.
+    """
+    if not entry or entry.get("stale") or entry.get("ledger") == UNREADABLE:
+        return entry
+    if served_stale(entry, [store_mtime(p) for p in store_paths]):
+        return {**entry, "stale": True}
+    return entry
 
 
 def _store_refresh_report(ok: bool, error: str | None, provider_name: str | None,
@@ -636,9 +679,10 @@ def api_set_season(req: dict = None):
 
 @ucl_app.get("/api/boot")
 def api_boot():
+    season = _active_season_token()
     return JSONResponse({
         "boot": cache.get("boot", []),
-        "refresh": _refresh_report,
+        "refresh": _freshness(_refresh_report, _freshness_store_paths(season)),
     })
 
 
