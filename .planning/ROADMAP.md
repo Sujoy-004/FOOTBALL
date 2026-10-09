@@ -40,7 +40,7 @@ empty input can never again read as "nothing has happened yet" (Phase 2, Phase 5
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Layering Inversion & Deprecated-Path Removal** - The competition brains stop importing the web layer and the 485-LOC duplicate predictor path is deleted, with provably identical output
-- [ ] **Phase 2: Truthful Availability & Explicit Verified Ingestion** - A user refreshes on demand and sees exactly what landed, when, and why a store is empty
+- [x] **Phase 2: Truthful Availability & Explicit Verified Ingestion** - A user refreshes on demand and sees exactly what landed, when, and why a store is empty (completed 2026-10-09)
 - [ ] **Phase 3: Measured Skill — All Three Competitions** - A published, leak-free report says whether the ensemble beats naive baselines, market-only loss included
 - [ ] **Phase 4: Race-Free Derived State & Simulation Lifecycle** - Cached state is a frozen snapshot with a store stamp; simulations sample only unplayed matches and declare their seed
 - [ ] **Phase 5: Real↔Simulated Reconciliation** - The moment real results land, every covering simulated answer is retired automatically and visibly
@@ -380,7 +380,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Layering Inversion & Deprecated-Path Removal | 7/7 | Complete | 2026-10-06 |
-| 2. Truthful Availability & Explicit Verified Ingestion | 6/10 | In Progress | - |
+| 2. Truthful Availability & Explicit Verified Ingestion | 10/10 | Complete   | 2026-10-09 |
 | 3. Measured Skill — All Three Competitions | 0/TBD | Not started | - |
 | 4. Race-Free Derived State & Simulation Lifecycle | 0/TBD | Not started | - |
 | 5. Real↔Simulated Reconciliation | 0/TBD | Not started | - |
