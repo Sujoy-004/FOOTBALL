@@ -10,6 +10,7 @@ import {
   configureCompetitionRefresh,
   renderSimulationShell, bindSimulationShell,
   renderEloView, renderBlendView, loadModelViews,
+  renderAvailabilityBanner, renderAvailPanel, refreshButtonHtml,
 } from "./shared.js";
 
 const API = "/laliga/api";
@@ -158,8 +159,15 @@ function render() {
     const el = document.getElementById(id);
     if (!el) return;
     if (id === "tab-overview") el.innerHTML = _overviewHtml() || "";
-    else if (id === "tab-standings") el.innerHTML = _standingsHtml();
-    else if (id === "tab-fixtures") { el.innerHTML = _fixturesHtml(); bindMatchClicks(el); }
+    else if (id === "tab-standings") {
+      const blocked = _blockingAvailability(["results"]);
+      el.innerHTML = blocked ? renderAvailPanel(blocked) : _standingsHtml();
+    }
+    else if (id === "tab-fixtures") {
+      const blocked = _blockingAvailability(["fixtures"]);
+      el.innerHTML = blocked ? renderAvailPanel(blocked) : _fixturesHtml();
+      bindMatchClicks(el);
+    }
     else if (id === "tab-simulation") el.innerHTML = _simulationHtml();
   });
   // The pure-Elo validation card lives inside Overview; bind the simulation
@@ -179,12 +187,116 @@ function render() {
     });
   }
   bindSimulation();
+  _applyStatus();
+}
+
+function _applyStatus() {
   updateStatusBar(
     _esc(appState.season || "") + " &middot; " + appState.n_played + "/"
       + (appState.n_played + appState.n_unplayed) + " played &middot; "
-      + _esc(sigInfo()),
-    (_staleProvenanceChip())
+      + _esc(sigInfo()) + refreshButtonHtml("laliga", _refreshInFlight),
+    renderAvailabilityBanner(_currentBanner().state, _currentBanner().ctx)
   );
+}
+
+// ── Refresh results CTA (C1) + availability banner (C2) — Phase 02-08 ──
+let _bannerOverride = null;
+let _refreshInFlight = false;
+
+function _bannerStateFromRefresh(refresh) {
+  const r = refresh || {};
+  if (r.skipped_reason) return { state: "snapshot", ctx: {} };
+  if (r.deferred === true || r.reason === "provider_empty") return { state: "deferred", ctx: {} };
+  if (r.error) return { state: "failed", ctx: {} };
+  if (r.stale) return { state: "stale", ctx: {} };
+  return { state: "", ctx: {} };
+}
+
+function _currentBanner() {
+  const r = appState.refresh || {};
+  const derived = _bannerStateFromRefresh(r);
+  if (derived.state) { _bannerOverride = null; return derived; }
+  return _bannerOverride || { state: "", ctx: {} };
+}
+
+function _refreshTimestamp(refresh) {
+  const r = refresh || {};
+  return r.last_success_at || r.last_refresh || "";
+}
+
+// I6: first unhealthy store in the given key list replaces the table.
+function _blockingAvailability(keys) {
+  const d = appState.data || {};
+  const avail = d.availability || {};
+  const reasons = d.availability_reason || {};
+  const refresh = appState.refresh || {};
+  for (const key of keys) {
+    const s = avail[key];
+    if (s === "empty" || s === "missing" || s === "unavailable") {
+      return {
+        state: s,
+        reason: reasons[key] || null,
+        provider: refresh.provider || null,
+        lastRefresh: _refreshTimestamp(refresh) || null,
+        comp: "LaLiga",
+      };
+    }
+  }
+  return null;
+}
+
+// Delegate a single C1 click to one POST (I1/I2/I4). No page reload (I3).
+document.addEventListener("click", async (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest('.refresh-btn[data-comp="laliga"]') : null;
+  if (!btn || btn.disabled) return;
+  _refreshInFlight = true;
+  _bannerOverride = { state: "refreshing", ctx: { comp: "LaLiga" } };
+  _applyStatus();
+  try {
+    const resp = await fetch("/laliga/api/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const report = await resp.json().catch(() => null);
+    if (!report) throw new Error("Non-JSON refresh response");
+    if (report.success === true) {
+      _bannerOverride = { state: "success", ctx: { timestamp: report.last_success_at || "", nIngested: report.finished ? report.finished.ingested : 0 } };
+    } else if (report.deferred === true || report.reason === "provider_empty" || (report.finished && report.finished.received === 0)) {
+      _bannerOverride = { state: "zero_provider", ctx: {} };
+      const acqHost = document.getElementById("acqHost");
+      if (acqHost) renderAcquisitionPanel(acqHost, _acquisitionFromReport(report));
+    } else {
+      _bannerOverride = { state: "failed", ctx: {} };
+      const acqHost = document.getElementById("acqHost");
+      if (acqHost) renderAcquisitionPanel(acqHost, _acquisitionFromReport(report));
+    }
+    await refreshLive();
+    const acqHost = document.getElementById("acqHost");
+    if (acqHost) renderAcquisitionPanel(acqHost, _acquisition());
+    _applyStatus();
+  } catch (err) {
+    _bannerOverride = { state: "failed", ctx: {} };
+    _applyStatus();
+  } finally {
+    _refreshInFlight = false;
+    _applyStatus();
+  }
+});
+
+// IngestReport-shaped POST body → acquisition-panel object (C4).
+function _acquisitionFromReport(report) {
+  const r = report || {};
+  return {
+    competition: "LaLiga EA Sports " + (appState.season || ""),
+    source: r.skipped_reason ? "snapshot (offline)" : (r.provider || (r.stale ? "stale/error" : "live")),
+    mode: r.skipped_reason ? "snapshot" : "live",
+    stale: !!(r.error && !r.skipped_reason) || !!r.stale,
+    error: r.error && !r.skipped_reason ? r.error : null,
+    notice: r.deferred ? "Provider has no published match data yet — deferred." : null,
+    updatedAt: r.last_success_at || _refreshTimestamp(appState.refresh),
+    stages: r.stages || [],
+    finished: r.finished || null,
+  };
 }
 
 function _staleProvenanceChip() {
@@ -221,6 +333,7 @@ function _acquisition() {
       { key: "results", label: "Played results", state: "ok", count: prog.n_played != null ? prog.n_played : "--" },
       { key: "quality", label: "Prediction signals", state: Object.keys(appState.signals).length ? "ok" : "pending", count: Object.keys(appState.signals).length ? Object.keys(appState.signals).length : 0 },
     ],
+    finished: reports.finished || null,
   };
 }
 

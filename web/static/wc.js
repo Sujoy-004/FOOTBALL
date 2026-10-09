@@ -4,6 +4,8 @@ import {
   updateStatusBar, competitions, renderLoading, currentCompetition,
   configureCompetitionRefresh, renderSimulationShell, bindSimulationShell,
   renderEloView, renderBlendView, loadModelViews,
+  renderAcquisitionPanel, renderAvailabilityBanner, renderAvailPanel,
+  refreshButtonHtml,
 } from "./shared.js";
 
 const API = "/worldcup/api";
@@ -107,17 +109,118 @@ async function refreshLive() {
   renderBracket();
 }
 
+// ── Refresh results CTA (C1) + availability banner (C2) — Phase 02-08 ──
+let _bannerOverride = null;   // {state, ctx} set by the refresh click handler
+let _refreshInFlight = false;
+
+// Derivation order: an explicit snapshot skip or provider defer wins first,
+// then a truthful error (D-11 red banner), then staleness, else no banner.
+function _bannerStateFromRefresh(refresh) {
+  const r = refresh || {};
+  if (r.skipped_reason) return { state: "snapshot", ctx: {} };
+  if (r.deferred === true || r.reason === "provider_empty") return { state: "deferred", ctx: {} };
+  if (r.error) return { state: "failed", ctx: {} };
+  if (r.stale) return { state: "stale", ctx: {} };
+  return { state: "", ctx: {} };
+}
+
+// The derived state wins whenever it is non-empty (a truthful abnormality
+// always outranks the last click's LIVE banner). The override is kept while
+// the derived state is empty so the LIVE line persists after a good refresh.
+function _currentBanner() {
+  const r = (appState.data && appState.data.refresh) || {};
+  const derived = _bannerStateFromRefresh(r);
+  if (derived.state) { _bannerOverride = null; return derived; }
+  return _bannerOverride || { state: "", ctx: {} };
+}
+
+function _refreshTimestamp(refresh) {
+  const r = refresh || {};
+  return r.last_success_at || r.last_refresh || "";
+}
+
+// First unhealthy results store blocks the table (I6). Gates on the
+// results-bearing stores only.
+function _blockingAvailability() {
+  const d = appState.data || {};
+  const avail = d.availability || {};
+  const reasons = d.availability_reason || {};
+  const refresh = d.refresh || {};
+  for (const key of ["played", "played_groups"]) {
+    const s = avail[key];
+    if (s === "empty" || s === "missing" || s === "unavailable") {
+      return {
+        state: s,
+        reason: reasons[key] || null,
+        provider: refresh.provider || null,
+        lastRefresh: _refreshTimestamp(refresh) || null,
+        comp: "World Cup",
+      };
+    }
+  }
+  return null;
+}
+
+// IngestReport-shaped POST body → acquisition-panel object (C4).
+function _buildAcquisition(d) {
+  const r = (d && d.refresh) || {};
+  return {
+    competition: "World Cup 2026",
+    source: r.skipped_reason ? "Snapshot" : (r.provider || (r.stale ? "FALLBACK" : "LIVE")),
+    mode: r.skipped_reason ? "snapshot" : "live",
+    stale: !!(r.error && !r.skipped_reason) || !!r.stale,
+    error: r.error && !r.skipped_reason ? r.error : null,
+    notice: r.deferred ? "Provider has no published match data yet — deferred." : null,
+    updatedAt: _refreshTimestamp(r),
+    stages: [],
+    finished: r.finished || null,
+  };
+}
+
 function updateStatus() {
   const d = appState.data;
   if (!d) return;
   const signals = d.signals_meta?.signals || [];
   const nActive = signals.filter(s => s.available).length;
-  const stale = d.refresh && d.refresh.stale;
   updateStatusBar(
-    d.n_teams + " teams  |  " + d.n_played + " matches played  |  " + nActive + " active signals",
-    stale ? '<span style="color:#e6a817">⚠ STALE — live refresh failed; showing snapshot data</span>' : ""
+    d.n_teams + " teams  |  " + (d.n_played != null ? d.n_played + " matches played" : "no match data")
+      + "  |  " + nActive + " active signals" + refreshButtonHtml("worldcup", _refreshInFlight),
+    renderAvailabilityBanner(_currentBanner().state, _currentBanner().ctx)
   );
 }
+
+// Delegate a single C1 click to one POST (I1/I2/I4). No page reload (I3).
+document.addEventListener("click", async (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest('.refresh-btn[data-comp="worldcup"]') : null;
+  if (!btn || btn.disabled) return;
+  _refreshInFlight = true;
+  _bannerOverride = { state: "refreshing", ctx: { comp: "World Cup" } };
+  updateStatus();
+  try {
+    const resp = await fetch("/worldcup/api/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const report = await resp.json().catch(() => null);
+    if (!report) throw new Error("Non-JSON refresh response");
+    if (report.success === true) {
+      _bannerOverride = { state: "success", ctx: { timestamp: report.last_success_at || "", nIngested: report.finished ? report.finished.ingested : 0 } };
+    } else if (report.deferred === true || report.reason === "provider_empty" || (report.finished && report.finished.received === 0)) {
+      _bannerOverride = { state: "zero_provider", ctx: {} };
+    } else {
+      _bannerOverride = { state: "failed", ctx: {} };
+    }
+    await refreshLive();
+    renderAcquisitionPanel(document.getElementById("wcAcqPanel"), _buildAcquisition(appState.data));
+    updateStatus();
+  } catch (err) {
+    _bannerOverride = { state: "failed", ctx: {} };
+    updateStatus();
+  } finally {
+    _refreshInFlight = false;
+    updateStatus();
+  }
+});
 
 
 // ── Overview (real data only) ──
@@ -137,6 +240,8 @@ async function renderOverview() {
   html += '<div class="stat-card"><div class="val">' + nActive + ' / ' + signals.length + '</div><div class="lbl">Signals Available</div></div>';
   html += '</div>';
 
+  html += '<div class="chart-section"><div class="title">Acquisition &amp; Status</div><div id="wcAcqPanel"></div></div>';
+
   if (signals.length > 0) {
     html += '<div class="chart-section"><div class="title">Signal Cache Status</div>';
     html += '<div class="overview-signals" id="ovSignals">';
@@ -145,6 +250,7 @@ async function renderOverview() {
   }
 
   tab.innerHTML = html;
+  renderAcquisitionPanel(document.getElementById("wcAcqPanel"), _buildAcquisition(appState.data));
   // Elo + blend payloads are a second, independent fetch: paint a host
   // immediately and fill it when they land (or show their honest empty state).
   const modelHost = document.createElement("div");
@@ -687,6 +793,8 @@ window.__sendWhatIf = async function (mid, ta, tb) {
 function renderStandings() {
   const tab = document.getElementById("tab-standings");
   if (!tab) return;
+  const blocked = _blockingAvailability();
+  if (blocked) { tab.innerHTML = renderAvailPanel(blocked); return; }
   const s = appState.standings;
   if (!s) { tab.innerHTML = '<div class="dim" style="padding:20px">Standings data not available yet.</div>'; return; }
   // Handle both old format {standings: {A: [...]}} and new flat list [{}]

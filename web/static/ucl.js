@@ -7,6 +7,7 @@ import {
   configureCompetitionRefresh,
   renderSimulationShell, bindSimulationShell,
   renderEloView, renderBlendView, loadModelViews,
+  renderAvailabilityBanner, renderAvailPanel, refreshButtonHtml,
 } from "./shared.js";
 
 const API = "/ucl/api";
@@ -235,23 +236,94 @@ async function refreshLive() {
   updateStatus();
 }
 
+// ── Refresh results CTA (C1) + availability banner (C2) — Phase 02-08 ──
+let _bannerOverride = null;
+let _refreshInFlight = false;
+
+function _bannerStateFromRefresh(refresh) {
+  const r = refresh || {};
+  if (r.skipped_reason) return { state: "snapshot", ctx: {} };
+  if (r.deferred === true || r.reason === "provider_empty") return { state: "deferred", ctx: {} };
+  if (r.error) return { state: "failed", ctx: {} };
+  if (r.stale) return { state: "stale", ctx: {} };
+  return { state: "", ctx: {} };
+}
+
+function _currentBanner() {
+  const r = (appState.data && appState.data.refresh) || {};
+  const derived = _bannerStateFromRefresh(r);
+  if (derived.state) { _bannerOverride = null; return derived; }
+  return _bannerOverride || { state: "", ctx: {} };
+}
+
+function _refreshTimestamp(refresh) {
+  const r = refresh || {};
+  return r.last_success_at || r.last_refresh || "";
+}
+
+// I6: first unhealthy results store replaces the standings table.
+function _blockingAvailability(d) {
+  const data = d || appState.data || {};
+  const avail = data.availability || {};
+  const reasons = data.availability_reason || {};
+  const refresh = data.refresh || {};
+  for (const key of ["league_results", "knockout_results"]) {
+    const s = avail[key];
+    if (s === "empty" || s === "missing" || s === "unavailable") {
+      return {
+        state: s,
+        reason: reasons[key] || null,
+        provider: refresh.provider || null,
+        lastRefresh: _refreshTimestamp(refresh) || null,
+        comp: "UCL",
+      };
+    }
+  }
+  return null;
+}
+
 function updateStatus() {
   const d = appState.data;
   if (!d) return;
-  const refresh = d.refresh || {};
-  let notice = "";
-  if (refresh.skipped_reason) {
-    notice = '<span style="color:#e6a817">SNAPSHOT - showing stored data (live refresh skipped)</span>';
-  } else if (refresh.deferred === true || refresh.reason === "provider_empty") {
-    notice = '<span style="color:#168777">Provider has no published match data yet - showing draw-derived fixtures</span>';
-  } else if (refresh.stale) {
-    notice = '<span style="color:#e6a817">STALE - live refresh failed; showing last known data</span>';
-  }
   updateStatusBar(
-    d.n_teams + " teams  |  " + (d.n_played || 0) + " matches played",
-    notice
+    d.n_teams + " teams  |  " + (d.n_played != null ? d.n_played + " matches played" : "no match data")
+      + refreshButtonHtml("ucl", _refreshInFlight),
+    renderAvailabilityBanner(_currentBanner().state, _currentBanner().ctx)
   );
 }
+
+// Delegate a single C1 click to one POST (I1/I2/I4). No page reload (I3).
+document.addEventListener("click", async (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest('.refresh-btn[data-comp="ucl"]') : null;
+  if (!btn || btn.disabled) return;
+  _refreshInFlight = true;
+  _bannerOverride = { state: "refreshing", ctx: { comp: "UCL" } };
+  updateStatus();
+  try {
+    const resp = await fetch("/ucl/api/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const report = await resp.json().catch(() => null);
+    if (!report) throw new Error("Non-JSON refresh response");
+    if (report.success === true) {
+      _bannerOverride = { state: "success", ctx: { timestamp: report.last_success_at || "", nIngested: report.finished ? report.finished.ingested : 0 } };
+    } else if (report.deferred === true || report.reason === "provider_empty" || (report.finished && report.finished.received === 0)) {
+      _bannerOverride = { state: "zero_provider", ctx: {} };
+    } else {
+      _bannerOverride = { state: "failed", ctx: {} };
+    }
+    await refreshLive();
+    renderAcquisitionPanel(document.getElementById("uclAcqPanel"), _buildAcquisition(appState.data));
+    updateStatus();
+  } catch (err) {
+    _bannerOverride = { state: "failed", ctx: {} };
+    updateStatus();
+  } finally {
+    _refreshInFlight = false;
+    updateStatus();
+  }
+});
 
 // ── Overview ─────────────────────────────────────────────────────────
 
@@ -531,6 +603,7 @@ function _buildAcquisition(d) {
   const succeeded = refresh.success === true;
   const snapshotMode = !!refresh.skipped_reason;
   const deferred = refresh.deferred === true || refresh.reason === "provider_empty";
+  const finished = refresh.finished || null;
 
   let mode, source, error = null, stale = false, notice = null;
   if (snapshotMode) {
@@ -596,6 +669,7 @@ function _buildAcquisition(d) {
     stale,
     notice,
     stages,
+    finished,
   };
 }
 
@@ -617,6 +691,8 @@ function _applySimulationPayload(sim, fallbackRuns) {
 async function renderStandings() {
   const tab = document.getElementById("tab-standings");
   if (!tab) return;
+  const blocked = _blockingAvailability(appState.data);
+  if (blocked) { tab.innerHTML = renderAvailPanel(blocked); return; }
   const st = appState.standings || [];
   if (!st.length) { tab.innerHTML = '<div style="color:#15565B;font-size:12px">No standings data.</div>'; return; }
   let html = '<div class="league-table-wrap"><table class="league-table">'

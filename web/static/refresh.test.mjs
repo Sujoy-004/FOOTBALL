@@ -281,7 +281,95 @@ test("a throwing reload hook neither wedges nor crashes the loop", async () => {
   assert.equal(calls, 3, "interval keeps firing after a failed reload");
 });
 
+// ── 7. Phase 02-08 shared render helpers (C1/C2/C3/C4) ──────────────
+// shared.js registers top-level DOM listeners at import time, so the
+// document/window stubs must land BEFORE the dynamic import.
+globalThis.document = {
+  addEventListener() {}, querySelector() { return null; },
+  querySelectorAll() { return []; }, getElementById() { return null; },
+  createElement() {
+    return { style: {}, classList: { add() {}, remove() {} }, setAttribute() {}, appendChild() {} };
+  },
+  body: { contains() { return false; }, className: "" },
+};
+globalThis.window = {
+  addEventListener() {}, location: { hash: "" },
+  matchMedia() { return { matches: false }; },
+};
+const shared = await import("./shared.js");
+
 test("re-registering the active competition re-arms its timer", async () => {
+
+test("refresh button copy: idle vs in-flight (I2, D-01)", () => {
+  const idle = shared.refreshButtonHtml("worldcup", false);
+  assert.ok(idle.includes("Refresh results"), "idle label");
+  assert.ok(!idle.includes("disabled"), "idle not disabled");
+  const inFlight = shared.refreshButtonHtml("worldcup", true);
+  assert.ok(inFlight.includes("Refreshing…"), "in-flight label");
+  assert.ok(inFlight.includes("disabled"), "in-flight disabled");
+  assert.ok(inFlight.includes('aria-busy="true"'), "in-flight aria-busy");
+});
+
+test("missing panel carries D-04 copy verbatim", () => {
+  const html = shared.renderAvailPanel({ state: "missing", comp: "World Cup" });
+  assert.ok(html.includes("No data yet — tap Refresh to fetch results"), "D-04 locked copy");
+  assert.ok(html.includes("No data yet"), "heading");
+});
+
+test("empty and unavailable panels substitute provider/timestamp/reason", () => {
+  const empty = shared.renderAvailPanel({ state: "empty", comp: "LaLiga", provider: "fdo", lastRefresh: "2026-10-08T10:00:00Z" });
+  assert.ok(empty.includes("The LaLiga store is present but contains no finished matches."), "EMPTY body");
+  assert.ok(empty.includes("Provider: fdo"), "provider substituted");
+  assert.ok(empty.includes("Last refresh: 2026-10-08T10:00:00Z"), "timestamp substituted");
+  const unav = shared.renderAvailPanel({ state: "unavailable", reason: "corrupt JSON", provider: "fdo", lastRefresh: "2026-10-08T10:00:00Z" });
+  assert.ok(unav.includes("Store unavailable: corrupt JSON."), "UNAVAILABLE body");
+  assert.ok(unav.includes("Try Refresh results."), "UNAVAILABLE tail");
+});
+
+test("panel and banner escape server-side strings (T-08-X)", () => {
+  const xss = '<img src=x onerror=alert(1)>';
+  const panel = shared.renderAvailPanel({ state: "unavailable", reason: xss, provider: xss, lastRefresh: xss });
+  assert.ok(!panel.includes("<img src=x"), "no raw img tag in panel");
+  assert.ok(panel.includes("&lt;img src=x"), "escaped in panel");
+  const banner = shared.renderAvailabilityBanner("refreshing", { comp: xss });
+  assert.ok(!banner.includes("<img src=x"), "no raw img tag in banner");
+  assert.ok(banner.includes("&lt;img src=x"), "escaped in banner");
+});
+
+test("banner and panel carry role=status and aria-live=polite", () => {
+  const banner = shared.renderAvailabilityBanner("failed", {});
+  assert.ok(banner.includes('role="status"'), "banner role");
+  assert.ok(banner.includes('aria-live="polite"'), "banner aria-live");
+  const panel = shared.renderAvailPanel({ state: "missing", comp: "UCL" });
+  assert.ok(panel.includes('role="status"'), "panel role");
+  assert.ok(panel.includes('aria-live="polite"'), "panel aria-live");
+});
+
+test("caption renders only when the report carries counters", () => {
+  const el = { innerHTML: "" };
+  shared.renderAcquisitionPanel(el, {
+    competition: "X", source: "live", mode: "live", stages: [],
+    finished: { ingested: 3, skipped_unmatchable: 1, skipped_no_target: 0, skipped_missing_score: 0, not_finished: 2 },
+  });
+  assert.ok(el.innerHTML.includes("Ingested 3 · Skipped 1 · Not finished 2"), "caption with counters");
+  const el2 = { innerHTML: "" };
+  shared.renderAcquisitionPanel(el2, { competition: "X", source: "live", mode: "live", stages: [] });
+  assert.ok(!el2.innerHTML.includes(".acq-caption"), "no caption without counters");
+});
+
+test("legacy SNAPSHOT/STALE/DEFERRED wording is byte-identical", () => {
+  assert.equal(shared.renderAvailabilityBanner("snapshot", {}).includes("SNAPSHOT - showing stored data (live refresh skipped)"), true);
+  assert.equal(shared.renderAvailabilityBanner("stale", {}).includes("STALE - live refresh failed; showing last known data"), true);
+  assert.equal(shared.renderAvailabilityBanner("deferred", {}).includes("Provider has no published match data yet - showing draw-derived fixtures"), true);
+});
+
+test("I6 predicate: panel replaces table only for unhealthy states", () => {
+  assert.equal(shared.renderAvailPanel({ state: "available" }), "");
+  assert.equal(shared.renderAvailPanel({ state: "unknown" }), "");
+  assert.ok(shared.renderAvailPanel({ state: "empty", comp: "UCL" }) !== "");
+  assert.ok(shared.renderAvailPanel({ state: "missing", comp: "UCL" }) !== "");
+  assert.ok(shared.renderAvailPanel({ state: "unavailable", comp: "UCL" }) !== "");
+});
   const h = makeHarness();
   h.mgr.activateRefresh("wc");
   h.clock.step(50);
