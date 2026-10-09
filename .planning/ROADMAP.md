@@ -145,6 +145,7 @@ predictor path is gone — with every canonical computed number provably unchang
 **Goal**: A user can trigger a refresh, see exactly what landed and when, and never sees
 "empty" where the truth is "missing" or "failed".
 **Depends on**: Phase 1 (ledger durability depends on the collapsed atomic writer)
+**Scope addendum (D-08):** In addition to the requirements above, Phase 2 includes the four World Cup signal-cache producers (odds, rolling form, squad value, rest days) rebuilt during the explicit refresh — see plan 02-09.
 **Requirements**: TRUTH-01, TRUTH-02, TRUTH-03, INGEST-01, INGEST-02, INGEST-03, INGEST-04, HARD-02, HARD-03
 **Success Criteria** (what must be TRUE):
   1. With `worldcup/data/played.json` deleted, the World Cup view states that the store is
