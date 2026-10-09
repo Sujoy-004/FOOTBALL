@@ -296,17 +296,31 @@ class TestUiCarrierCopy:
         assert src.index("refresh.deferred") < src.index("live refresh failed")
 
     def test_ucl_js_keeps_real_stale_message(self):
-        src = (WEB_STATIC / "ucl.js").read_text(encoding="utf-8")
-        assert "STALE - live refresh failed; showing last known data" in src
+        """02-08 relocated the stale copy into the shared carrier.
+
+        The exact string must still exist once, and UCL must *delegate* to it
+        via the shared renderer rather than hardcoding a second copy.
+        """
+        shared = (WEB_STATIC / "shared.js").read_text(encoding="utf-8")
+        assert "STALE - live refresh failed; showing last known data" in shared
+        ucl = (WEB_STATIC / "ucl.js").read_text(encoding="utf-8")
+        assert "./shared.js" in ucl
+        assert "renderAvailabilityBanner" in ucl
+        assert "STALE - live refresh failed; showing last known data" not in ucl
 
     def test_shared_panel_renders_notice_line(self):
         src = (WEB_STATIC / "shared.js").read_text(encoding="utf-8")
         assert "acq-notice-line" in src
         assert "acq.notice" in src
 
-    def test_wc_js_unaffected(self):
-        """The WC stale message is untouched by the UCL-only fix."""
+    def test_wc_js_delegates_stale_copy_to_shared(self):
+        """02-08 also routes the WC banner/stale copy through the shared carrier.
+
+        WC must import the shared renderer and must not carry a private copy of
+        the stale string or the shared notice-line markup (single source of copy).
+        """
         src = (WEB_STATIC / "wc.js").read_text(encoding="utf-8")
-        assert "live refresh failed" in src
-        assert "provider_empty" not in src
+        assert "./shared.js" in src
+        assert "renderAvailabilityBanner" in src
+        assert "STALE - live refresh failed; showing last known data" not in src
         assert "acq-notice-line" not in src
