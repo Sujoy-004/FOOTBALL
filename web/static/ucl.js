@@ -261,13 +261,16 @@ function _refreshTimestamp(refresh) {
   return r.last_success_at || r.last_refresh || "";
 }
 
-// I6: first unhealthy results store replaces the standings table.
-function _blockingAvailability(d) {
-  const data = d || appState.data || {};
+// I6: first unhealthy store in the given key list replaces the standings table.
+// Store scoping is per-view: the league table depends only on league_results.
+// knockout_results is legitimately absent during the league phase (D-12 truth),
+// so it must never block the standings view.
+function _blockingAvailability(keys) {
+  const data = appState.data || {};
   const avail = data.availability || {};
   const reasons = data.availability_reason || {};
   const refresh = data.refresh || {};
-  for (const key of ["league_results", "knockout_results"]) {
+  for (const key of keys) {
     const s = avail[key];
     if (s === "empty" || s === "missing" || s === "unavailable") {
       return {
@@ -691,7 +694,7 @@ function _applySimulationPayload(sim, fallbackRuns) {
 async function renderStandings() {
   const tab = document.getElementById("tab-standings");
   if (!tab) return;
-  const blocked = _blockingAvailability(appState.data);
+  const blocked = _blockingAvailability(["league_results"]);
   if (blocked) { tab.innerHTML = renderAvailPanel(blocked); return; }
   const st = appState.standings || [];
   if (!st.length) { tab.innerHTML = '<div style="color:#15565B;font-size:12px">No standings data.</div>'; return; }
