@@ -162,7 +162,9 @@ def _assert_report_shape(body: dict) -> None:
     for row in body["stages"]:
         assert set(row) == STAGE_ROW_KEYS, f"stage row shape drifted: {row!r}"
         assert row["state"] in STAGE_STATES, f"bad stage state: {row!r}"
-        assert isinstance(row["count"], int)
+        # ``count`` is None when work was skipped (fresh cache / snapshot /
+        # no provider) and an int when work actually ran (plan 02-09).
+        assert row["count"] is None or isinstance(row["count"], int), row
     # `status` is derived from the report, so it can never contradict it.
     if body["success"]:
         assert body["status"] == "ok" and body["refreshed"] is True
@@ -208,6 +210,21 @@ def test_snapshot_mode_answers_full_report_with_zero_network(
         body.get("skipped_reason") or body.get("reason") or ""
     ), f"offline session must disclose the snapshot reason: {body!r}"
     assert CountingProvider.calls == 0, "snapshot mode must never call a provider"
+
+    # The World Cup snapshot report also discloses the four signal-cache rows
+    # as not attempted (plan 02-09): a skipped cache must never read as fresh.
+    if app_id == "worldcup":
+        keys = {row["key"] for row in body["stages"]}
+        assert {
+            "signals.odds",
+            "signals.rolling_form",
+            "signals.squad_value",
+            "signals.rest_days",
+        } <= keys, body["stages"]
+        assert all(
+            row["state"] == "unavailable" and row["count"] is None
+            for row in body["stages"]
+        ), body["stages"]
 
     # read purity in the same session (criterion 2's page-load clause)
     before = CountingProvider.calls

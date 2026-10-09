@@ -256,6 +256,108 @@ def test_produce_signal_caches_snapshot_returns_four_not_attempted_rows(tmp_path
 # ── test 6: no import-time credential/network reads ──────────────────────
 
 
+def _seed_and_run_wc(tmp_path, monkeypatch, *, with_team_values=True):
+    """One offline live ``fetch_live_data`` pass over an R16 payload."""
+    import arch_util as au
+    from test_knockout_ingest_chain import bracket_events, seed_empty_wc_dir
+
+    wc_dir = seed_empty_wc_dir(tmp_path / "wc")
+    if with_team_values:
+        shutil.copy2(WC_DATA / "team_values.json", wc_dir / "team_values.json")
+    events = bracket_events(wc_dir, ("R16",), seed_r32_winners=True)
+
+    stub = au.StubProvider(events, competition="WC")
+    _, get_data_provider = au.recording_provider(stub)
+    au.patch_wc_offline(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        "football_core.runtime_support.get_data_provider", get_data_provider
+    )
+    monkeypatch.delenv("ODDS_PROVIDER", raising=False)
+    monkeypatch.delenv("THE_ODDS_API_KEY", raising=False)
+    monkeypatch.delenv("BSD_API_KEY", raising=False)
+
+    from competitions.worldcup.src.pipeline import fetch_live_data
+
+    return wc_dir, fetch_live_data("", "", wc_dir)
+
+
+def test_fetch_live_data_appends_signal_rows_on_live_success(tmp_path, monkeypatch):
+    """One refresh = one report with a results row PLUS the four signal rows."""
+    wc_dir, report = _seed_and_run_wc(tmp_path, monkeypatch)
+
+    assert report["success"] is True, report
+    keys = [row["key"] for row in report["stages"]]
+    assert keys[0] == "results", keys
+    assert keys[1:] == [
+        "signals.odds",
+        "signals.rolling_form",
+        "signals.squad_value",
+        "signals.rest_days",
+    ], keys
+
+    by_key = {row["key"]: row for row in report["stages"]}
+    assert by_key["signals.odds"]["state"] == "unavailable"
+    assert by_key["signals.odds"]["count"] is None
+    for key in ("signals.rolling_form", "signals.squad_value", "signals.rest_days"):
+        assert by_key[key]["state"] == "ok", by_key[key]
+        assert isinstance(by_key[key]["count"], int)
+        assert by_key[key]["count"] > 0
+
+
+def test_single_live_fetch_writes_all_local_caches(tmp_path, monkeypatch):
+    """A single acquisition pass writes the three local caches and records them."""
+    wc_dir, report = _seed_and_run_wc(tmp_path, monkeypatch)
+    assert report["success"] is True, report
+
+    for name in (
+        "rolling_form_cache.json",
+        "squad_value_cache.json",
+        "rest_days_cache.json",
+    ):
+        assert (wc_dir / name).exists(), f"{name} not written"
+    # No odds provider is configured in this environment: no odds overwrite.
+    assert not (wc_dir / "odds_cache.json").exists()
+
+    written = set(report["written_files"])
+    for name in (
+        "rolling_form_cache.json",
+        "squad_value_cache.json",
+        "rest_days_cache.json",
+    ):
+        assert str(wc_dir / name) in written, (name, report["written_files"])
+    assert not any("odds_cache.json" in path for path in written)
+
+
+def test_fetch_live_data_snapshot_appends_not_attempted_rows(tmp_path, monkeypatch):
+    """Snapshot refresh publishes four unavailable rows and writes nothing."""
+    from test_knockout_ingest_chain import seed_empty_wc_dir
+
+    wc_dir = seed_empty_wc_dir(tmp_path / "wc")
+    import competitions.worldcup.src.pipeline as wc_pipeline
+
+    monkeypatch.setattr(
+        "football_core.runtime_support.is_snapshot_mode", lambda: True
+    )
+    monkeypatch.setattr(
+        wc_pipeline, "_last_refresh_report_path", lambda: tmp_path / "freshness.json"
+    )
+
+    report = wc_pipeline.fetch_live_data("", "", wc_dir)
+
+    assert report["attempted"] is False
+    assert [row["key"] for row in report["stages"]] == [
+        "signals.odds",
+        "signals.rolling_form",
+        "signals.squad_value",
+        "signals.rest_days",
+    ]
+    for row in report["stages"]:
+        assert row["state"] == "unavailable", row
+        assert row["count"] is None, row
+        assert "snapshot" in row["detail"].lower(), row
+    assert list(wc_dir.glob("*_cache.json")) == [], "snapshot must not write caches"
+
+
 def test_signal_caches_has_no_import_time_credential_or_network_reads():
     """Credentials and transport are touched ONLY inside producer calls.
 
