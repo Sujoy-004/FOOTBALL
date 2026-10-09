@@ -165,7 +165,7 @@ def test_producer_skips_within_ttl_and_recomputes_when_expired(tmp_path):
     ).isoformat()
     save_signal_cache(first, filename, dst)
 
-    row3 = produce_rolling_form_cache(dst, now=now)
+    row3 = produce_rolling_form_cache(dst, now=now + timedelta(hours=2))
     assert isinstance(row3["count"], int) and row3["count"] > 0
     assert load_signal_cache(filename, dst)["fetched_at"] != first["fetched_at"]
 
