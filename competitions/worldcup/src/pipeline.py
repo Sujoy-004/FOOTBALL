@@ -121,6 +121,7 @@ def _build_report(
     finished: dict,
     skipped_reason=None,
     stages=None,
+    written_files=None,
 ) -> dict:
     """Single refresh-report shape for EVERY fetch_live_data exit path (02-03).
 
@@ -144,7 +145,7 @@ def _build_report(
         "last_success_at": last_success_at,
         "finished": finished,
         "stages": [dict(stage) for stage in (stages or [])],
-        "written_files": [],
+        "written_files": list(written_files) if written_files is not None else [],
         "deferred": reason in ("deferred", "deferred/provider-empty"),
     }
     if skipped_reason is not None:
@@ -285,6 +286,10 @@ def fetch_live_data(
         # D-13: nothing was attempted, so nothing succeeded — the deferred
         # verdict is DERIVED from the (zeroed) counters, never declared.
         success, reason = derive_success(None, False, report)
+        # D-02/02-09: the four signal caches were not attempted either; they
+        # publish truthful ``unavailable`` rows and write nothing (zero network).
+        from src.signal_caches import produce_signal_caches
+
         return _build_report(
             None,
             attempted=False,
@@ -295,6 +300,9 @@ def fetch_live_data(
             last_success_at=None,
             finished=report,
             skipped_reason="snapshot mode selected at startup",
+            stages=produce_signal_caches(
+                data_dir, now=datetime.now(timezone.utc), mode="snapshot"
+            ),
         )
     from football_core.runtime_support import get_data_provider
     provider = get_data_provider(bsd_api_key, football_data_org_key, constants.DEFAULT_LEAGUE_ID)
@@ -486,6 +494,18 @@ def fetch_live_data(
                     "skipped_missing_score", "skipped_no_change")
     }
     success, reason = derive_success(type(provider).__name__, True, flat_counters)
+    # D-02/02-09: one acquisition pass also refreshes the four signal caches.
+    # The results row stays first; the four cache rows follow, each truthful
+    # about what it did (wrote / skipped-as-fresh / unavailable / error).
+    from src.signal_caches import produce_signal_caches
+
+    written_files: list[str] = []
+    cache_rows = produce_signal_caches(
+        data_dir,
+        now=datetime.now(timezone.utc),
+        mode="live",
+        written_files=written_files,
+    )
     report = _build_report(
         type(provider).__name__,
         attempted=True,
@@ -499,11 +519,15 @@ def fetch_live_data(
             else _read_prev_ledger().get("worldcup", {}).get("last_success_at")
         ),
         finished={"group_stage": group_stats, "knockout": ko_stats},
-        stages=[_results_stage_row(
-            "ok" if success else "error",
-            flat_counters["ingested"] if success else 0,
-            type(provider).__name__ if success else (reason or "refresh failed"),
-        )],
+        stages=[
+            _results_stage_row(
+                "ok" if success else "error",
+                flat_counters["ingested"] if success else 0,
+                type(provider).__name__ if success else (reason or "refresh failed"),
+            ),
+            *cache_rows,
+        ],
+        written_files=written_files,
     )
     if not success:
         logger.warning(
