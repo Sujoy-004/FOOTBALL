@@ -137,7 +137,7 @@ def test_live_fetch_partitions_events_before_routing(monkeypatch, tmp_path):
     class FakeProvider:
         last_error = None
 
-        def fetch_matches(self, competition_id="WC"):
+        def fetch_matches(self, competition_id="WC", *, season=None, **kwargs):
             return [
                 _group_event(eid="gA1"),
                 _group_event(home="Mexico", away="South Korea", eid="gA2"),
