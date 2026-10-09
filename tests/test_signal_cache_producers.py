@@ -358,6 +358,87 @@ def test_fetch_live_data_snapshot_appends_not_attempted_rows(tmp_path, monkeypat
     assert list(wc_dir.glob("*_cache.json")) == [], "snapshot must not write caches"
 
 
+# ── test 7: D-10 pickup proof ────────────────────────────────────────────
+
+
+def _engine_inputs(dst: Path):
+    from football_core.signal import PredictionContext
+
+    groups_raw = json.loads((dst / "groups.json").read_text(encoding="utf-8"))
+    groups = groups_raw.get("groups", groups_raw)
+    teams = json.loads((dst / "teams.json").read_text(encoding="utf-8"))
+    matches = [m for g in groups.values() for m in g.get("matches", [])]
+    context = PredictionContext(
+        fixtures=matches,
+        elo_ratings={name: data["elo"] for name, data in teams.items()},
+        played_results=[],
+    )
+    return groups["A"]["matches"][0], matches, context
+
+
+def _probs(dst: Path):
+    from src.engine import build_engine_from_caches
+
+    target, matches, context = _engine_inputs(dst)
+    engine = build_engine_from_caches(data_dir=dst)
+    pred = engine.evaluate(target, context)
+    return (pred.home_prob, pred.draw_prob, pred.away_prob)
+
+
+def test_engine_from_caches_picks_up_produced_caches(tmp_path):
+    """D-10: produced caches flow into the ensemble's probabilities.
+
+    Built BEFORE the producers, the engine only sees the base Elo signal (the
+    four cache-backed signals abstain on an empty cache). After the three local
+    producers run, rebuilding the engine must yield a DIFFERENT blended vector
+    for the same fixture -- the deliberate demonstration that a fetch which
+    writes caches actually steers predictions.
+    """
+    from src.signal_caches import (
+        produce_odds_cache,
+        produce_rest_days_cache,
+        produce_rolling_form_cache,
+        produce_squad_value_cache,
+    )
+
+    dst = _seed(tmp_path)
+    now = datetime.now(timezone.utc)
+
+    before = _probs(dst)
+    assert abs(sum(before) - 1.0) < 1e-6, before
+
+    produce_rolling_form_cache(dst, now=now)
+    produce_squad_value_cache(dst, now=now)
+    produce_rest_days_cache(dst, now=now)
+    local_only = _probs(dst)
+
+    assert local_only != before, (
+        "engine ignored the local caches -- D-10 flow is broken"
+    )
+
+    # The odds signal participates only once an odds cache exists. The target
+    # fixture is injected through the producer's fetch seam (mirrors test 4).
+    target, _, _ = _engine_inputs(dst)
+    injected = {
+        "id": target["match_id"],
+        "status": "scheduled",
+        "group_name": "Group A",
+        "home_team": target["team_a"],
+        "away_team": target["team_b"],
+        "odds_home": 1.4,
+        "odds_draw": 4.5,
+        "odds_away": 7.0,
+        "event_date": "2026-06-12T16:00:00Z",
+    }
+    row = produce_odds_cache(dst, now=now, fetch_fn=lambda: [injected])
+    assert row["state"] == "ok", row
+
+    with_odds = _probs(dst)
+    assert with_odds != local_only, (
+        "engine ignored the odds cache -- market_odds signal is not wired"
+    )
+
+
 def test_signal_caches_has_no_import_time_credential_or_network_reads():
     """Credentials and transport are touched ONLY inside producer calls.
 
