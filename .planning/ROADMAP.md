@@ -192,13 +192,19 @@ predictor path is gone — with every canonical computed number provably unchang
 
 ### Phase 02.1: Frontend Restyle and UX Coherence (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
+**Goal:** Ship a premium, dark-first, broadcast-grade interface built on ONE shared presentation
+architecture reused by all three competitions — with self-hosted fonts, skeleton loaders, an
+asymmetric editorial shell, and a broadcast lower-third — while keeping the vanilla-JS stack,
+module contracts, hash routing, refresh semantics, and every canonical number unchanged.
+**Requirements**: None (INSERTED phase — coverage via decisions D-01..D-12 in `02.1-CONTEXT.md`)
 **Depends on:** Phase 2
-**Plans:** 0 plans
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 02.1 to break down)
+- [ ] 02.1-01-PLAN.md — Token foundation + six self-hosted woff2 fonts + app-shell regions
+- [ ] 02.1-02-PLAN.md — Shared archetype CSS + app-shell/asymmetric-hero CSS + full token migration
+- [ ] 02.1-03-PLAN.md — JS restyle: skeleton loaders, asymmetric hero/chooser DOM, sidebar drawer + topbar
+- [ ] 02.1-04-PLAN.md — Verification gates: real baseline diff, font resolution, pinned suites, visual
 
 ### Phase 3: Measured Skill — All Three Competitions
 **Goal**: A reader can see, per competition, whether the ensemble actually beats naive
