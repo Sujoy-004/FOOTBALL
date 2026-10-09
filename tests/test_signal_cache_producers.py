@@ -466,3 +466,37 @@ def test_signal_caches_has_no_import_time_credential_or_network_reads():
     assert not offenders, (
         f"module-level credential/network access found at lines {offenders}"
     )
+
+
+# ── test 8: a crashing producer cannot abort the pass (T-09-D) ────────────
+
+
+def test_crashing_producer_becomes_error_row_and_never_raises(tmp_path, monkeypatch):
+    """One producer blowing up yields an ``error`` row; the other three run."""
+    from src import signal_caches
+
+    dst = _seed(tmp_path)
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr(signal_caches, "_produce_rolling_form_cache", _boom)
+
+    rows = signal_caches.produce_signal_caches(
+        dst, now=datetime.now(timezone.utc), mode="live"
+    )
+    assert [r["key"] for r in rows] == [
+        "signals.odds",
+        "signals.rolling_form",
+        "signals.squad_value",
+        "signals.rest_days",
+    ]
+    broken = rows[1]
+    assert set(broken) == STAGE_ROW_KEYS
+    assert broken["state"] == "error"
+    assert broken["count"] is None
+    assert broken["detail"] == "RuntimeError"
+    # The remaining producers still ran and reported truthfully.
+    assert rows[0]["state"] in {"ok", "unavailable"}
+    assert rows[2]["state"] == "ok"
+    assert rows[3]["state"] == "ok"
