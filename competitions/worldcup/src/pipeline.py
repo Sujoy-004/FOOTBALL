@@ -340,7 +340,10 @@ def fetch_live_data(
             partition_events_by_stage, process_group_matches, process_matches,
         )
 
-        raw_matches = provider.fetch_matches(competition_id="WC")
+        # OQ9: pin the season so a provider's current-season default can never
+        # silently serve the prior season (the canonical WC 2026 corpus must be
+        # 2026). The provider builds ``params["season"]`` from this kwarg.
+        raw_matches = provider.fetch_matches(competition_id="WC", season=2026)
         if not raw_matches:
             reason = "provider returned no matches"
             err = getattr(provider, "last_error", None)

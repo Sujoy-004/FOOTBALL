@@ -214,7 +214,9 @@ class StubProvider:
         self.last_error = None
         self.calls = []
 
-    def fetch_matches(self, competition_id=None):
+    def fetch_matches(self, competition_id=None, *, season=None, **kwargs):
+        # ``season`` (OQ9 pin) and any future fetch params are accepted and
+        # ignored: this stub returns a fixed payload regardless of scope.
         self.calls.append(competition_id)
         if competition_id != self.competition:
             raise AssertionError(
