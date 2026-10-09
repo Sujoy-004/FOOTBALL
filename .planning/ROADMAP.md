@@ -190,6 +190,16 @@ predictor path is gone — with every canonical computed number provably unchang
   `[1/3,1/3,1/3]` at full weight when odds are absent (30% of the ensemble voting uniform).
   Flag it in the phase notes; do not smuggle it in as scope.
 
+### Phase 02.1: Frontend Restyle and UX Coherence (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 2
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 02.1 to break down)
+
 ### Phase 3: Measured Skill — All Three Competitions
 **Goal**: A reader can see, per competition, whether the ensemble actually beats naive
 baselines — with intervals, a declared sample, and the market-only loss printed.
