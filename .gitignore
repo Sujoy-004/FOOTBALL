@@ -35,6 +35,7 @@ competitions/worldcup/data/played.json
 competitions/worldcup/data/played_groups.json
 competitions/worldcup/data/probability_log.json
 competitions/worldcup/data/prediction_history.json
+competitions/worldcup/data/snapshot.json
 
 # World Cup — TTL-based signal caches (regeneratable by re-fetching)
 competitions/worldcup/data/odds_cache.json
