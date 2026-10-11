@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 02-06-PLAN.md (3 tasks, 3 commits a95f122..58dbec5; gates green modulo the 84 pre-existing baseline failures - full-suite failure set identical to baseline)
-last_updated: "2026-10-08T13:42:04.161Z"
-last_activity: 2026-10-08
+status: planned
+stopped_at: Phase 02.1 UI-SPEC approved
+last_updated: "2026-10-09T17:26:07.993Z"
+last_activity: 2026-10-09
 progress:
-  total_phases: 7
-  completed_phases: 1
+  total_phases: 8
+  completed_phases: 2
   total_plans: 17
-  completed_plans: 14
-  percent: 82
+  completed_plans: 17
+  percent: 100
 ---
 
 # Project State
@@ -23,14 +23,14 @@ See: .planning/PROJECT.md (updated 2026-10-05) · .planning/REQUIREMENTS.md · .
 **Core value:** Real results ingested explicitly and verified, simulations on genuinely
 unplayed matches, simulated answers automatically retired the moment real results land —
 and the engine's accuracy **measured** against naive baselines instead of claimed.
-**Current focus:** Phase 02 — truthful-availability-explicit-verified-ingestion
+**Current focus:** Phase 02.1 — frontend-restyle-and-ux-coherence
 
 ## Current Position
 
 Phase: 02 (truthful-availability-explicit-verified-ingestion) — EXECUTING
-Plan: 7 of 10 completed (next: 02-08)
-Status: Ready to execute
-Last activity: 2026-10-08 -- Completed 02-07-PLAN.md (availability truth layer)
+Plan: 10 of 10
+Status: planned
+Last activity: 2026-10-09
 
 Phase 01 is complete and verified (PASS_WITH_CAVEATS, `01-layering-inversion-deprecated-path-removal/VERIFICATION.md`).
 Brain->web imports are ZERO; `competitions/worldcup/src/predictors/` is deleted with parity
@@ -38,7 +38,7 @@ proven; one `atomic_write_text` in `football_core/state.py`; `web/wc_app.py` red
 961 -> 673 lines; `tests/test_layering_architecture.py` enforces both forbidden directions.
 Gate held at 105 -> 105 node ids against `01-01-BASELINE.md` in every one of the 7 plans.
 
-Progress: [████████░░] 82%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -83,8 +83,16 @@ Progress: [████████░░] 82%
 | Phase 02 P05 | 80min | 3 tasks | 9 files |
 | Phase 02 P06 | 175min | 3 tasks | 14 files |
 | Phase 02 P07 | 50min | 3 tasks | 7 files |
+| Phase 02 P08 | 80min | 3 tasks | 6 files |
+| Phase 02 P09 | 35min | 3 tasks | 4 files |
+| Phase 2 P10 | 30 | 3 tasks | 8 files |
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 2 edited: scope addendum (D-08): + four WC signal-cache producers (odds, rolling form, squad value, rest days) rebuilt during the explicit refresh — plan 02-09
+- Phase 02.1 inserted after Phase 2: Frontend Restyle and UX Coherence (URGENT)
 
 ### Decisions
 
@@ -181,6 +189,15 @@ Decisions are logged in the PROJECT.md Key Decisions table. Roadmap-specific:
 - [Phase ?]: availability_reason carries MISSING/UNAVAILABLE entries only (EMPTY is honest readable state, no reason); the key is omitted entirely when all stores are healthy
 - [Phase ?]: UCL/LaLiga served availability now truthful from load_json_store (was hardcoded EMPTY/AVAILABLE in UCL, list-truthiness in LaLiga); laliga_app.compute_all passes its own DATA_DIR
 - [Phase ?]: WC /api/simulate, /api/simulate-from-match, /api/what-if return 409 with store-naming error on MISSING/UNAVAILABLE played stores; EMPTY still allows a legitimate no-results-yet run
+- [Phase 02]: 02-08: availability blocking is scoped PER-VIEW, not global — a view may block only on the stores it actually reads. The UCL standings table depends solely on `league_results`; `knockout_results.json` is legitimately absent during the league phase, so it must never replace the standings view. Parameterized `_blockingAvailability(keys)` at `web/static/ucl.js:268`; the standings call site passes `["league_results"]`.
+- [Phase 02]: 02-08: the four truthful-availability UI helpers (`renderAvailabilityBanner`, `renderAvailPanel`, `refreshButtonHtml`, C4 caption) live as DOM-free string builders in `web/static/shared.js` and are Node-tested; the per-competition files own the DOM wiring and the single `POST /{comp}/api/refresh` handler. The Refresh button is the ONLY ingest trigger (D-03/I5).
+- [Phase 02]: 02-09: `produce_signal_caches` is the single brain-owned orchestrator called from inside `fetch_live_data`; it runs the four producers (odds, rolling_form, squad_value, rest_days) in fixed order with per-producer try/except that folds any crash into an `error` row (never aborts results ingestion, D-13 untouched) and collects actually-written paths into an optional out-list.
+- [Phase 02]: 02-09: the odds producer reads `ODDS_PROVIDER` at CALL time via `resolve_odds_provider`; unset/empty mode → `(None, None)` → row `unavailable` detail "no odds provider configured" and NO write. A parsed-empty result also never overwrites a valid cache (T-09-T). `fetch_and_cache_odds`'s unused `api_key` first arg is passed `""` so no key is held in memory.
+- [Phase 02]: 02-09: the snapshot branch publishes four truthful not-attempted rows (`unavailable`, `count: None`, detail names snapshot mode) and touches neither disk nor network; `report.written_files` is populated from the real writes so the endpoint layer (02-06 deferred) can surface them in 02-10; `web/wc_app.py` deliberately untouched because 02-06 sited the stage builder in the pipeline.
+- [Phase 02]: 02-09: D-10 demonstrated by test — engine built before the producers sees only base Elo; after the three local producers run the same fixture's blended vector changes, and the odds signal participates only once an injected odds cache exists. Gate: full suite 84 failed + 2 errors (down from the 98+2 live reference), zero growth attributable to 02-09 (the 3 WC-relevant new nodes fail with pipeline.py reverted; the rest are UCL/season-transition/UI nodes from 02-02…02-08 plus gitignored runtime-data drift).
+- [Phase ?]: 02-10 executed under the mandated zero-network policy: the live INGEST-04 refresh was NOT performed; closure rests on the plan's D-15 / T-10-D offline path with an honest, non-fabricated shortfall record (no 72/32/104 counts asserted). — Plan T-10-D: 'the phase gate never requires the provider to be up'; asserting live counts without a live run would be fabrication.
+- [Phase ?]: All nine Phase 2 requirements marked complete (not_found: []) because the gate showed ZERO failing-set growth vs 02-09; T-10-E 'requirements stay unmarked' applies only to non-pin-fixable failing-set growth, which is absent.
+- [Phase ?]: WC provider fetch pinned to season=2026 at the call site (OQ9), proven offline by tests/test_wc_season_pin.py.
 
 ### Pending Todos
 
@@ -284,6 +301,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-08T13:42:04.143Z
-Stopped at: Completed 02-06-PLAN.md (3 tasks, 3 commits a95f122..58dbec5; gates green modulo the 84 pre-existing baseline failures - full-suite failure set identical to baseline)
-Resume file: None
+Last session: 2026-10-11
+Stopped at: Session resumed — re-running plan checker iteration 3 on Phase 02.1's 4 revised plans (prev pass aborted)
+Resume file: .planning/phases/02.1-frontend-restyle-and-ux-coherence/02.1-04-PLAN.md
