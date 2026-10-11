@@ -198,12 +198,12 @@ asymmetric editorial shell, and a broadcast lower-third — while keeping the va
 module contracts, hash routing, refresh semantics, and every canonical number unchanged.
 **Requirements**: None (INSERTED phase — coverage via decisions D-01..D-12 in `02.1-CONTEXT.md`)
 **Depends on:** Phase 2
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 - [x] 02.1-01-PLAN.md — Token foundation + six self-hosted woff2 fonts + app-shell regions
 - [x] 02.1-02-PLAN.md — Shared archetype CSS + app-shell/asymmetric-hero CSS + full token migration
-- [ ] 02.1-03-PLAN.md — JS restyle: skeleton loaders, asymmetric hero/chooser DOM, sidebar drawer + topbar
+- [x] 02.1-03-PLAN.md — JS restyle: skeleton loaders, asymmetric hero/chooser DOM, sidebar drawer + topbar
 - [ ] 02.1-04-PLAN.md — Verification gates: real baseline diff, font resolution, pinned suites, visual
 
 ### Phase 3: Measured Skill — All Three Competitions

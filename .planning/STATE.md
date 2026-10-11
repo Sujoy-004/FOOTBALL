@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02.1-02-PLAN.md
-last_updated: "2026-10-11T12:42:00.000Z"
+stopped_at: Completed 02.1-03-PLAN.md
+last_updated: "2026-10-11T13:07:22.545Z"
 last_activity: 2026-10-11
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 21
-  completed_plans: 19
-  percent: 90
+  completed_plans: 20
+  percent: 95
 ---
 
 # Project State
@@ -28,7 +28,7 @@ and the engine's accuracy **measured** against naive baselines instead of claime
 ## Current Position
 
 Phase: 02.1 (frontend-restyle-and-ux-coherence) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-10-11
 
@@ -38,7 +38,7 @@ proven; one `atomic_write_text` in `football_core/state.py`; `web/wc_app.py` red
 961 -> 673 lines; `tests/test_layering_architecture.py` enforces both forbidden directions.
 Gate held at 105 -> 105 node ids against `01-01-BASELINE.md` in every one of the 7 plans.
 
-Progress: [█████████░] 90%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -88,6 +88,7 @@ Progress: [█████████░] 90%
 | Phase 2 P10 | 30 | 3 tasks | 8 files |
 | Phase 02.1-frontend-restyle-and-ux-coherence P01 | 23min | 3 tasks | 8 files |
 | Phase 02.1-frontend-restyle-and-ux-coherence P02 | 26min | 3 tasks | 1 file |
+| Phase 02.1 P03 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -206,6 +207,8 @@ Decisions are logged in the PROJECT.md Key Decisions table. Roadmap-specific:
 - [Phase 02.1]: Plan 02 - `web/static/shared.css` now consumes the whole Plan-01 token layer; Orbitron/Playfair and all five legacy palette literals (#16A085/#153D4C/#F6DBC0/#140C30/#15565B) plus their rgba() forms retired; LaLiga reds #E85D5D/#7A2E2E -> var(--foul). `#153D4C` mapped CONTEXTUALLY: lines with `solid #153D4C` or lacking `background` -> var(--chalk); background fills -> var(--raise). rgba() -> color-mix(in srgb, var(--token) P%, transparent); 8-digit hex replaced before 6-digit. Pinned contract blocks preserved byte-exact.
 - [Phase 02.1]: Plan 02 - the legacy `@media (max-width:800px)` horizontal `.nav-bar` rule was NOT deleted; the new shell `.nav-bar` base rule was inserted AFTER it, so at equal specificity the later rule wins and the legacy horizontal-nav behaviour is neutralised (keeps the diff additive, avoids the ≤1100px rail / ≤768px drawer conflict).
 - [Phase 02.1]: Plan 02 - the repo carries 70 PRE-EXISTING, unrelated test failures (UCL season/snapshot/truth payloads) plus 2 errors; proven unrelated because `git diff a02227a HEAD --stat` shows only `web/static/shared.css` changed and the failing tests never read CSS. CSS contract tests (`test_simulation_shell_contract.py`, `test_ui_normalization_shell.py`) pass 65/65.
+- [Phase 02.1]: single per-view Refresh CTA now lives in #appTopbar with competition name + an OFFLINE/LIVE .mode-pill derived from each module's EXISTING refresh block (wc.js/ucl.js read appState.data.refresh; laliga.js reads appState.refresh; skipped_reason -> OFFLINE). refreshButtonHtml removed from every updateStatusBar(...) arg list; one delegated handler per module unchanged.
+- [Phase 02.1]: Landing/competition views clear #appTopbar (innerHTML='') on entry so a stale previous-competition Refresh CTA can never leak across view transitions (Rule 2 deviation, D-11).
 
 ### Pending Todos
 
@@ -319,6 +322,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T12:42:00.000Z
-Stopped at: Completed 02.1-02-PLAN.md
+Last session: 2026-10-11T13:07:22.524Z
+Stopped at: Completed 02.1-03-PLAN.md
 Resume file: None
