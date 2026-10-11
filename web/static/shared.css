@@ -89,7 +89,7 @@ body {
   font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas", monospace;
   font-size: 13px; line-height: 1.5; min-height: 100vh;
 }
-#app { max-width: 1400px; margin: 0 auto; position: relative; z-index: 1; display: flex; flex-wrap: wrap; }
+#app { position: relative; z-index: 1; }
 
 /* Tabs */
 .tab-bar { display: flex; gap: 0; border-bottom: 1px solid #153D4C; margin-bottom: 12px; flex-wrap: wrap; }
@@ -149,10 +149,157 @@ body {
   #contentArea { padding: 12px 8px; }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   App shell (Phase 02.1, D-07) — sidebar rail + main column grid.
+   Region geometry for the DOM emitted by index.html (shell) and shared.js
+   (nav/topbar/lower-third). Replaces the old flex-wrap #app layout.
+   ══════════════════════════════════════════════════════════════════════ */
+.app-shell {
+  display: grid;
+  grid-template-columns: 256px 1fr;
+  min-height: 100dvh;
+  align-items: stretch;
+}
+
+/* Sidebar rail */
+.app-sidebar {
+  position: relative;
+  background: var(--pitch);
+  border-right: 1px solid var(--chalk);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  z-index: 2;
+}
+.nav-bar {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; flex: 1 1 auto; margin: 0;
+  padding: var(--space-4) var(--space-2);
+  border-left: none; min-height: 0;
+}
+.nav-btn.active {
+  border-left: 3px solid var(--accent);
+  background: var(--raise);
+  color: var(--accent);
+}
+.nav-btn.active .nb-badge { color: var(--accent); }
+
+/* Main column */
+.app-main {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+  min-height: 100dvh;
+}
+
+/* Topbar */
+.topbar {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 48px; padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--chalk);
+  background: color-mix(in srgb, var(--pitch) 82%, transparent);
+}
+.topbar .brand, .topbar-title {
+  font-family: var(--font-display); font-weight: 700;
+  letter-spacing: 0.02em; color: var(--ink-1);
+}
+.mode-pill {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 2px 8px; border-radius: var(--radius-full);
+  border: 1px solid var(--chalk); color: var(--ink-2);
+}
+.mode-pill.live {
+  color: var(--live);
+  border-color: color-mix(in srgb, var(--live) 55%, transparent);
+  background: color-mix(in srgb, var(--live) 14%, transparent);
+}
+.mode-pill.snapshot {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+}
+.mode-pill.offline { color: var(--ink-2); border-color: var(--chalk); background: var(--raise); }
+.topbar .refresh-slot { margin-left: auto; }
+
+/* Broadcast lower-third ticker */
+.lower-third {
+  border-top: 1px solid var(--chalk);
+  background: color-mix(in srgb, var(--void) 70%, transparent);
+  padding: 0 var(--space-4);
+}
+.lower-third .status-bar { border-top: none; margin-top: 0; min-height: 28px; }
+.status-bar .live-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--live); animation: live-pulse 1.8s var(--ease) infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.82); }
+}
+
+/* Off-canvas drawer toggle (mobile only) */
+.drawer-toggle {
+  display: none;
+  position: fixed; top: 10px; right: 12px; z-index: 40;
+  width: 40px; height: 40px; border-radius: var(--radius-8);
+  background: var(--dugout); color: var(--ink-1); font-size: 18px; line-height: 1;
+  border: 1px solid var(--chalk); cursor: pointer;
+}
+
+/* Responsive rail */
+@media (max-width: 1100px) {
+  .app-shell { grid-template-columns: 64px 1fr; }
+  .app-sidebar .nb-label,
+  .app-sidebar .nav-section-label,
+  .app-sidebar .nav-divider { display: none; }
+  .app-sidebar .nav-btn { justify-content: center; padding: 8px 0; border-radius: var(--radius-4); }
+}
+@media (max-width: 768px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .app-sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 256px;
+    transform: translateX(-100%);
+    transition: transform var(--ease) 240ms;
+    box-shadow: var(--shadow-1);
+  }
+  .app-shell.drawer-open .app-sidebar { transform: translateX(0); }
+  .drawer-toggle { display: block; }
+  #contentArea { min-width: 0; }
+  .landing-cards {
+    display: flex; overflow-x: auto; gap: var(--space-3);
+    scroll-snap-type: x mandatory; padding-bottom: var(--space-2);
+  }
+  .landing-cards .lc-card { flex: 0 0 78%; scroll-snap-align: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar { transition: none; }
+  .status-bar .live-dot { animation: none; }
+}
+
 /* ── Landing Page ── */
 
 /* Hero */
-.landing-hero { text-align: center; padding: 32px 0 24px; max-width: 680px; margin: 0 auto; }
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  align-items: end;
+  gap: var(--space-6);
+  padding: var(--space-8) 0 var(--space-6);
+  text-align: left;
+  max-width: none; margin: 0;
+}
+.lh-copy { min-width: 0; }
+.lh-copy .lh-title { font-family: var(--font-display); }
+.lh-signal {
+  background: var(--dugout);
+  border: 1px solid var(--chalk);
+  border-radius: var(--radius-8);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-4);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.lh-signal .signal-value { font-family: var(--font-mono); }
 .lh-badge {
   display: inline-block; font-size: 9px; letter-spacing: 3px; color: #16A085;
   border: 1px solid rgba(22,160,133,0.25); border-radius: 12px; padding: 3px 12px;
@@ -201,7 +348,12 @@ body {
 }
 
 /* Competition cards */
-.landing-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.landing-cards { display: grid; grid-template-columns: 1.7fr 1fr 1fr; gap: var(--space-4); align-items: stretch; }
+.landing-cards .lc-featured {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  padding: var(--space-6);
+}
+.landing-cards .lc-featured .lcc-badge { color: var(--accent); }
 .lc-card {
   border: 1px solid rgba(21,61,76,0.3); border-radius: 10px; padding: 20px;
   background: rgba(20,12,48,0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
