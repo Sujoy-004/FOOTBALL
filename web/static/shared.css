@@ -1,3 +1,88 @@
+/* ── Design tokens (Phase 02.1) — single source of truth ── */
+:root {
+  /* neutrals (cool, consistent ramp — never pure black) */
+  --void: #0A0E12;
+  --pitch: #0F141A;
+  --dugout: #151B23;
+  --raise: #1C242E;
+  --chalk: rgba(244,246,248,0.09);
+  --ink-1: #F4F6F8;
+  --ink-2: #9AA5B1;
+  --ink-3: #5B6673;
+  /* accent + semantic status (status only) */
+  --accent: #E7C27D;
+  --live: #17A398;
+  --form: #3FB27F;
+  --amber: #E0A64B;
+  --foul: #E0524A;
+  --info: #5B8DEF;
+  /* spacing scale (4/8 base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-8: 48px;
+  --space-10: 64px;
+  --space-12: 96px;
+  /* typography stacks */
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Manrope", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* motion */
+  --ease: cubic-bezier(0.22,1,0.36,1);
+  /* radius + elevation */
+  --radius-4: 4px;
+  --radius-8: 8px;
+  --radius-full: 999px;
+  --shadow-1: 0 8px 24px rgba(0,0,0,0.35);
+}
+
+/* ── Self-hosted fonts (offline-capable; no runtime hotlinks) ── */
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/spacegrotesk-500.woff2") format('woff2');
+}
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/spacegrotesk-700.woff2") format('woff2');
+}
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/manrope-500.woff2") format('woff2');
+}
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/manrope-700.woff2") format('woff2');
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/jetbrainsmono-500.woff2") format('woff2');
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/jetbrainsmono-700.woff2") format('woff2');
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   background: linear-gradient(135deg, #140C30, #14253E 50%, #153D4C); color: #F6DBC0;
