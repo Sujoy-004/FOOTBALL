@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planned
-stopped_at: Phase 02.1 UI-SPEC approved
-last_updated: "2026-10-09T17:26:07.993Z"
-last_activity: 2026-10-09
+status: executing
+stopped_at: Completed 02.1-01-PLAN.md
+last_updated: "2026-10-11T12:10:40.204Z"
+last_activity: 2026-10-11
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 17
-  completed_plans: 17
-  percent: 100
+  total_plans: 21
+  completed_plans: 18
+  percent: 86
 ---
 
 # Project State
@@ -27,10 +27,10 @@ and the engine's accuracy **measured** against naive baselines instead of claime
 
 ## Current Position
 
-Phase: 02 (truthful-availability-explicit-verified-ingestion) — EXECUTING
-Plan: 10 of 10
-Status: planned
-Last activity: 2026-10-09
+Phase: 02.1 (frontend-restyle-and-ux-coherence) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-10-11
 
 Phase 01 is complete and verified (PASS_WITH_CAVEATS, `01-layering-inversion-deprecated-path-removal/VERIFICATION.md`).
 Brain->web imports are ZERO; `competitions/worldcup/src/predictors/` is deleted with parity
@@ -38,7 +38,7 @@ proven; one `atomic_write_text` in `football_core/state.py`; `web/wc_app.py` red
 961 -> 673 lines; `tests/test_layering_architecture.py` enforces both forbidden directions.
 Gate held at 105 -> 105 node ids against `01-01-BASELINE.md` in every one of the 7 plans.
 
-Progress: [██████████] 100%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -86,6 +86,7 @@ Progress: [██████████] 100%
 | Phase 02 P08 | 80min | 3 tasks | 6 files |
 | Phase 02 P09 | 35min | 3 tasks | 4 files |
 | Phase 2 P10 | 30 | 3 tasks | 8 files |
+| Phase 02.1-frontend-restyle-and-ux-coherence P01 | 23min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -198,6 +199,9 @@ Decisions are logged in the PROJECT.md Key Decisions table. Roadmap-specific:
 - [Phase ?]: 02-10 executed under the mandated zero-network policy: the live INGEST-04 refresh was NOT performed; closure rests on the plan's D-15 / T-10-D offline path with an honest, non-fabricated shortfall record (no 72/32/104 counts asserted). — Plan T-10-D: 'the phase gate never requires the provider to be up'; asserting live counts without a live run would be fabrication.
 - [Phase ?]: All nine Phase 2 requirements marked complete (not_found: []) because the gate showed ZERO failing-set growth vs 02-09; T-10-E 'requirements stay unmarked' applies only to non-pin-fixable failing-set growth, which is absent.
 - [Phase ?]: WC provider fetch pinned to season=2026 at the call site (OQ9), proven offline by tests/test_wc_season_pin.py.
+- [Phase ?]: Self-hosted woff2 fonts (Space Grotesk/Manrope/JetBrains Mono 500/700) replace Google Fonts hotlinks - zero external font network requests at runtime
+- [Phase ?]: Design tokens live in an additive :root block in shared.css; legacy hardcoded font-family/palette literals NOT migrated here (Plan 02 task 3)
+- [Phase ?]: index.html restructured to app-shell grid regions (sidebar | main -> topbar | content | lower-third) preserving JS mount ids navBar/contentArea/statusBar
 
 ### Pending Todos
 
@@ -301,6 +305,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11
-Stopped at: Session resumed — re-running plan checker iteration 3 on Phase 02.1's 4 revised plans (prev pass aborted)
-Resume file: .planning/phases/02.1-frontend-restyle-and-ux-coherence/02.1-04-PLAN.md
+Last session: 2026-10-11T12:10:40.179Z
+Stopped at: Completed 02.1-01-PLAN.md
+Resume file: None
