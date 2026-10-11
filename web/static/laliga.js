@@ -190,11 +190,26 @@ function render() {
   _applyStatus();
 }
 
+// Topbar: competition name + mode pill + the single Refresh CTA (D-11). The
+// OFFLINE/LIVE pill reuses the SAME refresh block the banner reads — an
+// explicit offline session is the only producer of skipped_reason.
+function _renderTopbar() {
+  const host = document.getElementById("appTopbar");
+  if (!host) return;
+  const r = appState.refresh || {};
+  const offline = !!r.skipped_reason;
+  const name = (currentCompetition && currentCompetition.label) || "LaLiga EA Sports";
+  host.innerHTML = '<span class="topbar-title">' + _esc(name) + '</span>'
+    + '<span class="mode-pill ' + (offline ? "offline" : "live") + '">' + (offline ? "OFFLINE" : "LIVE") + '</span>'
+    + '<span class="refresh-slot">' + refreshButtonHtml("laliga", _refreshInFlight) + '</span>';
+}
+
 function _applyStatus() {
+  _renderTopbar();
   updateStatusBar(
     _esc(appState.season || "") + " &middot; " + appState.n_played + "/"
       + (appState.n_played + appState.n_unplayed) + " played &middot; "
-      + _esc(sigInfo()) + refreshButtonHtml("laliga", _refreshInFlight),
+      + _esc(sigInfo()),
     renderAvailabilityBanner(_currentBanner().state, _currentBanner().ctx)
   );
 }

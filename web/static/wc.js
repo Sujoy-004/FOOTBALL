@@ -177,14 +177,29 @@ function _buildAcquisition(d) {
   };
 }
 
+// Topbar: competition name + mode pill + the single Refresh CTA (D-11). The
+// OFFLINE/LIVE pill reuses the SAME refresh block the banner reads — an
+// explicit offline session is the only producer of skipped_reason.
+function _renderTopbar() {
+  const host = document.getElementById("appTopbar");
+  if (!host) return;
+  const r = (appState.data && appState.data.refresh) || {};
+  const offline = !!r.skipped_reason;
+  const name = (currentCompetition && currentCompetition.label) || "World Cup 2026";
+  host.innerHTML = '<span class="topbar-title">' + _esc(name) + '</span>'
+    + '<span class="mode-pill ' + (offline ? "offline" : "live") + '">' + (offline ? "OFFLINE" : "LIVE") + '</span>'
+    + '<span class="refresh-slot">' + refreshButtonHtml("worldcup", _refreshInFlight) + '</span>';
+}
+
 function updateStatus() {
   const d = appState.data;
   if (!d) return;
   const signals = d.signals_meta?.signals || [];
   const nActive = signals.filter(s => s.available).length;
+  _renderTopbar();
   updateStatusBar(
     d.n_teams + " teams  |  " + (d.n_played != null ? d.n_played + " matches played" : "no match data")
-      + "  |  " + nActive + " active signals" + refreshButtonHtml("worldcup", _refreshInFlight),
+      + "  |  " + nActive + " active signals",
     renderAvailabilityBanner(_currentBanner().state, _currentBanner().ctx)
   );
 }
