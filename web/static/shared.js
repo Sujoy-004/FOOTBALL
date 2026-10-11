@@ -24,7 +24,7 @@ async function safeJson(url, options) {
 }
 
 // ── Lightweight loading indicator ────────────────────────────────────
-// Injects a small, theme-consistent spinner + label into targetEl, REPLACING
+// Injects a theme-consistent skeleton shimmer + label into targetEl, REPLACING
 // its current content. Callers show it immediately before real async work
 // (fetch/build) and let the subsequent real render overwrite it — the loader
 // therefore reflects genuine in-flight work only, never an artificial delay.
@@ -34,7 +34,11 @@ function renderLoading(targetEl, label) {
   const text = (label == null || label === "") ? "Loading..." : String(label);
   targetEl.innerHTML =
     '<div class="loading-state" role="status" aria-live="polite">'
-    + '<span class="loading-spinner" aria-hidden="true"></span>'
+    + '<div class="skeleton" aria-hidden="true">'
+    + '<div class="skeleton-line"></div>'
+    + '<div class="skeleton-line"></div>'
+    + '<div class="skeleton-line"></div>'
+    + "</div>"
     + '<span class="loading-label">' + _esc(text) + "</span>"
     + "</div>";
 }
@@ -191,6 +195,19 @@ document.addEventListener("keydown", e => {
   window.location.hash = "#" + el.dataset.route;
 });
 
+// ── Off-canvas drawer toggle (mobile) ──
+// Single control for #drawerToggle: reflects/toggles the drawer-open class on
+// the #app shell so the sidebar rail slides in over the content. Guarded for a
+// missing control and writes aria-expanded to match the visible state.
+document.addEventListener("click", e => {
+  const toggle = e.target && e.target.closest ? e.target.closest("#drawerToggle") : null;
+  if (!toggle) return;
+  const app = document.getElementById("app");
+  if (!app) return;
+  const open = app.classList.toggle("drawer-open");
+  toggle.setAttribute("aria-expanded", open ? "true" : "false");
+});
+
 // ── Landing Page ──
 function renderLanding() {
   currentCompetition = null;
@@ -198,27 +215,37 @@ function renderLanding() {
   stopAllCompetitionRefresh();
   document.body.className = "";
   document.getElementById("landingBackdrop").classList.add("show");
+  // The topbar CTA is view-scoped: leaving a competition clears it so the
+  // landing view never shows a stale Refresh button for the wrong competition.
+  document.getElementById("appTopbar").innerHTML = "";
 
   renderNavBar(null);
 
   document.getElementById("contentArea").innerHTML = `
     <div class="landing-hero">
-      <div class="lh-badge">PREDICTIVE ANALYTICS</div>
-      <h1 class="lh-title">FOOTBALL</h1>
-      <p class="lh-sub">Multi-Competition Predictor</p>
-      <p class="lh-tagline">Real-time match forecasting powered by Elo ratings, multi-signal blending, and Monte Carlo simulation across football's biggest tournaments.</p>
-      <div class="lh-actions">
-        <a class="lh-btn lh-btn-primary" href="#/worldcup">Explore WorldCup 2026</a>
-        <a class="lh-btn lh-btn-primary" href="#/ucl">Explore UEFA Champions League</a>
-        <a class="lh-btn lh-btn-primary" href="#/laliga">Explore LaLiga EA Sports</a>
+      <div class="lh-copy">
+        <div class="lh-badge">PREDICTIVE ANALYTICS</div>
+        <h1 class="lh-title">FOOTBALL</h1>
+        <p class="lh-sub">Multi-Competition Predictor</p>
+        <p class="lh-tagline">Real-time match forecasting powered by Elo ratings, multi-signal blending, and Monte Carlo simulation across football's biggest tournaments.</p>
+        <div class="lh-actions">
+          <a class="lh-btn lh-btn-primary" href="#/worldcup">Explore WorldCup 2026</a>
+          <a class="lh-btn lh-btn-primary" href="#/ucl">Explore UEFA Champions League</a>
+          <a class="lh-btn lh-btn-primary" href="#/laliga">Explore LaLiga EA Sports</a>
+        </div>
       </div>
+      <aside class="lh-signal" aria-label="Match-night signal">
+        <div class="signal-label">Match-night signal</div>
+        <div class="signal-value">Real results are ingested the moment they are played</div>
+        <div class="signal-note">Simulations run only on genuinely unplayed fixtures.</div>
+      </aside>
     </div>
 
     <div class="landing-section">
       <h2 class="ls-title">Competitions</h2>
       <div class="landing-cards">
-        ${Object.entries(competitions).map(([slug, c]) => `
-          <div class="lc-card ${slug} ${c.disabled ? "lc-disabled" : ""}" data-route="${c.route}"${c.disabled ? ' data-disabled="1"' : ""}>
+        ${Object.entries(competitions).map(([slug, c], i) => `
+          <div class="lc-card ${slug}${i === 0 ? " lc-featured" : ""} ${c.disabled ? "lc-disabled" : ""}" data-route="${c.route}"${c.disabled ? ' data-disabled="1"' : ""}>
             <div class="lcc-top">
               <div class="lcc-badge">${c.short}</div>
               <div class="lcc-name">${c.label}</div>
@@ -329,7 +356,7 @@ function renderNavBar(activeSlug) {
     <div class="nav-section-label">Competitions</div>
     ${Object.entries(competitions).map(([s, c]) => `
       <button class="nav-btn ${s === activeSlug ? "active" : ""} ${c.disabled ? "disabled" : ""}"
-        data-route="${c.route}"${c.disabled ? ' data-disabled="1"' : ""}>
+        data-route="${c.route}"${c.disabled ? ' data-disabled="1"' : ""} aria-label="${c.label}" title="${c.label}">
         <span class="nb-badge">${c.short}</span>
         <span class="nb-label">${c.label}</span>
       </button>
@@ -360,7 +387,7 @@ async function loadCompetition(slug) {
     ${contentHtml}
     <div class="modal-overlay" id="modalOverlay">
       <div class="modal">
-        <button class="modal-close" id="modalClose">&times;</button>
+        <button class="modal-close" id="modalClose" aria-label="Close" title="Close">&times;</button>
         <h2 id="modalTitle"></h2>
         <div class="m-sub" id="modalSub"></div>
         <div id="modalBody"></div>
@@ -370,6 +397,11 @@ async function loadCompetition(slug) {
 
   document.getElementById("statusBar").innerHTML =
     '<span id="statusLeft"></span><span id="statusRight"></span>';
+
+  // Clear the topbar for the incoming view; the competition module repopulates
+  // it (name + mode pill + single Refresh) once its first render lands, so a
+  // stale previous-competition CTA is never clickable during the swap.
+  document.getElementById("appTopbar").innerHTML = "";
 
   // Activate first tab
   const firstTab = document.querySelector(".tab-btn");
