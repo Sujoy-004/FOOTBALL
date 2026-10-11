@@ -738,6 +738,176 @@ body {
   z-index: 3; pointer-events: none;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Shared component archetypes (Phase 02.1, D-03) — token-only consumers.
+   One presentation architecture reused across WorldCup / UCL / LaLiga;
+   identity comes from accent + content, never from layout. Additive over
+   the base rules above; per-competition palette overrides below still win.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Data tables (standings / fixtures / groups / odds / insight) ── */
+.eval-table, .league-table, .odds-table, .group-table,
+.bubble-table, .wi-table, .modal table.insight-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+}
+.eval-table th, .league-table th, .odds-table th, .group-table th,
+.bubble-table th, .wi-table th, .modal table.insight-table th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--dugout);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--chalk);
+}
+.eval-table td, .league-table td, .odds-table td, .wi-table td,
+.modal table.insight-table td { border-bottom: 1px solid var(--chalk); }
+.eval-table tbody tr:hover td,
+.league-table tbody tr:hover td,
+.odds-table tbody tr:hover td { background: var(--raise); }
+.eval-table .num, .league-table .num, .odds-table .num,
+.group-table .num, .wi-table .num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+/* Qualification bands — 3px left rule (never zebra stripes) */
+.league-table .zone-top8, .group-table .advancing {
+  border-left: 3px solid var(--form);
+  background: color-mix(in srgb, var(--form) 12%, transparent);
+}
+.league-table .zone-playoff, .group-table .bubble {
+  border-left: 3px solid var(--info);
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+}
+.league-table .zone-relegation, .group-table .eliminated {
+  border-left: 3px solid var(--foul);
+  background: color-mix(in srgb, var(--foul) 10%, transparent);
+}
+
+/* ── Cards (stat / team / group / playoff / matchday) ── */
+.stat-card, .team-card, .group-card, .playoff-card, .md-card, .eval-summary {
+  background: var(--dugout);
+  border: 1px solid var(--chalk);
+  border-radius: var(--radius-8);
+  box-shadow: var(--shadow-1);
+}
+.team-card {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: transform var(--ease) 180ms, border-color var(--ease) 180ms;
+}
+.team-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+.team-card .name, .group-card .g-title, .playoff-card .p-team.winner,
+.playoff-card .p-score, .md-header { color: var(--accent); }
+.team-card .elo, .group-table th, .md-count, .md-arrow { color: var(--ink-3); }
+.team-card .ring, .chart-row .cbar-wrap, .champ-bar-row .cbar-wrap,
+.prob-bar-wrap, .progress-bar-wrap, .odds-bar-wrap,
+.team-ring-item .tr-bar { background: var(--raise); }
+
+/* ── Knockout bracket ── */
+.match-card {
+  background: var(--dugout);
+  border: 1px solid var(--chalk);
+  border-radius: var(--radius-4);
+  box-shadow: var(--shadow-1);
+}
+.match-card.mc-played { border-left: 3px solid var(--form); }
+.match-card.mc-upcoming { border-left: 3px solid var(--ink-3); }
+.match-card.mc-tbd { border-left: 3px solid var(--chalk); opacity: 0.72; }
+.match-card.mc-played.is-winner, .match-card.mc-winner { border-color: var(--accent); }
+#bracketSvg path { stroke: var(--info); }
+
+/* ── Modal / overlay surfaces ── */
+.modal-backdrop, .sim-popup-backdrop {
+  background: color-mix(in srgb, var(--void) 72%, transparent);
+  backdrop-filter: blur(2px);
+}
+.modal, .sim-popup {
+  background: var(--dugout);
+  border: 1px solid var(--chalk);
+  border-radius: var(--radius-8);
+  box-shadow: var(--shadow-1);
+}
+
+/* ── Simulation artifacts ── */
+.sim-popup .title, .sim-modal .title { color: var(--accent); }
+.sim-presets .status-btn {
+  background: var(--raise);
+  border: 1px solid var(--chalk);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  border-radius: var(--radius-4);
+  transition: background var(--ease) 160ms, color var(--ease) 160ms;
+}
+.sim-presets .status-btn:hover { background: var(--dugout); color: var(--ink-1); }
+.sim-presets .status-btn.sim-preset.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Buttons ── */
+.btn-primary, .lh-btn-primary {
+  background: var(--accent);
+  color: var(--void);
+  border: 1px solid var(--accent);
+  font-family: var(--font-display);
+  border-radius: var(--radius-4);
+  transition: transform var(--ease) 140ms, background var(--ease) 140ms;
+}
+.btn-primary:hover, .lh-btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 85%, var(--void));
+  transform: translateY(-1px);
+}
+.btn-ghost, .lh-btn {
+  background: transparent;
+  border: 1px solid var(--chalk);
+  color: var(--ink-1);
+  border-radius: var(--radius-4);
+}
+
+/* ── Skeleton loader (replaces the circular spinner) ── */
+.loading-state { display: flex; gap: var(--space-3); align-items: flex-start; }
+.skeleton {
+  position: relative;
+  min-height: 12px;
+  border-radius: var(--radius-4);
+  background: linear-gradient(
+    90deg,
+    var(--raise) 0%,
+    color-mix(in srgb, var(--raise) 55%, var(--chalk)) 40%,
+    var(--raise) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s var(--ease) infinite;
+}
+.skeleton-block { height: 112px; width: 100%; }
+.skeleton-line { height: 12px; width: 62%; margin-bottom: var(--space-2); }
+.skeleton-line.short { width: 38%; }
+.skeleton-line.tall { height: 22px; width: 44%; }
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* ── Motion (transform / opacity only) ── */
+@keyframes draw {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+#bracketSvg, .bracket-grid { animation: draw 420ms var(--ease) both; }
+.eval-row-enter { animation: draw 260ms var(--ease) both; }
+
+/* Gate all decorative motion */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  #bracketSvg, .bracket-grid, .eval-row-enter { animation: none; }
+  .team-card, .btn-primary, .lh-btn-primary { transition: none; }
+}
+
 /* ── WC Earth Tone Palette ── */
 .competition-worldcup {
   background: linear-gradient(rgba(10,12,20,0.55), rgba(10,12,20,0.65)), url("images/wc.webp") center / cover fixed no-repeat;
