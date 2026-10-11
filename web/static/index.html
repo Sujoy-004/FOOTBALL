@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FOOTBALL — Multi-Competition Predictor</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Orbitron:wght@400;700&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="static/shared.css">
 </head>
 <body>
@@ -46,11 +43,19 @@
   </div>
   <div class="bd-vignette"></div>
 </div>
-<div id="app">
-  <div class="nav-bar" id="navBar"></div>
-  <div id="contentArea"></div>
-  <div class="status-bar" id="statusBar"></div>
+<div id="app" class="app-shell">
+  <aside class="app-sidebar" id="appSidebar">
+    <div class="nav-bar" id="navBar"></div>
+  </aside>
+  <div class="app-main" id="appMain">
+    <header class="topbar" id="appTopbar"></header>
+    <div id="contentArea"></div>
+    <footer class="lower-third" id="appLowerThird">
+      <div class="status-bar" id="statusBar"></div>
+    </footer>
+  </div>
 </div>
+<button class="drawer-toggle" id="drawerToggle" aria-label="Toggle competition menu" aria-expanded="false">&#9776;</button>
 
 <script type="module" src="static/shared.js"></script>
 </body>
