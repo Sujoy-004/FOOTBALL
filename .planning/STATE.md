@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02.1-01-PLAN.md
-last_updated: "2026-10-11T12:10:40.204Z"
+stopped_at: Completed 02.1-02-PLAN.md
+last_updated: "2026-10-11T12:42:00.000Z"
 last_activity: 2026-10-11
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 21
-  completed_plans: 18
-  percent: 86
+  completed_plans: 19
+  percent: 90
 ---
 
 # Project State
@@ -28,7 +28,7 @@ and the engine's accuracy **measured** against naive baselines instead of claime
 ## Current Position
 
 Phase: 02.1 (frontend-restyle-and-ux-coherence) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-10-11
 
@@ -38,7 +38,7 @@ proven; one `atomic_write_text` in `football_core/state.py`; `web/wc_app.py` red
 961 -> 673 lines; `tests/test_layering_architecture.py` enforces both forbidden directions.
 Gate held at 105 -> 105 node ids against `01-01-BASELINE.md` in every one of the 7 plans.
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -87,6 +87,7 @@ Progress: [█████████░] 86%
 | Phase 02 P09 | 35min | 3 tasks | 4 files |
 | Phase 2 P10 | 30 | 3 tasks | 8 files |
 | Phase 02.1-frontend-restyle-and-ux-coherence P01 | 23min | 3 tasks | 8 files |
+| Phase 02.1-frontend-restyle-and-ux-coherence P02 | 26min | 3 tasks | 1 file |
 
 ## Accumulated Context
 
@@ -202,12 +203,25 @@ Decisions are logged in the PROJECT.md Key Decisions table. Roadmap-specific:
 - [Phase ?]: Self-hosted woff2 fonts (Space Grotesk/Manrope/JetBrains Mono 500/700) replace Google Fonts hotlinks - zero external font network requests at runtime
 - [Phase ?]: Design tokens live in an additive :root block in shared.css; legacy hardcoded font-family/palette literals NOT migrated here (Plan 02 task 3)
 - [Phase ?]: index.html restructured to app-shell grid regions (sidebar | main -> topbar | content | lower-third) preserving JS mount ids navBar/contentArea/statusBar
+- [Phase 02.1]: Plan 02 - `web/static/shared.css` now consumes the whole Plan-01 token layer; Orbitron/Playfair and all five legacy palette literals (#16A085/#153D4C/#F6DBC0/#140C30/#15565B) plus their rgba() forms retired; LaLiga reds #E85D5D/#7A2E2E -> var(--foul). `#153D4C` mapped CONTEXTUALLY: lines with `solid #153D4C` or lacking `background` -> var(--chalk); background fills -> var(--raise). rgba() -> color-mix(in srgb, var(--token) P%, transparent); 8-digit hex replaced before 6-digit. Pinned contract blocks preserved byte-exact.
+- [Phase 02.1]: Plan 02 - the legacy `@media (max-width:800px)` horizontal `.nav-bar` rule was NOT deleted; the new shell `.nav-bar` base rule was inserted AFTER it, so at equal specificity the later rule wins and the legacy horizontal-nav behaviour is neutralised (keeps the diff additive, avoids the ≤1100px rail / ≤768px drawer conflict).
+- [Phase 02.1]: Plan 02 - the repo carries 70 PRE-EXISTING, unrelated test failures (UCL season/snapshot/truth payloads) plus 2 errors; proven unrelated because `git diff a02227a HEAD --stat` shows only `web/static/shared.css` changed and the failing tests never read CSS. CSS contract tests (`test_simulation_shell_contract.py`, `test_ui_normalization_shell.py`) pass 65/65.
 
 ### Pending Todos
 
 None yet.
 
 ### Blockers/Concerns
+
+- **Phase 02.1 (2026-10-11): 70 pre-existing failing tests + 2 errors, NOT caused by Plan 02.**
+  All are UCL/season/snapshot/truth-payload nodes (`test_season_transition.py`,
+  `test_snapshot_isolation.py`, `test_truth_payloads.py`, `test_ucl_presentation_contract.py`,
+  `test_ucl_refresh_season_scoped.py`, `test_active_season_sim.py`); none read `shared.css`.
+  Proven unrelated: Plan 02's three commits (`4e2f325`, `3174df5`, `787897a`) change ONLY
+  `web/static/shared.css` (`git diff a02227a HEAD --stat`), and stashing the uncommitted
+  `competitions/ucl/src/state.py` / `competitions/ucl/tests/test_state_ucl.py` does not make
+  them pass. Full suite: 70 failed, 1871 passed, 7 skipped, 2 errors. Owned by the UCL
+  data/pipeline track, not this CSS plan.
 
 - **Phase 01→02 (2026-10-06): the baseline SHRANK — 105 → 100 node ids, 0 new.**
   Ingesting the 18 real UCL matchday-1 results (`FootballDataOrgProvider`, via the app's
@@ -305,6 +319,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T12:10:40.179Z
-Stopped at: Completed 02.1-01-PLAN.md
+Last session: 2026-10-11T12:42:00.000Z
+Stopped at: Completed 02.1-02-PLAN.md
 Resume file: None
