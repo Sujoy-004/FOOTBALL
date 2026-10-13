@@ -58,6 +58,83 @@ def _empty_ko_store() -> dict:
     }
 
 
+def _populate_ko_from_standings(active_dp: Path, root_dp: Path) -> dict:
+    payload, _, _ = load_json_store(active_dp / "results.json")
+    matches = payload.get("matches", payload) if isinstance(payload, dict) else payload
+    if not isinstance(matches, list):
+        matches = []
+    standings: dict[str, dict] = {}
+    for m in matches:
+        if not isinstance(m, dict):
+            continue
+        if m.get("home_score") is None or m.get("away_score") is None:
+            continue
+        team_a, team_b = m.get("team_a"), m.get("team_b")
+        if not team_a or not team_b:
+            continue
+        hs, as_ = _as_int(m.get("home_score")), _as_int(m.get("away_score"))
+        if hs is None or as_ is None:
+            continue
+        for team in (team_a, team_b):
+            if team not in standings:
+                standings[team] = {"team": team, "pts": 0, "gd": 0, "gf": 0}
+            standings[team]["gf"] += hs if team == team_a else as_
+            standings[team]["gd"] += (hs - as_) if team == team_a else (as_ - hs)
+        if hs > as_:
+            standings[team_a]["pts"] += 3
+        elif hs < as_:
+            standings[team_b]["pts"] += 3
+        else:
+            standings[team_a]["pts"] += 1
+            standings[team_b]["pts"] += 1
+    table = sorted(standings.values(), key=lambda r: (-r["pts"], -r["gd"], -r["gf"], r["team"]))
+    position_map = {row["team"]: idx + 1 for idx, row in enumerate(table)}
+
+    pairings_payload, pairings_avail, _ = load_json_store(root_dp / "playoff_pairings.json")
+    playoff_entries: list = []
+    if pairings_avail is DataAvailability.AVAILABLE and isinstance(pairings_payload, dict):
+        for tie in pairings_payload.get("pairings", []):
+            pos_a, pos_b = tie.get("position_a"), tie.get("position_b")
+            team_a = next((t for t, p in position_map.items() if p == pos_a), None)
+            team_b = next((t for t, p in position_map.items() if p == pos_b), None)
+            if team_a and team_b:
+                playoff_entries.append({
+                    "match_id": f"playoff_t{tie['tie']}",
+                    "tie_num": tie["tie"],
+                    "round": "playoff",
+                    "team_a": team_a,
+                    "team_b": team_b,
+                })
+
+    rules_payload, rules_avail, _ = load_json_store(root_dp / "bracket_rules.json")
+    r16_entries: list = []
+    playoff_winners: dict[int, str] = {}
+    for entry in playoff_entries:
+        playoff_winners[_as_int(entry.get("tie_num")) or 0] = entry["team_a"]
+    if rules_avail is DataAvailability.AVAILABLE and isinstance(rules_payload, dict):
+        for match in rules_payload.get("matches", []):
+            if match.get("round") != "R16":
+                continue
+            seed = match.get("home_seed")
+            away_tie = match.get("away_playoff_tie")
+            team_a = next((t for t, p in position_map.items() if p == seed), None)
+            team_b = playoff_winners.get(away_tie) if away_tie else None
+            if team_a:
+                r16_entries.append({
+                    "match_id": match["match_id"],
+                    "round": "R16",
+                    "team_a": team_a,
+                    "team_b": team_b,
+                })
+
+    return {
+        "playoff": playoff_entries,
+        "rounds": {"R16": r16_entries, "QF": [], "SF": []},
+        "final": [],
+        "champion": None,
+    }
+
+
 def _as_int(value: Any) -> Optional[int]:
     try:
         return int(value)
@@ -660,6 +737,8 @@ def build_competition_state(data_dir, mode: str = MODE_RESULTS, sim_payload: Opt
 
     if ko_availability is DataAvailability.AVAILABLE:
         ko_store = _normalise_ko_store(ko_payload)
+    elif ko_availability is DataAvailability.MISSING and league_availability is DataAvailability.AVAILABLE:
+        ko_store = _populate_ko_from_standings(_active_dp, dp)
     else:
         ko_store = _empty_ko_store()
 

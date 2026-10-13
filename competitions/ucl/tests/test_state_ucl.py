@@ -31,8 +31,9 @@ def _copy_base_data(tmp_path: Path, with_results: bool = True) -> Path:
         (dst / name).write_text(
             (REAL_DATA_DIR / name).read_text(encoding="utf-8"), encoding="utf-8")
     if with_results:
+        season_results = REAL_DATA_DIR / "seasons" / "2026_27" / "results.json"
         (dst / "results.json").write_text(
-            (REAL_DATA_DIR / "results.json").read_text(encoding="utf-8"), encoding="utf-8")
+            season_results.read_text(encoding="utf-8"), encoding="utf-8")
     return dst
 
 
@@ -181,10 +182,9 @@ def test_missing_knockout_store_produces_skeletons(tmp_path):
     r16 = state["stages"]["R16"]["matches"]
     assert [m["id"] for m in r16] == _rules_ids(dst, "R16")
     for match in r16:
-        assert match["team_a"] is None and match["team_b"] is None
         assert match["status"] == "scheduled"
         assert match["winner"] is None
-        assert match["provenance"] is None
+        assert match["provenance"] == "manual"
         assert match["slot_sources"] == {"home_seed": match["quarter"], "away_playoff_tie": None} or \
                set(match["slot_sources"].keys()) == {"home_seed", "away_playoff_tie"}
     qf = state["stages"]["QF"]["matches"]
@@ -204,6 +204,49 @@ def test_missing_knockout_store_produces_skeletons(tmp_path):
     assert [m["id"] for m in po] == [f"playoff_t{i}" for i in range(1, 9)]
     assert po[0]["slot_sources"] == {"position_a": 9, "position_b": 24}
     assert po[7]["slot_sources"] == {"position_a": 16, "position_b": 17}
+
+
+def test_missing_knockout_store_populates_slots_from_standings(tmp_path):
+    dst = _copy_base_data(tmp_path)
+    state = build_competition_state(dst)
+    results = json.loads((dst / "results.json").read_text(encoding="utf-8"))
+    matches = results["matches"]
+    played = {}
+    for m in matches:
+        if m.get("home_score") is not None and m.get("away_score") is not None:
+            played[m["match_id"]] = m
+    standings: dict[str, dict] = {}
+    for m in played.values():
+        for team in (m["team_a"], m["team_b"]):
+            if team not in standings:
+                standings[team] = {"team": team, "pts": 0, "gd": 0, "gf": 0}
+            standings[team]["gf"] += m["home_score"] if team == m["team_a"] else m["away_score"]
+            standings[team]["gd"] += (m["home_score"] if team == m["team_a"] else m["away_score"]) - \
+                                      (m["away_score"] if team == m["team_a"] else m["home_score"])
+        if m["home_score"] > m["away_score"]:
+            standings[m["team_a"]]["pts"] += 3
+        elif m["home_score"] < m["away_score"]:
+            standings[m["team_b"]]["pts"] += 3
+        else:
+            standings[m["team_a"]]["pts"] += 1
+            standings[m["team_b"]]["pts"] += 1
+    table = sorted(standings.values(), key=lambda r: (-r["pts"], -r["gd"], -r["gf"], r["team"]))
+    position_map = {row["team"]: idx + 1 for idx, row in enumerate(table)}
+    po = state["stages"]["playoff"]["matches"]
+    pairings = json.loads((dst / "playoff_pairings.json").read_text(encoding="utf-8"))["pairings"]
+    for tie_idx, tie in enumerate(pairings, start=1):
+        node = po[tie_idx - 1]
+        assert node["team_a"] is not None and node["team_b"] is not None
+        assert {node["team_a"], node["team_b"]} == {
+            next(t for t, p in position_map.items() if p == tie["position_a"]),
+            next(t for t, p in position_map.items() if p == tie["position_b"]),
+        }
+    r16 = state["stages"]["R16"]["matches"]
+    for match in r16:
+        assert match["team_a"] is not None
+        seed = match["slot_sources"]["home_seed"]
+        expected_home = next(t for t, p in position_map.items() if p == seed)
+        assert match["team_a"] == expected_home
 
 
 def test_empty_v1_store_is_honest_empty(tmp_path):
