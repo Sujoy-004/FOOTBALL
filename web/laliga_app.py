@@ -841,9 +841,9 @@ def api_validation():
                 "n_matches_fetched": len(results),
                 "n_matches_matched": len(predictions),
                 "prediction_metrics": {
-                    "brier": round(metrics["brier"], 6),
-                    "log_loss": round(metrics["log_loss"], 6),
-                    "accuracy": round(metrics["accuracy"], 6),
+                    "brier": round(metrics["brier"], 6) if metrics["brier"] is not None else None,
+                    "log_loss": round(metrics["log_loss"], 6) if metrics["log_loss"] is not None else None,
+                    "accuracy": round(metrics["accuracy"], 6) if metrics["accuracy"] is not None else None,
                     "n": metrics["n"],
                 },
             },

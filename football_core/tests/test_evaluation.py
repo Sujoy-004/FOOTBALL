@@ -7,8 +7,9 @@ import pytest
 from football_core.evaluation import (
     brier_score, log_loss, compute_metrics,
     calibration_curve, expected_calibration_error,
-    trps, validate_tournament_matrix,
+    trps, tournament_trps, validate_tournament_matrix,
     multi_class_log_loss, multi_class_brier, multi_class_ece,
+    ranked_probability_score, ordered_brier,
 )
 
 
@@ -256,6 +257,51 @@ class TestValidateTournamentMatrix:
         ranks = np.array([1, 1, 1, 1])
         with pytest.raises(ValueError, match="at least 2"):
             validate_tournament_matrix(matrix, ranks)
+
+
+class TestRankedProbabilityScore:
+    """Tests for the match-level ranked probability score (D-13)."""
+
+    def test_perfect_prediction(self):
+        """One-hot prediction at the actual outcome scores 0.0."""
+        assert ranked_probability_score([1.0, 0.0, 0.0], 0) == 0.0
+        assert ranked_probability_score([0.0, 1.0, 0.0], 1) == 0.0
+        assert ranked_probability_score([0.0, 0.0, 1.0], 2) == 0.0
+
+    def test_fully_wrong_one_hot(self):
+        """One-hot prediction at a wrong outcome scores 1.0."""
+        assert ranked_probability_score([0.0, 0.0, 1.0], 0) == 1.0
+        assert ranked_probability_score([1.0, 0.0, 0.0], 2) == 1.0
+
+    def test_uniform_mid(self):
+        """Uniform prediction vs away win: (1/9 + 4/9) / 2 = 5/18."""
+        assert ranked_probability_score([1 / 3, 1 / 3, 1 / 3], 2) == pytest.approx(5 / 18)
+
+    def test_ordered_brier_is_half_rps(self):
+        """ordered_brier == ranked_probability_score(...) / 2 for K=3."""
+        probs = [0.6, 0.3, 0.1]
+        assert ordered_brier(probs, 0) == pytest.approx(
+            ranked_probability_score(probs, 0) / 2
+        )
+
+    def test_tournament_trps_is_trps(self):
+        """tournament_trps is the same object as trps (D-13 alias)."""
+        assert tournament_trps is trps
+
+    def test_raises_on_wrong_length(self):
+        """Non-3 probability vector raises ValueError."""
+        with pytest.raises(ValueError):
+            ranked_probability_score([0.5, 0.5], 0)
+
+    def test_raises_on_bad_sum(self):
+        """Probabilities not summing to ~1.0 raise ValueError."""
+        with pytest.raises(ValueError):
+            ranked_probability_score([0.5, 0.2, 0.1], 0)
+
+    def test_raises_on_bad_index(self):
+        """actual_index outside [0, 2] raises ValueError."""
+        with pytest.raises(ValueError):
+            ranked_probability_score([0.2, 0.5, 0.3], 5)
 
 
 class TestMultiClassLogLoss:

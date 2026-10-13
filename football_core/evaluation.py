@@ -156,6 +156,12 @@ def trps(prediction_matrix: np.ndarray, actual_ranks: np.ndarray,
     return float(np.sum(squared_diff) / (T * (R - 1)))
 
 
+# D-13: the tournament TRPS under a distinct, non-colliding name. `trps` itself
+# is unchanged; consumers (competitions/ucl/src/validation_suite.py,
+# football_core/tests/test_evaluation.py) keep importing the same object.
+tournament_trps = trps
+
+
 def validate_tournament_matrix(
     prediction_matrix: np.ndarray,
     actual_ranks: np.ndarray,
@@ -201,6 +207,70 @@ def validate_tournament_matrix(
             f"actual_ranks must be in range [1, {R}], "
             f"got [{actual_ranks.min()}, {actual_ranks.max()}]"
         )
+
+
+def ranked_probability_score(probs: list[float], actual_index: int) -> float:
+    """Ranked Probability Score (RPS) for a single K=3 match outcome.
+
+    Computed with the cumulative-sum formulation over the canonical class
+    order home -> draw -> away (indices 0/1/2, the same order as
+    ``MatchOutcome.outcome_index``):
+
+        RPS = 1/(K-1) * sum_{k=1}^{K-1} (C_k - O_k)^2
+
+    where ``C`` is the cumulative predicted distribution and ``O`` the
+    cumulative one-hot actual. Scale is [0, 1]: 0.0 for a perfect
+    prediction, 1.0 for a fully-wrong one-hot.
+
+    Conversion: ``ordered_brier = ranked_probability_score(...) / 2`` for
+    K=3 (``multi_class_brier`` divides by 3, i.e. is on a [0, 2/3] scale
+    while sklearn's Brier is [0, 2]; the /2 maps the [0, 1] RPS onto the
+    ordered-Brier scale).
+
+    Parameters
+    ----------
+    probs : list[float]
+        [p_home, p_draw, p_away]; must sum to ~1.0.
+    actual_index : int
+        0 = home, 1 = draw, 2 = away.
+
+    Returns
+    -------
+    float
+        Ranked probability score in [0, 1].
+
+    Raises
+    ------
+    ValueError
+        If ``len(probs) != 3``, ``probs`` does not sum to ~1.0, or
+        ``actual_index`` is outside [0, 2].
+    """
+    if len(probs) != 3:
+        raise ValueError(
+            f"ranked_probability_score requires exactly 3 probabilities, "
+            f"got {len(probs)}"
+        )
+    if not math.isclose(sum(probs), 1.0, rel_tol=1e-5, abs_tol=1e-8):
+        raise ValueError(f"probabilities must sum to 1.0, got {sum(probs)!r}")
+    if not 0 <= actual_index <= 2:
+        raise ValueError(f"actual_index must be in [0, 2], got {actual_index}")
+    cumulative_pred = 0.0
+    cumulative_actual = 0.0
+    rps = 0.0
+    for k in range(2):  # K-1 = 2 cumulative terms
+        cumulative_pred += probs[k]
+        cumulative_actual += 1.0 if k == actual_index else 0.0
+        rps += (cumulative_pred - cumulative_actual) ** 2
+    return rps / 2.0
+
+
+def ordered_brier(probs: list[float], actual_index: int) -> float:
+    """Ordered Brier score for a K=3 match: ``ranked_probability_score(...) / 2``.
+
+    See :func:`ranked_probability_score` for the canonical class order
+    (home -> draw -> away) and the scale rationale.
+    """
+    return ranked_probability_score(probs, actual_index) / 2.0
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

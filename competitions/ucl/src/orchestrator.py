@@ -572,9 +572,9 @@ def run_validation(
         "n_matches_matched": len(predictions),
         "n_odds_available": len(odds_predictions),
         "prediction_metrics": {
-            "brier": round(prediction_metrics["brier"], 6),
-            "log_loss": round(prediction_metrics["log_loss"], 6),
-            "accuracy": round(prediction_metrics["accuracy"], 6),
+            "brier": round(prediction_metrics["brier"], 6) if prediction_metrics["brier"] is not None else None,
+            "log_loss": round(prediction_metrics["log_loss"], 6) if prediction_metrics["log_loss"] is not None else None,
+            "accuracy": round(prediction_metrics["accuracy"], 6) if prediction_metrics["accuracy"] is not None else None,
             "n": prediction_metrics["n"],
         },
         "calibration": calibration,
