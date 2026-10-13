@@ -439,3 +439,191 @@ def multi_class_ece(
         ece += (b["count"] / total_count) * abs(b["mean_confidence"] - b["accuracy"])
 
     return round(ece, 6)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── Held-out calibration diagnostics (D-10 / D-11 / D-12) ──────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# D-11: every retained classwise-ECE bin must hold at least this many
+# observations; classes that cannot satisfy it are withheld, not emitted.
+CLASSWISE_ECE_MIN_PER_BIN = 20
+
+
+def classwise_ece(
+    probabilities: list[list[float]],
+    actuals: list[int],
+    n_bins: int = 10,
+) -> dict:
+    """Per-class (home/draw/away) Expected Calibration Error (D-10).
+
+    Unlike :func:`multi_class_ece` (which bins by max-confidence), each class
+    is binned by the *predicted probability of that class*, so the block
+    reveals per-outcome miscalibration rather than a single blended number.
+
+    D-11 small-n rule: bins are down-binned (halved) until every retained
+    non-empty bin has ``observations/bin >= 20``. A class whose population
+    cannot satisfy that rule even with a single bin is withheld (returned as
+    ``None`` and named in ``withheld``) rather than emitting a biased number.
+
+    Parameters
+    ----------
+    probabilities : list[list[float]]
+        Nested list where each element is [p_home, p_draw, p_away].
+    actuals : list[int]
+        List of integers: 0 = home, 1 = draw, 2 = away.
+    n_bins : int, optional
+        Starting number of equal-width bins over [0, 1], by default 10.
+
+    Returns
+    -------
+    dict
+        ``{"home": float | None, "draw": float | None, "away": float | None,
+        "macro": float | None, "withheld": list[str]}``. ``macro`` is the mean
+        of the non-withheld class ECEs, or ``None`` when every class is
+        withheld.
+
+    Raises
+    ------
+    ValueError
+        If `probabilities` is empty or `actuals` differs in length.
+    """
+    n = len(probabilities)
+    if n == 0:
+        raise ValueError(
+            "classwise_ece requires a non-empty population; "
+            "empty input is not a perfect score"
+        )
+    if len(actuals) != n:
+        raise ValueError(
+            f"actuals length ({len(actuals)}) must match "
+            f"probabilities length ({n})"
+        )
+
+    class_names = ("home", "draw", "away")
+    values: dict[str, float | None] = {}
+    withheld: list[str] = []
+    for class_idx, name in enumerate(class_names):
+        pairs = [
+            (min(max(probs[class_idx], 0.0), 1.0), 1.0 if actual == class_idx else 0.0)
+            for probs, actual in zip(probabilities, actuals)
+        ]
+        ece = _single_class_ece(pairs, n_bins)
+        if ece is None:
+            values[name] = None
+            withheld.append(name)
+        else:
+            values[name] = ece
+
+    retained = [values[name] for name in class_names if values[name] is not None]
+    macro = round(sum(retained) / len(retained), 6) if retained else None
+
+    return {
+        "home": values["home"],
+        "draw": values["draw"],
+        "away": values["away"],
+        "macro": macro,
+        "withheld": withheld,
+    }
+
+
+def _single_class_ece(pairs: list[tuple[float, float]], n_bins: int) -> float | None:
+    """ECE for one class binned by its predicted probability.
+
+    Down-bins (halving) until every retained non-empty bin has at least
+    ``CLASSWISE_ECE_MIN_PER_BIN`` (20) observations. Returns ``None`` when
+    even a single bin cannot satisfy the rule (D-11).
+    """
+    count = len(pairs)
+    bins = max(1, min(n_bins, count))
+    while bins >= 1:
+        bin_counts = [0] * bins
+        bin_pred_sums = [0.0] * bins
+        bin_actual_sums = [0.0] * bins
+        for p, y in pairs:
+            idx = min(int(p * bins), bins - 1)
+            bin_counts[idx] += 1
+            bin_pred_sums[idx] += p
+            bin_actual_sums[idx] += y
+        if all(c == 0 or c >= CLASSWISE_ECE_MIN_PER_BIN for c in bin_counts):
+            ece = 0.0
+            for c, pred_sum, actual_sum in zip(bin_counts, bin_pred_sums, bin_actual_sums):
+                if c > 0:
+                    ece += (c / count) * abs(pred_sum / c - actual_sum / c)
+            return round(ece, 6)
+        if bins == 1:
+            return None
+        bins = max(1, bins // 2)
+    return None
+
+
+def calibration_slope_intercept(
+    predicted: list[float],
+    actual: list[int | float],
+) -> dict:
+    """Fit ``logit(actual_rate) = intercept + slope * logit(predicted)`` (D-12).
+
+    Read-only held-out diagnostic: maximum-likelihood logistic calibration on
+    the supplied population (Newton-Raphson on the logit transform, numpy
+    only). It never mutates its inputs and never writes or refits production
+    weights. Single-series by design — a per-class caller loops over classes
+    and passes each class's probability series.
+
+    Parameters
+    ----------
+    predicted : list[float]
+        Predicted probabilities for the outcome being calibrated.
+    actual : list[int | float]
+        Observed outcomes (1/0 or 1.0/0.0) aligned with `predicted`.
+
+    Returns
+    -------
+    dict
+        ``{"slope": float, "intercept": float, "n": int}`` with the scalars
+        rounded to 6 decimals.
+
+    Raises
+    ------
+    ValueError
+        If `predicted` is empty or `actual` differs in length.
+    """
+    n = len(predicted)
+    if n == 0:
+        raise ValueError(
+            "calibration_slope_intercept requires a non-empty population; "
+            "empty input is not a perfect score"
+        )
+    if len(actual) != n:
+        raise ValueError(
+            f"actual length ({len(actual)}) must match predicted length ({n})"
+        )
+
+    p = np.clip(np.asarray(predicted, dtype=float), 1e-15, 1 - 1e-15)
+    y = np.asarray(actual, dtype=float)
+    x = np.log(p / (1.0 - p))
+
+    # Newton-Raphson for the 2-parameter logistic likelihood.
+    beta = np.zeros(2)  # [intercept, slope]
+    for _ in range(100):
+        z = np.clip(beta[0] + beta[1] * x, -500.0, 500.0)
+        q = 1.0 / (1.0 + np.exp(-z))
+        w = q * (1.0 - q)
+        resid = y - q
+        grad = np.array([np.sum(resid), np.sum(resid * x)])
+        hess = np.array([
+            [np.sum(w), np.sum(w * x)],
+            [np.sum(w * x), np.sum(w * x * x)],
+        ])
+        try:
+            step = np.linalg.solve(hess + 1e-10 * np.eye(2), grad)
+        except np.linalg.LinAlgError:
+            break
+        beta = beta + step
+        if float(np.max(np.abs(step))) < 1e-10:
+            break
+
+    return {
+        "slope": round(float(beta[1]), 6),
+        "intercept": round(float(beta[0]), 6),
+        "n": n,
+    }

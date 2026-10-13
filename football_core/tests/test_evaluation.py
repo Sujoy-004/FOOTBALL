@@ -10,6 +10,7 @@ from football_core.evaluation import (
     trps, tournament_trps, validate_tournament_matrix,
     multi_class_log_loss, multi_class_brier, multi_class_ece,
     ranked_probability_score, ordered_brier,
+    classwise_ece, calibration_slope_intercept,
 )
 
 
@@ -439,3 +440,125 @@ class TestMultiClassECE:
         actuals = [0] * (n // 2) + [2] * (n - n // 2)  # argmax=0, hit rate 0.5
         ece = multi_class_ece(probs, actuals)
         assert ece == pytest.approx(abs(0.4 - 0.5), abs=1e-6)
+
+
+class TestClasswiseECE:
+    """Tests for per-class expected calibration error (D-10 / D-11)."""
+
+    @staticmethod
+    def _dirichlet_population(n: int, seed: int = 1234) -> tuple[list[list[float]], list[int]]:
+        """Well-calibrated population: Dirichlet probs, actuals drawn from them."""
+        rng = np.random.default_rng(seed)
+        probs = rng.dirichlet([1.0, 1.0, 1.0], size=n)
+        u = rng.random(n)
+        actuals = (u[:, None] < np.cumsum(probs, axis=1)).argmax(axis=1)
+        return probs.tolist(), actuals.tolist()
+
+    def test_well_calibrated_all_classes_near_zero(self):
+        """A calibrated population yields ECE ~ 0 for every class."""
+        probs, actuals = self._dirichlet_population(10_000)
+        result = classwise_ece(probs, actuals)
+        assert result["withheld"] == []
+        for cls in ("home", "draw", "away"):
+            assert result[cls] is not None
+            assert result[cls] == pytest.approx(0.0, abs=0.05)
+        assert result["macro"] == pytest.approx(0.0, abs=0.05)
+
+    def test_per_class_miscalibration_moves_only_that_class(self):
+        """Shifting only the home predictions inflates only the home ECE."""
+        probs, actuals = self._dirichlet_population(10_000)
+        result = classwise_ece(probs, actuals)
+
+        shifted = [
+            [min(p[0] + 0.35, 1.0), p[1], p[2]]
+            for p in probs
+        ]
+        shifted_result = classwise_ece(shifted, actuals)
+
+        assert shifted_result["home"] is not None
+        assert shifted_result["home"] > 0.15
+        # draw and away untouched -> identical to the calibrated run
+        assert shifted_result["draw"] == result["draw"]
+        assert shifted_result["away"] == result["away"]
+        assert shifted_result["macro"] is not None
+
+    def test_small_n_withholds_all_classes(self):
+        """n < 20 per class cannot satisfy observations/bin >= 20 -> withheld."""
+        probs, actuals = self._dirichlet_population(15)
+        result = classwise_ece(probs, actuals)
+        assert result["home"] is None
+        assert result["draw"] is None
+        assert result["away"] is None
+        assert result["macro"] is None
+        assert result["withheld"] == ["home", "draw", "away"]
+
+    def test_concentrated_single_bin_retained(self):
+        """All predictions in one bin with n >= 20 -> retained, ECE computable."""
+        n = 200
+        probs = [[0.5, 0.3, 0.2]] * n
+        actuals = [0] * 100 + [1] * 60 + [2] * 40
+        result = classwise_ece(probs, actuals)
+        assert result["withheld"] == []
+        # home: p=0.5, actual rate = 100/200 = 0.5 -> ECE 0.0
+        assert result["home"] == pytest.approx(0.0, abs=1e-6)
+        # draw: p=0.3, actual rate = 60/200 = 0.3 -> ECE 0.0
+        assert result["draw"] == pytest.approx(0.0, abs=1e-6)
+        # away: p=0.2, actual rate = 40/200 = 0.2 -> ECE 0.0
+        assert result["away"] == pytest.approx(0.0, abs=1e-6)
+
+    def test_empty_raises(self):
+        """Empty input raises ValueError."""
+        with pytest.raises(ValueError):
+            classwise_ece([], [])
+
+    def test_length_mismatch_raises(self):
+        """Mismatched actuals length raises ValueError."""
+        with pytest.raises(ValueError):
+            classwise_ece([[0.5, 0.3, 0.2]], [])
+
+
+class TestCalibrationSlopeIntercept:
+    """Tests for the read-only calibration slope/intercept fit (D-12)."""
+
+    @staticmethod
+    def _synthetic(n: int, slope: float, intercept: float, seed: int = 99) -> tuple[list[float], list[int]]:
+        """Binary outcomes drawn from sigmoid(intercept + slope * logit(p))."""
+        rng = np.random.default_rng(seed)
+        p = rng.uniform(0.05, 0.95, size=n)
+        z = intercept + slope * np.log(p / (1.0 - p))
+        q = 1.0 / (1.0 + np.exp(-z))
+        y = (rng.uniform(size=n) < q).astype(int)
+        return p.tolist(), y.tolist()
+
+    def test_recovers_known_linear_logit(self):
+        """A known synthetic logit is recovered within tolerance."""
+        predicted, actual = self._synthetic(10_000, slope=1.4, intercept=0.3)
+        result = calibration_slope_intercept(predicted, actual)
+        assert result["n"] == 10_000
+        assert result["slope"] == pytest.approx(1.4, abs=0.05)
+        assert result["intercept"] == pytest.approx(0.3, abs=0.05)
+
+    def test_recovers_identity_calibration(self):
+        """Slope 1 / intercept 0 (perfect calibration) is recovered."""
+        predicted, actual = self._synthetic(10_000, slope=1.0, intercept=0.0, seed=7)
+        result = calibration_slope_intercept(predicted, actual)
+        assert result["slope"] == pytest.approx(1.0, abs=0.05)
+        assert result["intercept"] == pytest.approx(0.0, abs=0.05)
+
+    def test_empty_raises(self):
+        """Empty input raises ValueError."""
+        with pytest.raises(ValueError):
+            calibration_slope_intercept([], [])
+
+    def test_length_mismatch_raises(self):
+        """Mismatched actual length raises ValueError."""
+        with pytest.raises(ValueError):
+            calibration_slope_intercept([0.5], [])
+
+    def test_inputs_not_mutated(self):
+        """Read-only contract: the passed lists are unchanged after the call."""
+        predicted = [0.1, 0.4, 0.7, 0.9, 0.33, 0.66]
+        actual = [0, 1, 1, 1, 0, 1]
+        calibration_slope_intercept(predicted, actual)
+        assert predicted == [0.1, 0.4, 0.7, 0.9, 0.33, 0.66]
+        assert actual == [0, 1, 1, 1, 0, 1]
