@@ -1,6 +1,11 @@
 .planning/
 .opencode/
 
+# Local dev-server logs (regenerable)
+.server-err.log
+.server-out.log
+*.log
+
 # Python
 __pycache__/
 *.pyc
