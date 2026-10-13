@@ -1,4 +1,11 @@
-"""Shared accuracy metric primitives — extracted from WC evaluation.py."""
+"""Shared accuracy metric primitives — extracted from WC evaluation.py.
+
+Empty-input policy (D-15): an empty population is never a perfect score.
+The `multi_class_*` primitives raise `ValueError` on empty input, and
+`compute_metrics` returns `None` metrics with `n == 0`. Consumers must
+guard empty populations explicitly (see `historical_backfill.metrics_from`
+and `competitions/ucl/src/gate.py`).
+"""
 
 import math
 from dataclasses import dataclass
@@ -46,8 +53,13 @@ def log_loss(prediction: float, actual: float, eps: float = 1e-15) -> float:
 
 
 def compute_metrics(predictions: list[float], actuals: list[float]) -> dict:
+    """Binary-shape convenience metrics; empty input yields `None` metrics.
+
+    An empty (or length-mismatched) population is not a perfect score, so
+    the metric values are returned as `None` and only `n == 0` is truthful.
+    """
     if not predictions or len(predictions) != len(actuals):
-        return {"brier": 0.0, "log_loss": 0.0, "accuracy": 0.0, "n": 0}
+        return {"brier": None, "log_loss": None, "accuracy": None, "n": 0}
     n = len(predictions)
     brier_sum = ll_sum = 0.0
     correct = 0.0
@@ -216,10 +228,18 @@ def multi_class_log_loss(
     -------
     float
         Multi-class log loss (lower = better).
+
+    Raises
+    ------
+    ValueError
+        If `probabilities` is empty — empty input is not a perfect score.
     """
     n = len(probabilities)
     if n == 0:
-        return 0.0
+        raise ValueError(
+            "multi_class_log_loss requires a non-empty population; "
+            "empty input is not a perfect score"
+        )
 
     total_loss = 0.0
     for probs, actual in zip(probabilities, actuals):
@@ -248,10 +268,18 @@ def multi_class_brier(
     -------
     float
         Multi-class Brier score (0 = perfect, higher = worse).
+
+    Raises
+    ------
+    ValueError
+        If `probabilities` is empty — empty input is not a perfect score.
     """
     n = len(probabilities)
     if n == 0:
-        return 0.0
+        raise ValueError(
+            "multi_class_brier requires a non-empty population; "
+            "empty input is not a perfect score"
+        )
 
     total = 0.0
     for probs, actual in zip(probabilities, actuals):
@@ -286,10 +314,18 @@ def multi_class_ece(
     -------
     float
         Expected Calibration Error (0 = perfectly calibrated, higher = worse).
+
+    Raises
+    ------
+    ValueError
+        If `probabilities` is empty — empty input is not a perfect score.
     """
     n = len(probabilities)
     if n == 0:
-        return 0.0
+        raise ValueError(
+            "multi_class_ece requires a non-empty population; "
+            "empty input is not a perfect score"
+        )
 
     # Adaptive binning for small samples
     if n < 100:

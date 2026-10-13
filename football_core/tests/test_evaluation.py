@@ -56,6 +56,22 @@ class TestComputeMetrics:
         result = compute_metrics([], [])
         assert result["n"] == 0
 
+    def test_empty_returns_none_metrics(self):
+        """Empty input yields None metrics, never a fabricated perfect 0.0."""
+        result = compute_metrics([], [])
+        assert result["brier"] is None
+        assert result["log_loss"] is None
+        assert result["accuracy"] is None
+        assert result["n"] == 0
+
+    def test_length_mismatch_returns_none_metrics(self):
+        """Length-mismatched input yields None metrics, not a computed value."""
+        result = compute_metrics([0.8, 0.3], [1.0])
+        assert result["brier"] is None
+        assert result["log_loss"] is None
+        assert result["accuracy"] is None
+        assert result["n"] == 0
+
     def test_all_perfect(self):
         result = compute_metrics([1.0, 1.0, 1.0], [1.0, 1.0, 1.0])
         assert result["brier"] == 0.0
@@ -259,9 +275,10 @@ class TestMultiClassLogLoss:
         loss = multi_class_log_loss(probs, actuals)
         assert loss > 0.0
 
-    def test_empty_returns_zero(self):
-        """Empty input returns 0.0."""
-        assert multi_class_log_loss([], []) == 0.0
+    def test_empty_raises(self):
+        """Empty input raises ValueError, never returns a perfect 0.0."""
+        with pytest.raises(ValueError):
+            multi_class_log_loss([], [])
 
     def test_clamping_prevents_inf(self):
         """Zero probability is clamped to avoid infinite loss."""
@@ -289,9 +306,10 @@ class TestMultiClassBrier:
         score = multi_class_brier(probs, actuals)
         assert score == pytest.approx(2.0 / 3.0, abs=1e-10)
 
-    def test_empty_returns_zero(self):
-        """Empty input returns 0.0."""
-        assert multi_class_brier([], []) == 0.0
+    def test_empty_raises(self):
+        """Empty input raises ValueError, never returns a perfect 0.0."""
+        with pytest.raises(ValueError):
+            multi_class_brier([], [])
 
 
 class TestMultiClassECE:
@@ -319,9 +337,10 @@ class TestMultiClassECE:
         assert isinstance(ece, float)
         assert 0.0 <= ece <= 1.0
 
-    def test_empty_returns_zero(self):
-        """Empty input returns 0.0."""
-        assert multi_class_ece([], []) == 0.0
+    def test_empty_raises(self):
+        """Empty input raises ValueError, never returns a perfect 0.0."""
+        with pytest.raises(ValueError):
+            multi_class_ece([], [])
 
     def test_single_bin_with_few_samples(self):
         """Small sample triggers adaptive binning, never errors."""
