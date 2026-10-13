@@ -1,4 +1,4 @@
-/* ── Design tokens (Phase 02.1) — single source of truth ── */
+/* ── Design tokens (Phase 2 frontend restyle) — single source of truth ── */
 :root {
   /* neutrals (cool, consistent ramp — never pure black) */
   --void: #0A0E12;
@@ -92,7 +92,7 @@ body {
 #app { position: relative; z-index: 1; }
 
 /* Tabs */
-.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--chalk); margin-bottom: 12px; flex-wrap: wrap; }
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--chalk); margin-bottom: 12px; margin-top: 0; flex-wrap: wrap; }
 .tab-btn {
   background: transparent; border: none; color: var(--ink-3); padding: 8px 14px;
   font-family: inherit; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent;
@@ -100,11 +100,11 @@ body {
 }
 .tab-btn:hover { color: var(--ink-1); }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-.tab-content { display: none; }
+.tab-content { display: none; padding-top: 0; }
 .tab-content.active { display: block; }
 
 /* Content area (left side) */
-#contentArea { flex: 1; min-width: 0; order: 1; padding: 12px 16px; }
+#contentArea { flex: 1; min-width: 0; padding: 12px 16px; }
 
 /* Status bar (bottom, full width) */
 .status-bar { order: 3; width: 100%; }
@@ -150,7 +150,7 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   App shell (Phase 02.1, D-07) — sidebar rail + main column grid.
+   App shell (Phase 2 frontend restyle, D-07) — sidebar rail + main column grid.
    Region geometry for the DOM emitted by index.html (shell) and shared.js
    (nav/topbar/lower-third). Replaces the old flex-wrap #app layout.
    ══════════════════════════════════════════════════════════════════════ */
@@ -191,6 +191,9 @@ body {
   min-width: 0;
   min-height: 100dvh;
 }
+.app-main > .topbar { grid-row: 1; }
+.app-main > #contentArea { grid-row: 2; }
+.app-main > .lower-third { grid-row: 3; }
 
 /* Topbar */
 .topbar {
@@ -276,120 +279,165 @@ body {
   .status-bar .live-dot { animation: none; }
 }
 
-/* ── Landing Page ── */
+/* ══════════════════════════════════════════════════════════════════════
+   LANDING PAGE — Premium Sports Analytics
+   ══════════════════════════════════════════════════════════════════════ */
 
-/* Hero */
+/* Hide sidebar on landing page — full-width content */
+body.landing .app-shell {
+  grid-template-columns: 1fr;
+}
+body.landing .app-sidebar {
+  display: none;
+}
+
+/* Hero — single column, centered */
 .landing-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  align-items: end;
-  gap: var(--space-6);
-  padding: var(--space-8) 0 var(--space-6);
-  text-align: left;
+  grid-template-columns: 1fr;
+  align-items: center;
+  justify-items: center;
+  gap: var(--space-8);
+  padding: var(--space-12) 0 var(--space-8);
+  text-align: center;
   max-width: none; margin: 0;
 }
 .lh-copy { min-width: 0; }
 .lh-copy .lh-title { font-family: var(--font-display); }
+
+/* Signal panel — data credibility card */
 .lh-signal {
   background: var(--dugout);
   border: 1px solid var(--chalk);
   border-radius: var(--radius-8);
   box-shadow: var(--shadow-1);
-  padding: var(--space-4);
+  padding: var(--space-5);
   text-align: left;
   font-variant-numeric: tabular-nums;
 }
-.lh-signal .signal-value { font-family: var(--font-mono); }
-.lh-badge {
-  display: inline-block; font-size: 9px; letter-spacing: 3px; color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); border-radius: 12px; padding: 3px 12px;
-  margin-bottom: 14px; text-transform: uppercase;
+.lh-signal .signal-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: var(--space-2);
 }
+.lh-signal .signal-value {
+  font-family: var(--font-mono); font-size: 13px; color: var(--ink-1);
+  line-height: 1.5; margin-bottom: var(--space-2);
+}
+.lh-signal .signal-note {
+  font-size: 11px; color: var(--ink-3); line-height: 1.5;
+  border-top: 1px solid var(--chalk); padding-top: var(--space-2);
+}
+
+/* Hero badge — small gold pill */
+.lh-badge {
+  display: inline-block; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.18em; color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--radius-full); padding: 4px 14px;
+  margin-bottom: var(--space-4); text-transform: uppercase;
+}
+
+/* Hero headline */
 .lh-title {
   font-family: var(--font-display);
-  font-size: 32px; font-weight: 700; color: var(--ink-1);
-  letter-spacing: 6px; text-transform: uppercase; margin-bottom: 6px;
+  font-size: 40px; font-weight: 700; color: var(--ink-1);
+  letter-spacing: 0.02em; text-transform: uppercase; margin-bottom: var(--space-2);
+  line-height: 1.1;
 }
 .lh-sub {
   font-family: var(--font-body);
-  font-style: italic; font-size: 16px; color: var(--accent); margin-bottom: 10px;
+  font-style: italic; font-size: 17px; color: var(--accent); margin-bottom: var(--space-3);
 }
 .lh-tagline {
-  font-size: 13px; color: var(--ink-3); line-height: 1.6;
-  max-width: 520px; margin: 0 auto 22px;
+  font-size: 14px; color: var(--ink-2); line-height: 1.65;
+  max-width: 540px; margin-bottom: var(--space-5);
 }
-.lh-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+/* Hero CTAs — primary + secondary row */
+.lh-actions { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
 .lh-btn {
-  display: inline-block; padding: 9px 22px; border-radius: 6px;
-  font-family: inherit; font-size: 12px; font-weight: bold; cursor: pointer;
-  text-decoration: none; transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-  letter-spacing: 0.5px;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 12px 28px; border-radius: var(--radius-8);
+  font-family: var(--font-display); font-size: 13px; font-weight: 700;
+  cursor: pointer; text-decoration: none;
+  transition: background 0.18s, transform 0.15s, box-shadow 0.18s, border-color 0.18s;
+  letter-spacing: 0.04em; border: 1px solid transparent;
+  text-align: center; justify-content: center;
 }
 .lh-btn-primary {
-  background: var(--accent); color: var(--void); border: 1px solid var(--accent);
+  background: transparent !important; color: var(--ink-1) !important;
+  border-color: color-mix(in srgb, var(--ink-3) 40%, transparent) !important;
 }
 .lh-btn-primary:hover {
-  background: #1ABC9C; transform: translateY(-1px);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--ink-3) 15%, transparent) !important;
+  border-color: var(--ink-3) !important; transform: translateY(-2px);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--ink-3) 10%, transparent);
 }
 .lh-btn-secondary {
-  background: transparent; color: var(--ink-1); border: 1px solid color-mix(in srgb, var(--ink-3) 60%, transparent);
+  background: transparent !important; color: var(--ink-1) !important;
+  border-color: color-mix(in srgb, var(--ink-3) 40%, transparent) !important;
 }
 .lh-btn-secondary:hover {
-  background: color-mix(in srgb, var(--ink-3) 40%, transparent); border-color: var(--ink-3); transform: translateY(-1px);
+  background: color-mix(in srgb, var(--ink-3) 15%, transparent) !important;
+  border-color: var(--ink-3) !important; transform: translateY(-2px);
 }
+.lh-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
-/* Landing sections */
-.landing-section { margin-top: 28px; }
+/* ── Landing sections ── */
+.landing-section { margin-top: var(--space-10); }
 .ls-title {
   font-family: var(--font-display);
-  font-size: 15px; color: var(--ink-1); margin-bottom: 14px;
-  padding-bottom: 6px; border-bottom: 1px solid color-mix(in srgb, var(--ink-3) 40%, transparent);
+  font-size: 16px; color: var(--ink-1); margin-bottom: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink-3) 30%, transparent);
+  letter-spacing: 0.02em;
 }
 
-/* Competition cards */
-.landing-cards { display: grid; grid-template-columns: 1.7fr 1fr 1fr; gap: var(--space-4); align-items: stretch; }
+/* ── Competition cards ── */
+.landing-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); align-items: stretch; }
 .landing-cards .lc-featured {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   padding: var(--space-6);
 }
 .landing-cards .lc-featured .lcc-badge { color: var(--accent); }
 .lc-card {
-  border: 1px solid color-mix(in srgb, var(--ink-3) 30%, transparent); border-radius: 10px; padding: 20px;
-  background: color-mix(in srgb, var(--void) 60%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.12); cursor: pointer;
-  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+  border: 1px solid color-mix(in srgb, var(--ink-3) 25%, transparent);
+  border-radius: var(--radius-8); padding: var(--space-5);
+  background: var(--dugout);
+  box-shadow: var(--shadow-1); cursor: pointer;
+  transition: border-color 0.18s, transform 0.15s, box-shadow 0.18s;
   display: flex; flex-direction: column; position: relative; overflow: hidden;
 }
 .lc-card::before {
   content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
   background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0; transition: opacity 0.3s;
+  opacity: 0; transition: opacity 0.25s;
 }
-.lc-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 30px color-mix(in srgb, var(--accent) 12%, transparent); }
-.lc-card:hover::before { opacity: 0.6; }
+.lc-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 30px color-mix(in srgb, var(--accent) 10%, transparent); }
+.lc-card:hover::before { opacity: 0.5; }
+.lc-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .lc-card.worldcup {
-  border-color: rgba(211,163,118,0.35);
-  background: linear-gradient(color-mix(in srgb, var(--void) 45%, transparent), color-mix(in srgb, var(--void) 55%, transparent)), url("images/wc.webp") center / cover no-repeat;
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--void) 50%, transparent), color-mix(in srgb, var(--void) 65%, transparent)), url("images/wc.webp") center / cover no-repeat;
 }
 .lc-card.worldcup .lcc-badge { color: #D3A376; }
 .lc-card.worldcup .lcc-stat, .lc-card.worldcup .lcc-loading, .lc-card.worldcup .lcc-coming-soon { color: #D3A376; }
 .lc-card.worldcup .lcc-stat strong, .lc-card.worldcup .lcc-name { color: #FFF2DF; }
 .lc-card.ucl {
-  border-color: color-mix(in srgb, var(--ink-3) 45%, transparent);
-  background: linear-gradient(color-mix(in srgb, var(--void) 60%, transparent), color-mix(in srgb, var(--void) 72%, transparent)), url("images/ucl.webp") center / cover no-repeat;
+  border-color: color-mix(in srgb, var(--ink-3) 35%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--void) 55%, transparent), color-mix(in srgb, var(--void) 70%, transparent)), url("images/ucl.webp") center / cover no-repeat;
 }
 .lc-card.laliga {
-  border-color: rgba(218,64,64,0.4);
-  background: linear-gradient(rgba(16,8,12,0.55), rgba(16,8,12,0.65)), url("images/laliga.webp") center / cover no-repeat;
+  border-color: rgba(218,64,64,0.35);
+  background: linear-gradient(135deg, rgba(16,8,12,0.5), rgba(16,8,12,0.6)), url("images/laliga.webp") center / cover no-repeat;
 }
 .lc-card.laliga .lcc-badge { color: var(--foul); }
 .lc-card.laliga .lcc-stat, .lc-card.laliga .lcc-loading, .lc-card.laliga .lcc-coming-soon { color: #E8B45D; }
 .lc-card.laliga .lcc-stat strong, .lc-card.laliga .lcc-name { color: #FFE7E7; }
 .lc-card.lc-disabled { opacity: 0.45; cursor: default; }
-.lc-card.lc-disabled:hover { border-color: color-mix(in srgb, var(--ink-3) 30%, transparent); transform: none; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
+.lc-card.lc-disabled:hover { border-color: color-mix(in srgb, var(--ink-3) 25%, transparent); transform: none; box-shadow: var(--shadow-1); }
 .lc-card.lc-disabled:hover::before { opacity: 0; }
-.lcc-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.lcc-top { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
 .lcc-badge {
   font-family: var(--font-display);
   font-size: 22px; font-weight: 700; color: var(--ink-3); letter-spacing: 3px; flex-shrink: 0;
@@ -398,33 +446,37 @@ body {
   font-family: var(--font-display);
   font-size: 16px; font-weight: 700; color: var(--ink-1);
 }
-.lcc-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; font-size: 11px; min-height: 18px; }
-.lcc-stat { color: var(--ink-3); }
-.lcc-stat strong { color: var(--ink-1); font-weight: normal; }
+.lcc-meta { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-3); font-size: 11px; min-height: 18px; }
+.lcc-stat { color: var(--ink-3); font-family: var(--font-mono); }
+.lcc-stat strong { color: var(--ink-1); font-weight: 700; }
 .lcc-loading { color: var(--ink-3); font-size: 11px; font-style: italic; }
 .lcc-coming-soon { color: var(--ink-3); font-size: 11px; font-style: italic; }
 .lcc-chevron {
-  margin-top: auto; font-size: 11px; color: var(--accent); letter-spacing: 0.5px;
+  margin-top: auto; font-family: var(--font-display); font-size: 12px; font-weight: 700;
+  color: var(--accent); letter-spacing: 0.04em;
   transition: color 0.15s;
 }
 .lc-card.lc-disabled .lcc-chevron { color: var(--ink-3); }
 
-/* Feature strip */
-.lf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+/* ── Prediction Engine feature cards ── */
+.lf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
 .lf-card {
-  border: 1px solid color-mix(in srgb, var(--ink-3) 20%, transparent); border-radius: 8px; padding: 16px;
-  background: color-mix(in srgb, var(--void) 40%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  transition: border-color 0.2s, background 0.2s;
-  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--ink-3) 20%, transparent);
+  border-radius: var(--radius-8); padding: var(--space-4);
+  background: var(--dugout);
+  transition: border-color 0.18s, background 0.18s, transform 0.15s;
+  cursor: pointer; display: flex; flex-direction: column;
 }
-.lf-card:hover { border-color: color-mix(in srgb, var(--ink-3) 50%, transparent); background: color-mix(in srgb, var(--void) 60%, transparent); }
-.lf-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lf-card:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--raise); transform: translateY(-2px); }
+.lf-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .lfc-cta {
-  margin-top: 10px; font-size: 11px; color: var(--accent); letter-spacing: 0.5px;
+  margin-top: auto; padding-top: var(--space-3);
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+  color: var(--accent); letter-spacing: 0.04em;
   transition: color 0.15s;
 }
 .lf-card:hover .lfc-cta, .lf-card:focus-visible .lfc-cta { color: var(--ink-1); }
-.lfc-icon { display: flex; gap: 4px; margin-bottom: 10px; }
+.lfc-icon { display: flex; gap: 4px; margin-bottom: var(--space-3); }
 .lfc-dot {
   display: inline-block; width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent); opacity: 0.5;
@@ -434,15 +486,26 @@ body {
 .lf-card:nth-child(3) .lfc-dot { opacity: 0.4; }
 .lf-card:nth-child(4) .lfc-dot:first-child { opacity: 0.8; }
 .lf-card:nth-child(4) .lfc-dot:last-child { opacity: 0.3; }
-.lfc-name { font-size: 12px; color: var(--ink-1); font-weight: bold; margin-bottom: 6px; }
-.lfc-desc { font-size: 11px; color: var(--ink-3); line-height: 1.55; }
+.lfc-name { font-family: var(--font-display); font-size: 13px; color: var(--ink-1); font-weight: 700; margin-bottom: var(--space-2); }
+.lfc-desc { font-size: 12px; color: var(--ink-2); line-height: 1.6; text-align: center; }
 
-@media (max-width: 800px) {
-  .landing-hero { padding: 20px 0 16px; }
-  .lh-title { font-size: 24px; letter-spacing: 4px; }
-  .lh-tagline { font-size: 12px; }
-  .landing-cards { grid-template-columns: 1fr; gap: 10px; }
-  .lf-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .landing-hero { grid-template-columns: 1fr; gap: var(--space-6); padding: var(--space-8) 0 var(--space-6); }
+  .lh-signal { max-width: 480px; }
+  .landing-cards { grid-template-columns: 1fr 1fr; }
+  .lc-featured { grid-column: 1 / -1; }
+  .lf-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .landing-hero { padding: var(--space-6) 0 var(--space-4); }
+  .lh-title { font-size: 28px; letter-spacing: 0.01em; }
+  .lh-sub { font-size: 15px; }
+  .lh-tagline { font-size: 13px; }
+  .lh-actions { width: 100%; }
+  .lh-btn { width: 100%; justify-content: center; }
+  .landing-cards { grid-template-columns: 1fr; gap: var(--space-3); }
+  .lf-grid { grid-template-columns: 1fr; gap: var(--space-2); }
   .ls-title { font-size: 14px; }
 }
 
@@ -479,7 +542,7 @@ body {
 .team-card .ring-fill { height: 100%; border-radius: 2px; transition: width 0.6s; min-width: 2px; }
 .team-card .ring-lbl { font-size: 9px; color: color-mix(in srgb, var(--ink-1) 53%, transparent); text-align: center; margin-top: 2px; }
 
-.chart-section { margin-bottom: 14px; }
+.chart-section { margin-bottom: 14px; margin-top: 0; }
 .chart-section .title { color: var(--accent); font-size: 12px; margin-bottom: 6px; }
 .chart-row {
   display: flex; align-items: center; margin: 2px 0; height: 20px;
@@ -789,7 +852,7 @@ body {
 }
 .landing-backdrop.show {
   display: block;
-  background-image: linear-gradient(rgba(5,10,15,0.72), rgba(5,10,15,0.88)), url("images/stadium.webp");
+  background-image: linear-gradient(rgba(7,12,18,0.88) 0%, rgba(7,12,18,0.94) 50%, rgba(7,12,18,0.98) 100%), url("images/stadium.webp");
   background-size: cover;
   background-position: center;
 }
@@ -891,7 +954,7 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   Shared component archetypes (Phase 02.1, D-03) — token-only consumers.
+   Shared component archetypes (Phase 2 frontend restyle, D-03) — token-only consumers.
    One presentation architecture reused across WorldCup / UCL / LaLiga;
    identity comes from accent + content, never from layout. Additive over
    the base rules above; per-competition palette overrides below still win.

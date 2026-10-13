@@ -213,32 +213,27 @@ function renderLanding() {
   currentCompetition = null;
   pendingFocus = "";
   stopAllCompetitionRefresh();
-  document.body.className = "";
+  document.body.className = "landing";
   document.getElementById("landingBackdrop").classList.add("show");
   // The topbar CTA is view-scoped: leaving a competition clears it so the
   // landing view never shows a stale Refresh button for the wrong competition.
   document.getElementById("appTopbar").innerHTML = "";
 
-  renderNavBar(null);
+  document.getElementById("navBar").innerHTML = "";
 
   document.getElementById("contentArea").innerHTML = `
     <div class="landing-hero">
       <div class="lh-copy">
-        <div class="lh-badge">PREDICTIVE ANALYTICS</div>
+        <div class="lh-badge">Predictive Analytics</div>
         <h1 class="lh-title">FOOTBALL</h1>
         <p class="lh-sub">Multi-Competition Predictor</p>
-        <p class="lh-tagline">Real-time match forecasting powered by Elo ratings, multi-signal blending, and Monte Carlo simulation across football's biggest tournaments.</p>
+        <p class="lh-tagline">Match forecasting powered by Elo ratings, multi-signal blending, and Monte Carlo simulation across football&rsquo;s biggest tournaments.</p>
         <div class="lh-actions">
-          <a class="lh-btn lh-btn-primary" href="#/worldcup">Explore WorldCup 2026</a>
-          <a class="lh-btn lh-btn-primary" href="#/ucl">Explore UEFA Champions League</a>
-          <a class="lh-btn lh-btn-primary" href="#/laliga">Explore LaLiga EA Sports</a>
+          <a class="lh-btn lh-btn-primary" href="#/worldcup">Explore World Cup 2026</a>
+          <a class="lh-btn lh-btn-secondary" href="#/ucl">UEFA Champions League</a>
+          <a class="lh-btn lh-btn-secondary" href="#/laliga">LaLiga EA Sports</a>
         </div>
       </div>
-      <aside class="lh-signal" aria-label="Match-night signal">
-        <div class="signal-label">Match-night signal</div>
-        <div class="signal-value">Real results are ingested the moment they are played</div>
-        <div class="signal-note">Simulations run only on genuinely unplayed fixtures.</div>
-      </aside>
     </div>
 
     <div class="landing-section">
@@ -268,25 +263,25 @@ function renderLanding() {
           <div class="lfc-icon"><span class="lfc-dot"></span></div>
           <div class="lfc-name">Elo Ratings</div>
           <div class="lfc-desc">Dynamic team strength ratings updated with every match result, drawn from international and club competition history.</div>
-          <div class="lfc-cta">Open &rarr;</div>
+          <div class="lfc-cta">View Ratings &rarr;</div>
         </div>
         <div class="lf-card" role="link" tabindex="0" data-route="/worldcup" data-focus="blend">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">Multi-Signal Blending</div>
           <div class="lfc-desc">Refined Elo, market odds, rolling form, squad value, and rest days &mdash; blended by a transparent weighted ensemble.</div>
-          <div class="lfc-cta">Open &rarr;</div>
+          <div class="lfc-cta">See Blend &rarr;</div>
         </div>
         <div class="lf-card" role="link" tabindex="0" data-route="/worldcup" data-focus="simulation">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">Monte Carlo Simulation</div>
           <div class="lfc-desc">Seeded tournament simulations projecting every knockout path, group outcome, and championship probability. You choose whether to simulate and how many runs to run.</div>
-          <div class="lfc-cta">Open &rarr;</div>
+          <div class="lfc-cta">Run Simulation &rarr;</div>
         </div>
         <div class="lf-card" role="link" tabindex="0" data-route="/laliga" data-focus="simulation">
           <div class="lfc-icon"><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span><span class="lfc-dot"></span></div>
           <div class="lfc-name">What-If Analysis</div>
           <div class="lfc-desc">Adjust a team&rsquo;s Elo rating and re-run the seeded simulation &mdash; see exactly how championship probabilities shift.</div>
-          <div class="lfc-cta">Open &rarr;</div>
+          <div class="lfc-cta">Test Scenario &rarr;</div>
         </div>
       </div>
     </div>
