@@ -46,9 +46,10 @@ import numpy as np
 
 from football_core.blender import compute_log_loss_weights
 from football_core.evaluation import multi_class_log_loss
-from football_core.historical_backfill import cache_merge as shared_cache_merge
+from football_core.historical_backfill import BOOT_SEED, N_BOOT, bootstrap_cis, cache_merge as shared_cache_merge
 from football_core.historical_backfill import ece_points as shared_ece_points
 from football_core.historical_backfill import per_match as shared_per_match
+from football_core.historical_backfill import pooled_metrics
 
 from competitions.ucl.historical_backfill.evaluate import (
     SEASONS,
@@ -71,9 +72,6 @@ from competitions.ucl.src.historical import (
 )
 
 OUT_PATH = os.path.join(HISTORICAL_DIR, "evaluation", "market_elo_results.json")
-
-BOOT_SEED = 20260601
-N_BOOT = 2000
 
 CORE_MODELS = [
     ("market_only", ["market_odds"], None),
@@ -191,58 +189,19 @@ def ece_from_cache(conf: np.ndarray, hit: np.ndarray, n_bins: int = 10) -> float
     return round(shared_ece_points(conf, hit, n_bins), 6)
 
 
-def pooled_metrics(c: dict) -> dict:
-    return {
-        "n": c["n"],
-        "log_loss": round(float(c["ll"].mean()), 6),
-        "brier": round(float(c["brier"].mean() / 3), 6),
-        "ece": ece_from_cache(c["conf"], c["hit"]),
-        "mean_confidence": round(float(c["conf"].mean()), 6),
-        "accuracy": round(float(c["hit"].mean()), 6),
-    }
-
-
-def bootstrap_cis(cached: dict[str, dict]) -> dict:
-    rng = np.random.default_rng(BOOT_SEED)
-    n = cached[next(iter(cached))]["n"]
-    idx = rng.integers(0, n, size=(N_BOOT, n))
-
-    out: dict = {}
-    for name, c in cached.items():
-        ll_b = c["ll"][idx].mean(axis=1)
-        br_b = c["brier"][idx].mean(axis=1) / 3
-        ece_b = np.array([ece_from_cache(c["conf"][row], c["hit"][row]) for row in idx])
-        out[name] = {
-            "log_loss": {"2.5": round(float(np.percentile(ll_b, 2.5)), 6),
-                         "97.5": round(float(np.percentile(ll_b, 97.5)), 6)},
-            "brier": {"2.5": round(float(np.percentile(br_b, 2.5)), 6),
-                      "97.5": round(float(np.percentile(br_b, 97.5)), 6)},
-            "ece": {"2.5": round(float(np.percentile(ece_b, 2.5)), 6),
-                    "97.5": round(float(np.percentile(ece_b, 97.5)), 6)},
-        }
-
-    pairs = [
-        ("prod_ensemble", "me_equal"), ("prod_ensemble", "market_only"),
-        ("me_equal", "market_only"), ("me_equal", "elo_only"),
-        ("me_equal", "me_learned"), ("me_learned", "market_only"),
-        ("me", "me_form"), ("me", "me_rest"),
-        ("me", "me_form_rest"),
-        ("me_form", "me_form_rest"), ("me_rest", "me_form_rest"),
-        ("prod_ensemble", "ens_equal"), ("prod_ensemble", "ens_learned"),
-        ("ens_equal", "me_equal"), ("ens_learned", "me_learned"),
-    ]
-    delta: dict = {}
-    for a, b in pairs:
-        if a not in cached or b not in cached:
-            continue
-        d = cached[a]["ll"][idx].mean(axis=1) - cached[b]["ll"][idx].mean(axis=1)
-        delta[f"{a}_vs_{b}"] = {
-            "delta_ll": round(float(d.mean()), 6),
-            "2.5": round(float(np.percentile(d, 2.5)), 6),
-            "97.5": round(float(np.percentile(d, 97.5)), 6),
-        }
-    out["_delta_ll"] = delta
-    return out
+# UCL-specific paired-delta comparisons, passed to the promoted
+# ``bootstrap_cis`` at each call site so the ``_delta_ll`` block keeps its
+# exact key set (D-09: the resampling core lives in football_core only).
+PAIRS = [
+    ("prod_ensemble", "me_equal"), ("prod_ensemble", "market_only"),
+    ("me_equal", "market_only"), ("me_equal", "elo_only"),
+    ("me_equal", "me_learned"), ("me_learned", "market_only"),
+    ("me", "me_form"), ("me", "me_rest"),
+    ("me", "me_form_rest"),
+    ("me_form", "me_form_rest"), ("me_rest", "me_form_rest"),
+    ("prod_ensemble", "ens_equal"), ("prod_ensemble", "ens_learned"),
+    ("ens_equal", "me_equal"), ("ens_learned", "me_learned"),
+]
 
 
 # ───────────────────────────────── main ─────────────────────────────────
@@ -318,7 +277,7 @@ def main() -> None:
 
     out["pooled"]["n"] = cached_pooled["market_only"]["n"]
     out["pooled"]["models"] = {name: pooled_metrics(c) for name, c in cached_pooled.items()}
-    out["pooled"]["ci"] = bootstrap_cis(cached_pooled)
+    out["pooled"]["ci"] = bootstrap_cis(cached_pooled, pairs=PAIRS)
 
     # ─────── secondary: full all-completed population (619) ───────
     # Grounds the architecture recommendation for matches where market odds
@@ -339,7 +298,7 @@ def main() -> None:
     out["all_pooled"] = {
         "n": cached_all["uniform"]["n"],
         "models": {name: pooled_metrics(c) for name, c in cached_all.items()},
-        "ci": bootstrap_cis(cached_all),
+        "ci": bootstrap_cis(cached_all, pairs=PAIRS),
     }
 
     # ─────────────────── dilution analysis (2021/22-2023/24) ───────────────────
@@ -368,7 +327,7 @@ def main() -> None:
             cache_merge(dil_caches, name, probs, actuals)
 
     out["dilution"]["models"] = {name: pooled_metrics(c) for name, c in dil_caches.items()}
-    out["dilution"]["ci"] = bootstrap_cis(dil_caches)
+    out["dilution"]["ci"] = bootstrap_cis(dil_caches, pairs=PAIRS)
 
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)

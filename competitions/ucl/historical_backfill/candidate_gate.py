@@ -71,9 +71,8 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-import numpy as np
-
 from football_core.blender import EnsembleEngine
+from football_core.historical_backfill import bootstrap_cis, delta_ci, pooled_metrics
 
 from competitions.ucl.historical_backfill.evaluate import (
     SEASONS,
@@ -88,13 +87,9 @@ from competitions.ucl.historical_backfill.evaluate import (
     _signal_output,
 )
 from competitions.ucl.historical_backfill.market_elo_investigation import (
-    BOOT_SEED,
-    N_BOOT,
-    bootstrap_cis,
     cache_merge,
     freq_preds,
     learn_weights,
-    pooled_metrics,
 )
 from competitions.ucl.src.ensemble import (
     MarketEloSignal,
@@ -243,20 +238,6 @@ def produce_model(
         actuals = [o for o in (outcome_index(m) for m in matches) if o is not None]
         return [f] * len(actuals), actuals, []
     raise ValueError(name)
-
-
-def delta_ci(cached: dict, name_a: str, name_b: str) -> dict:
-    """Paired 95% bootstrap CI for (ll_a - ll_b), same seed/resample scheme
-    as ``bootstrap_cis`` (default_rng(BOOT_SEED), N_BOOT draws)."""
-    n = cached[name_a]["n"]
-    rng = np.random.default_rng(BOOT_SEED)
-    idx = rng.integers(0, n, size=(N_BOOT, n))
-    d = cached[name_a]["ll"][idx].mean(axis=1) - cached[name_b]["ll"][idx].mean(axis=1)
-    return {
-        "delta_ll": round(float(d.mean()), 6),
-        "2.5": round(float(np.percentile(d, 2.5)), 6),
-        "97.5": round(float(np.percentile(d, 97.5)), 6),
-    }
 
 
 def run_targeted_tests() -> dict:

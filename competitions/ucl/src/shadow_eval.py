@@ -38,6 +38,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
+from football_core.historical_backfill import BOOT_SEED, N_BOOT, delta_ci
 from football_core.state import atomic_write_text
 
 logger = logging.getLogger("ucl.shadow_eval")
@@ -58,9 +61,6 @@ MODEL_VERSION = "shadow-1.0.0"
 SHADOW_STRATEGIES = ("production", "market_elo_equal", "market_elo_prior")
 _ODDS_KEYS = ("odds_home", "odds_draw", "odds_away")
 _OUTCOME_INDEX = {"H": 0, "D": 1, "A": 2}
-
-BOOT_SEED = 20260601
-N_BOOT = 2000
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -764,22 +764,6 @@ def _match_ll(probs: list[float], actual: int, eps: float = 1e-15) -> float:
     return -math.log(p)
 
 
-def _paired_bootstrap(deltas: list[float], n_boot: int = N_BOOT, seed: int = BOOT_SEED) -> tuple[float, float, float]:
-    """Paired percentile bootstrap on per-match delta series."""
-    import numpy as np
-
-    arr = np.asarray(deltas, dtype=float)
-    n = arr.size
-    rng = np.random.default_rng(seed)
-    idx = rng.integers(0, n, size=(n_boot, n))
-    means = arr[idx].mean(axis=1)
-    return (
-        float(arr.mean()),
-        float(np.percentile(means, 2.5)),
-        float(np.percentile(means, 97.5)),
-    )
-
-
 _PREDICTION_PAIRS = (
     ("market_elo_equal", "production"),
     ("market_elo_prior", "production"),
@@ -861,7 +845,18 @@ def build_report(
             - _match_ll(*per_strategy_scored[first][mid])
             for mid in common
         ]
-        mean, lo, hi = _paired_bootstrap(deltas)
+        # Promoted delta_ci (D-09): identical resampling scheme
+        # (default_rng(BOOT_SEED), N_BOOT draws) now lives only in
+        # football_core.historical_backfill.  A zero model makes the paired
+        # bootstrap of the delta series a special case of the delta-LL CI.
+        _arr = np.asarray(deltas, dtype=float)
+        _boot = delta_ci(
+            {"first": {"n": _arr.size, "ll": _arr},
+             "second": {"n": _arr.size, "ll": np.zeros(_arr.size)}},
+            "first",
+            "second",
+        )
+        mean, lo, hi = _boot["delta_ll"], _boot["2.5"], _boot["97.5"]
         if lo > 0:
             verdict, preferred = "preferred", first
         elif hi < 0:
