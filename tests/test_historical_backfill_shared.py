@@ -289,6 +289,41 @@ def test_ece_points_matches_pre_refactor_formula_and_pins_confidence_one():
     assert shared.ece_points(only_one, np.array([True, False])) == pytest.approx(0.5)
 
 
+# ── D-02 fixed holdout split ──
+
+
+def test_split_train_test_is_strictly_ordered():
+    matches = [
+        {"match_id": "a", "event_date": "2019-05-01T00:00:00Z"},
+        {"match_id": "b", "event_date": "2020-12-31T23:59:59Z"},
+        {"match_id": "c", "event_date": "2021-01-01T00:00:00Z"},
+        {"match_id": "d", "event_date": "2022-06-15T00:00:00Z"},
+    ]
+    train, test = shared.split_train_test(matches)
+    assert [m["match_id"] for m in train] == ["a", "b"]
+    assert [m["match_id"] for m in test] == ["c", "d"]
+    assert max(t["event_date"] for t in train) < min(t["event_date"] for t in test)
+
+
+def test_split_train_test_rejects_undated_and_empty():
+    with pytest.raises(ValueError):
+        shared.split_train_test([{"match_id": "x"}])
+    with pytest.raises(ValueError):
+        shared.split_train_test([{"match_id": "x", "event_date": "2021-03-01T00:00:00Z"}])
+    with pytest.raises(ValueError):
+        shared.split_train_test([{"match_id": "x", "event_date": "2019-03-01T00:00:00Z"}])
+
+
+def test_no_kfold_primitives_in_evaluation_path():
+    import pathlib
+
+    root = pathlib.Path(shared.__file__).resolve().parent
+    for name in ("historical_backfill.py", "evaluation.py"):
+        text = (root / name).read_text(encoding="utf-8")
+        for banned in ("KFold", "StratifiedKFold", "TimeSeriesSplit"):
+            assert banned not in text, f"{banned} found in {name}"
+
+
 # ── build-time validation ──
 
 def test_validate_season_reports_duplicates_and_missing_elo():

@@ -37,9 +37,14 @@ import numpy as np
 
 from football_core.blender import EnsembleEngine, compute_log_loss_weights
 from football_core.evaluation import (
+    CLASSWISE_ECE_MIN_PER_BIN,
+    calibration_slope_intercept,
+    classwise_ece,
     multi_class_brier,
     multi_class_ece,
     multi_class_log_loss,
+    ranked_probability_score,
+    tournament_trps,
 )
 from football_core.signals.market_odds import MarketOddsSignal
 from football_core.signals.refined_elo import RefinedEloSignal
@@ -383,6 +388,48 @@ def first_date(matches: list[dict]) -> str:
     return min((m.get("event_date") or "") for m in matches)
 
 
+# ══════════════════════════════ D-02 fixed holdout split ══════════════════════════════
+
+# Single fixed chronological split (D-02): train = every match dated
+# <= TRAIN_END, test = every match dated >= TEST_START.  No sklearn
+# cross-validation splitter primitives anywhere in the evaluation path
+# (roadmap-locked absent).
+TRAIN_END = "2020-12-31T23:59:59Z"
+TEST_START = "2021-01-01T00:00:00Z"
+
+
+def split_train_test(matches: list[dict], train_end: str = TRAIN_END,
+                     test_start: str = TEST_START) -> tuple[list[dict], list[dict]]:
+    """Partition all matches into the single fixed chronological holdout.
+
+    ISO-8601 UTC strings compare lexicographically.  A match with a
+    missing/empty ``event_date`` is a hard error — an undated match cannot
+    be proven leak-free, so it is never silently bucketed.  The ordering
+    assertion ``max(train) < min(test)`` runs before returning; empty
+    train or test populations are errors.
+    """
+    train: list[dict] = []
+    test: list[dict] = []
+    for m in matches:
+        date = m.get("event_date")
+        if not date:
+            raise ValueError(
+                f"match {m.get('match_id', '?')!r} has no event_date; "
+                "an undated match cannot be proven leak-free"
+            )
+        if date <= train_end:
+            train.append(m)
+        else:
+            test.append(m)
+    if not train:
+        raise ValueError("empty training population at or before the cutoff")
+    if not test:
+        raise ValueError("empty test population after the cutoff")
+    if not max(t["event_date"] for t in train) < min(t["event_date"] for t in test):
+        raise ValueError("split ordering violated: max(train) >= min(test)")
+    return train, test
+
+
 def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
                    signal_order: list[str], prod_raw: dict[str, float],
                    dataset: str, harness: Harness) -> dict:
@@ -538,6 +585,86 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
         "freq": freq_metrics_on(pfreq, poos, harness.outcome_index),
     }
     results["overall"] = overall
+
+    # ─────────────────── D-02 single fixed holdout ───────────────────
+    # One date-aware chronological split (train <= 2020-12-31, test 2021+).
+    # Pitfall 9 decision: the split does NOT feed the legacy seasons[1:]
+    # learned-weights loop — that loop is left as-is for backward
+    # compatibility; the holdout block is computed purely from the pooled
+    # matches by date, independent of the seasons list length.
+    pool = [m for s in seasons for m in season_data[s][0]]
+    holdout: dict = {"split": "single fixed chronological (D-02)"}
+    train, test = split_train_test(pool)
+    holdout["cutoff"] = TRAIN_END
+    holdout["n_train"] = len(train)
+    holdout["n_test"] = len(test)
+    holdout["min_train"] = max(t["event_date"] for t in train)
+    holdout["min_test"] = min(t["event_date"] for t in test)
+    holdout["bootstrap"] = {"n_boot": N_BOOT, "seed": BOOT_SEED}
+
+    test_ids = {id(m) for m in test}
+    holdout_freq = harness.frequency_baseline(train)
+    configs = ("ensemble", "uniform", "freq", "elo_only", "market_only")
+    holdout_probs: dict[str, list] = {c: [] for c in configs}
+    holdout_actuals: dict[str, list] = {c: [] for c in configs}
+    holdout_caches: dict[str, dict] = {c: {} for c in configs}
+    holdout_ens_rows: dict[str, list] = {}
+    holdout["per_season"] = {}
+    for s in seasons:
+        matches, elo = season_data[s]
+        eng = build_engine(signal_order, prod_renorm,
+                           harness.replay_provider(harness.order_matches(matches)))
+        season_test = [m for m in matches if id(m) in test_ids]
+        season_completed = [m for m in season_test if harness.outcome_index(m) is not None]
+        probs_by_cfg: dict[str, list] = {}
+        actuals_by_cfg: dict[str, list] = {}
+        for cfg in configs:
+            probs: list[list[float]] = []
+            actuals: list[int] = []
+            if cfg == "uniform":
+                for m in season_completed:
+                    probs.append([1 / 3, 1 / 3, 1 / 3])
+                    actuals.append(harness.outcome_index(m))
+            elif cfg == "freq":
+                for m in season_completed:
+                    idx = harness.outcome_index(m)
+                    probs.append([holdout_freq["home"], holdout_freq["draw"],
+                                  holdout_freq["away"]])
+                    actuals.append(idx)
+            else:
+                signal_name = {"ensemble": None, "elo_only": "refined_elo",
+                               "market_only": "market_odds"}[cfg]
+                for m in season_test:
+                    idx = harness.outcome_index(m)
+                    if idx is None:
+                        continue
+                    ctx = harness.build_context(m, matches, elo_ratings=elo)
+                    if cfg == "ensemble":
+                        bp = eng.evaluate(m, ctx)
+                        probs.append([bp.home_prob, bp.draw_prob, bp.away_prob])
+                    else:
+                        out = signal_output(signal_name, m, ctx, matches, harness)
+                        probs.append([out.home_prob, out.draw_prob, out.away_prob])
+                    actuals.append(idx)
+            probs_by_cfg[cfg] = probs
+            actuals_by_cfg[cfg] = actuals
+            holdout_probs[cfg].extend(probs)
+            holdout_actuals[cfg].extend(actuals)
+            if actuals:
+                cache_merge(holdout_caches[cfg], cfg, probs, actuals)
+        row = {"n_test": len(season_test)}
+        for cfg in configs:
+            row[cfg] = (metrics_from(probs_by_cfg[cfg], actuals_by_cfg[cfg])
+                        if actuals_by_cfg[cfg] else {"n": 0})
+        holdout_ens_rows[s] = list(zip(probs_by_cfg["ensemble"],
+                                        actuals_by_cfg["ensemble"], season_completed))
+        holdout["per_season"][s] = row
+    holdout["models"] = {
+        cfg: (metrics_from(holdout_probs[cfg], holdout_actuals[cfg])
+              if holdout_actuals[cfg] else {"n": 0})
+        for cfg in configs
+    }
+    results["holdout"] = holdout
 
     # ─────────────────────── leave-one-signal-out ───────────────────────
     configs = {
