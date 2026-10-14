@@ -2,7 +2,7 @@
   "schema": 1,
   "season": "2020/21",
   "storage_deviation": "stored under data/historical instead of the approved data/seasons path because that path is the gitignored runtime season store",
-  "generated_at": "2026-09-22T04:32:56.482574+00:00",
+  "generated_at": "2026-10-14T03:18:34.960461+00:00",
   "checks": {
     "season": "2020_21",
     "n_matches": 380,
@@ -20,9 +20,9 @@
   "sources": {
     "results_odds": {
       "name": "football-data.co.uk SP1 archive",
-      "url": "https://www.football-data.co.uk/mmz4281/{code}/SP1.csv (season 2019/20-2023/24)",
+      "url": "https://www.football-data.co.uk/mmz4281/{code}/SP1.csv (season 2000/01-2025/26)",
       "license": "free for research use (see football-data.co.uk/terms.php)",
-      "note": "single authoritative file per season: 380 completed matches of a 20-team double round-robin with final scores and closing 1X2 odds; bookmaker preference Pinnacle -> Bet365 -> Max -> Avg; odds_known_at recorded as the kickoff event_date (closing line knowable at kickoff)"
+      "note": "single authoritative file per season: 380 completed matches of a 20-team double round-robin with final scores and closing 1X2 odds; bookmaker preference Pinnacle -> Bet365 -> Max -> Avg; odds_known_at recorded as the kickoff event_date (closing line knowable at kickoff). Early seasons pre-date Pinnacle/Bet365 coverage, so odds are simply absent there (coverage reported per season, never fabricated); several early archive files carry ragged trailing columns, normalized by the source adapter without dropping a match."
     },
     "elo": {
       "name": "xgabora/Club-Football-Match-Data EloRatings.csv",
@@ -32,7 +32,7 @@
     },
     "team_keys": {
       "canonical": "data/team_aliases.json keys; long-form aliases used by the 2026/27 production fixtures preferred where present",
-      "extras": "teams absent from 2026/27 (e.g. Almeria, Cadiz, Eibar, Girona, Granada, Huesca, Las Palmas, Leganes, Mallorca, Valladolid) get stable new keys via backfill/team_map.py"
+      "extras": "teams absent from 2026/27 (e.g. Almeria, Cadiz, Eibar, Girona, Granada, Huesca, Las Palmas, Leganes, Mallorca, Valladolid, plus the 2000/01-2018/19 historical clubs Albacete, Cordoba, Gimnastic, Hercules, La Coruna, Murcia, Numancia, Oviedo, Recreativo, Santander, Sp Gijon, Tenerife, Xerez, Zaragoza) get stable new keys via backfill/team_map.py"
     }
   }
 }

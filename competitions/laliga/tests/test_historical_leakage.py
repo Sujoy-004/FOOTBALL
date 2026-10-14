@@ -131,6 +131,12 @@ def test_rest_days_excludes_same_date_match():
 def test_market_odds_no_lookahead():
     pool = _replay_pool()
     for m in pool:
+        if m.get("odds_home") is None:
+            # Archive seasons that supply no closing line (2000/01, 2001/02, and
+            # a handful of early rows) carry no odds fields at all — there is no
+            # odds timestamp to look ahead with, and none is fabricated for them.
+            assert m.get("odds_known_at") is None
+            continue
         assert m.get("odds_known_at") == m["event_date"]
     sig = MarketOddsSignal()
     m0 = dict(pool[0])
