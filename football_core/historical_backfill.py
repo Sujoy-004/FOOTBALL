@@ -944,3 +944,110 @@ def delta_ci(cached: dict, name_a: str, name_b: str) -> dict:
         "2.5": round(float(np.percentile(d, 2.5)), 6),
         "97.5": round(float(np.percentile(d, 97.5)), 6),
     }
+
+
+# ── decision machinery (D-14 / D-16) ─────────────────────────────────────────
+#
+# MDE is direction-only context, not a significance claim; the Holm correction
+# is applied WITHIN one competition across the six ensemble-vs-baseline
+# comparisons; every published number is a CI plus a boolean, never a p-value.
+
+MDE_SD_REF = 0.25
+Z_ALPHA = 1.959964
+Z_POWER = 0.841621
+
+_BASELINES = ("uniform", "freq", "elo_only")
+
+
+def mde_for_n(n: int, sd: float = MDE_SD_REF) -> float:
+    """Minimum detectable effect at the phase's locked anchors.
+
+    ``(Z_ALPHA + Z_POWER) * sd / sqrt(n)`` reproduces the locked values
+    (≈0.058 at n=144, ≈0.069 at n=104 with ``sd=0.25``).  This is
+    direction-only context for a delta — never a significance claim.
+    """
+    return round((Z_ALPHA + Z_POWER) * sd / math.sqrt(n), 6)
+
+
+def holm_thresholds(m: int, alpha: float = 0.05) -> list[float]:
+    """Holm step-down critical levels ``[alpha/m, ..., alpha/2, alpha]``.
+
+    For ``m`` ranked hypotheses the i-th (0-indexed, strongest first) is
+    tested at ``alpha / (m - i)``; the first non-reject freezes the rest.
+    """
+    if m <= 0:
+        raise ValueError("m must be positive")
+    return [round(alpha / (m - i), 6) for i in range(m)]
+
+
+def declare_skill(comparisons: dict, n: int) -> dict:
+    """One-line skill verdict (D-16) over the six paired comparisons.
+
+    ``comparisons`` maps ``ensemble_vs_{baseline}__{log_loss,brier}`` to a
+    paired delta CI: ``{"delta": <point delta>, "2.5": ..., "97.5": ...}``
+    where a NEGATIVE delta favours the ensemble (lower log-loss / Brier).
+
+    Verdict: ``"skill declared"`` only when the ensemble's point delta is
+    favourable on ALL SIX comparisons; otherwise ``"not declared"`` with
+    ``won_by`` naming the baseline that beat the ensemble on the most
+    metrics (ties broken by the largest single losing delta).
+
+    The Holm step-down is applied within this competition across the six
+    comparisons, ranked most-favourable first: a comparison ``survives``
+    when its CI lies entirely below zero AND every more-favourable
+    comparison also survives (step-down stops at the first CI that
+    includes or exceeds zero).  Published output is a CI plus a boolean
+    per comparison — never a p-value (D-14).
+    """
+    expected = {
+        f"ensemble_vs_{b}__{metric}"
+        for b in _BASELINES
+        for metric in ("log_loss", "brier")
+    }
+    missing = expected - set(comparisons)
+    if missing:
+        raise ValueError(f"missing comparisons: {sorted(missing)}")
+
+    points: dict[str, float] = {}
+    wins: dict[str, int] = {b: 0 for b in _BASELINES}
+    worst_delta: dict[str, float] = {b: 0.0 for b in _BASELINES}
+    for key, comp in comparisons.items():
+        delta = float(comp["delta"])
+        points[key] = delta
+        if delta > 0:  # ensemble worse on this metric
+            baseline = key.split("_vs_")[1].split("__")[0]
+            wins[baseline] += 1
+            worst_delta[baseline] = max(worst_delta[baseline], delta)
+
+    all_favourable = all(d < 0 for d in points.values())
+    won_by = None
+    if not all_favourable:
+        won_by = max(_BASELINES, key=lambda b: (wins[b], worst_delta[b]))
+
+    ordered = sorted(points, key=lambda k: points[k])  # most favourable first
+    levels = holm_thresholds(len(ordered))
+    published: list[dict] = []
+    step_down_open = True
+    for rank, key in enumerate(ordered):
+        lo = float(comparisons[key]["2.5"])
+        hi = float(comparisons[key]["97.5"])
+        favourable = points[key] < 0
+        survives = bool(step_down_open and favourable and hi < 0)
+        if not (favourable and hi < 0):
+            step_down_open = False
+        published.append({
+            "comparison": key,
+            "delta": round(points[key], 6),
+            "ci": [round(lo, 6), round(hi, 6)],
+            "holm_alpha": levels[rank],
+            "favourable": favourable,
+            "survives_holm": survives,
+        })
+
+    return {
+        "verdict": "skill declared" if all_favourable else "not declared",
+        "won_by": won_by,
+        "mde": mde_for_n(n),
+        "n": n,
+        "comparisons": published,
+    }

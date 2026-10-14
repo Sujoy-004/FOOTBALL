@@ -14,7 +14,10 @@ from football_core.historical_backfill import (
     BOOT_SEED,
     N_BOOT,
     bootstrap_cis,
+    declare_skill,
     delta_ci,
+    holm_thresholds,
+    mde_for_n,
     pooled_metrics,
 )
 
@@ -129,3 +132,116 @@ class TestConstants:
 
     def test_n_boot(self):
         assert N_BOOT == 2000
+
+
+# ── MDE ─────────────────────────────────────────────────────────────────────
+
+
+class TestMde:
+    """mde_for_n reproduces both locked anchors (D-14)."""
+
+    def test_anchor_144(self):
+        assert mde_for_n(144) == pytest.approx(0.058, abs=0.001)
+
+    def test_anchor_104(self):
+        assert mde_for_n(104) == pytest.approx(0.069, abs=0.001)
+
+    def test_known_value(self):
+        # (1.959964 + 0.841621) * 0.25 / 12 = 0.058366...
+        assert mde_for_n(144) == 0.058366
+
+
+# ── Holm ─────────────────────────────────────────────────────────────────────
+
+
+class TestHolm:
+    """holm_thresholds yields the step-down critical levels, strongest first."""
+
+    def test_six_levels(self):
+        levels = holm_thresholds(6)
+        assert levels == pytest.approx(
+            [0.05 / 6, 0.05 / 5, 0.05 / 4, 0.05 / 3, 0.05 / 2, 0.05], abs=1e-6
+        )
+
+    def test_ordering_and_sum(self):
+        levels = holm_thresholds(6)
+        assert levels == sorted(levels)
+        assert levels[0] == pytest.approx(0.008333, abs=1e-6)
+        assert levels[-1] == 0.05
+        assert sum(levels) == pytest.approx(0.1225, abs=1e-6)
+
+    def test_custom_alpha(self):
+        assert holm_thresholds(4, alpha=0.10) == pytest.approx(
+            [0.025, 1 / 30, 0.05, 0.10], abs=1e-6
+        )
+
+
+# ── verdict ─────────────────────────────────────────────────────────────────
+
+
+def _comp(delta: float, lo: float, hi: float) -> dict:
+    return {"delta": delta, "2.5": lo, "97.5": hi}
+
+
+def _all_favourable() -> dict:
+    return {
+        "ensemble_vs_uniform__log_loss": _comp(-0.05, -0.10, -0.01),
+        "ensemble_vs_freq__log_loss": _comp(-0.04, -0.09, -0.005),
+        "ensemble_vs_elo_only__log_loss": _comp(-0.03, -0.08, -0.002),
+        "ensemble_vs_uniform__brier": _comp(-0.02, -0.07, -0.001),
+        "ensemble_vs_freq__brier": _comp(-0.015, -0.06, -0.004),
+        "ensemble_vs_elo_only__brier": _comp(-0.01, -0.05, -0.003),
+    }
+
+
+def _freq_wins_both() -> dict:
+    return {
+        "ensemble_vs_uniform__log_loss": _comp(-0.05, -0.10, -0.01),
+        "ensemble_vs_freq__log_loss": _comp(0.02, -0.01, 0.05),
+        "ensemble_vs_elo_only__log_loss": _comp(-0.03, -0.08, -0.002),
+        "ensemble_vs_uniform__brier": _comp(-0.02, -0.07, -0.001),
+        "ensemble_vs_freq__brier": _comp(0.01, -0.005, 0.03),
+        "ensemble_vs_elo_only__brier": _comp(-0.01, -0.05, -0.003),
+    }
+
+
+class TestVerdict:
+    """declare_skill (D-16): all-six-favourable declares, otherwise names winner."""
+
+    def test_skill_declared(self):
+        out = declare_skill(_all_favourable(), n=144)
+        assert out["verdict"] == "skill declared"
+        assert out["won_by"] is None
+        assert out["mde"] == pytest.approx(0.058, abs=0.001)
+        assert out["n"] == 144
+        assert len(out["comparisons"]) == 6
+        assert all(c["favourable"] for c in out["comparisons"])
+
+    def test_not_declared_names_winner(self):
+        out = declare_skill(_freq_wins_both(), n=619)
+        assert out["verdict"] == "not declared"
+        assert out["won_by"] == "freq"
+        assert out["n"] == 619
+        assert out["mde"] == mde_for_n(619)
+
+    def test_missing_comparison_raises(self):
+        bad = _all_favourable()
+        del bad["ensemble_vs_freq__brier"]
+        with pytest.raises(ValueError, match="freq"):
+            declare_skill(bad, n=100)
+
+    def test_no_p_value_in_output(self):
+        for comp in declare_skill(_all_favourable(), n=144)["comparisons"]:
+            assert "p_value" not in comp
+            assert "p" not in comp
+
+    def test_holm_step_down_freezes(self):
+        # The weakest favourable comparison has a CI including zero, so it and
+        # everything after it (less favourable by ranking) do not survive.
+        comps = _all_favourable()
+        comps["ensemble_vs_elo_only__brier"] = _comp(-0.01, -0.05, 0.02)
+        out = declare_skill(comps, n=144)
+        by_name = {c["comparison"]: c for c in out["comparisons"]}
+        assert by_name["ensemble_vs_elo_only__brier"]["survives_holm"] is False
+        # Still declared: the point deltas are all favourable (D-16).
+        assert out["verdict"] == "skill declared"
