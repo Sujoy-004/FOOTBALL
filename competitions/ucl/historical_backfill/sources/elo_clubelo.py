@@ -9,10 +9,15 @@ for every match of the season).
 
 Entry point matches the build.py contract::
 
-    elo: dict[str, dict[str, float]] = fetch_elo_snapshots()
-        # season keyed "2019_20".."2023_24"; each mapping is
-        # canonical team key -> ClubElo strength before the season's first
-        # match.
+    elo: dict[str, dict[str, float]] = fetch_elo_snapshots(seasons)
+        # season keyed by the contract's "20xx_yy" keys — restricted to the
+        # *accepted* seasons the build passes in (defaults to all contract
+        # seasons); each mapping is canonical team key -> ClubElo strength
+        # before the season's first match.
+
+``seasons`` is optional so the build can restrict acquisition to the seasons
+whose results source actually exists: computing a snapshot for a season with no
+openfootball file would raise on the missing first-match date for no reason.
 
 Source notes:
 - ClubElo is live at api.clubelo.com (unreachable from this environment);
@@ -114,7 +119,9 @@ def _load_elo_frame(path: str) -> pd.DataFrame:
     return load_elo_frame(path)
 
 
-def fetch_elo_snapshots() -> Dict[str, Dict[str, float]]:
+def fetch_elo_snapshots(
+    seasons: "list[str] | None" = None,
+) -> Dict[str, Dict[str, float]]:
     global unresolved_clubs
     csv_path = _download(ELO_URL, ELO_CSV)
     frame = _load_elo_frame(csv_path)
@@ -125,8 +132,9 @@ def fetch_elo_snapshots() -> Dict[str, Dict[str, float]]:
         except KeyError:
             return None
 
+    selected = list(SEASONS) if seasons is None else list(seasons)
     snapshots, unresolved_clubs = elo_snapshots(
-        frame, SEASONS, _first_match_date, _resolve
+        frame, selected, _first_match_date, _resolve
     )
     return snapshots
 

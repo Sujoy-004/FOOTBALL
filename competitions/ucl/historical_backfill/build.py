@@ -24,10 +24,13 @@ Adapter entrypoints (implemented by the source subagents):
     )
 
     results: dict[season, list[dict]] = fetch_openfootball_matches()
-        # season keyed "2019_20".."2023_24"; each match dict has
+        # season keyed by the contract's "20xx_yy" keys *that the source
+        # serves*; each match dict has
         #   match_id (MDxx_yy), team_a, team_b (canonical keys),
         #   home_score, away_score, event_date (ISO-8601 UTC),
         #   round_label, home_ground (str|None, "neutral" for COVID final-8)
+        # Returns (results, exclusions): exclusions names every contracted
+        # season the source does not cover (reported, never fabricated).
 
     odds: dict[season, dict[(date, home, away), odds]] = attach_odds()
         # odds: {"odds_home": float, "odds_draw": float, "odds_away": float,
@@ -35,9 +38,9 @@ Adapter entrypoints (implemented by the source subagents):
         # keyed by ISO date (same calendar date convention as results) +
         # canonical home/away team keys.
 
-    elo: dict[season, dict[str, float]] = fetch_elo_snapshots()
+    elo: dict[season, dict[str, float]] = fetch_elo_snapshots(accepted_seasons)
         # canonical team key -> ClubElo archive snapshot strictly before the
-        # season's first match; every canonical team of that season present.
+        # season's first match; computed for the accepted seasons only.
 """
 
 from __future__ import annotations
@@ -57,13 +60,22 @@ from football_core.historical_backfill import (
 
 from competitions.ucl.historical_backfill.contract import (
     HISTORICAL_DIR,
+    REPLAY_NAME,
     SCHEMA,
     SEASONS,
     season_dir,
 )
 
 
-def _retrieve() -> tuple[dict, dict, dict]:
+def _retrieve() -> tuple[dict, dict, dict, dict]:
+    """Run the three adapters for the contracted window.
+
+    Returns ``(results, odds, elo, exclusions)``. ``results`` holds only the
+    seasons whose openfootball source exists and parses; ``exclusions`` names
+    every other contracted season with the reason. The Elo snapshot is computed
+    only for the accepted seasons (a season with no source file has no
+    first-match date to snapshot against).
+    """
     from competitions.ucl.historical_backfill.sources.elo_clubelo import (
         fetch_elo_snapshots,
     )
@@ -72,19 +84,30 @@ def _retrieve() -> tuple[dict, dict, dict]:
         fetch_openfootball_matches,
     )
 
-    results = fetch_openfootball_matches()
+    results, exclusions = fetch_openfootball_matches()
     odds = attach_odds()
-    elo = fetch_elo_snapshots()
-    return results, odds, elo
+    elo = fetch_elo_snapshots(list(results))
+    return results, odds, elo, exclusions
 
 
 def build(verify_only: bool = False) -> dict:
-    results, odds, elo = _retrieve()
+    results, odds, elo, exclusions = _retrieve()
 
-    summary: dict = {"seasons": {}, "replay": {}, "provenance_hashes": {}}
+    accepted = [s for s in SEASONS if s in results]
+    summary: dict = {
+        "seasons": {},
+        "replay": {},
+        "provenance_hashes": {},
+        "accepted_seasons": accepted,
+        "excluded_seasons": dict(exclusions),
+    }
     replay_matches: list[dict] = []
 
     for season, label in SEASONS.items():
+        if season not in results:
+            # Excluded-and-reported: the source is absent or its format era is
+            # unrepresentable. Never fabricated to reach a round window.
+            continue
         matches = results[season]
         ordered = sorted(matches, key=lambda m: m["event_date"])
         for m in ordered:
@@ -113,14 +136,12 @@ def build(verify_only: bool = False) -> dict:
 
     merged = {
         "schema": SCHEMA,
-        "seasons": list(SEASONS.values()),
+        "seasons": [SEASONS[s] for s in accepted],
         "matches": replay_matches,
     }
     summary["replay"] = summarize_replay(replay_matches)
     if not verify_only:
-        write_json(
-            os.path.join(HISTORICAL_DIR, "replay_2019_20_2023_24.json"), merged
-        )
+        write_json(os.path.join(HISTORICAL_DIR, REPLAY_NAME), merged)
     return summary
 
 

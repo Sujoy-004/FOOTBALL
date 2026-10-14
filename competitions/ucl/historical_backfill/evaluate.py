@@ -53,7 +53,9 @@ HISTORICAL_DIR = os.path.join(
 OUT_DIR = os.path.join(HISTORICAL_DIR, "evaluation")
 OUT_PATH = os.path.join(OUT_DIR, "eval_results.json")
 
-SEASONS = ["2019_20", "2020_21", "2021_22", "2022_23", "2023_24"]
+from competitions.ucl.historical_backfill import contract
+
+SEASONS = [s for s in contract.SEASONS if os.path.isdir(contract.season_dir(s))]
 SIGNAL_ORDER = ["market_odds", "refined_elo", "rolling_form", "rest_days"]
 
 PROD_WEIGHTS_RAW = {
@@ -64,7 +66,12 @@ PROD_WEIGHTS_RAW = {
     "squad_value": 0.203813,
 }
 
-DATASET = "competitions/ucl/data/historical (2019/20-2023/24)"
+_WINDOW = (
+    f"{contract.SEASONS[SEASONS[0]]}-{contract.SEASONS[SEASONS[-1]]}"
+    if SEASONS
+    else "none"
+)
+DATASET = f"competitions/ucl/data/historical ({_WINDOW})"
 
 _HARNESS = Harness(
     build_context=build_context_for_match,

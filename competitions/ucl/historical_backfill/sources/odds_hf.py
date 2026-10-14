@@ -6,9 +6,15 @@ Reads closing 1X2 odds from the CC-BY-4.0 v-eatpizzanot/soccer-dataset
 
 ``attach_odds()`` returns:
     dict[season_label, dict[(date, home, away), odds_dict]]
-where season_label is one of "2019_20" .. "2023_24" and odds_dict has
-keys: odds_home, odds_draw, odds_away (floats), bookmaker (str),
+where season_label is one of the contract's ``SEASONS`` keys and odds_dict
+has keys: odds_home, odds_draw, odds_away (floats), bookmaker (str),
 known_at (str|None).
+
+The year -> season-label map is derived from ``contract.SEASONS`` (the single
+source of truth for the window) rather than a fixed literal, so widening the
+contract widens the odds coverage automatically. A season with no odds rows in
+the source keeps an empty bucket — the build reports the covered fraction; it
+is never fabricated to look complete.
 """
 
 from __future__ import annotations
@@ -46,10 +52,16 @@ def _load_parquet(name: str) -> pd.DataFrame:
     return pd.read_parquet(_ensure_parquet(name))
 
 
+# Calendar-year -> season-label map derived from the contract window. A UCL
+# season labelled "2020_21" kicks off in calendar year 2020, so the key is the
+# first four digits of the season key. Deriving it here (rather than a literal)
+# is what keeps the adapter window-generic.
+_SEASON_BY_START_YEAR: dict[int, str] = {int(k[:4]): k for k in SEASONS}
+
+
 def _season_label(start_year: int) -> str | None:
-    """Map a kickoff year to our season label. Only 2019-2023 inclusive."""
-    mapping = {2019: "2019_20", 2020: "2020_21", 2021: "2021_22", 2022: "2022_23", 2023: "2023_24"}
-    return mapping.get(start_year)
+    """Map a kickoff year to our season label, or None if out of window."""
+    return _SEASON_BY_START_YEAR.get(start_year)
 
 
 def _fixture_season(start_year: int, month: int) -> str | None:
@@ -65,12 +77,13 @@ def _fixture_season(start_year: int, month: int) -> str | None:
 
 
 def attach_odds() -> dict[str, dict[tuple[str, str, str], dict[str, Any]]]:
-    """Attach closing 1X2 odds to UCL fixtures for seasons 2019/20-2023/24.
+    """Attach closing 1X2 odds to UCL fixtures for every contract season.
 
     Returns:
-        dict keyed by season label ("2019_20".."2023_24"), each value a dict
-        keyed by (event_date_iso, canonical_home, canonical_away) mapping to
-        an odds dict with floats and bookmaker metadata.
+        dict keyed by season label (contract ``SEASONS`` keys), each value a
+        dict keyed by (event_date_iso, canonical_home, canonical_away) mapping
+        to an odds dict with floats and bookmaker metadata. Seasons the source
+        does not cover keep an empty bucket (reported, not fabricated).
     """
     fixtures_df = _load_parquet("fixtures.parquet")
     odds_df = _load_parquet("odds.parquet")
