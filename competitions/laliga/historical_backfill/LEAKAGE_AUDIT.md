@@ -18,7 +18,7 @@ any later match.
    chronological-key machinery, the replay provider, each signal's input
    channel, the ensemble weight fit, the frequency baseline windows).
 2. **Empirical verification** across **all 1900 matches** of
-   `replay_2019_20_2023_24.json` and the per-season `matches.json` /
+   the then-committed merged replay and the per-season `matches.json` /
    `elo_ratings.json` files via a throwaway script (temp dir, not committed):
    strict-before prior windows, same-date exclusion, form sensitivity, market
    odds provenance, Elo snapshot constancy, weight-fit and frequency-baseline

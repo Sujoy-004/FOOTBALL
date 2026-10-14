@@ -5,7 +5,7 @@ files, the ClubElo archive mirror) to a single canonical key. Keys are the
 exact strings from ``data/team_aliases.json`` (the long-form 2026/27
 production key preferred wherever an alias is ambiguous), plus a small stable
 set of keys for clubs absent from the production fixtures — i.e. clubs that
-featured in La Liga 2019/20-2023/24 but are not in the 2026/27 20-team season
+featured in La Liga 2000/01-2025/26 but are not in the 2026/27 20-team season
 (see ``_ADDED_CANONICAL_KEYS``).
 
 Resolution order:
@@ -38,7 +38,10 @@ _ALIASES_FILE = os.path.join(
 )
 
 # Stable canonical keys for clubs absent from data/team_aliases.json (not in
-# the 2026/27 20-team season but present in 2019/20-2023/24).
+# the 2026/27 20-team season but present in the 2000/01-2025/26 window).
+# NB: RC Deportivo La Coruña and Real Racing Club de Santander already exist as
+# keys in data/team_aliases.json, so only their new source spellings are added
+# to _CURATED below.
 _ADDED_CANONICAL_KEYS: tuple[str, ...] = (
     "UD Almería",       # Almeria
     "Cádiz CF",         # Cadiz
@@ -50,6 +53,19 @@ _ADDED_CANONICAL_KEYS: tuple[str, ...] = (
     "CD Leganés",       # Leganes
     "RCD Mallorca",     # Mallorca
     "Real Valladolid CF",  # Valladolid
+    # 2000/01-2018/19 historical clubs, resolved from the SP1 source files.
+    "Albacete Balompié",     # Albacete
+    "Córdoba CF",            # Cordoba
+    "Gimnàstic de Tarragona",  # Gimnastic (SP1) / Tarragona (ClubElo)
+    "Hércules CF",           # Hercules
+    "Real Murcia CF",        # Murcia
+    "CD Numancia",           # Numancia
+    "Real Oviedo",           # Oviedo
+    "Recreativo de Huelva",  # Recreativo
+    "Real Sporting de Gijón",  # Sp Gijon
+    "CD Tenerife",           # Tenerife
+    "Xerez CD",              # Xerez
+    "Real Zaragoza",         # Zaragoza
 )
 
 # Explicit spellings that survive neither the alias reverse lookup nor (on
@@ -74,6 +90,22 @@ _CURATED: dict[str, str] = {
     "Sociedad": "Real Sociedad de Fútbol",
     "Valladolid": "Real Valladolid CF",
     "Vallecano": "Rayo Vallecano de Madrid",
+    # historical clubs (2000/01-2018/19) — SP1 + ClubElo spellings
+    "Albacete": "Albacete Balompié",
+    "Cordoba": "Córdoba CF",
+    "Gimnastic": "Gimnàstic de Tarragona",
+    "Tarragona": "Gimnàstic de Tarragona",
+    "Hercules": "Hércules CF",
+    "La Coruna": "RC Deportivo La Coruña",
+    "Murcia": "Real Murcia CF",
+    "Numancia": "CD Numancia",
+    "Oviedo": "Real Oviedo",
+    "Recreativo": "Recreativo de Huelva",
+    "Santander": "Real Racing Club de Santander",
+    "Sp Gijon": "Real Sporting de Gijón",
+    "Tenerife": "CD Tenerife",
+    "Xerez": "Xerez CD",
+    "Zaragoza": "Real Zaragoza",
     # diacritic / latinized variants
     "Cadiz CF": "Cádiz CF",
     "Almeria CF": "UD Almería",

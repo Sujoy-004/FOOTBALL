@@ -53,6 +53,8 @@ from competitions.laliga.src.historical import (
     outcome_index,
 )
 
+from competitions.laliga.historical_backfill.contract import SEASONS as _SEASON_LABELS
+
 HISTORICAL_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "historical"
 )
@@ -63,10 +65,12 @@ CONFIG_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config"
 )
 
-SEASONS = ["2019_20", "2020_21", "2021_22", "2022_23", "2023_24"]
+# D-01 window, derived from the contract so the evaluated seasons cannot drift
+# from the committed corpus the build produced.
+SEASONS = list(_SEASON_LABELS)
 SIGNAL_ORDER = ["market_odds", "refined_elo", "rolling_form", "rest_days"]
 
-DATASET = "competitions/laliga/data/historical (2019/20-2023/24)"
+DATASET = "competitions/laliga/data/historical (2000/01-2025/26)"
 
 _HARNESS = Harness(
     build_context=build_context_for_match,

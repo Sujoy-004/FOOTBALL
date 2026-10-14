@@ -11,7 +11,7 @@ of truth) so results and Elo share one kickoff chronology.
 Entry point matches the build.py contract::
 
     elo: dict[str, dict[str, float]] = fetch_elo_snapshots()
-        # season keyed "2019_20".."2023_24"; each mapping is
+        # season keyed "2000_01".."2025_26"; each mapping is
         # canonical team key -> ClubElo strength before the season's first
         # match.
 
@@ -38,6 +38,8 @@ from competitions.laliga.historical_backfill.contract import FD_SEASON_URLS, SEA
 from competitions.laliga.historical_backfill.sources.results_fd import (
     TMP_DIR,
     _download,
+    parse_sp1_date,
+    read_sp1,
 )
 from competitions.laliga.historical_backfill.team_map import canonical
 
@@ -57,9 +59,8 @@ def _first_match_date(season: str) -> date:
     path = _download(
         FD_SEASON_URLS[season], os.path.join(TMP_DIR, f"SP1_{season}.csv")
     )
-    df = pd.read_csv(path)
-    dates = pd.to_datetime(df["Date"], format="%d/%m/%Y")
-    return dates.min().date()
+    df = read_sp1(path)
+    return min(parse_sp1_date(v) for v in df["Date"])
 
 
 def _load_elo_frame(path: str) -> pd.DataFrame:

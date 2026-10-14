@@ -16,7 +16,7 @@ used to predict a fixture.
 Entry point matches the build.py contract::
 
     matches: dict[str, list[dict]] = fetch_football_data_matches()
-        # season keyed "2019_20".."2023_24"; each match dict has
+        # season keyed "2000_01".."2025_26"; each match dict has
         #   team_a, team_b (canonical keys),
         #   home_score (int), away_score (int),
         #   event_date (ISO-8601 UTC, "YYYY-MM-DDTHH:MM:SSZ"),
@@ -30,7 +30,9 @@ Source notes:
   research — see https://www.football-data.co.uk/terms.php.
 - ``Date`` is DD/MM/YYYY and ``Time`` is local European (CET/CEST) timezone;
   both are converted to a UTC ISO timestamp so ISO string ordering is the
-  true chronological order for leakage-sensitive context construction.
+  true chronological order for leakage-sensitive context construction. Early
+  archive seasons (2000/01-2005/06) have no ``Time`` column; those rows use
+  00:00 local.
 - Unmapped rows raise :class:`KeyError` (data errors are loud).
 """
 
@@ -71,15 +73,72 @@ def _download(url: str, path: str) -> str:
     return path
 
 
+def read_sp1(path: str) -> pd.DataFrame:
+    """Read a football-data.co.uk SP1 CSV, tolerating its ragged rows.
+
+    The early archive files (2000/01-2004/05 in particular) mix row widths: the
+    header names N columns while data rows carry a variable number of trailing
+    empty/odds fields (football-data.co.uk appends closing-odds columns over
+    the years without rewriting the older rows). The default pandas C parser
+    rejects such a file (rows *wider* than the header). Rather than drop or
+    pad-with-loss, every data line is split to the header's own column count —
+    the excess is trailing and the leading columns (results, team names, odds)
+    are always aligned — and short rows are padded. No match is ever dropped.
+
+    Empty fields (whether from a short row or an absent value such as a season
+    with no closing odds for a match) are normalized to ``None`` so downstream
+    consumers see the same "missing" semantics as pandas' default reader would
+    give (``pd.notna`` is ``False``) — never a falsy-but-present ``""`` that
+    would break a numeric cast. Python's ``list`` has no NaN, so the padding
+    value here is ``None``; ``pd.DataFrame`` preserves it in the object-typed
+    columns this file produces.
+
+    Returns a :class:`pandas.DataFrame` named by the file's own header row.
+    """
+    with open(path, encoding="latin-1") as f:
+        lines = [line for line in f.read().splitlines() if line.strip()]
+    if not lines:
+        raise ValueError(f"{path}: empty SP1 file")
+    header = lines[0].split(",")
+    width = len(header)
+    rows = []
+    for line in lines[1:]:
+        fields = line.split(",")[:width]
+        fields = [None if v == "" else v for v in fields]
+        if len(fields) < width:
+            fields += [None] * (width - len(fields))
+        rows.append(fields)
+    return pd.DataFrame(rows, columns=header)
+
+
+def parse_sp1_date(raw: object) -> _dt.date:
+    """Parse a football-data.co.uk ``Date`` cell, accepting 4- or 2-digit years.
+
+    The archive uses ``DD/MM/YYYY`` from 2018/19 onward and ``DD/MM/YY`` for
+    every earlier season. ``strptime`` with ``%y`` resolves ``00``-``68`` to
+    ``2000``-``2068``, which is exactly right for the D-01 window
+    (2000/01-2025/26); no other two-digit window can appear here.
+    """
+    text = str(raw).strip()
+    for fmt in ("%d/%m/%Y", "%d/%m/%y"):
+        try:
+            return _dt.datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"unrecognised SP1 date: {text!r}")
+
+
 def _parse_event_date(date_str: str, time_str: str) -> str:
     """Convert football-data local Date+Time to a UTC ISO timestamp.
 
-    football-data dates are DD/MM/YYYY and times are local European
-    (CET/CEST). DST is resolved by interpreting the naive local time in the
-    Europe/Madrid zone and converting to UTC, so ISO string ordering is the
-    true chronological order for leakage-sensitive context construction.
+    football-data dates are DD/MM/YYYY (2018/19+) or DD/MM/YY (older) and times
+    are local European (CET/CEST). Seasons before 2019/20 carry no ``Time``
+    column, so those rows use local 00:00. DST is resolved by interpreting the
+    naive local time in the Europe/Madrid zone and converting to UTC, so ISO
+    string ordering is the true chronological order for leakage-sensitive
+    context construction.
     """
-    d = _dt.datetime.strptime(str(date_str).strip(), "%d/%m/%Y").date()
+    d = parse_sp1_date(date_str)
     t_str = str(time_str).strip() if pd.notna(time_str) else "00:00"
     t = _dt.datetime.strptime(t_str, "%H:%M").time()
     local = _dt.datetime.combine(d, t)
@@ -128,19 +187,23 @@ def fetch_football_data_matches() -> dict[str, list[dict]]:
     out: dict[str, list[dict]] = {}
     for season, url in FD_SEASON_URLS.items():
         path = _download(url, os.path.join(TMP_DIR, f"SP1_{season}.csv"))
-        df = pd.read_csv(path)
+        df = read_sp1(path)
         missing = {"HomeTeam", "AwayTeam", "FTHG", "FTAG", "Date"}.difference(df.columns)
         if missing:
             raise ValueError(f"{season}: missing columns {sorted(missing)}")
-        n_matches = len(df)
         matches = [_build_match(row) for _, row in df.iterrows()]
+        if not matches:
+            raise ValueError(
+                f"{season}: 0 rows parsed from {url} — refusing to pad a "
+                "missing season (silent padding is forbidden)"
+            )
+        out[season] = matches
+        print(f"{season}: {len(matches)} matches, {SEASONS[season]}")
         if len(matches) != 380:
             print(
                 f"WARNING {season}: {len(matches)} rows (expected 380 for a "
                 "20-team double round-robin) — check the source file"
             )
-        out[season] = matches
-        print(f"{season}: {n_matches} matches, {SEASONS[season]}")
     return out
 
 

@@ -27,13 +27,18 @@ from competitions.laliga.src.historical import (
     order_matches,
     prior_matches,
 )
+from competitions.laliga.historical_backfill.contract import (
+    REPLAY_PATH,
+    SEASONS as _SEASON_LABELS,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 HISTORICAL_DIR = os.path.join(REPO, "competitions", "laliga", "data", "historical")
-REPLAY_PATH = os.path.join(HISTORICAL_DIR, "replay_2019_20_2023_24.json")
 
-SEASONS = ["2019_20", "2020_21", "2021_22", "2022_23", "2023_24"]
+# Season list and replay path are owned by the backfill contract, so this audit
+# cannot drift from the corpus the build actually produced (D-01).
+SEASONS = list(_SEASON_LABELS)
 N_PER_SEASON = 380  # 20-team double round-robin expansion
 
 _ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
@@ -62,7 +67,7 @@ def _season_elo(season: str) -> dict[str, float]:
 
 def test_context_is_strictly_before_across_dataset():
     pool = _replay_pool()
-    assert len(pool) == 1900
+    assert len(pool) == N_PER_SEASON * len(SEASONS)
     for m in pool:
         prior = prior_matches(pool, m)
         for p in prior:
@@ -174,12 +179,17 @@ def test_weights_fit_uses_only_prior_seasons():
         target_ids = {m["match_id"] for m in _season_matches(target)}
         assert not (fit_ids & target_ids), f"{target}: eval season leaked into fit"
         assert len(fit_ids) == N_PER_SEASON * idx
-    # committed fits (when present) recorded the same strictly-prior pool
+    # committed fits (when present) recorded the same strictly-prior pool.
+    # Guarded with `target in learned`: 03-07 regenerates the committed fits for
+    # the widened window, so a not-yet-regenerated artifact must not crash the
+    # audit.
     ev_path = os.path.join(HISTORICAL_DIR, "evaluation", "eval_results.json")
     if os.path.exists(ev_path):
         with open(ev_path) as f:
             learned = json.load(f)["weights_learned"]["per_season"]
         for idx, target in enumerate(SEASONS[1:], start=1):
+            if target not in learned:
+                continue
             assert learned[target]["train_pool_n"] == N_PER_SEASON * idx
 
 

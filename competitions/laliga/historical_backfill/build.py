@@ -24,7 +24,7 @@ Adapter entrypoints (implemented by the source submodules):
     )
 
     results: dict[str, list[dict]] = fetch_football_data_matches()
-        # season keyed "2019_20".."2023_24"; each match dict has
+        # season keyed "2000_01".."2025_26"; each match dict has
         #   team_a, team_b (canonical keys),
         #   home_score, away_score, event_date (ISO-8601 UTC),
         #   odds_home/odds_draw/odds_away, odds_bookmaker, odds_known_at
@@ -51,6 +51,7 @@ from football_core.historical_backfill import (
 
 from competitions.laliga.historical_backfill.contract import (
     HISTORICAL_DIR,
+    REPLAY_NAME,
     SCHEMA,
     SEASONS,
     match_id,
@@ -103,9 +104,7 @@ def build(verify_only: bool = False) -> dict:
     }
     summary["replay"] = summarize_replay(replay_matches)
     if not verify_only:
-        write_json(
-            os.path.join(HISTORICAL_DIR, "replay_2019_20_2023_24.json"), merged
-        )
+        write_json(os.path.join(HISTORICAL_DIR, REPLAY_NAME), merged)
     return summary
 
 
@@ -119,7 +118,7 @@ def _provenance_sources(season: str) -> dict:
             "name": "football-data.co.uk SP1 archive",
             "url": (
                 "https://www.football-data.co.uk/mmz4281/{code}/SP1.csv "
-                "(season 2019/20-2023/24)"
+                "(season 2000/01-2025/26)"
             ),
             "license": "free for research use (see football-data.co.uk/terms.php)",
             "note": (
@@ -127,7 +126,11 @@ def _provenance_sources(season: str) -> dict:
                 "of a 20-team double round-robin with final scores and closing "
                 "1X2 odds; bookmaker preference Pinnacle -> Bet365 -> Max "
                 "-> Avg; odds_known_at recorded as the kickoff event_date "
-                "(closing line knowable at kickoff)"
+                "(closing line knowable at kickoff). Early seasons pre-date "
+                "Pinnacle/Bet365 coverage, so odds are simply absent there "
+                "(coverage reported per season, never fabricated); several "
+                "early archive files carry ragged trailing columns, normalized "
+                "by the source adapter without dropping a match."
             ),
         },
         "elo": {
@@ -148,7 +151,10 @@ def _provenance_sources(season: str) -> dict:
             "by the 2026/27 production fixtures preferred where present",
             "extras": "teams absent from 2026/27 (e.g. Almeria, Cadiz, Eibar, "
             "Girona, Granada, Huesca, Las Palmas, Leganes, Mallorca, "
-            "Valladolid) get stable new keys via backfill/team_map.py",
+            "Valladolid, plus the 2000/01-2018/19 historical clubs "
+            "Albacete, Cordoba, Gimnastic, Hercules, La Coruna, Murcia, "
+            "Numancia, Oviedo, Recreativo, Santander, Sp Gijon, Tenerife, "
+            "Xerez, Zaragoza) get stable new keys via backfill/team_map.py",
         },
     }
 

@@ -8,6 +8,8 @@ the FDO provider path unless the deployment forces BSD.
 
 from pathlib import Path
 
+from competitions.laliga.historical_backfill.contract import REPLAY_NAME
+
 SRC_DIR = Path(__file__).parent
 COMP_DIR = SRC_DIR.parent
 DATA_DIR = COMP_DIR / "data"
@@ -17,7 +19,9 @@ CONFIG_DIR = COMP_DIR / "config"
 # Kept apart from CONFIG_DIR/"signal_weights.json", which is the deployed
 # *engine* blend consumed by build_signal_engine and the backfill evaluation.
 BLEND_CALIBRATION_PATH = CONFIG_DIR / "blend_calibration.json"
-HISTORICAL_REPLAY_PATH = DATA_DIR / "historical" / "replay_2019_20_2023_24.json"
+# The merged historical replay's filename is owned by the backfill contract
+# (single source of truth for the D-01 window) — never hardcode it here.
+HISTORICAL_REPLAY_PATH = DATA_DIR / "historical" / REPLAY_NAME
 
 LALIGA_BSD_LEAGUE_ID = 3
 LALIGA_FDO_COMPETITION_ID = "PD"
