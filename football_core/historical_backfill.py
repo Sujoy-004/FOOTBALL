@@ -775,8 +775,7 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
     results["weights_learned"]["stability"] = stability
     results["weights_learned"]["per_season"] = learned
 
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2)
+    atomic_write_text(Path(out_path), json.dumps(results, indent=2))
     print(f"wrote {out_path}")
     return results
 

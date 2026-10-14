@@ -22,11 +22,5 @@
     "line": 1063,
     "symbol": "run_calibration_compute",
     "owner": "Phase 3"
-  },
-  {
-    "path": "football_core/historical_backfill.py",
-    "line": 650,
-    "symbol": "run_evaluation",
-    "owner": "Phase 3"
   }
 ]
