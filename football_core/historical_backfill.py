@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import unicodedata
@@ -858,3 +859,88 @@ def ece_points(conf, hit, n_bins: int = 10) -> float:
             continue
         ece += (cnt / conf.size) * abs(float(conf[mask].mean()) - float(hit[mask].sum() / cnt))
     return ece
+
+
+# ── promoted paired-bootstrap statistics (D-09) ──────────────────────────────
+#
+# One fixed seed and resample count so every comparison is paired and
+# reproducible.  The same index array is reused for every model within a
+# single call, which is the pairing guarantee.
+
+BOOT_SEED = 20260601
+N_BOOT = 2000
+
+
+def pooled_metrics(c: dict) -> dict:
+    """Pooled log-loss / Brier / ECE / confidence / accuracy for one cache entry.
+
+    Brier follows the ``/3`` convention (mean of per-match squared-error
+    vector length, scaled by 1/3).  All values rounded to 6 dp.
+    """
+    return {
+        "n": c["n"],
+        "log_loss": round(float(c["ll"].mean()), 6),
+        "brier": round(float(c["brier"].mean() / 3), 6),
+        "ece": round(ece_points(c["conf"], c["hit"]), 6),
+        "mean_confidence": round(float(c["conf"].mean()), 6),
+        "accuracy": round(float(c["hit"].mean()), 6),
+    }
+
+
+def bootstrap_cis(cached: dict[str, dict], pairs: list[tuple[str, str]] | None = None) -> dict:
+    """Paired percentile bootstrap 95% CIs for every model in ``cached``.
+
+    A single ``idx`` resample index is drawn once and reused for every model,
+    so all comparisons are paired.  If ``pairs`` is supplied, per-pair delta
+    log-loss CIs are appended under ``"_delta_ll"`` using the same ``idx``.
+
+    Output shape (D-14): ``{"2.5": ..., "97.5": ...}`` — never a p-value.
+    """
+    rng = np.random.default_rng(BOOT_SEED)
+    n = cached[next(iter(cached))]["n"]
+    idx = rng.integers(0, n, size=(N_BOOT, n))
+
+    out: dict = {}
+    for name, c in cached.items():
+        ll_b = c["ll"][idx].mean(axis=1)
+        br_b = c["brier"][idx].mean(axis=1) / 3
+        ece_b = np.array([round(ece_points(c["conf"][row], c["hit"][row]), 6) for row in idx])
+        out[name] = {
+            "log_loss": {"2.5": round(float(np.percentile(ll_b, 2.5)), 6),
+                         "97.5": round(float(np.percentile(ll_b, 97.5)), 6)},
+            "brier": {"2.5": round(float(np.percentile(br_b, 2.5)), 6),
+                      "97.5": round(float(np.percentile(br_b, 97.5)), 6)},
+            "ece": {"2.5": round(float(np.percentile(ece_b, 2.5)), 6),
+                    "97.5": round(float(np.percentile(ece_b, 97.5)), 6)},
+        }
+
+    if pairs is not None:
+        delta: dict = {}
+        for a, b in pairs:
+            if a not in cached or b not in cached:
+                continue
+            d = cached[a]["ll"][idx].mean(axis=1) - cached[b]["ll"][idx].mean(axis=1)
+            delta[f"{a}_vs_{b}"] = {
+                "delta_ll": round(float(d.mean()), 6),
+                "2.5": round(float(np.percentile(d, 2.5)), 6),
+                "97.5": round(float(np.percentile(d, 97.5)), 6),
+            }
+        out["_delta_ll"] = delta
+    return out
+
+
+def delta_ci(cached: dict, name_a: str, name_b: str) -> dict:
+    """Paired 95% bootstrap CI for (ll_a - ll_b), same seed/resample scheme
+    as :func:`bootstrap_cis` (``default_rng(BOOT_SEED)``, ``N_BOOT`` draws).
+
+    Returns ``{"delta_ll", "2.5", "97.5"}`` — never a p-value (D-14).
+    """
+    n = cached[name_a]["n"]
+    rng = np.random.default_rng(BOOT_SEED)
+    idx = rng.integers(0, n, size=(N_BOOT, n))
+    d = cached[name_a]["ll"][idx].mean(axis=1) - cached[name_b]["ll"][idx].mean(axis=1)
+    return {
+        "delta_ll": round(float(d.mean()), 6),
+        "2.5": round(float(np.percentile(d, 2.5)), 6),
+        "97.5": round(float(np.percentile(d, 97.5)), 6),
+    }
