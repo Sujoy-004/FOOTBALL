@@ -2,7 +2,7 @@
   "schema": 1,
   "season": "2019/20",
   "storage_deviation": "stored under data/historical instead of the approved data/seasons path because that path is the gitignored runtime season store",
-  "generated_at": "2026-09-10T18:28:21.548733+00:00",
+  "generated_at": "2026-10-14T04:54:31.570251+00:00",
   "checks": {
     "season": "2019_20",
     "n_matches": 119,

@@ -1,7 +1,7 @@
 {
   "meta": {
-    "generated_at": "2026-09-11T02:50:52.600464+00:00",
-    "dataset": "competitions/ucl/data/historical (2019/20-2023/24)",
+    "generated_at": "2026-10-15T08:25:22.547185+00:00",
+    "dataset": "competitions/ucl/data/historical (2011/12-2025/26)",
     "weights": {
       "production_raw": {
         "market_odds": 0.203813,
@@ -22,6 +22,654 @@
     "ece_note": "ece = football_core.evaluation.multi_class_ece (confidence-vs-accuracy ECE; the production implementation)"
   },
   "per_season": {
+    "2011_12": {
+      "n": 125,
+      "odds_n": 0,
+      "elo_covered_n": 87,
+      "all": {
+        "ensemble": {
+          "n": 125,
+          "log_loss": 1.004009,
+          "brier": 0.199561,
+          "ece": 0.119322,
+          "mean_confidence": 0.448668,
+          "accuracy": 0.568
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 125
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 1.056802,
+          "brier": 0.206108,
+          "ece": 0.183738,
+          "mean_confidence": 0.694763,
+          "accuracy": 0.544
+        }
+      },
+      "elo_covered": {
+        "n": 87,
+        "ensemble": {
+          "n": 87,
+          "log_loss": 1.015013,
+          "brier": 0.201988,
+          "ece": 0.118118,
+          "mean_confidence": 0.445106,
+          "accuracy": 0.563218
+        },
+        "elo_only": {
+          "n": 87,
+          "log_loss": 1.055765,
+          "brier": 0.206352,
+          "ece": 0.122998,
+          "mean_confidence": 0.655256,
+          "accuracy": 0.54023
+        }
+      },
+      "odds": null,
+      "window": {
+        "n_fit": 88,
+        "n_eval": 37,
+        "freq_dist": {
+          "home": 0.4318181818181818,
+          "draw": 0.3068181818181818,
+          "away": 0.26136363636363635
+        },
+        "ensemble": {
+          "n": 37,
+          "log_loss": 0.975018,
+          "brier": 0.192188,
+          "ece": 0.2317,
+          "mean_confidence": 0.443963,
+          "accuracy": 0.675676
+        },
+        "elo_only": {
+          "n": 37,
+          "log_loss": 0.963367,
+          "brier": 0.186019,
+          "ece": 0.079373,
+          "mean_confidence": 0.69119,
+          "accuracy": 0.621622
+        },
+        "freq": {
+          "n": 37,
+          "log_loss": 1.012397,
+          "brier": 0.201481,
+          "ece": 0.1898,
+          "mean_confidence": 0.431818,
+          "accuracy": 0.621622
+        }
+      }
+    },
+    "2012_13": {
+      "n": 125,
+      "odds_n": 0,
+      "elo_covered_n": 101,
+      "all": {
+        "ensemble": {
+          "n": 125,
+          "log_loss": 1.03455,
+          "brier": 0.206572,
+          "ece": 0.069686,
+          "mean_confidence": 0.446347,
+          "accuracy": 0.488
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 125
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 1.137779,
+          "brier": 0.222838,
+          "ece": 0.175238,
+          "mean_confidence": 0.680245,
+          "accuracy": 0.52
+        }
+      },
+      "elo_covered": {
+        "n": 101,
+        "ensemble": {
+          "n": 101,
+          "log_loss": 1.049701,
+          "brier": 0.210199,
+          "ece": 0.057953,
+          "mean_confidence": 0.445312,
+          "accuracy": 0.465347
+        },
+        "elo_only": {
+          "n": 101,
+          "log_loss": 1.180377,
+          "brier": 0.232242,
+          "ece": 0.194316,
+          "mean_confidence": 0.660932,
+          "accuracy": 0.485149
+        }
+      },
+      "odds": null,
+      "window": {
+        "n_fit": 88,
+        "n_eval": 37,
+        "freq_dist": {
+          "home": 0.4772727272727273,
+          "draw": 0.2159090909090909,
+          "away": 0.3068181818181818
+        },
+        "ensemble": {
+          "n": 37,
+          "log_loss": 1.085054,
+          "brier": 0.217713,
+          "ece": 0.0449,
+          "mean_confidence": 0.450303,
+          "accuracy": 0.405405
+        },
+        "elo_only": {
+          "n": 37,
+          "log_loss": 1.360233,
+          "brier": 0.262322,
+          "ece": 0.259627,
+          "mean_confidence": 0.692023,
+          "accuracy": 0.432432
+        },
+        "freq": {
+          "n": 37,
+          "log_loss": 1.066415,
+          "brier": 0.2156,
+          "ece": 0.0449,
+          "mean_confidence": 0.477273,
+          "accuracy": 0.432432
+        }
+      }
+    },
+    "2013_14": {
+      "n": 125,
+      "odds_n": 0,
+      "elo_covered_n": 103,
+      "all": {
+        "ensemble": {
+          "n": 125,
+          "log_loss": 0.990394,
+          "brier": 0.196027,
+          "ece": 0.12726,
+          "mean_confidence": 0.4487,
+          "accuracy": 0.576
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 125
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 0.981485,
+          "brier": 0.188418,
+          "ece": 0.125774,
+          "mean_confidence": 0.683175,
+          "accuracy": 0.56
+        }
+      },
+      "elo_covered": {
+        "n": 103,
+        "ensemble": {
+          "n": 103,
+          "log_loss": 0.996672,
+          "brier": 0.197487,
+          "ece": 0.11667,
+          "mean_confidence": 0.448281,
+          "accuracy": 0.563107
+        },
+        "elo_only": {
+          "n": 103,
+          "log_loss": 0.967693,
+          "brier": 0.186904,
+          "ece": 0.102732,
+          "mean_confidence": 0.662714,
+          "accuracy": 0.563107
+        }
+      },
+      "odds": null,
+      "window": {
+        "n_fit": 88,
+        "n_eval": 37,
+        "freq_dist": {
+          "home": 0.4772727272727273,
+          "draw": 0.19318181818181818,
+          "away": 0.32954545454545453
+        },
+        "ensemble": {
+          "n": 37,
+          "log_loss": 0.977982,
+          "brier": 0.193529,
+          "ece": 0.1467,
+          "mean_confidence": 0.447887,
+          "accuracy": 0.594595
+        },
+        "elo_only": {
+          "n": 37,
+          "log_loss": 0.939336,
+          "brier": 0.181274,
+          "ece": 0.088786,
+          "mean_confidence": 0.651842,
+          "accuracy": 0.594595
+        },
+        "freq": {
+          "n": 37,
+          "log_loss": 0.986437,
+          "brier": 0.197051,
+          "ece": 0.0903,
+          "mean_confidence": 0.477273,
+          "accuracy": 0.567568
+        }
+      }
+    },
+    "2014_15": {
+      "n": 125,
+      "odds_n": 0,
+      "elo_covered_n": 89,
+      "all": {
+        "ensemble": {
+          "n": 125,
+          "log_loss": 0.97934,
+          "brier": 0.194219,
+          "ece": 0.128244,
+          "mean_confidence": 0.447731,
+          "accuracy": 0.576
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 125
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 0.971721,
+          "brier": 0.187672,
+          "ece": 0.138118,
+          "mean_confidence": 0.691357,
+          "accuracy": 0.608
+        }
+      },
+      "elo_covered": {
+        "n": 89,
+        "ensemble": {
+          "n": 89,
+          "log_loss": 0.987144,
+          "brier": 0.196085,
+          "ece": 0.166129,
+          "mean_confidence": 0.442678,
+          "accuracy": 0.595506
+        },
+        "elo_only": {
+          "n": 89,
+          "log_loss": 0.966775,
+          "brier": 0.18692,
+          "ece": 0.090696,
+          "mean_confidence": 0.654541,
+          "accuracy": 0.606742
+        }
+      },
+      "odds": null,
+      "window": {
+        "n_fit": 88,
+        "n_eval": 37,
+        "freq_dist": {
+          "home": 0.5,
+          "draw": 0.22727272727272727,
+          "away": 0.2727272727272727
+        },
+        "ensemble": {
+          "n": 37,
+          "log_loss": 0.997581,
+          "brier": 0.197828,
+          "ece": 0.0615,
+          "mean_confidence": 0.452014,
+          "accuracy": 0.513514
+        },
+        "elo_only": {
+          "n": 37,
+          "log_loss": 1.016286,
+          "brier": 0.194546,
+          "ece": 0.117492,
+          "mean_confidence": 0.684987,
+          "accuracy": 0.567568
+        },
+        "freq": {
+          "n": 37,
+          "log_loss": 1.027445,
+          "brier": 0.205606,
+          "ece": 0.0135,
+          "mean_confidence": 0.5,
+          "accuracy": 0.513514
+        }
+      }
+    },
+    "2015_16": {
+      "n": 125,
+      "odds_n": 0,
+      "elo_covered_n": 89,
+      "all": {
+        "ensemble": {
+          "n": 125,
+          "log_loss": 0.956336,
+          "brier": 0.188162,
+          "ece": 0.183291,
+          "mean_confidence": 0.449222,
+          "accuracy": 0.632
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 125
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 0.891427,
+          "brier": 0.168182,
+          "ece": 0.070805,
+          "mean_confidence": 0.697305,
+          "accuracy": 0.64
+        }
+      },
+      "elo_covered": {
+        "n": 89,
+        "ensemble": {
+          "n": 89,
+          "log_loss": 0.965955,
+          "brier": 0.19024,
+          "ece": 0.184549,
+          "mean_confidence": 0.444716,
+          "accuracy": 0.629213
+        },
+        "elo_only": {
+          "n": 89,
+          "log_loss": 0.880632,
+          "brier": 0.165676,
+          "ece": 0.092797,
+          "mean_confidence": 0.663581,
+          "accuracy": 0.651685
+        }
+      },
+      "odds": null,
+      "window": {
+        "n_fit": 88,
+        "n_eval": 37,
+        "freq_dist": {
+          "home": 0.5681818181818182,
+          "draw": 0.17045454545454544,
+          "away": 0.26136363636363635
+        },
+        "ensemble": {
+          "n": 37,
+          "log_loss": 0.966965,
+          "brier": 0.191162,
+          "ece": 0.1804,
+          "mean_confidence": 0.441191,
+          "accuracy": 0.621622
+        },
+        "elo_only": {
+          "n": 37,
+          "log_loss": 0.865919,
+          "brier": 0.161122,
+          "ece": 0.054354,
+          "mean_confidence": 0.67108,
+          "accuracy": 0.648649
+        },
+        "freq": {
+          "n": 37,
+          "log_loss": 1.014518,
+          "brier": 0.201695,
+          "ece": 0.0277,
+          "mean_confidence": 0.568182,
+          "accuracy": 0.540541
+        }
+      }
+    },
+    "2016_17": {
+      "n": 125,
+      "odds_n": 0,
+      "elo_covered_n": 97,
+      "all": {
+        "ensemble": {
+          "n": 125,
+          "log_loss": 0.991571,
+          "brier": 0.197502,
+          "ece": 0.109987,
+          "mean_confidence": 0.449999,
+          "accuracy": 0.56
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 125
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 0.955421,
+          "brier": 0.188541,
+          "ece": 0.105035,
+          "mean_confidence": 0.676971,
+          "accuracy": 0.576
+        }
+      },
+      "elo_covered": {
+        "n": 97,
+        "ensemble": {
+          "n": 97,
+          "log_loss": 1.011985,
+          "brier": 0.202101,
+          "ece": 0.069256,
+          "mean_confidence": 0.446162,
+          "accuracy": 0.515464
+        },
+        "elo_only": {
+          "n": 97,
+          "log_loss": 1.010784,
+          "brier": 0.201332,
+          "ece": 0.164921,
+          "mean_confidence": 0.650335,
+          "accuracy": 0.525773
+        }
+      },
+      "odds": null,
+      "window": {
+        "n_fit": 88,
+        "n_eval": 37,
+        "freq_dist": {
+          "home": 0.375,
+          "draw": 0.3181818181818182,
+          "away": 0.3068181818181818
+        },
+        "ensemble": {
+          "n": 37,
+          "log_loss": 0.974208,
+          "brier": 0.19265,
+          "ece": 0.2059,
+          "mean_confidence": 0.442661,
+          "accuracy": 0.648649
+        },
+        "elo_only": {
+          "n": 37,
+          "log_loss": 0.875629,
+          "brier": 0.168631,
+          "ece": 0.041651,
+          "mean_confidence": 0.635743,
+          "accuracy": 0.621622
+        },
+        "freq": {
+          "n": 37,
+          "log_loss": 1.051844,
+          "brier": 0.211509,
+          "ece": 0.2466,
+          "mean_confidence": 0.375,
+          "accuracy": 0.621622
+        }
+      }
+    },
+    "2017_18": {
+      "n": 125,
+      "odds_n": 0,
+      "elo_covered_n": 91,
+      "all": {
+        "ensemble": {
+          "n": 125,
+          "log_loss": 1.019513,
+          "brier": 0.203146,
+          "ece": 0.114354,
+          "mean_confidence": 0.449723,
+          "accuracy": 0.512
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 125
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 1.120617,
+          "brier": 0.215205,
+          "ece": 0.174506,
+          "mean_confidence": 0.69452,
+          "accuracy": 0.52
+        }
+      },
+      "elo_covered": {
+        "n": 91,
+        "ensemble": {
+          "n": 91,
+          "log_loss": 1.031834,
+          "brier": 0.205691,
+          "ece": 0.087131,
+          "mean_confidence": 0.447336,
+          "accuracy": 0.494505
+        },
+        "elo_only": {
+          "n": 91,
+          "log_loss": 1.073833,
+          "brier": 0.207982,
+          "ece": 0.15733,
+          "mean_confidence": 0.658753,
+          "accuracy": 0.516484
+        }
+      },
+      "odds": null,
+      "window": {
+        "n_fit": 88,
+        "n_eval": 37,
+        "freq_dist": {
+          "home": 0.4431818181818182,
+          "draw": 0.2159090909090909,
+          "away": 0.3409090909090909
+        },
+        "ensemble": {
+          "n": 37,
+          "log_loss": 1.058184,
+          "brier": 0.211771,
+          "ece": 0.012,
+          "mean_confidence": 0.447503,
+          "accuracy": 0.459459
+        },
+        "elo_only": {
+          "n": 37,
+          "log_loss": 1.201993,
+          "brier": 0.235931,
+          "ece": 0.24363,
+          "mean_confidence": 0.676041,
+          "accuracy": 0.432432
+        },
+        "freq": {
+          "n": 37,
+          "log_loss": 1.042007,
+          "brier": 0.210248,
+          "ece": 0.0163,
+          "mean_confidence": 0.443182,
+          "accuracy": 0.459459
+        }
+      }
+    },
+    "2018_19": {
+      "n": 125,
+      "odds_n": 0,
+      "elo_covered_n": 107,
+      "all": {
+        "ensemble": {
+          "n": 125,
+          "log_loss": 1.02354,
+          "brier": 0.203745,
+          "ece": 0.16326,
+          "mean_confidence": 0.448297,
+          "accuracy": 0.472
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 125
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 1.092165,
+          "brier": 0.210019,
+          "ece": 0.183192,
+          "mean_confidence": 0.682692,
+          "accuracy": 0.52
+        }
+      },
+      "elo_covered": {
+        "n": 107,
+        "ensemble": {
+          "n": 107,
+          "log_loss": 1.026647,
+          "brier": 0.204542,
+          "ece": 0.157554,
+          "mean_confidence": 0.444958,
+          "accuracy": 0.46729
+        },
+        "elo_only": {
+          "n": 107,
+          "log_loss": 1.088981,
+          "brier": 0.209238,
+          "ece": 0.166562,
+          "mean_confidence": 0.665997,
+          "accuracy": 0.523364
+        }
+      },
+      "odds": null,
+      "window": {
+        "n_fit": 88,
+        "n_eval": 37,
+        "freq_dist": {
+          "home": 0.4431818181818182,
+          "draw": 0.25,
+          "away": 0.3068181818181818
+        },
+        "ensemble": {
+          "n": 37,
+          "log_loss": 1.067693,
+          "brier": 0.212856,
+          "ece": 0.0167,
+          "mean_confidence": 0.442768,
+          "accuracy": 0.459459
+        },
+        "elo_only": {
+          "n": 37,
+          "log_loss": 1.220251,
+          "brier": 0.225796,
+          "ece": 0.14643,
+          "mean_confidence": 0.659949,
+          "accuracy": 0.513514
+        },
+        "freq": {
+          "n": 37,
+          "log_loss": 1.030282,
+          "brier": 0.207363,
+          "ece": 0.0433,
+          "mean_confidence": 0.443182,
+          "accuracy": 0.486486
+        }
+      }
+    },
     "2019_20": {
       "n": 119,
       "odds_n": 0,
@@ -498,210 +1146,752 @@
           "accuracy": 0.540541
         }
       }
+    },
+    "2024_25": {
+      "n": 189,
+      "odds_n": 178,
+      "elo_covered_n": 151,
+      "all": {
+        "ensemble": {
+          "n": 189,
+          "log_loss": 0.947795,
+          "brier": 0.186212,
+          "ece": 0.114437,
+          "mean_confidence": 0.494031,
+          "accuracy": 0.608466
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 189
+        },
+        "elo_only": {
+          "n": 189,
+          "log_loss": 1.012022,
+          "brier": 0.19464,
+          "ece": 0.100203,
+          "mean_confidence": 0.668514,
+          "accuracy": 0.571429
+        }
+      },
+      "elo_covered": {
+        "n": 151,
+        "ensemble": {
+          "n": 151,
+          "log_loss": 0.98782,
+          "brier": 0.195925,
+          "ece": 0.076375,
+          "mean_confidence": 0.486537,
+          "accuracy": 0.562914
+        },
+        "elo_only": {
+          "n": 151,
+          "log_loss": 1.092835,
+          "brier": 0.212042,
+          "ece": 0.120999,
+          "mean_confidence": 0.644173,
+          "accuracy": 0.523179
+        }
+      },
+      "odds": {
+        "n": 178,
+        "ensemble": {
+          "n": 178,
+          "log_loss": 0.946566,
+          "brier": 0.185952,
+          "ece": 0.105461,
+          "mean_confidence": 0.495609,
+          "accuracy": 0.601124
+        },
+        "market_odds_only": {
+          "n": 178,
+          "log_loss": 0.875007,
+          "brier": 0.171153,
+          "ece": 0.04478,
+          "mean_confidence": 0.575831,
+          "accuracy": 0.589888
+        }
+      },
+      "window": {
+        "n_fit": 132,
+        "n_eval": 57,
+        "freq_dist": {
+          "home": 0.5378787878787878,
+          "draw": 0.12878787878787878,
+          "away": 0.3333333333333333
+        },
+        "ensemble": {
+          "n": 57,
+          "log_loss": 1.055882,
+          "brier": 0.212123,
+          "ece": 0.036637,
+          "mean_confidence": 0.481988,
+          "accuracy": 0.508772
+        },
+        "elo_only": {
+          "n": 57,
+          "log_loss": 1.242686,
+          "brier": 0.244954,
+          "ece": 0.179339,
+          "mean_confidence": 0.635312,
+          "accuracy": 0.45614
+        },
+        "freq": {
+          "n": 57,
+          "log_loss": 1.038902,
+          "brier": 0.211837,
+          "ece": 0.0993,
+          "mean_confidence": 0.537879,
+          "accuracy": 0.438596
+        }
+      }
+    },
+    "2025_26": {
+      "n": 189,
+      "odds_n": 166,
+      "elo_covered_n": 146,
+      "all": {
+        "ensemble": {
+          "n": 189,
+          "log_loss": 0.972419,
+          "brier": 0.191395,
+          "ece": 0.078548,
+          "mean_confidence": 0.487573,
+          "accuracy": 0.566138
+        },
+        "uniform": {
+          "uniform_log_loss": 1.098612,
+          "uniform_brier": 0.222222,
+          "n": 189
+        },
+        "elo_only": {
+          "n": 189,
+          "log_loss": 1.03459,
+          "brier": 0.197222,
+          "ece": 0.116459,
+          "mean_confidence": 0.665975,
+          "accuracy": 0.550265
+        }
+      },
+      "elo_covered": {
+        "n": 146,
+        "ensemble": {
+          "n": 146,
+          "log_loss": 0.972036,
+          "brier": 0.191242,
+          "ece": 0.095367,
+          "mean_confidence": 0.479993,
+          "accuracy": 0.575342
+        },
+        "elo_only": {
+          "n": 146,
+          "log_loss": 1.027539,
+          "brier": 0.196209,
+          "ece": 0.109032,
+          "mean_confidence": 0.638476,
+          "accuracy": 0.547945
+        }
+      },
+      "odds": {
+        "n": 166,
+        "ensemble": {
+          "n": 166,
+          "log_loss": 0.965912,
+          "brier": 0.18987,
+          "ece": 0.097635,
+          "mean_confidence": 0.49174,
+          "accuracy": 0.572289
+        },
+        "market_odds_only": {
+          "n": 166,
+          "log_loss": 0.921543,
+          "brier": 0.180239,
+          "ece": 0.048613,
+          "mean_confidence": 0.569662,
+          "accuracy": 0.596386
+        }
+      },
+      "window": {
+        "n_fit": 132,
+        "n_eval": 57,
+        "freq_dist": {
+          "home": 0.49242424242424243,
+          "draw": 0.17424242424242425,
+          "away": 0.3333333333333333
+        },
+        "ensemble": {
+          "n": 57,
+          "log_loss": 0.984594,
+          "brier": 0.195158,
+          "ece": 0.088098,
+          "mean_confidence": 0.473247,
+          "accuracy": 0.561404
+        },
+        "elo_only": {
+          "n": 57,
+          "log_loss": 1.077484,
+          "brier": 0.207806,
+          "ece": 0.139516,
+          "mean_confidence": 0.650851,
+          "accuracy": 0.526316
+        },
+        "freq": {
+          "n": 57,
+          "log_loss": 1.007051,
+          "brier": 0.201881,
+          "ece": 0.0339,
+          "mean_confidence": 0.492424,
+          "accuracy": 0.526316
+        }
+      }
     }
   },
   "overall": {
     "all": {
-      "all_n": 619,
+      "all_n": 1997,
       "ensemble": {
-        "n": 619,
-        "log_loss": 0.975163,
-        "brier": 0.192621,
-        "ece": 0.063522,
-        "mean_confidence": 0.485423,
-        "accuracy": 0.53958
+        "n": 1997,
+        "log_loss": 0.984704,
+        "brier": 0.194901,
+        "ece": 0.084844,
+        "mean_confidence": 0.467995,
+        "accuracy": 0.552829
       },
       "elo_only": {
-        "n": 619,
-        "log_loss": 1.030656,
-        "brier": 0.198676,
-        "ece": 0.130031,
-        "mean_confidence": 0.671219,
-        "accuracy": 0.541195
+        "n": 1997,
+        "log_loss": 1.026897,
+        "brier": 0.198005,
+        "ece": 0.125468,
+        "mean_confidence": 0.678684,
+        "accuracy": 0.554832
       },
       "uniform": {
-        "n": 619,
+        "n": 1997,
         "log_loss": 1.098612,
         "brier": 0.222222,
-        "ece": 0.1174,
+        "ece": 0.1444,
         "mean_confidence": 0.333333,
-        "accuracy": 0.450727
+        "accuracy": 0.477717
       },
-      "odds_n": 469,
+      "odds_n": 813,
       "odds_ensemble": {
-        "n": 469,
-        "log_loss": 0.961159,
-        "brier": 0.189353,
-        "ece": 0.076132,
-        "mean_confidence": 0.497726,
-        "accuracy": 0.545842
+        "n": 813,
+        "log_loss": 0.959704,
+        "brier": 0.18888,
+        "ece": 0.068448,
+        "mean_confidence": 0.496143,
+        "accuracy": 0.564576
       },
       "odds_market_only": {
-        "n": 469,
-        "log_loss": 0.893925,
-        "brier": 0.174817,
-        "ece": 0.066142,
-        "mean_confidence": 0.572606,
-        "accuracy": 0.618337
+        "n": 813,
+        "log_loss": 0.895422,
+        "brier": 0.175122,
+        "ece": 0.048195,
+        "mean_confidence": 0.572711,
+        "accuracy": 0.607626
       },
       "odds_uniform": {
-        "n": 469,
+        "n": 813,
         "log_loss": 1.098612,
         "brier": 0.222222,
-        "ece": 0.1251,
+        "ece": 0.1464,
         "mean_confidence": 0.333333,
-        "accuracy": 0.458422
+        "accuracy": 0.479705
       }
     },
     "elo_covered": {
-      "all_n": 519,
+      "all_n": 1580,
       "ensemble": {
-        "n": 519,
-        "log_loss": 0.996596,
-        "brier": 0.197668,
-        "ece": 0.075808,
-        "mean_confidence": 0.479105,
-        "accuracy": 0.510597
+        "n": 1580,
+        "log_loss": 1.001344,
+        "brier": 0.198788,
+        "ece": 0.070404,
+        "mean_confidence": 0.463733,
+        "accuracy": 0.534177
       },
       "elo_only": {
-        "n": 519,
-        "log_loss": 1.067492,
-        "brier": 0.207707,
-        "ece": 0.137043,
-        "mean_confidence": 0.647626,
-        "accuracy": 0.510597
+        "n": 1580,
+        "log_loss": 1.048427,
+        "brier": 0.203386,
+        "ece": 0.119108,
+        "mean_confidence": 0.652044,
+        "accuracy": 0.534177
       },
       "uniform": {
-        "n": 519,
+        "n": 1580,
         "log_loss": 1.098612,
         "brier": 0.222222,
-        "ece": 0.1156,
+        "ece": 0.1458,
         "mean_confidence": 0.333333,
-        "accuracy": 0.44894
+        "accuracy": 0.479114
       },
-      "odds_n": 399,
+      "odds_n": 680,
       "odds_ensemble": {
-        "n": 399,
-        "log_loss": 0.984229,
-        "brier": 0.194881,
-        "ece": 0.074979,
-        "mean_confidence": 0.489944,
-        "accuracy": 0.521303
+        "n": 680,
+        "log_loss": 0.981928,
+        "brier": 0.194163,
+        "ece": 0.057921,
+        "mean_confidence": 0.48767,
+        "accuracy": 0.545588
       },
       "odds_market_only": {
-        "n": 399,
-        "log_loss": 0.916405,
-        "brier": 0.180296,
-        "ece": 0.06361,
-        "mean_confidence": 0.556368,
-        "accuracy": 0.60401
+        "n": 680,
+        "log_loss": 0.917881,
+        "brier": 0.18043,
+        "ece": 0.049973,
+        "mean_confidence": 0.5548,
+        "accuracy": 0.597059
       },
       "odds_uniform": {
-        "n": 399,
+        "n": 680,
         "log_loss": 1.098612,
         "brier": 0.222222,
-        "ece": 0.1203,
+        "ece": 0.1446,
         "mean_confidence": 0.333333,
-        "accuracy": 0.453634
+        "accuracy": 0.477941
       }
     },
     "odds": {
-      "all_n": 469,
+      "all_n": 813,
       "ensemble": {
-        "n": 469,
-        "log_loss": 0.961159,
-        "brier": 0.189353,
-        "ece": 0.076132,
-        "mean_confidence": 0.497726,
-        "accuracy": 0.545842
+        "n": 813,
+        "log_loss": 0.959704,
+        "brier": 0.18888,
+        "ece": 0.068448,
+        "mean_confidence": 0.496143,
+        "accuracy": 0.564576
       },
       "elo_only": {
-        "n": 469,
-        "log_loss": 1.029025,
-        "brier": 0.199468,
-        "ece": 0.135899,
-        "mean_confidence": 0.67103,
-        "accuracy": 0.535181
+        "n": 813,
+        "log_loss": 1.028998,
+        "brier": 0.198436,
+        "ece": 0.124472,
+        "mean_confidence": 0.668034,
+        "accuracy": 0.544895
       },
       "uniform": {
-        "n": 469,
+        "n": 813,
         "log_loss": 1.098612,
         "brier": 0.222222,
-        "ece": 0.1251,
+        "ece": 0.1464,
         "mean_confidence": 0.333333,
-        "accuracy": 0.458422
+        "accuracy": 0.479705
       },
-      "odds_n": 469,
+      "odds_n": 813,
       "odds_ensemble": {
-        "n": 469,
-        "log_loss": 0.961159,
-        "brier": 0.189353,
-        "ece": 0.076132,
-        "mean_confidence": 0.497726,
-        "accuracy": 0.545842
+        "n": 813,
+        "log_loss": 0.959704,
+        "brier": 0.18888,
+        "ece": 0.068448,
+        "mean_confidence": 0.496143,
+        "accuracy": 0.564576
       },
       "odds_market_only": {
-        "n": 469,
-        "log_loss": 0.893925,
-        "brier": 0.174817,
-        "ece": 0.066142,
-        "mean_confidence": 0.572606,
-        "accuracy": 0.618337
+        "n": 813,
+        "log_loss": 0.895422,
+        "brier": 0.175122,
+        "ece": 0.048195,
+        "mean_confidence": 0.572711,
+        "accuracy": 0.607626
       },
       "odds_uniform": {
-        "n": 469,
+        "n": 813,
         "log_loss": 1.098612,
         "brier": 0.222222,
-        "ece": 0.1251,
+        "ece": 0.1464,
         "mean_confidence": 0.333333,
-        "accuracy": 0.458422
+        "accuracy": 0.479705
       }
     },
-    "n": 619,
-    "odds_n": 469,
+    "n": 1997,
+    "odds_n": 813,
     "window": {
-      "n_fit": 433,
-      "n_eval": 186,
+      "n_fit": 1398,
+      "n_eval": 599,
       "freq_dist": {
-        "home": 0.4387990762124711,
-        "draw": 0.19861431870669746,
-        "away": 0.3625866050808314
+        "home": 0.47067238912732473,
+        "draw": 0.21101573676680974,
+        "away": 0.31831187410586553
       },
       "ensemble": {
-        "n": 186,
-        "log_loss": 0.949667,
-        "brier": 0.186974,
-        "ece": 0.07559,
-        "mean_confidence": 0.491332,
-        "accuracy": 0.548387
+        "n": 599,
+        "log_loss": 0.957766,
+        "brier": 0.188487,
+        "ece": 0.07911,
+        "mean_confidence": 0.491834,
+        "accuracy": 0.570952
       },
       "elo_only": {
-        "n": 186,
-        "log_loss": 0.968231,
-        "brier": 0.189142,
-        "ece": 0.123276,
-        "mean_confidence": 0.658808,
-        "accuracy": 0.543011
+        "n": 599,
+        "log_loss": 1.009453,
+        "brier": 0.194751,
+        "ece": 0.119396,
+        "mean_confidence": 0.666786,
+        "accuracy": 0.550918
       },
       "uniform": {
-        "n": 186,
+        "n": 599,
         "log_loss": 1.098612,
         "brier": 0.222222,
-        "ece": 0.1452,
+        "ece": 0.1609,
         "mean_confidence": 0.333333,
-        "accuracy": 0.478495
+        "accuracy": 0.494157
       },
       "freq": {
-        "n": 186,
-        "log_loss": 1.04941,
-        "brier": 0.211372,
-        "ece": 0.0397,
-        "mean_confidence": 0.438799,
-        "accuracy": 0.478495
+        "n": 599,
+        "log_loss": 1.024879,
+        "brier": 0.206171,
+        "ece": 0.0235,
+        "mean_confidence": 0.470672,
+        "accuracy": 0.494157
       }
     }
   },
   "ablation": {
+    "2011_12": {
+      "n": 125,
+      "full": {
+        "n": 125,
+        "log_loss": 1.004009,
+        "brier": 0.199561,
+        "ece": 0.119322,
+        "mean_confidence": 0.448668,
+        "accuracy": 0.568
+      },
+      "without_elo": {
+        "n": 125,
+        "log_loss": 1.062029,
+        "brier": 0.21366,
+        "ece": 0.092328,
+        "mean_confidence": 0.387705,
+        "accuracy": 0.48
+      },
+      "without_odds": {
+        "n": 125,
+        "log_loss": 0.990049,
+        "brier": 0.19588,
+        "ece": 0.11305,
+        "mean_confidence": 0.48835,
+        "accuracy": 0.568
+      },
+      "without_form": {
+        "n": 125,
+        "log_loss": 1.004521,
+        "brier": 0.199597,
+        "ece": 0.096903,
+        "mean_confidence": 0.448872,
+        "accuracy": 0.544
+      },
+      "without_rest": {
+        "n": 125,
+        "log_loss": 0.988491,
+        "brier": 0.195575,
+        "ece": 0.112851,
+        "mean_confidence": 0.488296,
+        "accuracy": 0.568
+      }
+    },
+    "2012_13": {
+      "n": 125,
+      "full": {
+        "n": 125,
+        "log_loss": 1.03455,
+        "brier": 0.206572,
+        "ece": 0.069686,
+        "mean_confidence": 0.446347,
+        "accuracy": 0.488
+      },
+      "without_elo": {
+        "n": 125,
+        "log_loss": 1.073897,
+        "brier": 0.216347,
+        "ece": 0.08634,
+        "mean_confidence": 0.385675,
+        "accuracy": 0.472
+      },
+      "without_odds": {
+        "n": 125,
+        "log_loss": 1.030524,
+        "brier": 0.20508,
+        "ece": 0.060082,
+        "mean_confidence": 0.485231,
+        "accuracy": 0.488
+      },
+      "without_form": {
+        "n": 125,
+        "log_loss": 1.03051,
+        "brier": 0.205855,
+        "ece": 0.080848,
+        "mean_confidence": 0.44381,
+        "accuracy": 0.52
+      },
+      "without_rest": {
+        "n": 125,
+        "log_loss": 1.030586,
+        "brier": 0.205105,
+        "ece": 0.060134,
+        "mean_confidence": 0.485207,
+        "accuracy": 0.488
+      }
+    },
+    "2013_14": {
+      "n": 125,
+      "full": {
+        "n": 125,
+        "log_loss": 0.990394,
+        "brier": 0.196027,
+        "ece": 0.12726,
+        "mean_confidence": 0.4487,
+        "accuracy": 0.576
+      },
+      "without_elo": {
+        "n": 125,
+        "log_loss": 1.06298,
+        "brier": 0.213792,
+        "ece": 0.140518,
+        "mean_confidence": 0.387454,
+        "accuracy": 0.528
+      },
+      "without_odds": {
+        "n": 125,
+        "log_loss": 0.972488,
+        "brier": 0.191137,
+        "ece": 0.124437,
+        "mean_confidence": 0.488394,
+        "accuracy": 0.576
+      },
+      "without_form": {
+        "n": 125,
+        "log_loss": 0.98114,
+        "brier": 0.194064,
+        "ece": 0.15244,
+        "mean_confidence": 0.445277,
+        "accuracy": 0.56
+      },
+      "without_rest": {
+        "n": 125,
+        "log_loss": 0.973054,
+        "brier": 0.191307,
+        "ece": 0.130612,
+        "mean_confidence": 0.488271,
+        "accuracy": 0.576
+      }
+    },
+    "2014_15": {
+      "n": 125,
+      "full": {
+        "n": 125,
+        "log_loss": 0.97934,
+        "brier": 0.194219,
+        "ece": 0.128244,
+        "mean_confidence": 0.447731,
+        "accuracy": 0.576
+      },
+      "without_elo": {
+        "n": 125,
+        "log_loss": 1.056616,
+        "brier": 0.212684,
+        "ece": 0.111964,
+        "mean_confidence": 0.383987,
+        "accuracy": 0.496
+      },
+      "without_odds": {
+        "n": 125,
+        "log_loss": 0.95579,
+        "brier": 0.188617,
+        "ece": 0.091339,
+        "mean_confidence": 0.48709,
+        "accuracy": 0.576
+      },
+      "without_form": {
+        "n": 125,
+        "log_loss": 0.97676,
+        "brier": 0.193352,
+        "ece": 0.160426,
+        "mean_confidence": 0.447538,
+        "accuracy": 0.608
+      },
+      "without_rest": {
+        "n": 125,
+        "log_loss": 0.955438,
+        "brier": 0.188574,
+        "ece": 0.097425,
+        "mean_confidence": 0.487051,
+        "accuracy": 0.576
+      }
+    },
+    "2015_16": {
+      "n": 125,
+      "full": {
+        "n": 125,
+        "log_loss": 0.956336,
+        "brier": 0.188162,
+        "ece": 0.183291,
+        "mean_confidence": 0.449222,
+        "accuracy": 0.632
+      },
+      "without_elo": {
+        "n": 125,
+        "log_loss": 1.048916,
+        "brier": 0.210878,
+        "ece": 0.166933,
+        "mean_confidence": 0.385105,
+        "accuracy": 0.552
+      },
+      "without_odds": {
+        "n": 125,
+        "log_loss": 0.926591,
+        "brier": 0.180542,
+        "ece": 0.145139,
+        "mean_confidence": 0.489095,
+        "accuracy": 0.632
+      },
+      "without_form": {
+        "n": 125,
+        "log_loss": 0.951928,
+        "brier": 0.187079,
+        "ece": 0.190352,
+        "mean_confidence": 0.449651,
+        "accuracy": 0.64
+      },
+      "without_rest": {
+        "n": 125,
+        "log_loss": 0.926524,
+        "brier": 0.180486,
+        "ece": 0.14289,
+        "mean_confidence": 0.489074,
+        "accuracy": 0.632
+      }
+    },
+    "2016_17": {
+      "n": 125,
+      "full": {
+        "n": 125,
+        "log_loss": 0.991571,
+        "brier": 0.197502,
+        "ece": 0.109987,
+        "mean_confidence": 0.449999,
+        "accuracy": 0.56
+      },
+      "without_elo": {
+        "n": 125,
+        "log_loss": 1.065693,
+        "brier": 0.214653,
+        "ece": 0.06807,
+        "mean_confidence": 0.387922,
+        "accuracy": 0.456
+      },
+      "without_odds": {
+        "n": 125,
+        "log_loss": 0.971695,
+        "brier": 0.193137,
+        "ece": 0.069816,
+        "mean_confidence": 0.49014,
+        "accuracy": 0.56
+      },
+      "without_form": {
+        "n": 125,
+        "log_loss": 0.98386,
+        "brier": 0.195215,
+        "ece": 0.148808,
+        "mean_confidence": 0.443174,
+        "accuracy": 0.592
+      },
+      "without_rest": {
+        "n": 125,
+        "log_loss": 0.970228,
+        "brier": 0.192892,
+        "ece": 0.069891,
+        "mean_confidence": 0.490121,
+        "accuracy": 0.56
+      }
+    },
+    "2017_18": {
+      "n": 125,
+      "full": {
+        "n": 125,
+        "log_loss": 1.019513,
+        "brier": 0.203146,
+        "ece": 0.114354,
+        "mean_confidence": 0.449723,
+        "accuracy": 0.512
+      },
+      "without_elo": {
+        "n": 125,
+        "log_loss": 1.069848,
+        "brier": 0.215509,
+        "ece": 0.093303,
+        "mean_confidence": 0.386687,
+        "accuracy": 0.48
+      },
+      "without_odds": {
+        "n": 125,
+        "log_loss": 1.010935,
+        "brier": 0.200675,
+        "ece": 0.086982,
+        "mean_confidence": 0.489768,
+        "accuracy": 0.512
+      },
+      "without_form": {
+        "n": 125,
+        "log_loss": 1.016075,
+        "brier": 0.202283,
+        "ece": 0.085752,
+        "mean_confidence": 0.448702,
+        "accuracy": 0.52
+      },
+      "without_rest": {
+        "n": 125,
+        "log_loss": 1.010822,
+        "brier": 0.200637,
+        "ece": 0.071089,
+        "mean_confidence": 0.489729,
+        "accuracy": 0.512
+      }
+    },
+    "2018_19": {
+      "n": 125,
+      "full": {
+        "n": 125,
+        "log_loss": 1.02354,
+        "brier": 0.203745,
+        "ece": 0.16326,
+        "mean_confidence": 0.448297,
+        "accuracy": 0.472
+      },
+      "without_elo": {
+        "n": 125,
+        "log_loss": 1.077315,
+        "brier": 0.217113,
+        "ece": 0.084863,
+        "mean_confidence": 0.387143,
+        "accuracy": 0.472
+      },
+      "without_odds": {
+        "n": 125,
+        "log_loss": 1.016662,
+        "brier": 0.201388,
+        "ece": 0.122808,
+        "mean_confidence": 0.487852,
+        "accuracy": 0.472
+      },
+      "without_form": {
+        "n": 125,
+        "log_loss": 1.012932,
+        "brier": 0.201477,
+        "ece": 0.102732,
+        "mean_confidence": 0.444694,
+        "accuracy": 0.52
+      },
+      "without_rest": {
+        "n": 125,
+        "log_loss": 1.016203,
+        "brier": 0.201246,
+        "ece": 0.121893,
+        "mean_confidence": 0.487472,
+        "accuracy": 0.472
+      }
+    },
     "2019_20": {
       "n": 119,
       "full": {
@@ -917,47 +2107,133 @@
         "accuracy": 0.552
       }
     },
-    "overall": {
-      "n": 619,
+    "2024_25": {
+      "n": 189,
       "full": {
-        "n": 619,
-        "log_loss": 0.975163,
-        "brier": 0.192621,
-        "ece": 0.063522,
-        "mean_confidence": 0.485423,
-        "accuracy": 0.53958
+        "n": 189,
+        "log_loss": 0.947795,
+        "brier": 0.186212,
+        "ece": 0.114437,
+        "mean_confidence": 0.494031,
+        "accuracy": 0.608466
       },
       "without_elo": {
-        "n": 619,
-        "log_loss": 1.00607,
-        "brier": 0.200282,
-        "ece": 0.119553,
-        "mean_confidence": 0.431674,
-        "accuracy": 0.531502
+        "n": 189,
+        "log_loss": 0.971365,
+        "brier": 0.192216,
+        "ece": 0.154841,
+        "mean_confidence": 0.443044,
+        "accuracy": 0.597884
       },
       "without_odds": {
-        "n": 619,
-        "log_loss": 1.00605,
-        "brier": 0.199203,
-        "ece": 0.088471,
-        "mean_confidence": 0.486646,
-        "accuracy": 0.515347
+        "n": 189,
+        "log_loss": 0.990074,
+        "brier": 0.195338,
+        "ece": 0.091004,
+        "mean_confidence": 0.485718,
+        "accuracy": 0.57672
       },
       "without_form": {
-        "n": 619,
-        "log_loss": 0.95359,
-        "brier": 0.187576,
-        "ece": 0.074332,
-        "mean_confidence": 0.495965,
-        "accuracy": 0.570275
+        "n": 189,
+        "log_loss": 0.92738,
+        "brier": 0.181446,
+        "ece": 0.073739,
+        "mean_confidence": 0.508257,
+        "accuracy": 0.582011
       },
       "without_rest": {
-        "n": 619,
-        "log_loss": 0.962064,
-        "brier": 0.18954,
-        "ece": 0.05453,
-        "mean_confidence": 0.537808,
-        "accuracy": 0.53958
+        "n": 189,
+        "log_loss": 0.930354,
+        "brier": 0.182253,
+        "ece": 0.049129,
+        "mean_confidence": 0.550248,
+        "accuracy": 0.597884
+      }
+    },
+    "2025_26": {
+      "n": 189,
+      "full": {
+        "n": 189,
+        "log_loss": 0.972419,
+        "brier": 0.191395,
+        "ece": 0.078548,
+        "mean_confidence": 0.487573,
+        "accuracy": 0.566138
+      },
+      "without_elo": {
+        "n": 189,
+        "log_loss": 0.999261,
+        "brier": 0.198378,
+        "ece": 0.113533,
+        "mean_confidence": 0.436746,
+        "accuracy": 0.550265
+      },
+      "without_odds": {
+        "n": 189,
+        "log_loss": 1.003042,
+        "brier": 0.197949,
+        "ece": 0.112367,
+        "mean_confidence": 0.484321,
+        "accuracy": 0.518519
+      },
+      "without_form": {
+        "n": 189,
+        "log_loss": 0.95404,
+        "brier": 0.187392,
+        "ece": 0.075989,
+        "mean_confidence": 0.500748,
+        "accuracy": 0.57672
+      },
+      "without_rest": {
+        "n": 189,
+        "log_loss": 0.961284,
+        "brier": 0.187916,
+        "ece": 0.082769,
+        "mean_confidence": 0.540832,
+        "accuracy": 0.566138
+      }
+    },
+    "overall": {
+      "n": 1997,
+      "full": {
+        "n": 1997,
+        "log_loss": 0.984704,
+        "brier": 0.194901,
+        "ece": 0.084844,
+        "mean_confidence": 0.467995,
+        "accuracy": 0.552829
+      },
+      "without_elo": {
+        "n": 1997,
+        "log_loss": 1.031481,
+        "brier": 0.206373,
+        "ece": 0.109191,
+        "mean_confidence": 0.410589,
+        "accuracy": 0.51978
+      },
+      "without_odds": {
+        "n": 1997,
+        "log_loss": 0.993383,
+        "brier": 0.196392,
+        "ece": 0.06719,
+        "mean_confidence": 0.487136,
+        "accuracy": 0.537807
+      },
+      "without_form": {
+        "n": 1997,
+        "log_loss": 0.971746,
+        "brier": 0.19188,
+        "ece": 0.095528,
+        "mean_confidence": 0.472794,
+        "accuracy": 0.568353
+      },
+      "without_rest": {
+        "n": 1997,
+        "log_loss": 0.969933,
+        "brier": 0.191169,
+        "ece": 0.056517,
+        "mean_confidence": 0.514407,
+        "accuracy": 0.551828
       }
     }
   },
@@ -965,53 +2241,113 @@
     "stability": {
       "per_signal_min_max": {
         "market_odds": {
-          "min": 0.248875,
-          "max": 0.275126,
-          "spread": 0.026251
+          "min": 0.241352,
+          "max": 0.257891,
+          "spread": 0.016539
         },
         "refined_elo": {
-          "min": 0.249574,
-          "max": 0.261734,
-          "spread": 0.01216
+          "min": 0.248815,
+          "max": 0.26539,
+          "spread": 0.016575
         },
         "rolling_form": {
-          "min": 0.234204,
-          "max": 0.240541,
-          "spread": 0.006337
+          "min": 0.245001,
+          "max": 0.256009,
+          "spread": 0.011008
         },
         "rest_days": {
-          "min": 0.237752,
-          "max": 0.24885,
-          "spread": 0.011098
+          "min": 0.239868,
+          "max": 0.248082,
+          "spread": 0.008214
         }
       },
       "window_to_window_shift": {
+        "2013_14": {
+          "market_odds": 0.00345,
+          "refined_elo": -0.005945,
+          "rest_days": 0.003916,
+          "rolling_form": -0.001421
+        },
+        "2014_15": {
+          "market_odds": -0.00241,
+          "refined_elo": 0.006571,
+          "rest_days": -0.002077,
+          "rolling_form": -0.002084
+        },
+        "2015_16": {
+          "market_odds": -0.001959,
+          "refined_elo": 0.003278,
+          "rest_days": -0.001995,
+          "rolling_form": 0.000676
+        },
+        "2016_17": {
+          "market_odds": -0.002375,
+          "refined_elo": 0.004881,
+          "rest_days": -0.002395,
+          "rolling_form": -0.000111
+        },
+        "2017_18": {
+          "market_odds": -0.000419,
+          "refined_elo": 0.001845,
+          "rest_days": -0.000514,
+          "rolling_form": -0.000913
+        },
+        "2018_19": {
+          "market_odds": 0.001323,
+          "refined_elo": -0.003102,
+          "rest_days": 0.001345,
+          "rolling_form": 0.000434
+        },
+        "2019_20": {
+          "market_odds": 0.000967,
+          "refined_elo": -0.001384,
+          "rest_days": 0.000923,
+          "rolling_form": -0.000505
+        },
+        "2020_21": {
+          "market_odds": 0.000575,
+          "refined_elo": 0.00011,
+          "rest_days": 0.000601,
+          "rolling_form": -0.001285
+        },
         "2021_22": {
-          "market_odds": 0.023362,
-          "refined_elo": -0.01216,
-          "rest_days": -0.005656,
-          "rolling_form": -0.005545
+          "market_odds": 0.004744,
+          "refined_elo": -0.002219,
+          "rest_days": -0.000451,
+          "rolling_form": -0.002075
         },
         "2022_23": {
-          "market_odds": 0.002822,
-          "refined_elo": 0.000541,
-          "rest_days": -0.002572,
-          "rolling_form": -0.000792
+          "market_odds": 0.002632,
+          "refined_elo": -0.000587,
+          "rest_days": -0.000628,
+          "rolling_form": -0.001417
         },
         "2023_24": {
-          "market_odds": 6.7e-05,
-          "refined_elo": 0.001161,
-          "rest_days": -0.00287,
-          "rolling_form": 0.001642
+          "market_odds": 0.001786,
+          "refined_elo": -0.00022,
+          "rest_days": -0.001099,
+          "rolling_form": -0.000467
+        },
+        "2024_25": {
+          "market_odds": 0.001706,
+          "refined_elo": -2.9e-05,
+          "rest_days": -0.000945,
+          "rolling_form": -0.000732
+        },
+        "2025_26": {
+          "market_odds": 0.002806,
+          "refined_elo": -0.000719,
+          "rest_days": -0.000979,
+          "rolling_form": -0.001108
         }
       },
       "vs_production": {
-        "pearson": 0.2299
+        "pearson": -0.3611
       }
     },
     "per_season": {
-      "2020_21": {
-        "train_pool_n": 119,
+      "2012_13": {
+        "train_pool_n": 125,
         "signals_used": [
           "market_odds",
           "refined_elo",
@@ -1020,28 +2356,268 @@
         ],
         "per_signal_train_log_loss": {
           "market_odds": 1.098612,
-          "refined_elo": 1.044634,
-          "rolling_form": 1.136674,
-          "rest_days": 1.098719
+          "refined_elo": 1.056802,
+          "rolling_form": 1.051649,
+          "rest_days": 1.102656
         },
         "weights": {
-          "market_odds": 0.248875,
-          "refined_elo": 0.261734,
-          "rolling_form": 0.240541,
-          "rest_days": 0.24885
+          "market_odds": 0.245065,
+          "refined_elo": 0.25476,
+          "rolling_form": 0.256009,
+          "rest_days": 0.244166
         },
         "evaluation": {
           "n": 125,
-          "log_loss": 0.979455,
-          "brier": 0.193679,
-          "ece": 0.056836,
-          "mean_confidence": 0.505028,
-          "accuracy": 0.536,
-          "weights_source": "train:2019_20 -> eval:2020_21"
+          "log_loss": 1.033177,
+          "brier": 0.206179,
+          "ece": 0.047414,
+          "mean_confidence": 0.452317,
+          "accuracy": 0.488,
+          "weights_source": "train:2011_12 -> eval:2012_13"
+        }
+      },
+      "2013_14": {
+        "train_pool_n": 250,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.098612,
+          "refined_elo": 1.09729,
+          "rolling_form": 1.072405,
+          "rest_days": 1.10053
+        },
+        "weights": {
+          "market_odds": 0.248515,
+          "refined_elo": 0.248815,
+          "rolling_form": 0.254588,
+          "rest_days": 0.248082
+        },
+        "evaluation": {
+          "n": 125,
+          "log_loss": 0.988171,
+          "brier": 0.195443,
+          "ece": 0.123482,
+          "mean_confidence": 0.452549,
+          "accuracy": 0.576,
+          "weights_source": "train:2011_12+2012_13 -> eval:2013_14"
+        }
+      },
+      "2014_15": {
+        "train_pool_n": 375,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.098612,
+          "refined_elo": 1.058689,
+          "rolling_form": 1.070773,
+          "rest_days": 1.099062
+        },
+        "weights": {
+          "market_odds": 0.246105,
+          "refined_elo": 0.255386,
+          "rolling_form": 0.252504,
+          "rest_days": 0.246005
+        },
+        "evaluation": {
+          "n": 125,
+          "log_loss": 0.975033,
+          "brier": 0.193179,
+          "ece": 0.122494,
+          "mean_confidence": 0.453514,
+          "accuracy": 0.576,
+          "weights_source": "train:2011_12+2012_13+2013_14 -> eval:2014_15"
+        }
+      },
+      "2015_16": {
+        "train_pool_n": 500,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.098612,
+          "refined_elo": 1.036947,
+          "rolling_form": 1.059411,
+          "rest_days": 1.099222
+        },
+        "weights": {
+          "market_odds": 0.244146,
+          "refined_elo": 0.258664,
+          "rolling_form": 0.25318,
+          "rest_days": 0.24401
+        },
+        "evaluation": {
+          "n": 125,
+          "log_loss": 0.949891,
+          "brier": 0.186523,
+          "ece": 0.180769,
+          "mean_confidence": 0.456503,
+          "accuracy": 0.632,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15 -> eval:2015_16"
+        }
+      },
+      "2016_17": {
+        "train_pool_n": 625,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.098612,
+          "refined_elo": 1.007843,
+          "rolling_form": 1.049567,
+          "rest_days": 1.099321
+        },
+        "weights": {
+          "market_odds": 0.241771,
+          "refined_elo": 0.263545,
+          "rolling_form": 0.253069,
+          "rest_days": 0.241615
+        },
+        "evaluation": {
+          "n": 125,
+          "log_loss": 0.985567,
+          "brier": 0.196121,
+          "ece": 0.101369,
+          "mean_confidence": 0.45862,
+          "accuracy": 0.56,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16 -> eval:2016_17"
+        }
+      },
+      "2017_18": {
+        "train_pool_n": 750,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.098612,
+          "refined_elo": 0.999106,
+          "rolling_form": 1.05154,
+          "rest_days": 1.099756
+        },
+        "weights": {
+          "market_odds": 0.241352,
+          "refined_elo": 0.26539,
+          "rolling_form": 0.252156,
+          "rest_days": 0.241101
+        },
+        "evaluation": {
+          "n": 125,
+          "log_loss": 1.016116,
+          "brier": 0.202244,
+          "ece": 0.064306,
+          "mean_confidence": 0.459161,
+          "accuracy": 0.504,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16+2016_17 -> eval:2017_18"
+        }
+      },
+      "2018_19": {
+        "train_pool_n": 875,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.098612,
+          "refined_elo": 1.016464,
+          "rolling_form": 1.055488,
+          "rest_days": 1.099651
+        },
+        "weights": {
+          "market_odds": 0.242675,
+          "refined_elo": 0.262288,
+          "rolling_form": 0.25259,
+          "rest_days": 0.242446
+        },
+        "evaluation": {
+          "n": 125,
+          "log_loss": 1.020429,
+          "brier": 0.202884,
+          "ece": 0.148464,
+          "mean_confidence": 0.456365,
+          "accuracy": 0.48,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16+2016_17+2017_18 -> eval:2018_19"
+        }
+      },
+      "2019_20": {
+        "train_pool_n": 1000,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.098612,
+          "refined_elo": 1.025927,
+          "rolling_form": 1.061817,
+          "rest_days": 1.099847
+        },
+        "weights": {
+          "market_odds": 0.243642,
+          "refined_elo": 0.260904,
+          "rolling_form": 0.252085,
+          "rest_days": 0.243369
+        },
+        "evaluation": {
+          "n": 119,
+          "log_loss": 1.018038,
+          "brier": 0.202621,
+          "ece": 0.071435,
+          "mean_confidence": 0.453321,
+          "accuracy": 0.521008,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16+2016_17+2017_18+2018_19 -> eval:2019_20"
+        }
+      },
+      "2020_21": {
+        "train_pool_n": 1119,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.098612,
+          "refined_elo": 1.027916,
+          "rolling_form": 1.069778,
+          "rest_days": 1.099727
+        },
+        "weights": {
+          "market_odds": 0.244217,
+          "refined_elo": 0.261014,
+          "rolling_form": 0.2508,
+          "rest_days": 0.24397
+        },
+        "evaluation": {
+          "n": 125,
+          "log_loss": 0.981036,
+          "brier": 0.194038,
+          "ece": 0.056954,
+          "mean_confidence": 0.50515,
+          "accuracy": 0.528,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16+2016_17+2017_18+2018_19+2019_20 -> eval:2020_21"
         }
       },
       "2021_22": {
-        "train_pool_n": 244,
+        "train_pool_n": 1244,
         "signals_used": [
           "market_odds",
           "refined_elo",
@@ -1049,29 +2625,29 @@
           "rest_days"
         ],
         "per_signal_train_log_loss": {
-          "market_odds": 0.98451,
-          "refined_elo": 1.073911,
-          "rolling_form": 1.140529,
-          "rest_days": 1.102084
+          "market_odds": 1.076232,
+          "refined_elo": 1.035339,
+          "rolling_form": 1.077256,
+          "rest_days": 1.100285
         },
         "weights": {
-          "market_odds": 0.272237,
-          "refined_elo": 0.249574,
-          "rolling_form": 0.234996,
-          "rest_days": 0.243194
+          "market_odds": 0.248961,
+          "refined_elo": 0.258795,
+          "rolling_form": 0.248725,
+          "rest_days": 0.243519
         },
         "evaluation": {
           "n": 125,
-          "log_loss": 0.963493,
-          "brier": 0.189439,
-          "ece": 0.092958,
-          "mean_confidence": 0.498619,
+          "log_loss": 0.966165,
+          "brier": 0.190008,
+          "ece": 0.085511,
+          "mean_confidence": 0.499006,
           "accuracy": 0.528,
-          "weights_source": "train:2019_20+2020_21 -> eval:2021_22"
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16+2016_17+2017_18+2018_19+2019_20+2020_21 -> eval:2021_22"
         }
       },
       "2022_23": {
-        "train_pool_n": 369,
+        "train_pool_n": 1369,
         "signals_used": [
           "market_odds",
           "refined_elo",
@@ -1079,29 +2655,29 @@
           "rest_days"
         ],
         "per_signal_train_log_loss": {
-          "market_odds": 0.962938,
-          "refined_elo": 1.058974,
-          "rolling_form": 1.130917,
-          "rest_days": 1.100752
+          "market_odds": 1.062043,
+          "refined_elo": 1.034834,
+          "rolling_form": 1.080442,
+          "rest_days": 1.100091
         },
         "weights": {
-          "market_odds": 0.275059,
-          "refined_elo": 0.250115,
-          "rolling_form": 0.234204,
-          "rest_days": 0.240622
+          "market_odds": 0.251593,
+          "refined_elo": 0.258208,
+          "rolling_form": 0.247308,
+          "rest_days": 0.242891
         },
         "evaluation": {
           "n": 125,
-          "log_loss": 0.949935,
-          "brier": 0.186807,
-          "ece": 0.103067,
-          "mean_confidence": 0.493933,
-          "accuracy": 0.544,
-          "weights_source": "train:2019_20+2020_21+2021_22 -> eval:2022_23"
+          "log_loss": 0.951975,
+          "brier": 0.187227,
+          "ece": 0.088633,
+          "mean_confidence": 0.494294,
+          "accuracy": 0.552,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16+2016_17+2017_18+2018_19+2019_20+2020_21+2021_22 -> eval:2022_23"
         }
       },
       "2023_24": {
-        "train_pool_n": 494,
+        "train_pool_n": 1494,
         "signals_used": [
           "market_odds",
           "refined_elo",
@@ -1109,25 +2685,819 @@
           "rest_days"
         ],
         "per_signal_train_log_loss": {
-          "market_odds": 0.952439,
-          "refined_elo": 1.042839,
-          "rolling_form": 1.111063,
-          "rest_days": 1.102158
+          "market_odds": 1.050279,
+          "refined_elo": 1.031519,
+          "rolling_form": 1.078101,
+          "rest_days": 1.100611
         },
         "weights": {
-          "market_odds": 0.275126,
-          "refined_elo": 0.251276,
-          "rolling_form": 0.235846,
-          "rest_days": 0.237752
+          "market_odds": 0.253379,
+          "refined_elo": 0.257988,
+          "rolling_form": 0.246841,
+          "rest_days": 0.241792
         },
         "evaluation": {
           "n": 125,
-          "log_loss": 0.951528,
-          "brier": 0.187332,
-          "ece": 0.0975,
-          "mean_confidence": 0.501959,
-          "accuracy": 0.56,
-          "weights_source": "train:2019_20+2020_21+2021_22+2022_23 -> eval:2023_24"
+          "log_loss": 0.954039,
+          "brier": 0.187908,
+          "ece": 0.091112,
+          "mean_confidence": 0.501157,
+          "accuracy": 0.552,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16+2016_17+2017_18+2018_19+2019_20+2020_21+2021_22+2022_23 -> eval:2023_24"
+        }
+      },
+      "2024_25": {
+        "train_pool_n": 1619,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.039317,
+          "refined_elo": 1.027735,
+          "rolling_form": 1.077222,
+          "rest_days": 1.100756
+        },
+        "weights": {
+          "market_odds": 0.255085,
+          "refined_elo": 0.257959,
+          "rolling_form": 0.246109,
+          "rest_days": 0.240847
+        },
+        "evaluation": {
+          "n": 189,
+          "log_loss": 0.945886,
+          "brier": 0.185734,
+          "ece": 0.103709,
+          "mean_confidence": 0.499514,
+          "accuracy": 0.603175,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16+2016_17+2017_18+2018_19+2019_20+2020_21+2021_22+2022_23+2023_24 -> eval:2024_25"
+        }
+      },
+      "2025_26": {
+        "train_pool_n": 1808,
+        "signals_used": [
+          "market_odds",
+          "refined_elo",
+          "rolling_form",
+          "rest_days"
+        ],
+        "per_signal_train_log_loss": {
+          "market_odds": 1.023502,
+          "refined_elo": 1.026093,
+          "rolling_form": 1.077353,
+          "rest_days": 1.100408
+        },
+        "weights": {
+          "market_odds": 0.257891,
+          "refined_elo": 0.25724,
+          "rolling_form": 0.245001,
+          "rest_days": 0.239868
+        },
+        "evaluation": {
+          "n": 189,
+          "log_loss": 0.970267,
+          "brier": 0.190826,
+          "ece": 0.073949,
+          "mean_confidence": 0.493097,
+          "accuracy": 0.560847,
+          "weights_source": "train:2011_12+2012_13+2013_14+2014_15+2015_16+2016_17+2017_18+2018_19+2019_20+2020_21+2021_22+2022_23+2023_24+2024_25 -> eval:2025_26"
+        }
+      }
+    }
+  },
+  "holdout": {
+    "split": "single fixed chronological (D-02)",
+    "cutoff": "2020-12-31T23:59:59Z",
+    "n_train": 1215,
+    "n_test": 782,
+    "min_train": "2020-12-09T21:00:00Z",
+    "min_test": "2021-02-16T21:00:00Z",
+    "bootstrap": {
+      "n_boot": 2000,
+      "seed": 20260601
+    },
+    "per_season": {
+      "2011_12": {
+        "n_test": 0,
+        "ensemble": {
+          "n": 0
+        },
+        "uniform": {
+          "n": 0
+        },
+        "freq": {
+          "n": 0
+        },
+        "elo_only": {
+          "n": 0
+        },
+        "market_only": {
+          "n": 0
+        }
+      },
+      "2012_13": {
+        "n_test": 0,
+        "ensemble": {
+          "n": 0
+        },
+        "uniform": {
+          "n": 0
+        },
+        "freq": {
+          "n": 0
+        },
+        "elo_only": {
+          "n": 0
+        },
+        "market_only": {
+          "n": 0
+        }
+      },
+      "2013_14": {
+        "n_test": 0,
+        "ensemble": {
+          "n": 0
+        },
+        "uniform": {
+          "n": 0
+        },
+        "freq": {
+          "n": 0
+        },
+        "elo_only": {
+          "n": 0
+        },
+        "market_only": {
+          "n": 0
+        }
+      },
+      "2014_15": {
+        "n_test": 0,
+        "ensemble": {
+          "n": 0
+        },
+        "uniform": {
+          "n": 0
+        },
+        "freq": {
+          "n": 0
+        },
+        "elo_only": {
+          "n": 0
+        },
+        "market_only": {
+          "n": 0
+        }
+      },
+      "2015_16": {
+        "n_test": 0,
+        "ensemble": {
+          "n": 0
+        },
+        "uniform": {
+          "n": 0
+        },
+        "freq": {
+          "n": 0
+        },
+        "elo_only": {
+          "n": 0
+        },
+        "market_only": {
+          "n": 0
+        }
+      },
+      "2016_17": {
+        "n_test": 0,
+        "ensemble": {
+          "n": 0
+        },
+        "uniform": {
+          "n": 0
+        },
+        "freq": {
+          "n": 0
+        },
+        "elo_only": {
+          "n": 0
+        },
+        "market_only": {
+          "n": 0
+        }
+      },
+      "2017_18": {
+        "n_test": 0,
+        "ensemble": {
+          "n": 0
+        },
+        "uniform": {
+          "n": 0
+        },
+        "freq": {
+          "n": 0
+        },
+        "elo_only": {
+          "n": 0
+        },
+        "market_only": {
+          "n": 0
+        }
+      },
+      "2018_19": {
+        "n_test": 0,
+        "ensemble": {
+          "n": 0
+        },
+        "uniform": {
+          "n": 0
+        },
+        "freq": {
+          "n": 0
+        },
+        "elo_only": {
+          "n": 0
+        },
+        "market_only": {
+          "n": 0
+        }
+      },
+      "2019_20": {
+        "n_test": 0,
+        "ensemble": {
+          "n": 0
+        },
+        "uniform": {
+          "n": 0
+        },
+        "freq": {
+          "n": 0
+        },
+        "elo_only": {
+          "n": 0
+        },
+        "market_only": {
+          "n": 0
+        }
+      },
+      "2020_21": {
+        "n_test": 29,
+        "ensemble": {
+          "n": 29,
+          "log_loss": 1.071208,
+          "brier": 0.213729,
+          "ece": 0.0289,
+          "mean_confidence": 0.477217,
+          "accuracy": 0.448276
+        },
+        "uniform": {
+          "n": 29,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.046,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.37931
+        },
+        "freq": {
+          "n": 29,
+          "log_loss": 1.058304,
+          "brier": 0.215987,
+          "ece": 0.094,
+          "mean_confidence": 0.473251,
+          "accuracy": 0.37931
+        },
+        "elo_only": {
+          "n": 29,
+          "log_loss": 1.311939,
+          "brier": 0.252748,
+          "ece": 0.229952,
+          "mean_confidence": 0.643778,
+          "accuracy": 0.413793
+        },
+        "market_only": {
+          "n": 29,
+          "log_loss": 0.928991,
+          "brier": 0.181132,
+          "ece": 0.078507,
+          "mean_confidence": 0.507731,
+          "accuracy": 0.586207
+        }
+      },
+      "2021_22": {
+        "n_test": 125,
+        "ensemble": {
+          "n": 125,
+          "log_loss": 0.967166,
+          "brier": 0.1903,
+          "ece": 0.089902,
+          "mean_confidence": 0.493949,
+          "accuracy": 0.528
+        },
+        "uniform": {
+          "n": 125,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1147,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.448
+        },
+        "freq": {
+          "n": 125,
+          "log_loss": 1.055809,
+          "brier": 0.213136,
+          "ece": 0.0253,
+          "mean_confidence": 0.473251,
+          "accuracy": 0.448
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 1.029817,
+          "brier": 0.196993,
+          "ece": 0.139708,
+          "mean_confidence": 0.678297,
+          "accuracy": 0.552
+        },
+        "market_only": {
+          "n": 125,
+          "log_loss": 0.920828,
+          "brier": 0.181495,
+          "ece": 0.069745,
+          "mean_confidence": 0.550576,
+          "accuracy": 0.576
+        }
+      },
+      "2022_23": {
+        "n_test": 125,
+        "ensemble": {
+          "n": 125,
+          "log_loss": 0.953895,
+          "brier": 0.187706,
+          "ece": 0.098,
+          "mean_confidence": 0.489018,
+          "accuracy": 0.552
+        },
+        "uniform": {
+          "n": 125,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1547,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.488
+        },
+        "freq": {
+          "n": 125,
+          "log_loss": 1.039136,
+          "brier": 0.208834,
+          "ece": 0.0147,
+          "mean_confidence": 0.473251,
+          "accuracy": 0.488
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 0.995211,
+          "brier": 0.193123,
+          "ece": 0.14184,
+          "mean_confidence": 0.67377,
+          "accuracy": 0.536
+        },
+        "market_only": {
+          "n": 125,
+          "log_loss": 0.921446,
+          "brier": 0.181703,
+          "ece": 0.056901,
+          "mean_confidence": 0.545531,
+          "accuracy": 0.6
+        }
+      },
+      "2023_24": {
+        "n_test": 125,
+        "ensemble": {
+          "n": 125,
+          "log_loss": 0.955961,
+          "brier": 0.188365,
+          "ece": 0.076579,
+          "mean_confidence": 0.496017,
+          "accuracy": 0.552
+        },
+        "uniform": {
+          "n": 125,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1467,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.48
+        },
+        "freq": {
+          "n": 125,
+          "log_loss": 1.04247,
+          "brier": 0.209695,
+          "ece": 0.0067,
+          "mean_confidence": 0.473251,
+          "accuracy": 0.48
+        },
+        "elo_only": {
+          "n": 125,
+          "log_loss": 0.982509,
+          "brier": 0.191394,
+          "ece": 0.123762,
+          "mean_confidence": 0.660793,
+          "accuracy": 0.544
+        },
+        "market_only": {
+          "n": 125,
+          "log_loss": 0.908301,
+          "brier": 0.177128,
+          "ece": 0.056121,
+          "mean_confidence": 0.55782,
+          "accuracy": 0.6
+        }
+      },
+      "2024_25": {
+        "n_test": 189,
+        "ensemble": {
+          "n": 189,
+          "log_loss": 0.947795,
+          "brier": 0.186212,
+          "ece": 0.114437,
+          "mean_confidence": 0.494031,
+          "accuracy": 0.608466
+        },
+        "uniform": {
+          "n": 189,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1746,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.507937
+        },
+        "freq": {
+          "n": 189,
+          "log_loss": 1.004552,
+          "brier": 0.20213,
+          "ece": 0.0346,
+          "mean_confidence": 0.473251,
+          "accuracy": 0.507937
+        },
+        "elo_only": {
+          "n": 189,
+          "log_loss": 1.012022,
+          "brier": 0.19464,
+          "ece": 0.100203,
+          "mean_confidence": 0.668514,
+          "accuracy": 0.571429
+        },
+        "market_only": {
+          "n": 189,
+          "log_loss": 0.888021,
+          "brier": 0.174126,
+          "ece": 0.049219,
+          "mean_confidence": 0.561717,
+          "accuracy": 0.582011
+        }
+      },
+      "2025_26": {
+        "n_test": 189,
+        "ensemble": {
+          "n": 189,
+          "log_loss": 0.972419,
+          "brier": 0.191395,
+          "ece": 0.078548,
+          "mean_confidence": 0.487573,
+          "accuracy": 0.566138
+        },
+        "uniform": {
+          "n": 189,
+          "log_loss": 1.098612,
+          "brier": 0.222222,
+          "ece": 0.1693,
+          "mean_confidence": 0.333333,
+          "accuracy": 0.502646
+        },
+        "freq": {
+          "n": 189,
+          "log_loss": 1.020573,
+          "brier": 0.205097,
+          "ece": 0.0293,
+          "mean_confidence": 0.473251,
+          "accuracy": 0.502646
+        },
+        "elo_only": {
+          "n": 189,
+          "log_loss": 1.03459,
+          "brier": 0.197222,
+          "ece": 0.116459,
+          "mean_confidence": 0.665975,
+          "accuracy": 0.550265
+        },
+        "market_only": {
+          "n": 189,
+          "log_loss": 0.943091,
+          "brier": 0.185348,
+          "ece": 0.060321,
+          "mean_confidence": 0.540902,
+          "accuracy": 0.582011
+        }
+      }
+    },
+    "models": {
+      "ensemble": {
+        "n": 782,
+        "log_loss": 0.9637,
+        "brier": 0.189721,
+        "ece": 0.070008,
+        "mean_confidence": 0.491349,
+        "accuracy": 0.561381
+      },
+      "uniform": {
+        "n": 782,
+        "log_loss": 1.098612,
+        "brier": 0.222222,
+        "ece": 0.1514,
+        "mean_confidence": 0.333333,
+        "accuracy": 0.484655
+      },
+      "freq": {
+        "n": 782,
+        "log_loss": 1.0302,
+        "brier": 0.207401,
+        "ece": 0.0114,
+        "mean_confidence": 0.473251,
+        "accuracy": 0.484655
+      },
+      "elo_only": {
+        "n": 782,
+        "log_loss": 1.024038,
+        "brier": 0.197034,
+        "ece": 0.124722,
+        "mean_confidence": 0.668153,
+        "accuracy": 0.547315
+      },
+      "market_only": {
+        "n": 782,
+        "log_loss": 0.916679,
+        "brier": 0.179967,
+        "ece": 0.045772,
+        "mean_confidence": 0.549693,
+        "accuracy": 0.586957
+      }
+    },
+    "ci": {
+      "ensemble": {
+        "log_loss": {
+          "2.5": 0.938289,
+          "97.5": 0.988873
+        },
+        "brier": {
+          "2.5": 0.18376,
+          "97.5": 0.19576
+        },
+        "ece": {
+          "2.5": 0.051091,
+          "97.5": 0.10368
+        }
+      },
+      "uniform": {
+        "log_loss": {
+          "2.5": 1.098612,
+          "97.5": 1.098612
+        },
+        "brier": {
+          "2.5": 0.222222,
+          "97.5": 0.222222
+        },
+        "ece": {
+          "2.5": 0.118073,
+          "97.5": 0.187127
+        }
+      },
+      "freq": {
+        "log_loss": {
+          "2.5": 1.009519,
+          "97.5": 1.051102
+        },
+        "brier": {
+          "2.5": 0.202577,
+          "97.5": 0.212109
+        },
+        "ece": {
+          "2.5": 0.000105,
+          "97.5": 0.047209
+        }
+      },
+      "elo_only": {
+        "log_loss": {
+          "2.5": 0.963919,
+          "97.5": 1.082138
+        },
+        "brier": {
+          "2.5": 0.184645,
+          "97.5": 0.208938
+        },
+        "ece": {
+          "2.5": 0.093908,
+          "97.5": 0.157266
+        }
+      },
+      "market_only": {
+        "log_loss": {
+          "2.5": 0.883915,
+          "97.5": 0.952691
+        },
+        "brier": {
+          "2.5": 0.172254,
+          "97.5": 0.188415
+        },
+        "ece": {
+          "2.5": 0.030021,
+          "97.5": 0.080602
+        }
+      }
+    },
+    "comparisons": {
+      "ensemble_vs_uniform": {
+        "delta": -0.13473,
+        "2.5": -0.160323,
+        "97.5": -0.109739,
+        "mde": 0.025046,
+        "n": 782
+      },
+      "ensemble_vs_freq": {
+        "delta": -0.066106,
+        "2.5": -0.084684,
+        "97.5": -0.048553,
+        "mde": 0.025046,
+        "n": 782
+      },
+      "ensemble_vs_elo_only": {
+        "delta": -0.060165,
+        "2.5": -0.095712,
+        "97.5": -0.023372,
+        "mde": 0.025046,
+        "n": 782
+      },
+      "ensemble_vs_market_only": {
+        "delta": 0.046699,
+        "2.5": 0.027271,
+        "97.5": 0.065957,
+        "mde": 0.025046,
+        "n": 782
+      }
+    },
+    "verdict": {
+      "verdict": "skill declared",
+      "won_by": null,
+      "mde": 0.025046,
+      "n": 782,
+      "comparisons": [
+        {
+          "comparison": "ensemble_vs_uniform__log_loss",
+          "delta": -0.13473,
+          "ci": [
+            -0.160323,
+            -0.109739
+          ],
+          "holm_alpha": 0.008333,
+          "favourable": true,
+          "survives_holm": true
+        },
+        {
+          "comparison": "ensemble_vs_uniform__brier",
+          "delta": -0.097399,
+          "ci": [
+            -0.115387,
+            -0.079387
+          ],
+          "holm_alpha": 0.01,
+          "favourable": true,
+          "survives_holm": true
+        },
+        {
+          "comparison": "ensemble_vs_freq__log_loss",
+          "delta": -0.066106,
+          "ci": [
+            -0.084684,
+            -0.048553
+          ],
+          "holm_alpha": 0.0125,
+          "favourable": true,
+          "survives_holm": true
+        },
+        {
+          "comparison": "ensemble_vs_elo_only__log_loss",
+          "delta": -0.060165,
+          "ci": [
+            -0.095712,
+            -0.023372
+          ],
+          "holm_alpha": 0.016667,
+          "favourable": true,
+          "survives_holm": true
+        },
+        {
+          "comparison": "ensemble_vs_freq__brier",
+          "delta": -0.052793,
+          "ci": [
+            -0.064706,
+            -0.040953
+          ],
+          "holm_alpha": 0.025,
+          "favourable": true,
+          "survives_holm": true
+        },
+        {
+          "comparison": "ensemble_vs_elo_only__brier",
+          "delta": -0.021767,
+          "ci": [
+            -0.040505,
+            -0.001531
+          ],
+          "holm_alpha": 0.05,
+          "favourable": true,
+          "survives_holm": true
+        }
+      ]
+    },
+    "ordered": {
+      "rps": 0.207317,
+      "ordered_brier": 0.103659,
+      "order": [
+        "home",
+        "draw",
+        "away"
+      ],
+      "note": "secondary, not a gate",
+      "per_config": {
+        "ensemble": 0.207317,
+        "uniform": 0.247727,
+        "freq": 0.236608,
+        "elo_only": 0.221017,
+        "market_only": 0.195318
+      }
+    },
+    "tournament_trps": {
+      "trps": 0.159232,
+      "n_tournaments": 6,
+      "per_tournament": [
+        {
+          "season": "2020_21",
+          "trps": 0.218067
+        },
+        {
+          "season": "2021_22",
+          "trps": 0.156877
+        },
+        {
+          "season": "2022_23",
+          "trps": 0.161874
+        },
+        {
+          "season": "2023_24",
+          "trps": 0.155665
+        },
+        {
+          "season": "2024_25",
+          "trps": 0.120664
+        },
+        {
+          "season": "2025_26",
+          "trps": 0.142247
+        }
+      ],
+      "construction": "teams ranked by summed test-match points (3/1/0); ensemble strength = \u03a3(p_win + 0.5\u00b7p_draw); soft rank distribution",
+      "order": "rank 1 = top",
+      "note": "tournament-level TRPS block (roadmap criterion 1); secondary, not a gate",
+      "skipped_tournaments": 0
+    },
+    "classwise_ece": {
+      "home": 0.068514,
+      "draw": 0.093447,
+      "away": 0.078091,
+      "macro": 0.080017,
+      "withheld": []
+    },
+    "calibration_slope_intercept": {
+      "overall": {
+        "slope": 2.041092,
+        "intercept": 0.355611,
+        "n": 782
+      },
+      "per_class": {
+        "home": {
+          "slope": 2.335403,
+          "intercept": 0.21583,
+          "n": 782
+        },
+        "draw": {
+          "slope": 1.910181,
+          "intercept": 0.326752,
+          "n": 782
+        },
+        "away": {
+          "slope": 1.97659,
+          "intercept": 1.417133,
+          "n": 782
         }
       }
     }

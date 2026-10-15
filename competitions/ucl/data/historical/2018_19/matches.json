@@ -1,0 +1,1256 @@
+{
+  "schema": 1,
+  "season": "2018/19",
+  "matches": [
+    {
+      "match_id": "MD01_03",
+      "team_a": "Barcelona",
+      "team_b": "PSV Eindhoven",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2018-09-18T18:55:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_04",
+      "team_a": "Inter Milan",
+      "team_b": "Tottenham",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2018-09-18T18:55:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_01",
+      "team_a": "Club Brugge",
+      "team_b": "Borussia Dortmund",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2018-09-18T21:00:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_02",
+      "team_a": "Monaco",
+      "team_b": "Atletico Madrid",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2018-09-18T21:00:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_05",
+      "team_a": "Liverpool",
+      "team_b": "Paris Saint-Germain",
+      "home_score": 3,
+      "away_score": 2,
+      "event_date": "2018-09-18T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_06",
+      "team_a": "Red Star Belgrade",
+      "team_b": "Napoli",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2018-09-18T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_07",
+      "team_a": "Galatasaray",
+      "team_b": "Lokomotiv Moscow",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2018-09-18T21:00:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_08",
+      "team_a": "Schalke 04",
+      "team_b": "Porto",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-09-18T21:00:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_09",
+      "team_a": "Ajax",
+      "team_b": "AEK Athens",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2018-09-19T18:55:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_12",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "Hoffenheim",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2018-09-19T18:55:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_10",
+      "team_a": "Benfica",
+      "team_b": "Bayern Munich",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2018-09-19T21:00:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_11",
+      "team_a": "Manchester City",
+      "team_b": "Lyon",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2018-09-19T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_13",
+      "team_a": "Real Madrid",
+      "team_b": "Roma",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2018-09-19T21:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_14",
+      "team_a": "Viktoria Plzen",
+      "team_b": "CSKA Moscow",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2018-09-19T21:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_15",
+      "team_a": "Valencia",
+      "team_b": "Juventus",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2018-09-19T21:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_16",
+      "team_a": "Young Boys",
+      "team_b": "Manchester United",
+      "home_score": 0,
+      "away_score": 3,
+      "event_date": "2018-09-19T21:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_03",
+      "team_a": "Hoffenheim",
+      "team_b": "Manchester City",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2018-10-02T18:55:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_07",
+      "team_a": "Juventus",
+      "team_b": "Young Boys",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2018-10-02T18:55:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_01",
+      "team_a": "AEK Athens",
+      "team_b": "Benfica",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2018-10-02T21:00:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_02",
+      "team_a": "Bayern Munich",
+      "team_b": "Ajax",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-10-02T21:00:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_04",
+      "team_a": "Lyon",
+      "team_b": "Shakhtar Donetsk",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2018-10-02T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_05",
+      "team_a": "CSKA Moscow",
+      "team_b": "Real Madrid",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-10-02T21:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_06",
+      "team_a": "Roma",
+      "team_b": "Viktoria Plzen",
+      "home_score": 5,
+      "away_score": 0,
+      "event_date": "2018-10-02T21:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_08",
+      "team_a": "Manchester United",
+      "team_b": "Valencia",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2018-10-02T21:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_14",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Red Star Belgrade",
+      "home_score": 6,
+      "away_score": 1,
+      "event_date": "2018-10-03T18:55:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_15",
+      "team_a": "Lokomotiv Moscow",
+      "team_b": "Schalke 04",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2018-10-03T18:55:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_09",
+      "team_a": "Atletico Madrid",
+      "team_b": "Club Brugge",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2018-10-03T21:00:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_10",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Monaco",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2018-10-03T21:00:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_11",
+      "team_a": "PSV Eindhoven",
+      "team_b": "Inter Milan",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2018-10-03T21:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_12",
+      "team_a": "Tottenham",
+      "team_b": "Barcelona",
+      "home_score": 2,
+      "away_score": 4,
+      "event_date": "2018-10-03T21:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_13",
+      "team_a": "Napoli",
+      "team_b": "Liverpool",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-10-03T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_16",
+      "team_a": "Porto",
+      "team_b": "Galatasaray",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-10-03T21:00:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_01",
+      "team_a": "AEK Athens",
+      "team_b": "Bayern Munich",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2018-10-23T18:55:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_08",
+      "team_a": "Young Boys",
+      "team_b": "Valencia",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-10-23T18:55:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_02",
+      "team_a": "Ajax",
+      "team_b": "Benfica",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-10-23T21:00:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_03",
+      "team_a": "Hoffenheim",
+      "team_b": "Lyon",
+      "home_score": 3,
+      "away_score": 3,
+      "event_date": "2018-10-23T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_04",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "Manchester City",
+      "home_score": 0,
+      "away_score": 3,
+      "event_date": "2018-10-23T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_05",
+      "team_a": "Real Madrid",
+      "team_b": "Viktoria Plzen",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2018-10-23T21:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_06",
+      "team_a": "Roma",
+      "team_b": "CSKA Moscow",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2018-10-23T21:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_07",
+      "team_a": "Manchester United",
+      "team_b": "Juventus",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2018-10-23T21:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_10",
+      "team_a": "Club Brugge",
+      "team_b": "Monaco",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-10-24T18:55:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_12",
+      "team_a": "PSV Eindhoven",
+      "team_b": "Tottenham",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2018-10-24T18:55:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_09",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Atletico Madrid",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2018-10-24T21:00:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_11",
+      "team_a": "Barcelona",
+      "team_b": "Inter Milan",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2018-10-24T21:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_13",
+      "team_a": "Liverpool",
+      "team_b": "Red Star Belgrade",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2018-10-24T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_14",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Napoli",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2018-10-24T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_15",
+      "team_a": "Galatasaray",
+      "team_b": "Schalke 04",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2018-10-24T21:00:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_16",
+      "team_a": "Lokomotiv Moscow",
+      "team_b": "Porto",
+      "home_score": 1,
+      "away_score": 3,
+      "event_date": "2018-10-24T21:00:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_02",
+      "team_a": "Monaco",
+      "team_b": "Club Brugge",
+      "home_score": 0,
+      "away_score": 4,
+      "event_date": "2018-11-06T18:55:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_06",
+      "team_a": "Red Star Belgrade",
+      "team_b": "Liverpool",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2018-11-06T18:55:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_01",
+      "team_a": "Atletico Madrid",
+      "team_b": "Borussia Dortmund",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2018-11-06T21:00:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_03",
+      "team_a": "Inter Milan",
+      "team_b": "Barcelona",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-11-06T21:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_04",
+      "team_a": "Tottenham",
+      "team_b": "PSV Eindhoven",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2018-11-06T21:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_05",
+      "team_a": "Napoli",
+      "team_b": "Paris Saint-Germain",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-11-06T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_07",
+      "team_a": "Porto",
+      "team_b": "Lokomotiv Moscow",
+      "home_score": 4,
+      "away_score": 1,
+      "event_date": "2018-11-06T21:00:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_08",
+      "team_a": "Schalke 04",
+      "team_b": "Galatasaray",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2018-11-06T21:00:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_13",
+      "team_a": "CSKA Moscow",
+      "team_b": "Roma",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2018-11-07T18:55:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_16",
+      "team_a": "Valencia",
+      "team_b": "Young Boys",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2018-11-07T18:55:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_09",
+      "team_a": "Bayern Munich",
+      "team_b": "AEK Athens",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2018-11-07T21:00:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_10",
+      "team_a": "Benfica",
+      "team_b": "Ajax",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-11-07T21:00:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_11",
+      "team_a": "Lyon",
+      "team_b": "Hoffenheim",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2018-11-07T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_12",
+      "team_a": "Manchester City",
+      "team_b": "Shakhtar Donetsk",
+      "home_score": 6,
+      "away_score": 0,
+      "event_date": "2018-11-07T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_14",
+      "team_a": "Viktoria Plzen",
+      "team_b": "Real Madrid",
+      "home_score": 0,
+      "away_score": 5,
+      "event_date": "2018-11-07T21:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_15",
+      "team_a": "Juventus",
+      "team_b": "Manchester United",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2018-11-07T21:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_01",
+      "team_a": "AEK Athens",
+      "team_b": "Ajax",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2018-11-27T18:55:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_05",
+      "team_a": "CSKA Moscow",
+      "team_b": "Viktoria Plzen",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2018-11-27T18:55:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_02",
+      "team_a": "Bayern Munich",
+      "team_b": "Benfica",
+      "home_score": 5,
+      "away_score": 1,
+      "event_date": "2018-11-27T21:00:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_03",
+      "team_a": "Hoffenheim",
+      "team_b": "Shakhtar Donetsk",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2018-11-27T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_04",
+      "team_a": "Lyon",
+      "team_b": "Manchester City",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2018-11-27T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_06",
+      "team_a": "Roma",
+      "team_b": "Real Madrid",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2018-11-27T21:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_07",
+      "team_a": "Juventus",
+      "team_b": "Valencia",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-11-27T21:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_08",
+      "team_a": "Manchester United",
+      "team_b": "Young Boys",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-11-27T21:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_09",
+      "team_a": "Atletico Madrid",
+      "team_b": "Monaco",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2018-11-28T18:55:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_15",
+      "team_a": "Lokomotiv Moscow",
+      "team_b": "Galatasaray",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2018-11-28T18:55:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_10",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Club Brugge",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2018-11-28T21:00:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_11",
+      "team_a": "PSV Eindhoven",
+      "team_b": "Barcelona",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2018-11-28T21:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_12",
+      "team_a": "Tottenham",
+      "team_b": "Inter Milan",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-11-28T21:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_13",
+      "team_a": "Napoli",
+      "team_b": "Red Star Belgrade",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2018-11-28T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_14",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Liverpool",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2018-11-28T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_16",
+      "team_a": "Porto",
+      "team_b": "Schalke 04",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2018-11-28T21:00:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_07",
+      "team_a": "Galatasaray",
+      "team_b": "Porto",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2018-12-11T18:55:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_08",
+      "team_a": "Schalke 04",
+      "team_b": "Lokomotiv Moscow",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-12-11T18:55:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_01",
+      "team_a": "Club Brugge",
+      "team_b": "Atletico Madrid",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2018-12-11T21:00:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_02",
+      "team_a": "Monaco",
+      "team_b": "Borussia Dortmund",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2018-12-11T21:00:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_03",
+      "team_a": "Barcelona",
+      "team_b": "Tottenham",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-12-11T21:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_04",
+      "team_a": "Inter Milan",
+      "team_b": "PSV Eindhoven",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-12-11T21:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_05",
+      "team_a": "Liverpool",
+      "team_b": "Napoli",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-12-11T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_06",
+      "team_a": "Red Star Belgrade",
+      "team_b": "Paris Saint-Germain",
+      "home_score": 1,
+      "away_score": 4,
+      "event_date": "2018-12-11T21:00:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_13",
+      "team_a": "Real Madrid",
+      "team_b": "CSKA Moscow",
+      "home_score": 0,
+      "away_score": 3,
+      "event_date": "2018-12-12T18:55:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_14",
+      "team_a": "Viktoria Plzen",
+      "team_b": "Roma",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2018-12-12T18:55:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_09",
+      "team_a": "Ajax",
+      "team_b": "Bayern Munich",
+      "home_score": 3,
+      "away_score": 3,
+      "event_date": "2018-12-12T21:00:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_10",
+      "team_a": "Benfica",
+      "team_b": "AEK Athens",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2018-12-12T21:00:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_11",
+      "team_a": "Manchester City",
+      "team_b": "Hoffenheim",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2018-12-12T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_12",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "Lyon",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2018-12-12T21:00:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_15",
+      "team_a": "Valencia",
+      "team_b": "Manchester United",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2018-12-12T21:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_16",
+      "team_a": "Young Boys",
+      "team_b": "Juventus",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2018-12-12T21:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_01",
+      "team_a": "Manchester United",
+      "team_b": "Paris Saint-Germain",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2019-02-12T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_02",
+      "team_a": "Roma",
+      "team_b": "Porto",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2019-02-12T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_03",
+      "team_a": "Tottenham",
+      "team_b": "Borussia Dortmund",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2019-02-13T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_04",
+      "team_a": "Ajax",
+      "team_b": "Real Madrid",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2019-02-13T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_05",
+      "team_a": "Lyon",
+      "team_b": "Barcelona",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2019-02-19T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_06",
+      "team_a": "Liverpool",
+      "team_b": "Bayern Munich",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2019-02-19T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_07",
+      "team_a": "Schalke 04",
+      "team_b": "Manchester City",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2019-02-20T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_08",
+      "team_a": "Atletico Madrid",
+      "team_b": "Juventus",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2019-02-20T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_09",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Tottenham",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2019-03-05T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_10",
+      "team_a": "Real Madrid",
+      "team_b": "Ajax",
+      "home_score": 1,
+      "away_score": 4,
+      "event_date": "2019-03-05T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_11",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Manchester United",
+      "home_score": 1,
+      "away_score": 3,
+      "event_date": "2019-03-06T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_12",
+      "team_a": "Porto",
+      "team_b": "Roma",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2019-03-06T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_13",
+      "team_a": "Manchester City",
+      "team_b": "Schalke 04",
+      "home_score": 7,
+      "away_score": 0,
+      "event_date": "2019-03-12T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_14",
+      "team_a": "Juventus",
+      "team_b": "Atletico Madrid",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2019-03-12T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_15",
+      "team_a": "Barcelona",
+      "team_b": "Lyon",
+      "home_score": 5,
+      "away_score": 1,
+      "event_date": "2019-03-13T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_16",
+      "team_a": "Bayern Munich",
+      "team_b": "Liverpool",
+      "home_score": 1,
+      "away_score": 3,
+      "event_date": "2019-03-13T21:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_01",
+      "team_a": "Liverpool",
+      "team_b": "Porto",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2019-04-09T21:00:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_02",
+      "team_a": "Tottenham",
+      "team_b": "Manchester City",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2019-04-09T21:00:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_03",
+      "team_a": "Ajax",
+      "team_b": "Juventus",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2019-04-10T21:00:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_04",
+      "team_a": "Manchester United",
+      "team_b": "Barcelona",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2019-04-10T21:00:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_05",
+      "team_a": "Juventus",
+      "team_b": "Ajax",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2019-04-16T21:00:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_06",
+      "team_a": "Barcelona",
+      "team_b": "Manchester United",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2019-04-16T21:00:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_07",
+      "team_a": "Porto",
+      "team_b": "Liverpool",
+      "home_score": 1,
+      "away_score": 4,
+      "event_date": "2019-04-17T21:00:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_08",
+      "team_a": "Manchester City",
+      "team_b": "Tottenham",
+      "home_score": 4,
+      "away_score": 3,
+      "event_date": "2019-04-17T21:00:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD09_01",
+      "team_a": "Tottenham",
+      "team_b": "Ajax",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2019-04-30T21:00:00Z",
+      "round_label": "Semifinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD09_02",
+      "team_a": "Barcelona",
+      "team_b": "Liverpool",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2019-05-01T21:00:00Z",
+      "round_label": "Semifinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD09_03",
+      "team_a": "Liverpool",
+      "team_b": "Barcelona",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2019-05-07T21:00:00Z",
+      "round_label": "Semifinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD09_04",
+      "team_a": "Ajax",
+      "team_b": "Tottenham",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2019-05-08T21:00:00Z",
+      "round_label": "Semifinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD10_01",
+      "team_a": "Tottenham",
+      "team_b": "Liverpool",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2019-06-01T21:00:00Z",
+      "round_label": "Final",
+      "home_ground": "home"
+    }
+  ]
+}

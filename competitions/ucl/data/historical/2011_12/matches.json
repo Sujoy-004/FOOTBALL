@@ -1,0 +1,1256 @@
+{
+  "schema": 1,
+  "season": "2011/12",
+  "matches": [
+    {
+      "match_id": "MD01_01",
+      "team_a": "Chelsea",
+      "team_b": "Bayer Leverkusen",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-09-13T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_02",
+      "team_a": "Genk",
+      "team_b": "Valencia",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2011-09-13T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_03",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Arsenal",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-09-13T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_04",
+      "team_a": "Olympiacos",
+      "team_b": "Marseille",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2011-09-13T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_05",
+      "team_a": "APOEL",
+      "team_b": "Zenit Saint Petersburg",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-09-13T20:45:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_06",
+      "team_a": "Porto",
+      "team_b": "Shakhtar Donetsk",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-09-13T20:45:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_07",
+      "team_a": "Barcelona",
+      "team_b": "AC Milan",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2011-09-13T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_08",
+      "team_a": "Viktoria Plzen",
+      "team_b": "BATE Borisov",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-09-13T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_09",
+      "team_a": "Manchester City",
+      "team_b": "Napoli",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-09-14T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_10",
+      "team_a": "Villarreal",
+      "team_b": "Bayern Munich",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2011-09-14T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_11",
+      "team_a": "Inter Milan",
+      "team_b": "Trabzonspor",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2011-09-14T20:45:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_12",
+      "team_a": "Lille",
+      "team_b": "CSKA Moscow",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2011-09-14T20:45:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_13",
+      "team_a": "Basel",
+      "team_b": "Otelul Galati",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-09-14T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_14",
+      "team_a": "Benfica",
+      "team_b": "Manchester United",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-09-14T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_15",
+      "team_a": "Ajax",
+      "team_b": "Lyon",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2011-09-14T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD01_16",
+      "team_a": "Dinamo Zagreb",
+      "team_b": "Real Madrid",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2011-09-14T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_03",
+      "team_a": "CSKA Moscow",
+      "team_b": "Inter Milan",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2011-09-27T18:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_01",
+      "team_a": "Bayern Munich",
+      "team_b": "Manchester City",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-09-27T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_02",
+      "team_a": "Napoli",
+      "team_b": "Villarreal",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-09-27T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_04",
+      "team_a": "Trabzonspor",
+      "team_b": "Lille",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-09-27T20:45:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_05",
+      "team_a": "Manchester United",
+      "team_b": "Basel",
+      "home_score": 3,
+      "away_score": 3,
+      "event_date": "2011-09-27T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_06",
+      "team_a": "Otelul Galati",
+      "team_b": "Benfica",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2011-09-27T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_07",
+      "team_a": "Lyon",
+      "team_b": "Dinamo Zagreb",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-09-27T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_08",
+      "team_a": "Real Madrid",
+      "team_b": "Ajax",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2011-09-27T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_14",
+      "team_a": "Zenit Saint Petersburg",
+      "team_b": "Porto",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2011-09-28T18:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_09",
+      "team_a": "Bayer Leverkusen",
+      "team_b": "Genk",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-09-28T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_10",
+      "team_a": "Valencia",
+      "team_b": "Chelsea",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-09-28T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_11",
+      "team_a": "Arsenal",
+      "team_b": "Olympiacos",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-09-28T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_12",
+      "team_a": "Marseille",
+      "team_b": "Borussia Dortmund",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2011-09-28T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_13",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "APOEL",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-09-28T20:45:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_15",
+      "team_a": "AC Milan",
+      "team_b": "Viktoria Plzen",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-09-28T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD02_16",
+      "team_a": "BATE Borisov",
+      "team_b": "Barcelona",
+      "home_score": 0,
+      "away_score": 5,
+      "event_date": "2011-09-28T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_03",
+      "team_a": "CSKA Moscow",
+      "team_b": "Trabzonspor",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2011-10-18T18:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_01",
+      "team_a": "Manchester City",
+      "team_b": "Villarreal",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-10-18T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_02",
+      "team_a": "Napoli",
+      "team_b": "Bayern Munich",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-10-18T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_04",
+      "team_a": "Lille",
+      "team_b": "Inter Milan",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2011-10-18T20:45:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_05",
+      "team_a": "Basel",
+      "team_b": "Benfica",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2011-10-18T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_06",
+      "team_a": "Otelul Galati",
+      "team_b": "Manchester United",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2011-10-18T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_07",
+      "team_a": "Dinamo Zagreb",
+      "team_b": "Ajax",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2011-10-18T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_08",
+      "team_a": "Real Madrid",
+      "team_b": "Lyon",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2011-10-18T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_09",
+      "team_a": "Bayer Leverkusen",
+      "team_b": "Valencia",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-10-19T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_10",
+      "team_a": "Chelsea",
+      "team_b": "Genk",
+      "home_score": 5,
+      "away_score": 0,
+      "event_date": "2011-10-19T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_11",
+      "team_a": "Marseille",
+      "team_b": "Arsenal",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2011-10-19T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_12",
+      "team_a": "Olympiacos",
+      "team_b": "Borussia Dortmund",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2011-10-19T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_13",
+      "team_a": "Porto",
+      "team_b": "APOEL",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-10-19T20:45:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_14",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "Zenit Saint Petersburg",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2011-10-19T20:45:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_15",
+      "team_a": "AC Milan",
+      "team_b": "BATE Borisov",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-10-19T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD03_16",
+      "team_a": "Barcelona",
+      "team_b": "Viktoria Plzen",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-10-19T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_06",
+      "team_a": "Zenit Saint Petersburg",
+      "team_b": "Shakhtar Donetsk",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2011-11-01T18:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_07",
+      "team_a": "BATE Borisov",
+      "team_b": "AC Milan",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-11-01T18:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_01",
+      "team_a": "Genk",
+      "team_b": "Chelsea",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-11-01T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_02",
+      "team_a": "Valencia",
+      "team_b": "Bayer Leverkusen",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2011-11-01T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_03",
+      "team_a": "Arsenal",
+      "team_b": "Marseille",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2011-11-01T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_04",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Olympiacos",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2011-11-01T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_05",
+      "team_a": "APOEL",
+      "team_b": "Porto",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-11-01T20:45:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_08",
+      "team_a": "Viktoria Plzen",
+      "team_b": "Barcelona",
+      "home_score": 0,
+      "away_score": 4,
+      "event_date": "2011-11-01T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_09",
+      "team_a": "Bayern Munich",
+      "team_b": "Napoli",
+      "home_score": 3,
+      "away_score": 2,
+      "event_date": "2011-11-02T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_10",
+      "team_a": "Villarreal",
+      "team_b": "Manchester City",
+      "home_score": 0,
+      "away_score": 3,
+      "event_date": "2011-11-02T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_11",
+      "team_a": "Inter Milan",
+      "team_b": "Lille",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-11-02T20:45:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_12",
+      "team_a": "Trabzonspor",
+      "team_b": "CSKA Moscow",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2011-11-02T20:45:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_13",
+      "team_a": "Benfica",
+      "team_b": "Basel",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-11-02T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_14",
+      "team_a": "Manchester United",
+      "team_b": "Otelul Galati",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-11-02T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_15",
+      "team_a": "Ajax",
+      "team_b": "Dinamo Zagreb",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2011-11-02T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD04_16",
+      "team_a": "Lyon",
+      "team_b": "Real Madrid",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2011-11-02T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_03",
+      "team_a": "CSKA Moscow",
+      "team_b": "Lille",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2011-11-22T18:00:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_01",
+      "team_a": "Bayern Munich",
+      "team_b": "Villarreal",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2011-11-22T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_02",
+      "team_a": "Napoli",
+      "team_b": "Manchester City",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-11-22T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_04",
+      "team_a": "Trabzonspor",
+      "team_b": "Inter Milan",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-11-22T20:45:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_05",
+      "team_a": "Manchester United",
+      "team_b": "Benfica",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2011-11-22T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_06",
+      "team_a": "Otelul Galati",
+      "team_b": "Basel",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2011-11-22T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_07",
+      "team_a": "Lyon",
+      "team_b": "Ajax",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2011-11-22T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_08",
+      "team_a": "Real Madrid",
+      "team_b": "Dinamo Zagreb",
+      "home_score": 6,
+      "away_score": 2,
+      "event_date": "2011-11-22T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_14",
+      "team_a": "Zenit Saint Petersburg",
+      "team_b": "APOEL",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2011-11-23T18:00:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_16",
+      "team_a": "BATE Borisov",
+      "team_b": "Viktoria Plzen",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2011-11-23T19:00:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_09",
+      "team_a": "Bayer Leverkusen",
+      "team_b": "Chelsea",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-11-23T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_10",
+      "team_a": "Valencia",
+      "team_b": "Genk",
+      "home_score": 7,
+      "away_score": 0,
+      "event_date": "2011-11-23T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_11",
+      "team_a": "Arsenal",
+      "team_b": "Borussia Dortmund",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-11-23T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_12",
+      "team_a": "Marseille",
+      "team_b": "Olympiacos",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2011-11-23T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_13",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "Porto",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2011-11-23T20:45:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD05_15",
+      "team_a": "AC Milan",
+      "team_b": "Barcelona",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2011-11-23T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_01",
+      "team_a": "Chelsea",
+      "team_b": "Valencia",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2011-12-06T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_02",
+      "team_a": "Genk",
+      "team_b": "Bayer Leverkusen",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2011-12-06T20:45:00Z",
+      "round_label": "Group E",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_03",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Marseille",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2011-12-06T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_04",
+      "team_a": "Olympiacos",
+      "team_b": "Arsenal",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2011-12-06T20:45:00Z",
+      "round_label": "Group F",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_05",
+      "team_a": "APOEL",
+      "team_b": "Shakhtar Donetsk",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2011-12-06T20:45:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_06",
+      "team_a": "Porto",
+      "team_b": "Zenit Saint Petersburg",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2011-12-06T20:45:00Z",
+      "round_label": "Group G",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_07",
+      "team_a": "Barcelona",
+      "team_b": "BATE Borisov",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2011-12-06T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_08",
+      "team_a": "Viktoria Plzen",
+      "team_b": "AC Milan",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2011-12-06T20:45:00Z",
+      "round_label": "Group H",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_09",
+      "team_a": "Manchester City",
+      "team_b": "Bayern Munich",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2011-12-07T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_10",
+      "team_a": "Villarreal",
+      "team_b": "Napoli",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2011-12-07T20:45:00Z",
+      "round_label": "Group A",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_11",
+      "team_a": "Inter Milan",
+      "team_b": "CSKA Moscow",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2011-12-07T20:45:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_12",
+      "team_a": "Lille",
+      "team_b": "Trabzonspor",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2011-12-07T20:45:00Z",
+      "round_label": "Group B",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_13",
+      "team_a": "Basel",
+      "team_b": "Manchester United",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2011-12-07T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_14",
+      "team_a": "Benfica",
+      "team_b": "Otelul Galati",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2011-12-07T20:45:00Z",
+      "round_label": "Group C",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_15",
+      "team_a": "Ajax",
+      "team_b": "Real Madrid",
+      "home_score": 0,
+      "away_score": 3,
+      "event_date": "2011-12-07T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD06_16",
+      "team_a": "Dinamo Zagreb",
+      "team_b": "Lyon",
+      "home_score": 1,
+      "away_score": 7,
+      "event_date": "2011-12-07T20:45:00Z",
+      "round_label": "Group D",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_01",
+      "team_a": "Lyon",
+      "team_b": "APOEL",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2012-02-14T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_02",
+      "team_a": "Bayer Leverkusen",
+      "team_b": "Barcelona",
+      "home_score": 1,
+      "away_score": 3,
+      "event_date": "2012-02-14T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_03",
+      "team_a": "Zenit Saint Petersburg",
+      "team_b": "Benfica",
+      "home_score": 3,
+      "away_score": 2,
+      "event_date": "2012-02-15T18:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_04",
+      "team_a": "AC Milan",
+      "team_b": "Arsenal",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2012-02-15T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_05",
+      "team_a": "CSKA Moscow",
+      "team_b": "Real Madrid",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2012-02-21T18:00:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_06",
+      "team_a": "Napoli",
+      "team_b": "Chelsea",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2012-02-21T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_07",
+      "team_a": "Basel",
+      "team_b": "Bayern Munich",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2012-02-22T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_08",
+      "team_a": "Marseille",
+      "team_b": "Inter Milan",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2012-02-22T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_09",
+      "team_a": "Arsenal",
+      "team_b": "AC Milan",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2012-03-06T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_10",
+      "team_a": "Benfica",
+      "team_b": "Zenit Saint Petersburg",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2012-03-06T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_11",
+      "team_a": "APOEL",
+      "team_b": "Lyon",
+      "home_score": 4,
+      "away_score": 3,
+      "event_date": "2012-03-07T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_12",
+      "team_a": "Barcelona",
+      "team_b": "Bayer Leverkusen",
+      "home_score": 7,
+      "away_score": 1,
+      "event_date": "2012-03-07T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_13",
+      "team_a": "Bayern Munich",
+      "team_b": "Basel",
+      "home_score": 7,
+      "away_score": 0,
+      "event_date": "2012-03-13T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_14",
+      "team_a": "Inter Milan",
+      "team_b": "Marseille",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2012-03-13T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_15",
+      "team_a": "Chelsea",
+      "team_b": "Napoli",
+      "home_score": 4,
+      "away_score": 1,
+      "event_date": "2012-03-14T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD07_16",
+      "team_a": "Real Madrid",
+      "team_b": "CSKA Moscow",
+      "home_score": 4,
+      "away_score": 1,
+      "event_date": "2012-03-14T20:45:00Z",
+      "round_label": "Round of 16",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_01",
+      "team_a": "APOEL",
+      "team_b": "Real Madrid",
+      "home_score": 0,
+      "away_score": 3,
+      "event_date": "2012-03-27T20:45:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_02",
+      "team_a": "Benfica",
+      "team_b": "Chelsea",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2012-03-27T20:45:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_03",
+      "team_a": "Marseille",
+      "team_b": "Bayern Munich",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2012-03-28T20:45:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_04",
+      "team_a": "AC Milan",
+      "team_b": "Barcelona",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2012-03-28T20:45:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_05",
+      "team_a": "Bayern Munich",
+      "team_b": "Marseille",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2012-04-03T20:45:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_06",
+      "team_a": "Barcelona",
+      "team_b": "AC Milan",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2012-04-03T20:45:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_07",
+      "team_a": "Real Madrid",
+      "team_b": "APOEL",
+      "home_score": 5,
+      "away_score": 2,
+      "event_date": "2012-04-04T20:45:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD08_08",
+      "team_a": "Chelsea",
+      "team_b": "Benfica",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2012-04-04T20:45:00Z",
+      "round_label": "Quarterfinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD09_01",
+      "team_a": "Bayern Munich",
+      "team_b": "Real Madrid",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2012-04-17T20:45:00Z",
+      "round_label": "Semifinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD09_02",
+      "team_a": "Chelsea",
+      "team_b": "Barcelona",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2012-04-18T20:45:00Z",
+      "round_label": "Semifinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD09_03",
+      "team_a": "Barcelona",
+      "team_b": "Chelsea",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2012-04-24T20:45:00Z",
+      "round_label": "Semifinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD09_04",
+      "team_a": "Real Madrid",
+      "team_b": "Bayern Munich",
+      "home_score": 1,
+      "away_score": 3,
+      "event_date": "2012-04-25T20:45:00Z",
+      "round_label": "Semifinals",
+      "home_ground": "home"
+    },
+    {
+      "match_id": "MD10_01",
+      "team_a": "Bayern Munich",
+      "team_b": "Chelsea",
+      "home_score": 3,
+      "away_score": 4,
+      "event_date": "2012-05-19T20:45:00Z",
+      "round_label": "Final",
+      "home_ground": "home"
+    }
+  ]
+}
