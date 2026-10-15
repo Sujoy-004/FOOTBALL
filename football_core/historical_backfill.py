@@ -664,6 +664,155 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
               if holdout_actuals[cfg] else {"n": 0})
         for cfg in configs
     }
+
+    scored_n = len(holdout_actuals["ensemble"])
+    if scored_n:
+        merged = {cfg: holdout_caches[cfg][cfg] for cfg in configs
+                  if cfg in holdout_caches[cfg]}
+        brier_view = {name: {"n": c["n"], "ll": c["brier"]}
+                      for name, c in merged.items()}
+        # ── paired bootstrap CI + MDE per comparison (D-14) ──
+        # The point delta is published under the single key "delta" — the
+        # one key the 03-07 renderer reads; the primitive's delta_ll never
+        # leaks into the artifact.
+        holdout["ci"] = bootstrap_cis(merged)
+        comparisons: dict[str, dict] = {}
+        for name in ("uniform", "freq", "elo_only", "market_only"):
+            if name not in merged:
+                continue
+            d = delta_ci(merged, "ensemble", name)
+            comparisons[f"ensemble_vs_{name}"] = {
+                "delta": d["delta_ll"],
+                "2.5": d["2.5"],
+                "97.5": d["97.5"],
+                "mde": mde_for_n(scored_n),
+                "n": scored_n,
+            }
+        holdout["comparisons"] = comparisons
+
+        # ── D-16 verdict over the six within-competition comparisons ──
+        # delta_ci is metric-agnostic (it resamples the "ll" array), so the
+        # brier side reuses the same seeded core via a brier-view cache.
+        skill_input = {}
+        for name in ("uniform", "freq", "elo_only"):
+            if name not in merged:
+                continue
+            d_ll = delta_ci(merged, "ensemble", name)
+            d_br = delta_ci(brier_view, "ensemble", name)
+            skill_input[f"ensemble_vs_{name}__log_loss"] = {
+                "delta": d_ll["delta_ll"], "2.5": d_ll["2.5"], "97.5": d_ll["97.5"]}
+            skill_input[f"ensemble_vs_{name}__brier"] = {
+                "delta": d_br["delta_ll"], "2.5": d_br["2.5"], "97.5": d_br["97.5"]}
+        holdout["verdict"] = declare_skill(skill_input, scored_n)
+
+        # ── match-level ordered score (D-13; secondary, never a gate) ──
+        per_config_rps: dict[str, float | None] = {}
+        for cfg in configs:
+            vals = [ranked_probability_score(p, a)
+                    for p, a in zip(holdout_probs[cfg], holdout_actuals[cfg])]
+            per_config_rps[cfg] = round(sum(vals) / len(vals), 6) if vals else None
+        rps_mean = per_config_rps.get("ensemble")
+        holdout["ordered"] = {
+            "rps": rps_mean,
+            "ordered_brier": round(rps_mean / 2, 6) if rps_mean is not None else None,
+            "order": ["home", "draw", "away"],
+            "note": "secondary, not a gate",
+            "per_config": per_config_rps,
+        }
+
+        # ── tournament-level TRPS (roadmap criterion 1; secondary) ──
+        # Per held-out season: teams ranked by summed test-match points
+        # (3/1/0, ties by team name); ensemble strength = Σ(p_win + 0.5·
+        # p_draw); rank-probability matrix via the validation_suite
+        # proximity construction; scored by the 03-01 tournament_trps alias.
+        per_tournament: list[dict] = []
+        skipped = 0
+        for s in seasons:
+            rows = holdout_ens_rows.get(s) or []
+            if not rows:
+                continue
+            teams = sorted({t for _, _, m in rows
+                            for t in (m.get("team_a"), m.get("team_b")) if t})
+            if len(teams) < 2:
+                skipped += 1
+                continue
+            strength = {t: 0.0 for t in teams}
+            points = {t: 0 for t in teams}
+            for probs, idx, m in rows:
+                pa, pb = m.get("team_a"), m.get("team_b")
+                if pa in strength:
+                    strength[pa] += probs[0] + 0.5 * probs[1]
+                if pb in strength:
+                    strength[pb] += probs[2] + 0.5 * probs[1]
+                if idx == 0 and pa in points:
+                    points[pa] += 3
+                elif idx == 2 and pb in points:
+                    points[pb] += 3
+                elif pa in points and pb in points:
+                    points[pa] += 1
+                    points[pb] += 1
+            actual_ranking = sorted(teams, key=lambda t: (-points[t], t))
+            actual_ranks = np.array([actual_ranking.index(t) + 1 for t in teams])
+            n_teams = len(teams)
+            matrix = np.zeros((n_teams, n_teams))
+            shifted = (np.array([strength[t] for t in teams], dtype=float)
+                       - min(strength[t] for t in teams) + 0.01)
+            s_max = float(shifted.max())
+            for j in range(n_teams):
+                rank_probs = np.array([
+                    1.0 / (1.0 + abs((s_j - shifted[j]) / s_max * (n_teams - 1)))
+                    for s_j in shifted
+                ])
+                matrix[:, j] = rank_probs / rank_probs.sum()
+            per_tournament.append({
+                "season": s,
+                "trps": round(float(tournament_trps(matrix, actual_ranks)), 6),
+            })
+        if per_tournament:
+            holdout["tournament_trps"] = {
+                "trps": round(sum(t["trps"] for t in per_tournament)
+                               / len(per_tournament), 6),
+                "n_tournaments": len(per_tournament),
+                "per_tournament": per_tournament,
+                "construction": "teams ranked by summed test-match points "
+                                "(3/1/0); ensemble strength = Σ(p_win + 0.5·p_draw); "
+                                "soft rank distribution",
+                "order": "rank 1 = top",
+                "note": "tournament-level TRPS block (roadmap criterion 1); "
+                        "secondary, not a gate",
+                "skipped_tournaments": skipped,
+            }
+        else:
+            holdout["tournament_trps"] = {
+                "available": False,
+                "reason": "no tournament with ≥2 comparable teams on the test population",
+            }
+
+        # ── classwise ECE with the D-11 >= 20 obs/bin withhold rule ──
+        holdout["classwise_ece"] = classwise_ece(
+            holdout_probs["ensemble"], holdout_actuals["ensemble"])
+
+        # ── D-12 calibration slope/intercept (read-only diagnostic) ──
+        # Overall: confidence (max prob) vs correctness, fitted on the whole
+        # held-out population.  Per-class: one-vs-rest predicted probability
+        # vs that class's 0/1 outcome; classes below the D-11 small-n floor
+        # are emitted as None rather than emitting a biased fit.
+        conf = [max(p) for p in holdout_probs["ensemble"]]
+        correct = [1.0 if int(np.argmax(p)) == a else 0.0
+                   for p, a in zip(holdout_probs["ensemble"], holdout_actuals["ensemble"])]
+        per_class_cal: dict[str, dict | None] = {}
+        for ci, cname in enumerate(("home", "draw", "away")):
+            if scored_n >= CLASSWISE_ECE_MIN_PER_BIN:
+                per_class_cal[cname] = calibration_slope_intercept(
+                    [p[ci] for p in holdout_probs["ensemble"]],
+                    [1.0 if a == ci else 0.0 for a in holdout_actuals["ensemble"]],
+                )
+            else:
+                per_class_cal[cname] = None
+        holdout["calibration_slope_intercept"] = {
+            "overall": calibration_slope_intercept(conf, correct),
+            "per_class": per_class_cal,
+        }
     results["holdout"] = holdout
 
     # ─────────────────────── leave-one-signal-out ───────────────────────

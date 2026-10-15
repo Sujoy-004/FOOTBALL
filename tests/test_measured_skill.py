@@ -7,18 +7,22 @@ boolean, never a significance claim.
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
 from football_core.historical_backfill import (
     BOOT_SEED,
     N_BOOT,
+    Harness,
     bootstrap_cis,
     declare_skill,
     delta_ci,
     holm_thresholds,
     mde_for_n,
     pooled_metrics,
+    run_evaluation,
 )
 
 
@@ -245,3 +249,131 @@ class TestVerdict:
         assert by_name["ensemble_vs_elo_only__brier"]["survives_holm"] is False
         # Still declared: the point deltas are all favourable (D-16).
         assert out["verdict"] == "skill declared"
+
+
+# ── holdout block (D-02 / D-13 / D-14 / D-16) ─────────────────────────────────
+
+
+def _ucl_harness() -> Harness:
+    from competitions.ucl.src.historical import (
+        ReplayResultProvider,
+        build_context_for_match,
+        frequency_baseline,
+        load_replay_matches,
+        order_matches,
+        outcome_index,
+    )
+
+    return Harness(
+        build_context=build_context_for_match,
+        outcome_index=outcome_index,
+        order_matches=order_matches,
+        frequency_baseline=frequency_baseline,
+        replay_provider=ReplayResultProvider,
+        load_replay_matches=load_replay_matches,
+    )
+
+
+def _write_season(root, season: str, matches: list[dict], elo: dict) -> None:
+    sdir = root / season
+    sdir.mkdir(parents=True, exist_ok=True)
+    (sdir / "matches.json").write_text(json.dumps(matches), encoding="utf-8")
+    (sdir / "elo_ratings.json").write_text(json.dumps(elo), encoding="utf-8")
+
+
+def _synthetic_corpus(tmp_path) -> None:
+    """Two seasons straddling the cutoff; every match completed, 8 teams."""
+    teams = [f"T{i}" for i in range(8)]
+    elo = {t: 1500.0 + 10 * i for i, t in enumerate(teams)}
+
+    def mk(prefix: str, n: int, year: int) -> list[dict]:
+        rows = []
+        for k in range(n):
+            i, j = (2 * k) % 8, (2 * k + 1) % 8
+            hs, aw = (2, 0) if k % 2 == 0 else (1, 1)
+            rows.append({
+                "match_id": f"{prefix}{k}",
+                "team_a": teams[i],
+                "team_b": teams[j],
+                "event_date": f"{year}-03-{k + 1:02d}T00:00:00Z",
+                "home_score": hs,
+                "away_score": aw,
+            })
+        return rows
+
+    _write_season(tmp_path, "2019_20", mk("A", 4, 2019), elo)
+    _write_season(tmp_path, "2021_22", mk("B", 4, 2021), elo)
+
+
+def _run(tmp_path):
+    out = tmp_path / "eval_results.json"
+    return run_evaluation(
+        str(out), str(tmp_path), ["2019_20", "2021_22"],
+        ["market_odds", "refined_elo", "rolling_form", "rest_days"],
+        {"market_odds": 0.2, "refined_elo": 0.2, "rolling_form": 0.2,
+         "rest_days": 0.2, "squad_value": 0.2},
+        "synthetic-test-corpus", _ucl_harness(),
+    )
+
+
+def _assert_no_p_key(obj, path="$") -> None:
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            assert key not in ("p", "p_value"), f"forbidden key {key!r} at {path}"
+            _assert_no_p_key(value, f"{path}.{key}")
+    elif isinstance(obj, list):
+        for i, value in enumerate(obj):
+            _assert_no_p_key(value, f"{path}[{i}]")
+
+
+class TestHoldoutBlock:
+    def test_holdout_block_shape_and_determinism(self, tmp_path):
+        _synthetic_corpus(tmp_path)
+        results = _run(tmp_path)
+        holdout = results["holdout"]
+
+        # split record
+        assert holdout["split"] == "single fixed chronological (D-02)"
+        assert holdout["cutoff"] == "2020-12-31T23:59:59Z"
+        assert holdout["n_train"] == 4
+        assert holdout["n_test"] == 4
+        assert holdout["min_train"] < holdout["min_test"]
+        assert holdout["bootstrap"]["seed"] == BOOT_SEED
+        assert holdout["bootstrap"]["n_boot"] == N_BOOT
+
+        # render-facing comparisons: single "delta" key, no delta_ll leak
+        assert set(holdout["comparisons"]) == {
+            "ensemble_vs_uniform", "ensemble_vs_freq",
+            "ensemble_vs_elo_only", "ensemble_vs_market_only",
+        }
+        for comp in holdout["comparisons"].values():
+            assert set(comp) == {"delta", "2.5", "97.5", "mde", "n"}
+            assert comp["n"] == 4
+
+        # ordered score: ordered_brier == rps/2, declared order
+        ordered = holdout["ordered"]
+        assert ordered["order"] == ["home", "draw", "away"]
+        assert ordered["ordered_brier"] == round(ordered["rps"] / 2, 6)
+        assert ordered["note"] == "secondary, not a gate"
+
+        # tournament-level TRPS block: trps + construction present
+        tt = holdout["tournament_trps"]
+        assert "trps" in tt
+        assert "construction" in tt
+        assert tt["n_tournaments"] == 1
+        assert tt["order"] == "rank 1 = top"
+
+        # calibration overall carries slope/intercept/n
+        cal = holdout["calibration_slope_intercept"]["overall"]
+        assert {"slope", "intercept", "n"} <= set(cal)
+
+        # verdict + classwise ECE present
+        assert holdout["verdict"]["verdict"] in ("skill declared", "not declared")
+        assert "classwise_ece" in holdout
+
+        # no p-value anywhere in the returned artifact
+        _assert_no_p_key(results)
+
+        # deterministic: a second run reproduces the identical holdout
+        again = _run(tmp_path)
+        assert again["holdout"] == holdout
