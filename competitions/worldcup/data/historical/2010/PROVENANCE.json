@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "season": "2010",
+  "storage_deviation": "stored under data/historical instead of the approved data/seasons path because that path is the gitignored runtime season store",
+  "generated_at": "2026-10-16T03:18:54.869336+00:00",
+  "checks": {
+    "season": "2010",
+    "n_matches": 64,
+    "duplicate_match_ids": [],
+    "n_teams": 32,
+    "elo_missing_teams": [
+      "Algeria",
+      "Argentina",
+      "Australia",
+      "Brazil",
+      "Cameroon",
+      "Chile",
+      "Denmark",
+      "England",
+      "France",
+      "Germany",
+      "Ghana",
+      "Greece",
+      "Honduras",
+      "Italy",
+      "Ivory Coast",
+      "Japan",
+      "Mexico",
+      "Netherlands",
+      "New Zealand",
+      "Nigeria",
+      "North Korea",
+      "Paraguay",
+      "Portugal",
+      "Serbia",
+      "Slovakia",
+      "Slovenia",
+      "South Africa",
+      "South Korea",
+      "Spain",
+      "Switzerland",
+      "United States",
+      "Uruguay"
+    ],
+    "n_odds": 0,
+    "min_date": "2010-06-11T21:00:00Z",
+    "max_date": "2010-07-11T21:00:00Z"
+  },
+  "files": {
+    "matches": "e313d360851e7a8cc590ad5cf913a774acca047110828edc677899365e056c84",
+    "elo_ratings": "e3566b3a06430868d71e9287dfd6c6c520a3da027aabea01951d407ee131dc2f"
+  },
+  "sources": {
+    "results": {
+      "name": "openfootball/world-cup cup.txt + cup_finals.txt",
+      "url": "https://raw.githubusercontent.com/openfootball/world-cup/master/2010--south_africa/cup.txt (+ cup_finals.txt)",
+      "license": "CC0-1.0 (public domain)",
+      "note": "per-tournament group-stage and knockout files; real national teams, real scores, real dates; knockout winners resolved from extra-time/penalty annotations (never a fabricated draw); kickoff times converted to UTC where the source publishes a UTC offset (2014+), otherwise a documented 21:00:00Z default is used (day-level chronology unaffected)"
+    },
+    "elo": {
+      "name": "eloratings.net (national-team Elo)",
+      "url": "https://www.eloratings.net/World.tsv",
+      "license": "eloratings.net",
+      "deviation": "no date-indexed historical feed exists (verified 2026-10-15: date-indexed URLs return HTTP 404); every tournament snapshot is empty and the gap is recorded — refined_elo is reported as insufficient_data:no_elo_ratings and never rendered as a synthetic rating (A4/D-03)"
+    },
+    "team_keys": {
+      "canonical": "data/team_aliases.json keys (long-form 2026 production keys) + stable extras for historical national teams absent from the 2026 aliases (Angola, Cameroon, China, Costa Rica, Denmark, Ireland, Italy, Nigeria, Poland, Russia, Serbia and Montenegro, Slovenia, Togo, Trinidad and Tobago, Ukraine); openfootball-only spellings curated (Bosnia-Herzegovina -> Bosnia and Herzegovina)"
+    }
+  }
+}
