@@ -26,8 +26,10 @@ from __future__ import annotations
 
 import os
 from functools import partial
+from pathlib import Path
 
 from football_core import historical_backfill as shared
+from football_core.evaluation_report import render_evaluation_markdown
 from football_core.historical_backfill import (
     Harness,
     build_engine,
@@ -37,6 +39,7 @@ from football_core.historical_backfill import (
     renormalize,
     run_evaluation,
 )
+from football_core.state import atomic_write_text
 
 from competitions.ucl.src.historical import (
     ReplayResultProvider,
@@ -73,6 +76,24 @@ _WINDOW = (
 )
 DATASET = f"competitions/ucl/data/historical ({_WINDOW})"
 
+# Competition-specific declarations rendered once, before the first UCL 1X2
+# number, by the shared renderer's "## Declarations" block. The knockout
+# mapping (D-05/D-06) must be declared before any UCL number is published.
+_EXTRA_DECLARATIONS = [
+    "Knockout mapping (D-05/D-06): UCL ties are two-legged, so a per-match "
+    "\"advancing winner\" cannot be derived from a single match. Every UCL "
+    "match in this report is scored as a three-way H/D/A outcome on that leg's "
+    "own result (90/120-minute score); the two-legged tie winner is a separate "
+    "figure and is not scored here. No per-match advancing-winner label is "
+    "applied to UCL.",
+    "Reconciliation with `football_core/elo.py:37`: the Elo update codes a "
+    "penalty-shootout win as `W = 0.75/0.25` (a two-way partial result), "
+    "whereas a leg result is a three-way H/D/A. The two codings must not be "
+    "conflated: a shootout outcome is never rendered as a draw in the tie "
+    "figure, and the per-match 1X2 labels stay three-way.",
+    "LaLiga has no knockout stage, so this knockout mapping applies to UCL only.",
+]
+
 _HARNESS = Harness(
     build_context=build_context_for_match,
     outcome_index=outcome_index,
@@ -98,8 +119,12 @@ freq_metrics_on = partial(shared.freq_metrics_on, outcome_index=outcome_index)
 
 
 def main() -> None:
-    run_evaluation(OUT_PATH, HISTORICAL_DIR, SEASONS, SIGNAL_ORDER,
-                   PROD_WEIGHTS_RAW, DATASET, _HARNESS)
+    results = run_evaluation(OUT_PATH, HISTORICAL_DIR, SEASONS, SIGNAL_ORDER,
+                             PROD_WEIGHTS_RAW, DATASET, _HARNESS)
+    md = render_evaluation_markdown(
+        results, competition="UCL", extra_declarations=_EXTRA_DECLARATIONS,
+    )
+    atomic_write_text(Path(os.path.join(OUT_DIR, "EVALUATION.md")), md)
 
 
 if __name__ == "__main__":
