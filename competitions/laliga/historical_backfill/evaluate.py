@@ -32,8 +32,10 @@ from __future__ import annotations
 import json
 import os
 from functools import partial
+from pathlib import Path
 
 from football_core import historical_backfill as shared
+from football_core.evaluation_report import render_evaluation_markdown
 from football_core.historical_backfill import (
     Harness,
     build_engine,
@@ -43,6 +45,7 @@ from football_core.historical_backfill import (
     renormalize,
     run_evaluation,
 )
+from football_core.state import atomic_write_text
 
 from competitions.laliga.src.historical import (
     ReplayResultProvider,
@@ -71,6 +74,21 @@ SEASONS = list(_SEASON_LABELS)
 SIGNAL_ORDER = ["market_odds", "refined_elo", "rolling_form", "rest_days"]
 
 DATASET = "competitions/laliga/data/historical (2000/01-2025/26)"
+
+# Competition-specific declarations rendered once, before the first number, by
+# the shared renderer's "## Declarations" block. The D-01 window is taken from
+# DATASET (contract-derived) so it cannot drift from the corpus.
+_EXTRA_DECLARATIONS = [
+    "LaLiga odds coverage: every match in the backtest carries Pinnacle "
+    "closing odds (~100% coverage), so the reported numbers are computed on a "
+    "fully-covered population with no odds-less subpopulation.",
+    "4-signal renormalization: `squad_value` has no historical data source, so "
+    "the production weights are renormalized over the four historical signals "
+    "(market_odds / refined_elo / rolling_form / rest_days); this is not the "
+    "live 5-signal engine.",
+    f"D-01 window: the corpus spans {DATASET}; one fixed chronological split "
+    "(train ≤ 2020-12-31, validate 2021–2026).",
+]
 
 _HARNESS = Harness(
     build_context=build_context_for_match,
@@ -104,8 +122,12 @@ freq_metrics_on = partial(shared.freq_metrics_on, outcome_index=outcome_index)
 
 
 def main() -> None:
-    run_evaluation(OUT_PATH, HISTORICAL_DIR, SEASONS, SIGNAL_ORDER,
-                   production_weights(), DATASET, _HARNESS)
+    results = run_evaluation(OUT_PATH, HISTORICAL_DIR, SEASONS, SIGNAL_ORDER,
+                             production_weights(), DATASET, _HARNESS)
+    md = render_evaluation_markdown(
+        results, competition="LaLiga", extra_declarations=_EXTRA_DECLARATIONS,
+    )
+    atomic_write_text(Path(os.path.join(OUT_DIR, "EVALUATION.md")), md)
 
 
 if __name__ == "__main__":
