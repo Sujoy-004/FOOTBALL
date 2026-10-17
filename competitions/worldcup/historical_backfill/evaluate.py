@@ -91,8 +91,8 @@ _EXTRA_DECLARATIONS = [
     "before calling `run_evaluation` (the harness would silently drop them "
     "otherwise).",
     "Confidence ECE (D-10): the WC calibration block uses the confidence "
-    "`multi_class_ece` (not classwise ECE) because the ~100-match sample "
-    "cannot satisfy the classwise `observations/bin >= 20` rule.",
+    "`multi_class_ece` (not the per-class variant) because the ~100-match "
+    "sample cannot satisfy the `observations/bin >= 20` small-n rule.",
     "Knockout H/D/A + Elo reconciliation: the knockout target is the advancing "
     "winner (0/2, never 1) and the forecast is renormalized two-way "
     "(`p_home/(p_home+p_away)`); the Elo update coding `W = 0.75/0.25` "
@@ -271,6 +271,9 @@ def run(
         }
 
     results["holdout"] = holdout
+
+    # Re-write the JSON so the on-disk artifact matches the transformed results
+    atomic_write_text(Path(out_path), json.dumps(results, indent=2))
 
     # ── Render and write the report ──
     md = render_evaluation_markdown(
