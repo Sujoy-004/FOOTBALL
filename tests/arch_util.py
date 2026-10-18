@@ -251,12 +251,47 @@ def patch_wc_offline(monkeypatch, tmp_path):
     return leader
 
 
+def _comp_id(module) -> str:
+    """Map a web app module to its holder competition id (``wc_app``→worldcup)."""
+    name = getattr(module, "__name__", "")
+    if name.endswith("wc_app"):
+        return "worldcup"
+    if name.endswith("ucl_app"):
+        return "ucl"
+    if name.endswith("laliga_app"):
+        return "laliga"
+    return name
+
+
 def snapshot_cache_state(module):
-    snapshot = dict(getattr(module, "cache"))
-    return snapshot
+    """Snapshot a module's derived cache, dual-path for pre/post migration.
+
+    Pre-migration the app exposes a module-level ``cache`` dict; post-migration
+    (plans 04-02..04-04) that global is gone and the cache lives in the frozen
+    ``web.derived.holder`` slot. Both shapes return a plain ``dict`` so callers
+    need no change.
+    """
+    try:
+        return dict(getattr(module, "cache"))
+    except AttributeError:
+        from web.derived import holder
+
+        return dict(holder.read_data(_comp_id(module)))
 
 
 def restore_cache_state(module, snapshot):
-    cache = getattr(module, "cache")
-    cache.clear()
-    cache.update(snapshot)
+    """Restore a module's derived cache, dual-path for pre/post migration."""
+    try:
+        cache = getattr(module, "cache")
+        cache.clear()
+        cache.update(snapshot)
+    except AttributeError:
+        from web.derived import holder
+
+        comp = _comp_id(module)
+        holder.publish_data(
+            comp,
+            snapshot,
+            mode=holder.read_mode(comp),
+            stamp=holder.read_stamp(comp),
+        )
