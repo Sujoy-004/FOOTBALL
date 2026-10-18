@@ -18,6 +18,7 @@ from collections.abc import Callable
 from typing import Any
 
 from football_core import runtime_support
+from fastapi.responses import JSONResponse
 
 
 def ts() -> str:
@@ -229,3 +230,36 @@ def error_response(
     logging.getLogger(__name__).exception(
         "request failed (%s): %s", context or "?", exc)
     return JSONResponse({"error": public}, status_code=status)
+
+
+def _json_default(obj):
+    """JSON fallback for the frozen containers the derived snapshot serves.
+
+    ``MappingProxyType`` is not serializable by a bare ``json.dumps`` (FastAPI's
+    ``jsonable_encoder`` handles it, but the ~120 existing ``JSONResponse(``
+    call sites do not). ``RobustJSONResponse`` routes through here so payloads
+    that became frozen need no per-call-site churn.
+    """
+    from types import MappingProxyType
+
+    if isinstance(obj, MappingProxyType):
+        return dict(obj)
+    if isinstance(obj, (set, frozenset)):
+        return list(obj)
+    raise TypeError(
+        f"Object of type {type(obj).__name__} is not JSON serializable"
+    )
+
+
+class RobustJSONResponse(JSONResponse):
+    """``JSONResponse`` that serializes frozen (proxy/tuple/frozenset) payloads."""
+
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+            default=_json_default,
+        ).encode("utf-8")
