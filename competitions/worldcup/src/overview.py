@@ -16,8 +16,6 @@ from football_core.runtime_support import boot_step
 
 DATA_DIR = constants.DATA_DIR
 
-boot_log: list[dict] = []
-
 
 def load_json(data_dir, name: str) -> dict:
     """Read one JSON store as a dict.
@@ -92,9 +90,13 @@ def compute_overview() -> dict:
 
     Loads teams, groups, bracket, played results from disk and computes
     deterministic standings and bracket display only.
+
+    The boot log is a PER-CALL local: two request threads can no longer
+    interleave a rebind and an append on a shared module global (the log
+    was a module-level list before, so concurrent calls could splice one
+    call's steps into another's diagnostics).
     """
-    global boot_log
-    boot_log = []
+    boot_log: list[dict] = []
     data = {"boot": []}
 
     ld = boot_step("Data Loading", lambda: {

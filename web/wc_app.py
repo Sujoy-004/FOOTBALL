@@ -1,16 +1,29 @@
+"""World Cup 2026 — FastAPI sub-app mounted under /worldcup.
+
+Tournament logic lives in ``competitions.worldcup.src``; this module only
+wires transport, the freshness ledger and the simulation task service.
+
+State lives in the race-free holder (``web.derived.holder``): one frozen
+snapshot per competition, rebound in ONE assignment, with the store stamp
+folded in — reads go through ``_snap()``, writes through
+``holder.publish_data`` / ``publish_sim`` / ``clear_sim``. No mutable module
+globals.
+"""
+
 import json, os
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from datetime import datetime, timezone
 
 import fastapi
-from fastapi.responses import JSONResponse
 
 from dotenv import load_dotenv
 
 from football_core.freshness import UNREADABLE, read_ledger, served_stale, store_mtime
 from football_core.state import atomic_write_text
 from football_core.domain import DataAvailability, load_json_store
+from football_core.store_stamp import StoreStamp, stamp_store
 from competitions.worldcup.src import constants, elo
 from competitions.worldcup.src.knockout import run_full_simulation, resolve_knockout_slot_teams
 from competitions.worldcup.src.state import load_groups, load_annex_c
@@ -34,12 +47,15 @@ from competitions.worldcup.src.bracket import (
 )
 from competitions.worldcup.src.overview import compute_overview
 from web.common import (
+    RobustJSONResponse as JSONResponse,
     boot_step,
     error_response,
     load_json,
     not_attempted_report,
     refresh_response_body,
 )
+from web.derived import holder
+from web.derived.stamps import WC_ROLES
 from web.simulation_service import (
     SimulationTaskService, build_simulation_meta,
 )
@@ -126,9 +142,50 @@ def _factual_counts() -> tuple[int | None, int | None]:
     return n_played, len(all_ids - played_ids)
 
 
-cache: dict = {}
-sim_cache: dict = {}
 service = SimulationTaskService()
+
+
+def _observed_stamp() -> StoreStamp:
+    """The WC store stamp — the ONE value a request compares for freshness.
+
+    World Cup stores are NOT season-routed: the six canonical files live
+    flat in ``competitions/worldcup/data``, so the plain module ``DATA_DIR``
+    is the right directory to stamp. ``snapshot.json`` is deliberately not
+    part of ``WC_ROLES`` — a simulation run must never age the data stamp.
+    """
+    return stamp_store(DATA_DIR, WC_ROLES)
+
+
+def _build_state() -> tuple[dict, str]:
+    """Build the WC derived snapshot: the overview plus the constant mode.
+
+    Never raises: a compute failure degrades to a truthful error block (the
+    pre-holder boot path degraded the same way) so a request never fails
+    with a 500 on unreadable stores.
+    """
+    try:
+        data = dict(compute_overview() or {})
+    except Exception:
+        logger.exception("worldcup overview compute failed")
+        data = {"error": "overview compute failed"}
+    return data, "results"   # WC has no sim toggle; mode is constant truth
+
+
+def _snap():
+    """The frozen WC snapshot for this request (rebuilt only when stale)."""
+    return holder.get_or_rebuild("worldcup", _observed_stamp(), _build_state)
+
+
+def _publish_snapshot(report: dict | None = None) -> None:
+    """Publish the overview (plus an optional refresh report) as ONE snapshot.
+
+    The report and the derived data travel together, so a reader can never
+    see a fresh refresh verdict next to data from an older generation.
+    """
+    data, mode = _build_state()
+    if report is not None:
+        data["refresh"] = report
+    holder.publish_data("worldcup", data, mode, _observed_stamp())
 
 
 def build_chronological_matches() -> dict:
@@ -166,20 +223,22 @@ def compute_signal_stats():
 
 def compute_signal_detail(name: str):
     from competitions.worldcup.src.evaluation import compute_signal_detail as _eval
-    return _eval(name, constants.DATA_DIR, cache.get("evaluation", {}))
+    return _eval(name, constants.DATA_DIR, _snap().get("evaluation", {}))
 
 
 def compute_blend_info():
     """Blend info from in-memory cache evaluation + backtest — no cached file."""
     from competitions.worldcup.src.evaluation import compute_blend_info as _eval
-    return _eval(constants.DATA_DIR, cache.get("evaluation", {}), {})
+    return _eval(constants.DATA_DIR, _snap().get("evaluation", {}), {})
 
 
 def _fetch_live_data() -> dict:
     """Fetch live match data + signal caches — delegates to pipeline.
 
     Returns the refresh report (provider/success/error/staleness/ingestion
-    counters) and stores it in cache["refresh"] for the API surface.
+    counters). The report is published INTO the holder snapshot (together
+    with the overview rebuilt from the stores the run just wrote), so the
+    API surface serves one generation-consistent view.
     """
     from competitions.worldcup.src.pipeline import fetch_live_data as _pipeline_fetch
     try:
@@ -190,7 +249,7 @@ def _fetch_live_data() -> dict:
         report = {"provider": None, "attempted": True, "success": False,
                   "error": "live refresh failed", "stale": True,
                   "finished": {}}
-    cache["refresh"] = report
+    _publish_snapshot(report)
     return report
 
 
@@ -202,11 +261,12 @@ wc_app = fastapi.FastAPI()
 def api_data():
     availability, reasons = _availability_block()
     n_played, n_unplayed = _factual_counts()
+    snap = _snap()
     payload = {
         "refresh": _current_refresh_report(),
-        "teams": cache.get("teams", []),
-        "n_teams": cache.get("n_teams", 0),
-        "phase": cache.get("phase", {}),
+        "teams": snap.get("teams", []),
+        "n_teams": snap.get("n_teams", 0),
+        "phase": snap.get("phase", {}),
         "simulation": _simulation_state_block(),
         "availability": availability,
     }
@@ -232,15 +292,16 @@ def api_refresh():
     HTTP stays 200 because a truthful failure is data, not an HTTP error.
 
     Side effects: the wrapper persists the report to the freshness ledger
-    (attempted runs only) and the cache is rebuilt from disk so subsequent
-    ``GET /api/data`` shows the freshly ingested facts.
+    (attempted runs only) and the snapshot is rebuilt from disk so
+    subsequent ``GET /api/data`` shows the freshly ingested facts.
     """
-    global cache
     from web.competitions import REGISTRY
 
     try:
         report = dict(REGISTRY.get("worldcup").refresh())
-        cache = compute_overview() or {}
+        data, mode = _build_state()
+        holder.publish_data("worldcup", data, mode, _observed_stamp())
+        holder.clear_sim("worldcup")  # D-06: a data change retires the simulation
     except Exception as e:
         return error_response(
             e, status=503, context="worldcup refresh",
@@ -253,7 +314,7 @@ def api_refresh():
 def _simulation_state_block() -> dict:
     """Shared product contract: availability + request lifecycle."""
     eligible, reason, _msg = simulation_eligibility()
-    sim_status = sim_cache.get("status", "not_requested")
+    sim_status = holder.read_sim("worldcup").get("status", "not_requested")
     request_state = {
         "running": "running",
         "completed": "completed",
@@ -322,16 +383,17 @@ def api_overview():
     has_sim = has_simulation()
     availability, reasons = _availability_block()
     n_played, n_unplayed = _factual_counts()
+    snap = _snap()
     payload = {
         "refresh": _current_refresh_report(),
-        "standings": cache.get("standings", []),
-        "teams": cache.get("teams", []),
-        "n_teams": cache.get("n_teams", 0),
-        "signals_meta": cache.get("signals_meta", {"signals": [], "n_total": 0}),
-        "phase": cache.get("phase", {}),
+        "standings": snap.get("standings", []),
+        "teams": snap.get("teams", []),
+        "n_teams": snap.get("n_teams", 0),
+        "signals_meta": snap.get("signals_meta", {"signals": [], "n_total": 0}),
+        "phase": snap.get("phase", {}),
 
         "has_simulation": has_sim,
-        "lifecycle": cache.get("lifecycle", {}),
+        "lifecycle": snap.get("lifecycle", {}),
         "availability": availability,
     }
     if reasons:
@@ -345,19 +407,20 @@ def api_overview():
 
 @wc_app.get("/api/simulation")
 def api_simulation():
+    sim = holder.read_sim("worldcup")
     payload = {
-        "top_teams": sim_cache.get("top_teams", []),
-        "signal_eval": sim_cache.get("signal_eval", {}),
-        "simulation_meta": sim_cache.get("simulation_meta"),
-        "status": sim_cache.get("status", "not_requested"),
-        "message": sim_cache.get("message"),
-        "full_bracket": sim_cache.get("full_bracket"),
+        "top_teams": sim.get("top_teams", []),
+        "signal_eval": sim.get("signal_eval", {}),
+        "simulation_meta": sim.get("simulation_meta"),
+        "status": sim.get("status", "not_requested"),
+        "message": sim.get("message"),
+        "full_bracket": sim.get("full_bracket"),
     }
     # n_unplayed comes from the completed sim's own record; absent that,
     # derive it live — and omit the key entirely when the stores are
     # unreadable rather than emitting a synthesised 0/None.
-    if "n_unplayed" in sim_cache:
-        payload["n_unplayed"] = sim_cache["n_unplayed"]
+    if "n_unplayed" in sim:
+        payload["n_unplayed"] = sim["n_unplayed"]
     else:
         live = unplayed_match_count()
         if live is not None:
@@ -367,22 +430,23 @@ def api_simulation():
 
 @wc_app.get("/api/boot")
 def api_boot():
-    return JSONResponse(cache.get("boot", []))
+    return JSONResponse(_snap().get("boot", []))
 
 
 @wc_app.get("/api/standings")
 def api_standings():
-    return JSONResponse({"standings": cache.get("standings", {}), "third_place": cache.get("third_place", [])})
+    snap = _snap()
+    return JSONResponse({"standings": snap.get("standings", {}), "third_place": snap.get("third_place", [])})
 
 
 @wc_app.get("/api/bracket")
 def api_bracket():
-    return JSONResponse(cache.get("bracket", {}))
+    return JSONResponse(_snap().get("bracket", {}))
 
 
 @wc_app.get("/api/bracket/full")
 def api_bracket_full():
-    return JSONResponse(cache.get("full_bracket", {}))
+    return JSONResponse(_snap().get("full_bracket", {}))
 
 
 @wc_app.get("/api/bracket/data")
@@ -399,7 +463,7 @@ def api_bracket_data():
 
 @wc_app.get("/api/evaluation")
 def api_evaluation():
-    return JSONResponse(cache.get("evaluation", {}))
+    return JSONResponse(_snap().get("evaluation", {}))
 
 
 @wc_app.get("/api/signals")
@@ -422,8 +486,10 @@ def api_elo():
     """
     ratings = {
         row["name"]: float(row["elo"])
-        for row in (cache.get("teams") or [])
-        if isinstance(row, dict) and row.get("name")
+        for row in (_snap().get("teams") or [])
+        # ``Mapping`` (not ``dict``): the snapshot is frozen, so a team row
+        # arrives as a read-only mapping proxy, not a plain dict.
+        if isinstance(row, Mapping) and row.get("name")
         and isinstance(row.get("elo"), (int, float))
     }
     if not ratings:
@@ -452,7 +518,7 @@ def simulation_eligibility() -> tuple[bool, Optional[str], str]:
 
 
 def has_simulation() -> bool:
-    return bool(sim_cache.get("status") == "completed")
+    return bool(holder.read_sim("worldcup").get("status") == "completed")
 
 
 def _run_wc_simulation(progress_cb, count: int, seed: Optional[int],
@@ -467,11 +533,14 @@ def _run_wc_simulation(progress_cb, count: int, seed: Optional[int],
 
 def _store_wc_sim_result(result: dict, count: int, seed: Optional[int],
                          weights=None, show_ci: str = "auto") -> dict:
-    """Cache/snapshot side effects. Returns the public task summary."""
-    global sim_cache
+    """Cache/snapshot side effects. Returns the public task summary.
+
+    The payload is assembled FIRST and published with ONE assignment: a
+    concurrent ``GET /api/simulation`` reader can never observe a payload
+    that is missing ``n_unplayed`` (or any other key).
+    """
     remaining = unplayed_match_count()
     sim_meta = result.get("simulation_meta", {})
-    overview = result["overview"]
     extra = {
         "weights": weights,
         "show_ci": show_ci,
@@ -480,7 +549,7 @@ def _store_wc_sim_result(result: dict, count: int, seed: Optional[int],
     }
     if remaining is not None:
         extra["unplayed_matches"] = remaining
-    sim_cache = {
+    payload = {
         "top_teams": result["top_teams"][:20],
         "signal_eval": result["eval_metrics"],
         "simulation_meta": build_simulation_meta(
@@ -496,13 +565,14 @@ def _store_wc_sim_result(result: dict, count: int, seed: Optional[int],
         "status": "completed",
     }
     if remaining is not None:
-        sim_cache["n_unplayed"] = remaining
+        payload["n_unplayed"] = remaining
     snapshot = result["snapshot"]
     snapshot["show_ci"] = show_ci
     atomic_write_text(
         DATA_DIR / "snapshot.json",
         json.dumps(snapshot, indent=2, default=str, ensure_ascii=False),
     )
+    holder.publish_sim("worldcup", payload)  # ONE atomic assignment; never mutate after
     ack = {}
     if remaining is not None:
         ack["n_unplayed"] = remaining
@@ -635,9 +705,10 @@ def api_simulate_from_match(req: dict = None):
 def api_match_insight(match_id: str = ""):
     if not match_id:
         return JSONResponse({"error": "match_id parameter required"})
-    fb = cache.get("full_bracket", {})
-    ev = cache.get("evaluation", {})
-    bl = cache.get("blend_data")
+    snap = _snap()
+    fb = snap.get("full_bracket", {})
+    ev = snap.get("evaluation", {})
+    bl = snap.get("blend_data")
     if not bl:
         bl_info = compute_blend_info()
         blend_weights = bl_info.get("blend_weights", {})
@@ -673,7 +744,7 @@ def api_match_what_if(req: dict = None):
         return JSONResponse({"error": "elo_delta must be non-zero"})
     elo_delta = max(-600, min(600, elo_delta))
 
-    fb = cache.get("full_bracket", {})
+    fb = _snap().get("full_bracket", {})
     match_data = None
     for r, ms in fb.get("rounds", {}).items():
         for m in ms:
@@ -775,7 +846,7 @@ def api_what_if(req: dict = None):
             status_code=409,
         )
 
-    fb = cache.get("full_bracket", {})
+    fb = _snap().get("full_bracket", {})
     match_data = None
     for r, ms in fb.get("rounds", {}).items():
         for m in ms:
