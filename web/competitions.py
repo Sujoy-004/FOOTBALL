@@ -228,13 +228,14 @@ def build_default_registry() -> CompetitionRegistry:
 
     def ucl_status() -> dict[str, Any]:
         counts = ucl_app._match_counts()
+        snap = ucl_app._snap()
         return {
-            "phase": ucl_app.cache.get("phase") or {},
+            "phase": snap.get("phase") or {},
             "n_played": counts[1] - counts[0],
             "n_unplayed": counts[0],
-            "mode": getattr(ucl_app, "_mode", None),
-            "availability": dict(ucl_app.cache.get("availability", {})),
-            "champion": ucl_app.cache.get("champion"),
+            "mode": snap.get("mode"),
+            "availability": dict(snap.get("availability", {})),
+            "champion": snap.get("champion"),
         }
 
     def ucl_simulation_support() -> dict[str, Any]:

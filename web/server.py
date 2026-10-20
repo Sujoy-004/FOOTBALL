@@ -151,7 +151,10 @@ async def lifespan(app: fastapi.FastAPI):
     # simulation-available view (never an empty cache).
     _wc.cache = await _boot_step("World Cup compute_overview",
                                  _wc.compute_overview) or {}
-    _ucl.cache = await _boot_step("UCL compute_all", _ucl.compute_all) or {}
+    _ucl_data = await _boot_step("UCL compute_all", _ucl.compute_all) or {}
+    from web.derived import holder as _holder
+    _holder.publish_data("ucl", _ucl_data, _ucl_data.get("mode", "results"),
+                         _ucl._observed_stamp())
 
     import web.laliga_app as _laliga
 
