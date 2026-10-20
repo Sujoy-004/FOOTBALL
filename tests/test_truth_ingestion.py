@@ -4,7 +4,10 @@ Guarantees:
 1. Provider alias normalization covers known official spellings.
 2. A FINISHED result that fails normalization is loudly surfaced and counted,
    never silently dropped.
-3. A completed match injected as played is never re-sampled by the simulator.
+3. A completed match injected as played is never re-sampled by the simulator:
+   it is substituted VERBATIM (ingested score and winner) and consumes no
+   randomness at all — the sampler draws exactly twice for the single
+   genuinely unplayed match.
 4. World Cup completed-result completeness (72 + 32 = 104) when runtime data
    is present post-tournament.
 5. Knockout results ingest once upstream group state is corrected
@@ -90,11 +93,37 @@ def test_finished_unmatchable_is_visible_and_counted(caplog):
     assert any("RESULT INGESTION SKIP" in r.message for r in caplog.records)
 
 
+class _CountingRng:
+    """An RNG stub that COUNTS its draws and always returns 0.
+
+    The Poisson sampler looks a bucket up with ``table[getrandbits(bits)]``;
+    returning 0 picks the table's first bucket, so an unplayed match still
+    receives a legal score. The counter is the point: a PLAYED match is
+    substituted verbatim and must consume NO draws at all.
+    """
+
+    def __init__(self) -> None:
+        self.draws = 0
+
+    def getrandbits(self, k: int) -> int:
+        self.draws += 1
+        return 0
+
+
 def test_completed_match_is_never_sampled():
-    """3+6. Injected played results are immutable regardless of seed."""
+    """3+6/SIM-01. Injected played results are immutable regardless of seed.
+
+    Two guarantees are pinned:
+
+    * **Verbatim substitution** — every played match comes back with exactly
+      the ingested score and winner, for every seed.
+    * **Never resampled** — a played match consumes NO randomness, so the
+      sampler draws exactly twice for the single genuinely unplayed match
+      (one ``score_a`` draw + one ``score_b`` draw). If a played match were
+      resampled the count would be 6.
+    """
     import random
 
-    from competitions.worldcup.src.groups import compute_standings
     from football_core.groups import simulate_group_matches
 
     teams = {"Alpha": {"elo": 1900}, "Beta": {"elo": 1700},
@@ -104,12 +133,20 @@ def test_completed_match_is_never_sampled():
         "matches": [
             {"match_id": "T1", "team_a": "Alpha", "team_b": "Beta"},
             {"match_id": "T2", "team_a": "Gamma", "team_b": "Delta"},
+            {"match_id": "T3", "team_a": "Alpha", "team_b": "Gamma"},
         ],
     }}}
-    # Real completed result for T1 that pure Elo would almost never produce.
-    played = {"T1": {"match_id": "T1", "team_a": "Beta", "team_b": "Alpha",
-                     "home_score": 4, "away_score": 0, "winner": "Beta",
-                     "is_draw": False}}
+    # Real completed results for T1 and T2 that pure Elo would almost never
+    # produce. T3 is genuinely unplayed and is the ONLY match that may be
+    # simulated.
+    played = {
+        "T1": {"match_id": "T1", "team_a": "Beta", "team_b": "Alpha",
+               "home_score": 4, "away_score": 0, "winner": "Beta",
+               "is_draw": False},
+        "T2": {"match_id": "T2", "team_a": "Gamma", "team_b": "Delta",
+               "home_score": 0, "away_score": 3, "winner": "Delta",
+               "is_draw": False},
+    }
     runs = []
     for seed in (1, 2, 3):
         rng = random.Random(seed)
@@ -121,8 +158,30 @@ def test_completed_match_is_never_sampled():
         t1 = res["A"]["T1"]
         assert (t1["score_a"], t1["score_b"]) == (4, 0), \
             "completed match was re-sampled - truth invariant violated"
+        # Every played match is substituted VERBATIM: the ingested score and
+        # the ingested winner, for every seed.
+        for match_id, pg in played.items():
+            out = res["A"][match_id]
+            assert (out["score_a"], out["score_b"]) == (pg["home_score"],
+                                                       pg["away_score"]), (
+                f"{match_id} was re-sampled - truth invariant violated")
+            assert out["winner"] == pg["winner"], (
+                f"{match_id} winner was re-sampled - truth invariant violated")
         runs.append(res)
     assert runs[0]["A"]["T1"] == runs[1]["A"]["T1"] == runs[2]["A"]["T1"]
+
+    # Deterministic resampled-set proof: exactly ONE match is unplayed, so the
+    # sampler must consume exactly TWO draws (score_a + score_b) — and not one
+    # more. A played match entering the resampled set would push this to 6.
+    elo_flat = {n: d["elo"] for n, d in teams.items()}
+    rng = _CountingRng()
+    simulate_group_matches(groups, teams, elo_flat, rng,
+                           fair_play=False,
+                           played_groups=played,
+                           base_rate=1.25)
+    assert rng.draws == 2, (
+        f"expected exactly 2 RNG draws (one unplayed match), got {rng.draws} - "
+        "a played match was resampled")
 
 
 def test_wc_completed_result_completeness_104():

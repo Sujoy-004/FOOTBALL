@@ -17,6 +17,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from web.derived import holder
+
 ROOT = Path(__file__).resolve().parent.parent
 UCL_DATA = ROOT / "competitions" / "ucl" / "data"
 PLAYED_ROWS = 60
@@ -42,7 +44,10 @@ def active_season_dir(tmp_path):
     (tmp_path / "current.json").unlink(missing_ok=True)
     # Only the canonical stores are removed; rule/pairing files stay so the
     # canonical bracket layer can still render simulated trees.
-    (tmp_path / "knockout_results.json").unlink()
+    # missing_ok: the store is gitignored runtime state, so it is often
+    # ALREADY absent — the fixture states an intent, it does not require the
+    # file to exist first.
+    (tmp_path / "knockout_results.json").unlink(missing_ok=True)
     snapshot = tmp_path / "snapshot.json"
     if snapshot.exists():
         snapshot.unlink()
@@ -93,12 +98,14 @@ class TestActiveSeasonLifecycle:
         monkeypatch.setattr(app, "DATA_DIR", active_season_dir)
         # Minimal cache seed (parity with existing suites); the lifespan
         # recompute reproduces the same values offline from the tmp stores.
-        app.cache.update({
+        # The derived state lives in the race-free holder (Phase 4) — there
+        # is no module-level ``cache`` global to mutate any more.
+        holder.publish_data("ucl", {
             "elo_ratings": _coeff_elo(),
             "availability": {"league_results": "available",
                              "knockout_results": "missing"},
             "champion": None,
-        })
+        }, mode="results", stamp=app._observed_stamp())
         with TestClient(ucl_app) as client:
             data = client.get("/api/data").json()
 
@@ -124,13 +131,13 @@ class TestActiveSeasonSimulationTruth:
         from web.ucl_app import ucl_app
 
         monkeypatch.setattr(app, "DATA_DIR", active_season_dir)
-        app.cache.update({
+        holder.publish_data("ucl", {
             "elo_ratings": _coeff_elo(),
             "availability": {"league_results": "available",
                              "knockout_results": "missing"},
             "champion": None,
-        })
-        app.sim_cache = {}
+        }, mode="results", stamp=app._observed_stamp())
+        holder.clear_sim("ucl")
 
         results_path = active_season_dir / "results.json"
         fixtures_path = active_season_dir / "fixtures.json"
