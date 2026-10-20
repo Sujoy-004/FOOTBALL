@@ -62,7 +62,7 @@ def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
     ucl_cache_saved = au.snapshot_cache_state(ucl_app)
     ucl_report_saved = dict(ucl_app._refresh_report)
     try:
-        wc_app.cache.clear()
+        holder.reset("worldcup")
         holder.reset("ucl")
 
         groups, played, played_groups = au.wc_repo_snapshot()
@@ -85,7 +85,7 @@ def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
         assert wc_report["success"] is True
         assert wc_calls == [27]
         assert json.loads(wc_leader.read_text(encoding="utf-8")).get("worldcup")
-        assert wc_app.cache.get("refresh", {}).get("success") is True
+        assert holder.read_data("worldcup").get("refresh", {}).get("success") is True
         assert holder.read_data("ucl") == {}
         assert au.snapshot_tree(ucl_dir) == before_ucl
 
@@ -106,7 +106,7 @@ def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
         assert ucl_calls == [7]
         ucl_ledger = json.loads(ucl_leader.read_text(encoding="utf-8"))
         assert ucl_ledger.get("ucl", {}).get("success") is not False
-        assert wc_app.cache.get("refresh", {}).get("success") is True
+        assert holder.read_data("worldcup").get("refresh", {}).get("success") is True
         assert au.snapshot_tree(wc_dir) == wc_after_wc_refresh
     finally:
         au.restore_cache_state(wc_app, wc_cache_saved)

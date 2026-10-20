@@ -203,8 +203,9 @@ class TestApiValidationContract:
 
     def test_no_simulation_means_no_simulated_payload(self, snapshot_mode):
         from web import wc_app
-        # Isolate from earlier tests that legitimately set the global.
-        wc_app.sim_cache = {}
+        from web.derived import holder
+        # Isolate from earlier tests that legitimately published a run.
+        holder.clear_sim("worldcup")
         with TestClient(wc_app.wc_app) as client:
             sim = client.get("/api/simulation").json()
             assert sim["status"] == "not_requested"

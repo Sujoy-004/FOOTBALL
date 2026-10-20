@@ -48,6 +48,7 @@ def test_wc_end_to_end_ingestion_is_idempotent(tmp_path, monkeypatch):
 
     from web import wc_app
     from competitions.worldcup.src import overview as wc_overview
+    from web.derived import holder
 
     cache_saved = au.snapshot_cache_state(wc_app)
     try:
@@ -57,12 +58,17 @@ def test_wc_end_to_end_ingestion_is_idempotent(tmp_path, monkeypatch):
         monkeypatch.setattr(wc_overview, "DATA_DIR", wc_dir)
         monkeypatch.setattr(wc_overview, "compute_signals_meta", lambda: {"signals": [], "n_total": 0})
         monkeypatch.setattr(wc_app, "DATA_DIR", wc_dir)
-        wc_app.cache.clear()
+        # The derived cache lives in the holder's frozen slot (04-04); the
+        # snapshot is published with the app's own observed stamp so _snap()
+        # serves exactly this generation.
+        holder.reset("worldcup")
         overview_after_1 = dict(wc_app.compute_overview())
-        wc_app.cache.update(overview_after_1)
+        holder.publish_data("worldcup", overview_after_1, "results",
+                            wc_app._observed_stamp())
         api_after_1 = wc_app.api_data().body
         overview_after_2 = dict(wc_app.compute_overview())
-        wc_app.cache.update(overview_after_2)
+        holder.publish_data("worldcup", overview_after_2, "results",
+                            wc_app._observed_stamp())
         api_after_2 = wc_app.api_data().body
         assert _no_boot(overview_after_1) == _no_boot(overview_after_2)
         assert api_after_1 == api_after_2

@@ -134,8 +134,8 @@ class TestSharedContractStates:
 
     def test_not_requested_state_before_any_run(self, snapshot_mode):
         from web.wc_app import wc_app
-        import web.wc_app as wc_mod
-        wc_mod.sim_cache = {}
+        from web.derived import holder
+        holder.clear_sim("worldcup")
         with TestClient(wc_app) as client:
             body = client.get("/api/simulation").json()
             assert body["status"] == "not_requested"

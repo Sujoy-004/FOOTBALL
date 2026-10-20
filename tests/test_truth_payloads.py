@@ -91,9 +91,12 @@ class TestUCLTruthPayloads:
             assert abs(a + b + c - 1.0) <= 0.001
 
     def test_wc_phase_and_no_simulation(self, snapshot_mode):
-        from web.wc_app import cache, compute_overview, wc_app
-        # The parent server assigns wc cache at boot; mirror that here.
-        cache.update(compute_overview())
+        import web.wc_app as wc_mod
+        from web.wc_app import compute_overview, wc_app
+        from web.derived import holder
+        # The parent server publishes the wc snapshot at boot; mirror that here.
+        holder.publish_data("worldcup", compute_overview(), "results",
+                            wc_mod._observed_stamp())
         with TestClient(wc_app) as client:
             overview = client.get("/api/overview").json()
             assert overview["has_simulation"] is False
@@ -183,10 +186,13 @@ class TestStandingsUnification:
 
 class TestWCInsightTruth:
     def test_compute_match_insight_truth_fields(self, snapshot_mode):
-        from web.wc_app import cache, compute_overview
+        import web.wc_app as wc_mod
+        from web.wc_app import compute_overview
+        from web.derived import holder
         from competitions.worldcup.src.insight import compute_match_insight
-        cache.update(compute_overview())
-        fb = cache["full_bracket"]
+        holder.publish_data("worldcup", compute_overview(), "results",
+                            wc_mod._observed_stamp())
+        fb = holder.read_data("worldcup")["full_bracket"]
         played_mid = None
         for ms in fb["rounds"].values():
             for m in ms:

@@ -38,9 +38,13 @@ def wc_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(wc_app, "DATA_DIR", dst)
     monkeypatch.setattr(wc_overview, "DATA_DIR", dst)
     saved = au.snapshot_cache_state(wc_app)
-    wc_app.cache.clear()
+    from web.derived import holder
+    holder.reset("worldcup")
     from web.wc_app import compute_overview
-    wc_app.cache.update(compute_overview())
+    # The derived cache lives in the holder's frozen slot (04-04): publish the
+    # seeded overview with the app's own observed stamp so _snap() serves it.
+    holder.publish_data("worldcup", compute_overview(), "results",
+                        wc_app._observed_stamp())
     _pin_snapshot()
     try:
         yield dst
@@ -267,10 +271,12 @@ class TestWCTruthPayloadParity:
         startup.set_session_decision(startup.StartupDecision("snapshot", ""))
         try:
             import web.wc_app as wc_mod
-            from web.wc_app import cache, compute_overview, wc_app
+            from web.wc_app import compute_overview, wc_app
+            from web.derived import holder
 
-            wc_mod.sim_cache = {}
-            cache.update(compute_overview())
+            holder.clear_sim("worldcup")
+            holder.publish_data("worldcup", compute_overview(), "results",
+                                wc_mod._observed_stamp())
             with TestClient(wc_app) as client:
                 overview = client.get("/api/overview").json()
                 assert overview["has_simulation"] is False

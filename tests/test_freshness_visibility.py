@@ -84,7 +84,8 @@ def test_wc_failure_surfaces_in_api_cache(monkeypatch):
         lambda *a, **k: report)
     out = wc_app._fetch_live_data()
     assert out == report
-    assert wc_app.cache["refresh"]["stale"] is True
+    from web.derived import holder
+    assert holder.read_data("worldcup")["refresh"]["stale"] is True
 
 
 def test_ucl_empty_fetch_marks_stale(monkeypatch, caplog):

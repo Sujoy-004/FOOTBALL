@@ -38,6 +38,7 @@ def test_wc_provider_exception_preserves_stores_and_reports_stale(
 
     from web import wc_app
     from competitions.worldcup.src import overview as wc_overview
+    from web.derived import holder
 
     cache_saved = au.snapshot_cache_state(wc_app)
     try:
@@ -49,7 +50,7 @@ def test_wc_provider_exception_preserves_stores_and_reports_stale(
             wc_overview, "compute_signals_meta", lambda: {"signals": [], "n_total": 0}
         )
         monkeypatch.setattr(wc_app, "DATA_DIR", wc_dir)
-        wc_app.cache.clear()
+        holder.reset("worldcup")
         overview = wc_app.compute_overview()
         assert isinstance(overview, dict) and overview.get("n_played", 0) >= 0
         assert "error" not in overview
@@ -196,6 +197,7 @@ def test_ucl_web_raising_provider_records_stale_in_ledger(tmp_path, monkeypatch)
 
 def test_wc_web_raising_provider_records_stale_in_ledger(tmp_path, monkeypatch):
     from web import wc_app
+    from web.derived import holder
 
     wc_dir = au.seed_wc_dir(tmp_path / "wc")
     before = au.snapshot_tree(wc_dir)
@@ -205,7 +207,7 @@ def test_wc_web_raising_provider_records_stale_in_ledger(tmp_path, monkeypatch):
     monkeypatch.setattr("football_core.runtime_support.get_data_provider", get_data_provider)
     cache_saved = au.snapshot_cache_state(wc_app)
     try:
-        wc_app.cache.clear()
+        holder.reset("worldcup")
         report = wc_app._fetch_live_data()
         assert report["success"] is False
         assert report["stale"] is True
