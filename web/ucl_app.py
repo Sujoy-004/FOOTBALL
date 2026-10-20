@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import fastapi
-from fastapi.responses import JSONResponse
 
 from competitions.ucl.src.orchestrator import (
     build_simulation_result,
@@ -51,6 +50,10 @@ from web.common import (
     ts,
 )
 from football_core.domain import DataAvailability, load_json_store
+from football_core.store_stamp import StoreStamp, stamp_store
+from web.common import RobustJSONResponse as JSONResponse
+from web.derived import holder
+from web.derived.stamps import UCL_ROLES
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 UCL_LEAGUE_ID: int = 7
@@ -146,12 +149,25 @@ _CALIBRATION_PATH = UCL_DIR / "config" / "signal_weights.json"
 #: Matches required before weights count as calibrated (mirrors World Cup).
 _CALIBRATION_THRESHOLD = 30
 
-cache: dict = {}
-sim_cache: dict = {}
-boot_log_local: list[dict] = []
-_mode: str = "results"
-
 service = SimulationTaskService()
+
+
+def _active_dir() -> Path:
+    from competitions.ucl.src.orchestrator import resolve_active_data_dir
+    return Path(resolve_active_data_dir(DATA_DIR))
+
+
+def _observed_stamp() -> StoreStamp:
+    return stamp_store(_active_dir(), UCL_ROLES)
+
+
+def _build_state() -> tuple[dict, str]:
+    data = compute_all()          # global-free; returns dict with "mode" key
+    return data, data.get("mode", "results")
+
+
+def _snap():
+    return holder.get_or_rebuild("ucl", _observed_stamp(), _build_state)
 
 
 def _refresh_report_path() -> Path:
@@ -401,9 +417,9 @@ def _fetch_live_data() -> None:
     from web.startup import is_snapshot_mode
     if is_snapshot_mode():
         logger.warning("[UCL] snapshot mode - live refresh skipped")
-        boot_log_local.append({"step": "UCL live fetch", "status": "skip",
-                               "elapsed": 0.0,
-                               "output": f"[{ts()}] Snapshot mode - live refresh skipped"})
+        holder.append_boot("ucl", {"step": "UCL live fetch", "status": "skip",
+                                   "elapsed": 0.0,
+                                   "output": f"[{ts()}] Snapshot mode - live refresh skipped"})
         # Parity with WC: record WHY no live fetch happened so the frontend
         # can disclose snapshot data instead of silently looking live-fresh.
         # D-13: nothing was attempted, so nothing succeeded (reclassify).
@@ -429,7 +445,7 @@ def _fetch_live_data() -> None:
             bool(_bsd_key()), bool(_football_data_org_key()),
             os.environ.get("DATA_PROVIDER", "") or "(unset)",
         )
-        boot_log_local.append({"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] No data provider configured"})
+        holder.append_boot("ucl", {"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] No data provider configured"})
         _store_refresh_report(False, "no data provider configured", None,
                               active_season=active_season)
         return
@@ -480,7 +496,7 @@ def _fetch_live_data() -> None:
                           active_season=active_season,
                           deferred=deferred, reason=reason, status=status)
     boot_status = "deferred" if deferred else ("ok" if ok else "skip")
-    boot_log_local.append({
+    holder.append_boot("ucl", {
         "step": "UCL live fetch", "status": boot_status, "elapsed": 0.0,
         "output": f"[{ts()}] {provider_name}: {n_raw} raw matches, {n_updated} updated",
     })
@@ -503,17 +519,16 @@ def _maybe_recompute_cache_after_ingest(summary: dict) -> None:
     if not per_season:
         return
     try:
-        old_mode = _mode
-        old_cache_snapshot = cache.get("mode")
+        old_mode = holder.read_mode("ucl")
         new_result = compute_all()
         if new_result.get("error"):
             logger.warning("[UCL] Cache recomputation failed: %s", new_result["error"])
             return
-        globals()["cache"] = new_result
+        holder.publish_data("ucl", new_result, new_result.get("mode", "results"),
+                            _observed_stamp())
         if new_result.get("mode") != old_mode:
-            globals()["_mode"] = new_result.get("mode", old_mode)
             logger.info("[UCL] Cache recomputed: mode changed from %s to %s",
-                        old_mode, _mode)
+                        old_mode, new_result.get("mode"))
     except Exception as exc:
         logger.warning("[UCL] Cache recomputation failed: %s", exc)
 
@@ -572,17 +587,14 @@ def _match_counts() -> tuple[int, int]:
 
 
 def deterministic_compute() -> dict:
-    global boot_log_local, _mode
-    boot_log_local = []
-    _mode = "results"
     from competitions.ucl.src.orchestrator import run_deterministic_compute as _f
     result = _f(str(DATA_DIR), bsd_api_key=_bsd_key())
-    boot_log_local = result.get("boot", [])
+    result["mode"] = "results"
+    result["boot"] = result.get("boot", [])
     return result
 
 
 def compute_all() -> dict:
-    global boot_log_local, _mode
     from competitions.ucl.src.orchestrator import resolve_compute_mode
     mode, mode_reason = resolve_compute_mode(str(DATA_DIR))
     if mode == "results":
@@ -590,26 +602,27 @@ def compute_all() -> dict:
     if mode == "error":
         # Real results exist but are unreadable: surface the failure instead
         # of fabricating a simulated season over them.
-        _mode = "results"
-        boot_log_local = [{"step": "Select data mode", "status": "error", "elapsed": 0.0,
-                           "output": f"[error] {mode_reason}"}]
-        return {"error": mode_reason, "boot": boot_log_local}
-    _mode = "simulation"
-    boot_log_local = []
+        return {
+            "error": mode_reason,
+            "mode": "results",
+            "boot": [{"step": "Select data mode", "status": "error", "elapsed": 0.0,
+                      "output": f"[error] {mode_reason}"}],
+        }
     from competitions.ucl.src.orchestrator import run_compute_all as _f
     result = _f(str(DATA_DIR), bsd_api_key=_bsd_key(), team_aliases=_BSD_TEAM_ALIASES)
-    boot_log_local = result.get("boot", [])
+    result["mode"] = "simulation"
+    result["boot"] = result.get("boot", [])
     return result
 
 
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
-    global cache
     # Zero provider calls during boot (Exchange 4 v2): caches come from
     # validated on-disk stores; reads stay pure and ingestion happens only
     # via the explicit refresh endpoint, FOOTBALL_PRELOAD_ALL preload or a
     # test (plan 02-06).
-    cache = compute_all()
+    data, mode = _build_state()
+    holder.publish_data("ucl", data, mode, _observed_stamp())
     yield
 
 
@@ -632,21 +645,22 @@ def api_data():
     # FOOTBALL_PRELOAD_ALL preload, or a test driving adapter.refresh().
     n_unplayed, n_total = _match_counts()
     lifecycle = _lifecycle_view()
-    availability = cache.get("availability") or None
+    snap = _snap()
+    availability = snap.get("availability") or None
     live_map, reasons = _live_availability()
     if not availability:
         availability = live_map
     payload = {
         "refresh": _refresh_report_for(_active_season_token()),
-        "teams": cache.get("teams", []),
-        "all_teams": cache.get("all_teams", []),
-        "n_teams": cache.get("n_teams", 0),
-        "n_iterations": cache.get("n_iterations", 0),
-        "snapshot_date": cache.get("snapshot_date", ""),
-        "champion": cache.get("champion"),
-        "mode": _mode,
+        "teams": snap.get("teams", []),
+        "all_teams": snap.get("all_teams", []),
+        "n_teams": snap.get("n_teams", 0),
+        "n_iterations": snap.get("n_iterations", 0),
+        "snapshot_date": snap.get("snapshot_date", ""),
+        "champion": snap.get("champion"),
+        "mode": snap.get("mode"),
         "availability": availability,
-        "phase": cache.get("phase", {}),
+        "phase": snap.get("phase", {}),
         "lifecycle": lifecycle,
         "season": lifecycle.get("season"),
         "n_total_fixtures": n_total,
@@ -707,10 +721,10 @@ def api_set_season(req: dict = None):
     basis = "pointer_local" if season == LOCAL_HISTORICAL_SEASON else "draw"
     provider = None if season == LOCAL_HISTORICAL_SEASON else f"ucl.draw.{season.replace('/', '_')}"
     pointer = set_current_season(DATA_DIR, season, basis=basis, provider=provider)
-    global cache, sim_cache, _mode
     try:
-        sim_cache = {}
-        cache = compute_all()
+        holder.clear_sim("ucl")
+        data, mode = _build_state()
+        holder.publish_data("ucl", data, mode, _observed_stamp())
     except Exception:
         # Transactional rollback: the pointer was flipped above, but a
         # downstream step (compute_all) failed — restore current.json to
@@ -731,31 +745,33 @@ def api_set_season(req: dict = None):
                 "[UCL] failed to restore seasons pointer after POST /api/season error",
                 exc_info=True)
         raise
-    return JSONResponse({"status": "ok", "current": pointer, "mode": _mode})
+    return JSONResponse({"status": "ok", "current": pointer,
+                         "mode": holder.read_mode("ucl")})
 
 
 @ucl_app.get("/api/boot")
 def api_boot():
     season = _active_season_token()
     return JSONResponse({
-        "boot": cache.get("boot", []),
+        "boot": _snap().get("boot", []),
         "refresh": _freshness(_refresh_report, _freshness_store_paths(season)),
     })
 
 
 @ucl_app.get("/api/simulation")
 def api_simulation():
+    sim = holder.read_sim("ucl")
     payload = {
-        "odds": sim_cache.get("odds", []),
-        "standings": sim_cache.get("standings", []),
-        "signals": sim_cache.get("signals", {}),
-        "elo_ratings": sim_cache.get("elo_ratings", {}),
-        "champion": sim_cache.get("champion"),
-        "mode": sim_cache.get("mode", _mode),
-        "n_iterations": sim_cache.get("n_iterations", 0),
-        "snapshot_date": sim_cache.get("snapshot_date", ""),
-        "status": sim_cache.get("status", "not_requested"),
-        "simulation_meta": sim_cache.get("simulation_meta"),
+        "odds": sim.get("odds", []),
+        "standings": sim.get("standings", []),
+        "signals": sim.get("signals", {}),
+        "elo_ratings": sim.get("elo_ratings", {}),
+        "champion": sim.get("champion"),
+        "mode": sim.get("mode", _snap().get("mode")),
+        "n_iterations": sim.get("n_iterations", 0),
+        "snapshot_date": sim.get("snapshot_date", ""),
+        "status": sim.get("status", "not_requested"),
+        "simulation_meta": sim.get("simulation_meta"),
     }
     bracket = _simulation_bracket_state()
     if bracket is not None:
@@ -787,7 +803,7 @@ def _lifecycle_view() -> dict:
 
 def _simulation_bracket_state() -> dict | None:
     """Simulated bracket in the same structural shape as the factual one."""
-    sim_payload = sim_cache.get("sim_state_payload")
+    sim_payload = holder.read_sim("ucl").get("sim_state_payload")
     if not sim_payload:
         return None
     from competitions.ucl.src.state import build_competition_state
@@ -804,8 +820,8 @@ def _simulation_bracket_state() -> dict | None:
 @ucl_app.get("/api/standings")
 def api_standings():
     return JSONResponse({
-        "standings": cache.get("standings", []),
-        "mode": _mode,
+        "standings": _snap().get("standings", []),
+        "mode": _snap().get("mode"),
         "season": _active_season_token(),
     })
 
@@ -816,7 +832,7 @@ def api_bracket():
     # Compatibility alias for older consumers of the league matchday rows.
     payload["league_matchdays"] = (
         payload.get("stages", {}).get("league", {}).get("matchdays")
-        or cache.get("league_matchdays", {}))
+        or _snap().get("league_matchdays", {}))
     # Same lifecycle view as /api/data (cheap reuse, one discover call each).
     payload["lifecycle"] = _lifecycle_view()
     return JSONResponse(payload)
@@ -824,15 +840,16 @@ def api_bracket():
 
 @ucl_app.get("/api/odds")
 def api_odds():
+    mode = _snap().get("mode")
     return JSONResponse({
-        "odds": cache.get("odds", []),
-        "mode": _mode,
+        "odds": _snap().get("odds", []),
+        "mode": mode,
         "season": _active_season_token(),
         # Results mode serves deterministic achieved-outcome indicators
         # (1.0/0.0), NOT model probabilities. Simulation runs surface their
         # projections through /api/simulation with SIMULATED provenance.
         "odds_semantics": (
-            "achieved_outcome_indicators" if _mode == "results"
+            "achieved_outcome_indicators" if mode == "results"
             else "monte_carlo_probabilities"),
     })
 
@@ -840,8 +857,8 @@ def api_odds():
 @ucl_app.get("/api/signals")
 def api_signals():
     return JSONResponse({
-        "signals": cache.get("signals", {}),
-        "mode": _mode,
+        "signals": _snap().get("signals", {}),
+        "mode": _snap().get("mode"),
         "season": _active_season_token(),
     })
 
@@ -863,12 +880,13 @@ def api_elo():
     A GET never fetches: the cache was populated at boot from the stored
     ClubElo snapshot, and this handler only reads it.
     """
+    snap = _snap()
     ratings = {
         team: float(value)
-        for team, value in (cache.get("elo_ratings") or {}).items()
+        for team, value in (snap.get("elo_ratings") or {}).items()
         if isinstance(value, (int, float))
     }
-    refined_elo = (cache.get("signals") or {}).get("refined_elo") or {}
+    refined_elo = (snap.get("signals") or {}).get("refined_elo") or {}
     provenance = refined_elo.get("provenance")
     coefficient_derived = provenance == "coefficient_derived"
     if coefficient_derived:
@@ -884,7 +902,7 @@ def api_elo():
     if not ratings and coefficient_derived:
         ratings = {
             team: float(value)
-            for team, value in (cache.get("elo_ratings") or {}).items()
+            for team, value in (snap.get("elo_ratings") or {}).items()
             if isinstance(value, (int, float))
         }
 
@@ -926,7 +944,7 @@ def api_blend():
             for name, value in (config.get("weights") or {}).items()
             if isinstance(value, (int, float))
         }
-        n_matches = int(config.get("n_matches") or len(cache.get("_results") or []))
+        n_matches = int(config.get("n_matches") or len(_snap().get("_results") or []))
         if not weights:
             return JSONResponse(_cold_start_blend(n_matches))
         return JSONResponse({
@@ -987,11 +1005,12 @@ def _season_outcome_undecided() -> bool:
     """
     if _unplayed_match_count() > 0:
         return True
-    availability = cache.get("availability", {})
+    snap = _snap()
+    availability = snap.get("availability", {})
     ko_state = availability.get("knockout_results")
     if ko_state in ("missing", "empty", "unavailable"):
         return True
-    return not cache.get("champion")
+    return not snap.get("champion")
 
 
 def simulation_eligibility() -> tuple[bool, Optional[str], str]:
@@ -1014,7 +1033,7 @@ def _simulation_state_block() -> dict:
     sessions depend on it; only the exposed availability flag changes.
     """
     undecided = _season_outcome_undecided()
-    sim_status = sim_cache.get("status", "not_requested")
+    sim_status = holder.read_sim("ucl").get("status", "not_requested")
     request_state = {
         "running": "running",
         "completed": "completed",
@@ -1040,12 +1059,11 @@ def _simulation_state_block() -> dict:
 def _ucl_sim_runner(progress_cb, count: int, seed):
     """Competition runner: offline Elo reuse + pipeline call.
 
-    Deliberately does NOT flip the global _mode: canonical cache data stays
+    Deliberately does NOT flip the display mode: canonical cache data stays
     factual ("results"); simulation provenance lives in simulation_meta.
     """
-    global boot_log_local
-    boot_log_local = []
-    cached_elo = cache.get("elo_ratings") or None
+    holder.publish_boot("ucl", ())
+    cached_elo = _snap().get("elo_ratings") or None
 
     def _normalized_progress(value: int, total: int, stage: str = "") -> None:
         # Pre-MC stages report (percent, 100); the MC loop reports
@@ -1066,18 +1084,18 @@ def _ucl_sim_runner(progress_cb, count: int, seed):
 
 def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
     """Cache/snapshot side effects. Returns the public task summary."""
-    global boot_log_local, _mode, sim_cache
-    result["boot"] = boot_log_local
+    payload = dict(result)
+    payload["boot"] = list(holder.read_boot("ucl"))
     meta_block = result.get("_meta") or {}
-    sim_cache = result
-    sim_cache["status"] = "completed"
-    sim_cache["simulation_meta"] = build_simulation_meta(
+    meta = build_simulation_meta(
         requested_count=count,
         actual_count=result.get("n_iterations"),
         seed=meta_block.get("seed"),
         provenance_extra=meta_block.get("provenance") or {},
         engine_version=meta_block.get("engine_version"),
     )
+    payload["status"] = "completed"
+    payload["simulation_meta"] = meta
     snapshot_data = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "mode": result.get("mode", "simulation"),
@@ -1090,7 +1108,7 @@ def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
         # Everything below is SIMULATED content; factual stores are never
         # touched by a run.
         "provenance": "simulated",
-        "simulation_meta": sim_cache["simulation_meta"],
+        "simulation_meta": meta,
         "odds": result.get("odds", []),
         "standings": result.get("standings", []),
         "signals": result.get("signals", {}),
@@ -1104,16 +1122,17 @@ def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
         snapshot_path,
         json.dumps(snapshot_data, indent=2, default=str, ensure_ascii=False),
     )
+    holder.publish_sim("ucl", payload)   # ONE atomic assignment; never mutate after
     return {"champion": result.get("champion"),
             "count": result.get("n_iterations")}
 
 
 @ucl_app.post("/api/reset")
 def api_reset():
-    global cache, _mode
     try:
-        cache = compute_all()
-        return JSONResponse({"status": "ok", "mode": _mode})
+        data, mode = _build_state()
+        holder.publish_data("ucl", data, mode, _observed_stamp())
+        return JSONResponse({"status": "ok", "mode": holder.read_mode("ucl")})
     except Exception as e:
         return error_response(e, context="ucl reset")
 
@@ -1129,17 +1148,18 @@ def api_refresh():
     counters, season, staleness); HTTP stays 200 because a truthful
     failure is data, not an HTTP error.
     """
-    global cache, _mode
     from web.competitions import REGISTRY
 
     try:
         report = dict(REGISTRY.get("ucl").refresh())
-        cache = compute_all()
+        data, mode = _build_state()
+        holder.publish_data("ucl", data, mode, _observed_stamp())
+        holder.clear_sim("ucl")  # D-06: sim cleared the moment refresh writes stores
     except Exception as e:
         return error_response(
             e, status=503, context="ucl refresh",
             public="Live refresh unavailable")
-    return JSONResponse(refresh_response_body(report, mode=_mode))
+    return JSONResponse(refresh_response_body(report, mode=holder.read_mode("ucl")))
 
 
 def _ucl_calibration_runner(progress_cb, count, seed):
@@ -1183,7 +1203,7 @@ def api_validation():
         if not results:
             return JSONResponse({"error": "no results data available", "validation": None})
 
-        elo_ratings = cache.get("elo_ratings", {})
+        elo_ratings = _snap().get("elo_ratings", {})
         if not elo_ratings:
             team_names = list({m["team_a"] for m in results} | {m["team_b"] for m in results})
             elo_ratings = fetch_team_elos(team_names) or {}
@@ -1372,12 +1392,13 @@ def api_match_insight(match_id: str = "", context: str = ""):
     winner = match_data.get("winner") or ""
     played_flag = bool(winner) or has_scores
 
-    elo_map = cache.get("elo_ratings", {})
+    snap = _snap()
+    elo_map = snap.get("elo_ratings", {})
     elo_a = elo_map.get(ta, 1500.0)
     elo_b = elo_map.get(tb, 1500.0)
     elo_prob = expected_score(elo_a, elo_b)
 
-    engine = cache.get("_signal_engine")
+    engine = snap.get("_signal_engine")
     signals_with_weights: dict = {}
     blended_prob: float | None = None
     prob_available = False
@@ -1411,14 +1432,14 @@ def api_match_insight(match_id: str = "", context: str = ""):
     # is unavailable the outcome chart data is explicitly absent.
     outcome = _ucl_outcome_dist(blended_prob, elo_a, elo_b) if blended_prob is not None else None
 
-    results = cache.get("_results", [])
+    results = snap.get("_results", [])
     form_trends: dict = {}
     h2h: dict = {"a_wins": 0, "b_wins": 0, "draws": 0, "total": 0}
     if results:
         form_trends = {ta: _ucl_form_trend(ta, results), tb: _ucl_form_trend(tb, results)}
         h2h = _ucl_head_to_head(ta, tb, results)
 
-    eval_data = cache.get("signals", {})
+    eval_data = snap.get("signals", {})
     insight = _ucl_insight_text(ta, tb, signals_with_weights, form_trends, h2h,
                                 outcome or {}, eval_data)
 
@@ -1503,7 +1524,7 @@ def api_what_if(req: dict = None):
     # Elo resolution mirrors the season runner: reuse the boot-time ratings
     # when present; only reach for ClubElo as a live fallback, and degrade
     # to coefficient-derived ratings offline instead of failing the request.
-    elo_ratings = cache.get("elo_ratings") or {}
+    elo_ratings = _snap().get("elo_ratings") or {}
     if not elo_ratings:
         try:
             elo_ratings = fetch_team_elos(team_names) or {}
