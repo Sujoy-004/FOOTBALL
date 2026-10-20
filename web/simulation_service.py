@@ -20,6 +20,16 @@ Canonical wire vocabulary (single field, shipped with matching frontend):
 Legacy strings (none/starting/started/complete/error/no_unplayed_matches/
 no_outstanding_outcomes/invalid_request) were retired together with the
 frontend consumers in the same commit.
+
+Run-response contract (SIM-02, D-11..D-14) — this service is the ONE place a
+run response is shaped, so every competition app inherits it:
+
+* an omitted seed is generated SERVER-SIDE and RETURNED, so the client can
+  reproduce the run; the same resolved seed is handed to the runner
+* every ack and terminal result carries ``seed``, ``n_simulations`` and
+  ``provenance == "simulated"``
+* a second concurrent run for the same competition is rejected (HTTP 409)
+  instead of queueing a second CPU-bound run
 """
 
 from __future__ import annotations
@@ -29,8 +39,10 @@ import time
 import uuid
 from typing import Any, Callable, Optional
 
+from football_core.domain import ResultProvenance
 from football_core.simulation import (
     SimulationContractError,
+    generate_seed,
     validate_n_simulations,
 )
 
@@ -90,9 +102,12 @@ class SimulationTaskService:
                 "error": f"invalid simulation count {count_value!r}: {exc}",
             }
 
-        resolved_seed: Optional[int]
+        resolved_seed: int
         if seed is None:
-            resolved_seed = None  # engine generates one; returned on completion
+            # D-11: the seed is generated SERVER-SIDE and RETURNED, so the
+            # ack always carries a concrete reproducibility handle and the
+            # engine reuses exactly that seed.
+            resolved_seed = generate_seed()
         else:
             try:
                 resolved_seed = int(seed)
@@ -117,6 +132,23 @@ class SimulationTaskService:
 
         task_id = str(uuid.uuid4())
         with self._lock:
+            # D-12: the in-flight gate lives INSIDE the lock — a boolean
+            # checked outside it would be the TOCTOU race this phase kills.
+            # The eligibility check above deliberately stays outside.
+            for existing in self._tasks.values():
+                if (existing.get("competition") == competition_id
+                        and existing.get("status") == "running"):
+                    payload = {
+                        "status": "validation_error",
+                        "state": "validation_error",
+                        "error": (
+                            "A simulation for this competition is already in flight. "
+                            "Wait for it to finish or cancel it."
+                        ),
+                        "requested": False,
+                    }
+                    payload.update(extra_ack or {})
+                    return 409, payload
             self._tasks[task_id] = {
                 "competition": competition_id,
                 "status": "running",
@@ -154,7 +186,17 @@ class SimulationTaskService:
                     entry["status"] = "completed"
                     entry["progress"] = 100.0
                     entry["elapsed"] = round(time.time() - entry["t0"], 2)
-                    entry["result"] = {"status": "completed", **summary}
+                    # The terminal result repeats the ack's contract, so a
+                    # client that only polls still learns the seed, the run
+                    # count and the provenance. The service's own values win
+                    # over the summary: they are the ones the engine used.
+                    entry["result"] = {
+                        **summary,
+                        "status": "completed",
+                        "n_simulations": count,
+                        "seed": resolved_seed,
+                        "provenance": ResultProvenance.SIMULATED.value,
+                    }
             except Exception as exc:  # fail fast; no partial results emitted
                 with self._lock:
                     entry = self._tasks[task_id]
@@ -171,7 +213,9 @@ class SimulationTaskService:
             "requested": True,
             "requested_count": count,
             "count": count,
+            "n_simulations": count,
             "seed": resolved_seed,
+            "provenance": ResultProvenance.SIMULATED.value,
             **options,
             **(extra_ack or {}),
         }
