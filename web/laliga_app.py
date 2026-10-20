@@ -6,6 +6,12 @@ reset, validation, report, match insight, and Elo what-if counterfactual.
 All tournament logic stays in ``competitions.laliga.src``; this module
 only wires transport, the freshness ledger, and the simulation task
 service.
+
+State lives in the race-free holder (``web.derived.holder``): one frozen
+snapshot per competition, rebound in ONE assignment, with the store
+stamp folded in — reads go through ``_snap()``, writes through
+``holder.publish_data`` / ``publish_sim`` / ``clear_sim``. No mutable
+module globals.
 """
 from __future__ import annotations
 
@@ -17,6 +23,7 @@ from football_core.freshness import (
     update_ledger,
 )
 from football_core.state import atomic_write_text
+from football_core.store_stamp import StoreStamp, stamp_store
 
 import json
 import logging
@@ -26,7 +33,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import fastapi
-from fastapi.responses import JSONResponse
 
 from competitions.laliga.src import seasons as season_store
 from competitions.laliga.src.constants import (
@@ -48,16 +54,19 @@ from competitions.laliga.src.pipeline import (
     load_results as _load_results_pipeline,
 )
 from competitions.laliga.src.simulation import run_mc_simulation as _run_mc_simulation_pipeline
-from competitions.laliga.src.state import build_competition_state as _build_state
+from competitions.laliga.src.state import build_competition_state
 from football_core.elo import expected_score
 from football_core.fetcher import derive_success
 from football_core.signal import PredictionContext
 from web.common import (
+    RobustJSONResponse as JSONResponse,
     error_response,
     offline_refresh_report,
     refresh_response_body,
     ts,
 )
+from web.derived import holder
+from web.derived.stamps import LALIGA_ROLES
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 logger = logging.getLogger(__name__)
@@ -74,12 +83,26 @@ def _bsd_key() -> str:
 def _football_data_org_key() -> str:
     return os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
 
-cache: dict = {}
-sim_cache: dict = {}
-boot_log_local: list[dict] = []
-_mode: str = "results"
 
 service = SimulationTaskService()
+
+
+def _active_dir() -> Path:
+    """The ACTIVE season's store dir (LaLiga stores are season-routed)."""
+    return Path(season_store.resolve_active_data_dir(DATA_DIR))
+
+
+def _observed_stamp() -> StoreStamp:
+    return stamp_store(_active_dir(), LALIGA_ROLES)
+
+
+def _build_state() -> tuple[dict, str]:
+    data = compute_all()          # global-free; returns dict with "mode" key
+    return data, data.get("mode", "results")
+
+
+def _snap():
+    return holder.get_or_rebuild("laliga", _observed_stamp(), _build_state)
 
 
 def _refresh_report_path() -> Path:
@@ -330,7 +353,7 @@ def _fetch_live_data():
             os.environ.get("DATA_PROVIDER", "") or "(unset)",
         )
         _store_refresh_report(False, "no data provider configured", None,
-                              active_season=active_season)
+                               active_season=active_season)
         return None
     try:
         summary = _brain_fetch(
@@ -344,7 +367,7 @@ def _fetch_live_data():
     except Exception as exc:
         logger.warning("[LaLiga] live fetch raised: %s", exc)
         _store_refresh_report(False, f"{exc.__class__.__name__}: {exc}",
-                              type(provider).__name__, active_season=active_season)
+                               type(provider).__name__, active_season=active_season)
         return None
 
     report = summary.get("report") or {}
@@ -369,13 +392,13 @@ def _fetch_live_data():
     # recorded as success (decision 1/2 of 02-02); `reason` still travels
     # through so the UI can present "not published yet".
     _store_refresh_report(ok, error, provider_name,
-                          n_matches=n_raw, n_updated=n_updated,
-                          finished=report.get("finished"),
-                          stages=report.get("stages"),
-                          active_season=active_season,
-                          deferred=deferred, reason=reason, status=status,
-                          odds_status=summary.get("odds"))
-    boot_log_local.append({
+                           n_matches=n_raw, n_updated=n_updated,
+                           finished=report.get("finished"),
+                           stages=report.get("stages"),
+                           active_season=active_season,
+                           deferred=deferred, reason=reason, status=status,
+                           odds_status=summary.get("odds"))
+    holder.append_boot("laliga", {
         "step": "LaLiga live fetch", "status": "deferred" if deferred else ("ok" if ok else "skip"),
         "elapsed": 0.0,
         "output": f"[{ts()}] {provider_name}: {n_raw} raw matches, {n_updated} updated",
@@ -388,14 +411,13 @@ def _fetch_live_data():
 
 
 def _recompute_cache() -> None:
-    global cache, _mode
     try:
         result = compute_all()
         if result.get("error"):
             logger.warning("[LaLiga] Cache recomputation failed: %s", result["error"])
             return
-        cache = result
-        _mode = result.get("mode", _mode)
+        holder.publish_data("laliga", result, result.get("mode", "results"),
+                            _observed_stamp())
     except Exception as exc:
         logger.warning("[LaLiga] Cache recomputation failed: %s", exc)
 
@@ -412,16 +434,14 @@ def _unplayed_match_count() -> int:
 
 
 def compute_all() -> dict:
-    global boot_log_local, _mode
-    boot_log_local = []
     from competitions.laliga.src.pipeline import compute_deterministic
     result = compute_deterministic(data_dir=DATA_DIR)
+    result["mode"] = "results"
     if result.get("error"):
-        _mode = "results"
-        boot_log_local.append({"step": "LaLiga compute", "status": "error", "elapsed": 0.0,
-                               "output": f"[error] {result['error']}"})
+        result["boot"] = [{"step": "LaLiga compute", "status": "error", "elapsed": 0.0,
+                           "output": f"[error] {result['error']}"}]
         return result
-    _mode = "results"
+    result["boot"] = result.get("boot", [])
     from competitions.laliga.src.pipeline import build_signal_engine
     result["_signal_engine"] = build_signal_engine(result.get("elo_ratings", {}))
     return result
@@ -429,22 +449,13 @@ def compute_all() -> dict:
 
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
-    global cache
-    cache = compute_all()
-    _ensure_signal_engine()
+    # Zero provider calls during boot (Exchange 4 v2): caches come from
+    # validated on-disk stores; reads stay pure and ingestion happens only
+    # via the explicit refresh endpoint, FOOTBALL_PRELOAD_ALL preload or a
+    # test (plan 02-06).
+    data, mode = _build_state()
+    holder.publish_data("laliga", data, mode, _observed_stamp())
     yield
-
-
-def build_signal_engine_for_cache() -> None:
-    """Attach the signal engine to the cache for match-insight endpoint."""
-    from competitions.laliga.src.pipeline import build_signal_engine
-    elo_ratings = cache.get("elo_ratings", {}) or load_elo_ratings(DATA_DIR)
-    cache["_signal_engine"] = build_signal_engine(elo_ratings)
-
-
-def _ensure_signal_engine() -> None:
-    if cache.get("_signal_engine") is None:
-        build_signal_engine_for_cache()
 
 
 laliga_app = fastapi.FastAPI(lifespan=lifespan)
@@ -464,24 +475,25 @@ def api_data():
     # happens only through the explicit POST /api/refresh endpoint, the
     # FOOTBALL_PRELOAD_ALL preload, or a test driving adapter.refresh().
     n_unplayed, n_total = _match_counts()
+    snap = _snap()
     live_map, reasons = _live_availability()
-    availability = cache.get("availability") or live_map
+    availability = snap.get("availability") or live_map
     payload = {
         "refresh": _refresh_report_for(_active_season_token()),
-        "teams": cache.get("teams", []),
-        "all_teams": cache.get("all_teams", []),
-        "standings": cache.get("standings", []),
-        "n_teams": cache.get("n_teams", 0),
-        "n_iterations": cache.get("n_iterations", 0),
-        "snapshot_date": cache.get("snapshot_date", ""),
-        "champion": cache.get("champion"),
-        "mode": _mode,
+        "teams": snap.get("teams", []),
+        "all_teams": snap.get("all_teams", []),
+        "standings": snap.get("standings", []),
+        "n_teams": snap.get("n_teams", 0),
+        "n_iterations": snap.get("n_iterations", 0),
+        "snapshot_date": snap.get("snapshot_date", ""),
+        "champion": snap.get("champion"),
+        "mode": snap.get("mode"),
         "availability": availability,
-        "phase": cache.get("phase", {}),
+        "phase": snap.get("phase", {}),
         "season": _active_season_token(),
         "n_total_fixtures": n_total,
         "odds_status": (_refresh_report.get("odds_status")
-                        or cache.get("odds_status") or {}),
+                        or snap.get("odds_status") or {}),
         "simulation": _simulation_state_block(),
         "n_unplayed": n_unplayed,
         "n_played": n_total - n_unplayed,
@@ -522,49 +534,57 @@ def api_set_season(req: dict = None):
         DATA_DIR, season, basis="shipped" if season == SHIPPED_SEASON else "catalog",
         provider=(None if season == SHIPPED_SEASON else f"laliga.{season.replace('/', '_')}"),
     )
-    global cache, sim_cache
-    sim_cache = {}
+    holder.clear_sim("laliga")
     _recompute_cache()
-    return JSONResponse({"status": "ok", "current": pointer, "mode": _mode})
+    return JSONResponse({"status": "ok", "current": pointer,
+                         "mode": holder.read_mode("laliga")})
 
 
 @laliga_app.get("/api/boot")
 def api_boot():
     season = _active_season_token()
+    # The deterministic compute contributes no boot steps of its own, so the
+    # acquisition ledger (the holder's boot slot) is the ONLY source of boot
+    # diagnostics. Serve the ledger together with whatever the snapshot
+    # carries (e.g. the compute-error entry) so this endpoint never answers
+    # with an empty list where real entries exist.
+    entries = list(holder.read_boot("laliga")) + list(_snap().get("boot", []))
     return JSONResponse({
-        "boot": cache.get("boot", boot_log_local),
+        "boot": entries,
         "refresh": _freshness(_refresh_report, _freshness_store_paths(season)),
     })
 
 
 @laliga_app.get("/api/simulation")
 def api_simulation():
+    sim = holder.read_sim("laliga")
     return JSONResponse({
-        "odds": sim_cache.get("odds", []),
-        "standings": sim_cache.get("standings", []),
-        "signals": sim_cache.get("signals", {}),
-        "elo_ratings": sim_cache.get("elo_ratings", {}),
-        "champion": sim_cache.get("champion"),
-        "mode": sim_cache.get("mode", _mode),
-        "n_iterations": sim_cache.get("n_iterations", 0),
-        "snapshot_date": sim_cache.get("snapshot_date", ""),
-        "status": sim_cache.get("status", "not_requested"),
-        "simulation_meta": sim_cache.get("simulation_meta"),
+        "odds": sim.get("odds", []),
+        "standings": sim.get("standings", []),
+        "signals": sim.get("signals", {}),
+        "elo_ratings": sim.get("elo_ratings", {}),
+        "champion": sim.get("champion"),
+        "mode": sim.get("mode", _snap().get("mode")),
+        "n_iterations": sim.get("n_iterations", 0),
+        "snapshot_date": sim.get("snapshot_date", ""),
+        "status": sim.get("status", "not_requested"),
+        "simulation_meta": sim.get("simulation_meta"),
     })
 
 
 def _competition_state() -> dict:
     current = season_store.get_current_season(DATA_DIR)
     active_season = current.get("season") if isinstance(current, dict) else None
-    return _build_state(str(DATA_DIR), mode="results", active_season=active_season,
-                        standings=cache.get("standings"))
+    return build_competition_state(str(DATA_DIR), mode="results", active_season=active_season,
+                                   standings=_snap().get("standings"))
 
 
 @laliga_app.get("/api/standings")
 def api_standings():
+    snap = _snap()
     return JSONResponse({
-        "standings": cache.get("standings", []),
-        "mode": _mode,
+        "standings": snap.get("standings", []),
+        "mode": snap.get("mode"),
         "season": _active_season_token(),
     })
 
@@ -579,21 +599,24 @@ def api_fixtures():
 
 @laliga_app.get("/api/odds")
 def api_odds():
+    snap = _snap()
+    mode = snap.get("mode")
     return JSONResponse({
-        "odds": cache.get("odds", []),
-        "mode": _mode,
+        "odds": snap.get("odds", []),
+        "mode": mode,
         "season": _active_season_token(),
         "odds_semantics": (
-            "achieved_outcome_indicators" if _mode == "results"
+            "achieved_outcome_indicators" if mode == "results"
             else "monte_carlo_probabilities"),
     })
 
 
 @laliga_app.get("/api/signals")
 def api_signals():
+    snap = _snap()
     return JSONResponse({
-        "signals": cache.get("signals", {}),
-        "mode": _mode,
+        "signals": snap.get("signals", {}),
+        "mode": snap.get("mode"),
         "season": _active_season_token(),
     })
 
@@ -604,9 +627,10 @@ def _season_outcome_undecided() -> bool:
 
 def _simulation_state_block() -> dict:
     undecided = _season_outcome_undecided()
+    sim_status = holder.read_sim("laliga").get("status", "not_requested")
     request_state = {
         "running": "running", "completed": "completed", "failed": "failed",
-    }.get(sim_cache.get("status", "not_requested"), "not_requested")
+    }.get(sim_status, "not_requested")
     if not undecided:
         return {"availability": "not_needed", "reason": None,
                 "request_state": request_state, "what_if": True}
@@ -631,7 +655,7 @@ def api_elo():
     """
     ratings = {
         team: float(value)
-        for team, value in (cache.get("elo_ratings") or {}).items()
+        for team, value in (_snap().get("elo_ratings") or {}).items()
         if isinstance(value, (int, float))
     } or load_elo_ratings(DATA_DIR)
     if not ratings:
@@ -675,7 +699,7 @@ def api_blend():
             for name, value in (config.get("weights") or {}).items()
             if isinstance(value, (int, float))
         }
-        n_matches = int(config.get("n_matches") or len(cache.get("_results") or []))
+        n_matches = int(config.get("n_matches") or len(_snap().get("_results") or []))
         if not weights:
             return JSONResponse(_cold_start_blend(n_matches))
         return JSONResponse({
@@ -718,9 +742,8 @@ def api_simulate(req: dict = None):
 
 
 def _laliga_sim_runner(progress_cb, count: int, seed):
-    global boot_log_local
-    boot_log_local = []
-    cached_elo = cache.get("elo_ratings") or None
+    holder.publish_boot("laliga", ())
+    cached_elo = _snap().get("elo_ratings") or None
 
     def _normalized_progress(value: int, total: int, stage: str = "") -> None:
         if total == 100:
@@ -736,18 +759,19 @@ def _laliga_sim_runner(progress_cb, count: int, seed):
 
 
 def _store_laliga_sim_result(result: dict, count: int, seed) -> dict:
-    global boot_log_local, sim_cache
-    result["boot"] = boot_log_local
+    """Cache/snapshot side effects. Returns the public task summary."""
+    payload = dict(result)
+    payload["boot"] = list(holder.read_boot("laliga"))
     meta_block = result.get("_meta") or {}
-    sim_cache = result
-    sim_cache["status"] = "completed"
-    sim_cache["simulation_meta"] = build_simulation_meta(
+    meta = build_simulation_meta(
         requested_count=count,
         actual_count=result.get("n_iterations"),
         seed=meta_block.get("seed"),
         provenance_extra=meta_block.get("provenance") or {},
         engine_version=meta_block.get("engine_version"),
     )
+    payload["status"] = "completed"
+    payload["simulation_meta"] = meta
     snapshot_data = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "mode": result.get("mode", "simulation"),
@@ -757,8 +781,10 @@ def _store_laliga_sim_result(result: dict, count: int, seed) -> dict:
         "n_teams": result.get("n_teams", 0),
         "champion": result.get("champion"),
         "snapshot_date": result.get("snapshot_date", ""),
+        # Everything below is SIMULATED content; factual stores are never
+        # touched by a run.
         "provenance": "simulated",
-        "simulation_meta": sim_cache["simulation_meta"],
+        "simulation_meta": meta,
         "odds": result.get("odds", []),
         "standings": result.get("standings", []),
         "signals": result.get("signals", {}),
@@ -769,16 +795,17 @@ def _store_laliga_sim_result(result: dict, count: int, seed) -> dict:
         snapshot_path,
         json.dumps(snapshot_data, indent=2, default=str, ensure_ascii=False),
     )
+    holder.publish_sim("laliga", payload)  # ONE atomic assignment; never mutate after
     return {"champion": result.get("champion"),
             "count": result.get("n_iterations")}
 
 
 @laliga_app.post("/api/reset")
 def api_reset():
-    global cache, _mode
     try:
-        cache = compute_all()
-        return JSONResponse({"status": "ok", "mode": _mode})
+        data, mode = _build_state()
+        holder.publish_data("laliga", data, mode, _observed_stamp())
+        return JSONResponse({"status": "ok", "mode": holder.read_mode("laliga")})
     except Exception as e:
         return error_response(e, context="laliga reset")
 
@@ -794,17 +821,18 @@ def api_refresh():
     counters, season, staleness); HTTP stays 200 because a truthful
     failure is data, not an HTTP error.
     """
-    global cache, _mode
     from web.competitions import REGISTRY
 
     try:
         report = dict(REGISTRY.get("laliga").refresh())
-        cache = compute_all()
+        data, mode = _build_state()
+        holder.publish_data("laliga", data, mode, _observed_stamp())
+        holder.clear_sim("laliga")  # D-06: sim cleared the moment refresh writes stores
     except Exception as e:
         return error_response(
             e, status=503, context="laliga refresh",
             public="Live refresh unavailable")
-    return JSONResponse(refresh_response_body(report, mode=_mode))
+    return JSONResponse(refresh_response_body(report, mode=holder.read_mode("laliga")))
 
 
 @laliga_app.get("/api/validation")
@@ -815,7 +843,7 @@ def api_validation():
         if not results:
             return JSONResponse({"error": "no results data available", "validation": None})
 
-        elo_ratings = cache.get("elo_ratings", {})
+        elo_ratings = _snap().get("elo_ratings", {})
         if not elo_ratings:
             elo_ratings = load_elo_ratings(DATA_DIR)
 
@@ -916,12 +944,13 @@ def api_match_insight(match_id: str = "", context: str = ""):
     if context == "simulated":
         provenance = "simulated"
 
-    elo_map = cache.get("elo_ratings", {})
+    snap = _snap()
+    elo_map = snap.get("elo_ratings", {})
     elo_a = elo_map.get(ta, 1500.0)
     elo_b = elo_map.get(tb, 1500.0)
     elo_prob = expected_score(elo_a, elo_b)
 
-    engine = cache.get("_signal_engine")
+    engine = snap.get("_signal_engine")
     signals_with_weights: dict = {}
     blended_prob: float | None = None
     prob_available = False
@@ -957,7 +986,7 @@ def api_match_insight(match_id: str = "", context: str = ""):
 
     outcome = laliga_outcome_dist_blend(blended_prob, elo_a, elo_b)
 
-    results = cache.get("_results", [])
+    results = snap.get("_results", [])
     form_trends: dict = {}
     h2h = {"a_wins": 0, "b_wins": 0, "draws": 0, "total": 0}
     if results:
@@ -966,7 +995,7 @@ def api_match_insight(match_id: str = "", context: str = ""):
         h2h = _laliga_head_to_head_pipeline(ta, tb, results)
 
     insight = _laliga_insight_text_pipeline(ta, tb, signals_with_weights, form_trends,
-                                            h2h, outcome or {}, cache.get("signals", {}))
+                                             h2h, outcome or {}, snap.get("signals", {}))
 
     return JSONResponse({
         "match_id": match_id,
@@ -1019,7 +1048,7 @@ def api_what_if(req: dict = None):
     ta = match_data.get("team_a") or match_data.get("home_team") or ""
     tb = match_data.get("team_b") or match_data.get("away_team") or ""
 
-    baseline_elos = dict(cache.get("elo_ratings", {})) or load_elo_ratings(DATA_DIR)
+    baseline_elos = dict(_snap().get("elo_ratings", {})) or load_elo_ratings(DATA_DIR)
 
     baseline = _run_mc_simulation_pipeline(
         str(DATA_DIR), n_iterations=n_iterations, seed=42,

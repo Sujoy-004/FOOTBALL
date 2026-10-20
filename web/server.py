@@ -158,8 +158,10 @@ async def lifespan(app: fastapi.FastAPI):
 
     import web.laliga_app as _laliga
 
-    _laliga.cache = await _boot_step("LaLiga compute_all",
+    _laliga_data = await _boot_step("LaLiga compute_all",
                                     _laliga.compute_all) or {}
+    _holder.publish_data("laliga", _laliga_data, _laliga_data.get("mode", "results"),
+                         _laliga._observed_stamp())
     yield
 
 
