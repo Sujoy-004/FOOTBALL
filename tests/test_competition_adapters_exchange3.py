@@ -68,15 +68,16 @@ class TestAdapterDeterminism:
 class TestEligibilityHonesty:
     def test_completed_real_season_is_not_simulatable(self):
         """All league matches played AND champion on file -> nothing to project."""
-        from web.ucl_app import _season_outcome_undecided, cache
-        saved = dict(cache)
+        from web.ucl_app import _season_outcome_undecided
+        from web.derived import holder
+        import web.ucl_app as app
+        saved = dict(holder.read_data("ucl"))
         try:
-            cache.update({
+            holder.publish_data("ucl", {
                 "availability": {"league_results": "available",
                                  "knockout_results": "available"},
                 "champion": "Real Madrid",
-            })
-            import web.ucl_app as app
+            }, mode="results", stamp=app._observed_stamp())
             monkey_unplayed = 0
             original = app._unplayed_match_count
             app._unplayed_match_count = lambda: monkey_unplayed
@@ -85,21 +86,22 @@ class TestEligibilityHonesty:
             finally:
                 app._unplayed_match_count = original
         finally:
-            cache.clear()
-            cache.update(saved)
+            holder.publish_data("ucl", saved, mode=holder.read_mode("ucl"),
+                                stamp=app._observed_stamp())
 
     def test_empty_knockout_store_keeps_season_projectable(self):
         """Missing/empty KO data means outcomes are UNDECIDED - the season
         stays simulatable; it must NOT be read as 'phase never happened'."""
-        from web.ucl_app import _season_outcome_undecided, cache
-        saved = dict(cache)
+        from web.ucl_app import _season_outcome_undecided
+        from web.derived import holder
+        import web.ucl_app as app
+        saved = dict(holder.read_data("ucl"))
         try:
-            cache.update({
+            holder.publish_data("ucl", {
                 "availability": {"league_results": "available",
                                  "knockout_results": "empty"},
                 "champion": None,
-            })
-            import web.ucl_app as app
+            }, mode="results", stamp=app._observed_stamp())
             original = app._unplayed_match_count
             app._unplayed_match_count = lambda: 0
             try:
@@ -107,8 +109,8 @@ class TestEligibilityHonesty:
             finally:
                 app._unplayed_match_count = original
         finally:
-            cache.clear()
-            cache.update(saved)
+            holder.publish_data("ucl", saved, mode=holder.read_mode("ucl"),
+                                stamp=app._observed_stamp())
 
 
 class TestApiValidationContract:
@@ -165,13 +167,17 @@ class TestApiValidationContract:
         teams = fixtures["schedule"]["teams"]
         coeffs = {t["name"]: t["coefficient"] for t in teams}
         mx = max(coeffs.values())
-        app.cache.update({
+        from web.derived import holder
+        _cache = dict(holder.read_data("ucl"))
+        _cache.update({
             "elo_ratings": {n: 1400.0 + (c / mx) * 400.0
                             for n, c in coeffs.items()},
             "availability": {"league_results": "missing",
                              "knockout_results": "missing"},
             "champion": None,
         })
+        holder.publish_data("ucl", _cache, mode=holder.read_mode("ucl"),
+                            stamp=holder.read_stamp("ucl"))
         with TestClient(ucl_app) as client:
             r = client.post("/api/simulate", json={"iterations": 1, "seed": None})
             assert r.status_code == 200

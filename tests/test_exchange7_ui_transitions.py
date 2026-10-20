@@ -63,12 +63,15 @@ def ucl_data_dir(tmp_path, monkeypatch):
     copy so a switch 2026/27 <-> 2025/26 is legal.
     """
     import web.ucl_app as ucl_app
+    from web.derived import holder
     dst = tmp_path / "ucl_data"
     shutil.copytree(UCL_DATA, dst, dirs_exist_ok=True)
     monkeypatch.setattr(ucl_app, "DATA_DIR", dst)
-    # Also clear any module caches so a fresh boot reads the temp dir.
-    ucl_app.cache = {}
-    ucl_app.sim_cache = {}
+    # Clear the holder so a fresh boot reads the temp dir, and stub
+    # compute_all so an empty read does not re-materialize real data.
+    holder.reset("ucl")
+    holder.clear_sim("ucl")
+    monkeypatch.setattr(ucl_app, "compute_all", lambda: {})
     monster_guard = getattr(pytest, "_ucl_data_dir_seeded", None)
     return dst
 

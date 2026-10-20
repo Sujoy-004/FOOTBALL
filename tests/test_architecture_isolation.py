@@ -51,6 +51,7 @@ def test_ucl_ingestion_never_writes_worldcup_data(tmp_path, monkeypatch):
 
 def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
     from web import ucl_app, wc_app
+    from web.derived import holder
 
     wc_dir = au.seed_wc_dir(tmp_path / "worldcup" / "data")
     ucl_dir = au.seed_ucl_dir(tmp_path / "ucl" / "data")
@@ -62,7 +63,7 @@ def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
     ucl_report_saved = dict(ucl_app._refresh_report)
     try:
         wc_app.cache.clear()
-        ucl_app.cache.clear()
+        holder.reset("ucl")
 
         groups, played, played_groups = au.wc_repo_snapshot()
         wc_leader = au.patch_wc_offline(monkeypatch, tmp_path)
@@ -85,7 +86,7 @@ def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
         assert wc_calls == [27]
         assert json.loads(wc_leader.read_text(encoding="utf-8")).get("worldcup")
         assert wc_app.cache.get("refresh", {}).get("success") is True
-        assert ucl_app.cache == {}
+        assert holder.read_data("ucl") == {}
         assert au.snapshot_tree(ucl_dir) == before_ucl
 
         wc_after_wc_refresh = au.snapshot_tree(wc_dir)

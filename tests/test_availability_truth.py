@@ -55,6 +55,7 @@ def wc_dir(tmp_path, monkeypatch):
 def ucl_dir(tmp_path, monkeypatch):
     """Full copy of the real UCL data dir; cache rebuilt."""
     import web.ucl_app as ucl_app
+    from web.derived import holder
 
     dst = tmp_path / "ucl_data"
     shutil.copytree(ROOT / "competitions" / "ucl" / "data", dst)
@@ -64,7 +65,9 @@ def ucl_dir(tmp_path, monkeypatch):
     (dst / "seasons" / "2026_27" / "knockout_results.json").write_text(
         "{}", encoding="utf-8")
     monkeypatch.setattr(ucl_app, "DATA_DIR", dst)
-    ucl_app.cache = ucl_app.compute_all()
+    _data = ucl_app.compute_all()
+    holder.publish_data("ucl", _data, _data.get("mode", "results"),
+                        ucl_app._observed_stamp())
     _pin_snapshot()
     try:
         yield dst
@@ -182,12 +185,15 @@ class TestUCLLaLigaAvailability:
     def test_ucl_reason_parity_and_healthy_omits_reason(self, ucl_dir):
         import web.ucl_app as ucl_app
         from web.ucl_app import ucl_app as app
+        from web.derived import holder
 
         with TestClient(app) as client:
             data = client.get("/api/data").json()
             assert "availability_reason" not in data
         (ucl_dir / "seasons" / "2026_27" / "results.json").unlink()
-        ucl_app.cache = ucl_app.compute_all()
+        _data = ucl_app.compute_all()
+        holder.publish_data("ucl", _data, _data.get("mode", "results"),
+                            ucl_app._observed_stamp())
         with TestClient(app) as client:
             data = client.get("/api/data").json()
             assert data["availability"]["league_results"] == "missing"
@@ -214,8 +220,11 @@ class TestUCLLaLigaAvailability:
     def test_ucl_payload_key_set_unchanged(self, ucl_dir):
         import web.ucl_app as ucl_app
         from web.ucl_app import ucl_app as app
+        from web.derived import holder
 
-        ucl_app.cache = ucl_app.compute_all()
+        _data = ucl_app.compute_all()
+        holder.publish_data("ucl", _data, _data.get("mode", "results"),
+                            ucl_app._observed_stamp())
         with TestClient(app) as client:
             data = client.get("/api/data").json()
             expected = {

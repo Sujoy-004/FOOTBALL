@@ -89,14 +89,19 @@ class TestCompetitionRegistry:
         # historical 2025/26 view before asserting ``not_needed``.
         from competitions.ucl.src.seasons import set_current_season
         import web.ucl_app as ucl_app
+        from web.derived import holder
         set_current_season(UCL_DATA, "2025/26", basis="test")
         try:
-            ucl_app.cache = ucl_app.compute_all()
+            _data = ucl_app.compute_all()
+            holder.publish_data("ucl", _data, _data.get("mode", "results"),
+                                ucl_app._observed_stamp())
             ucl = REGISTRY.get("ucl").simulation()
             assert ucl["availability"] == "not_needed"
         finally:
             set_current_season(UCL_DATA, "2026/27", basis="draw", provider="ucl.draw.2026_27")
-            ucl_app.cache = ucl_app.compute_all()
+            _data = ucl_app.compute_all()
+            holder.publish_data("ucl", _data, _data.get("mode", "results"),
+                                ucl_app._observed_stamp())
 
     def test_server_mounts_come_from_registry(self, snapshot_mode):
         from web.server import app as server_app
@@ -167,13 +172,17 @@ class TestSharedContractStates:
         teams = fixtures["schedule"]["teams"]
         coeffs = {t["name"]: t["coefficient"] for t in teams}
         mx = max(coeffs.values())
-        app.cache.update({
+        from web.derived import holder
+        _cache = dict(holder.read_data("ucl"))
+        _cache.update({
             "elo_ratings": {n: 1400.0 + (c / mx) * 400.0
                             for n, c in coeffs.items()},
             "availability": {"league_results": "missing",
                              "knockout_results": "missing"},
             "champion": None,
         })
+        holder.publish_data("ucl", _cache, mode=holder.read_mode("ucl"),
+                            stamp=holder.read_stamp("ucl"))
         with TestClient(ucl_app) as client:
             r = client.post("/api/simulate",
                             json={"iterations": 3, "seed": 4242})
@@ -204,7 +213,11 @@ class TestSharedContractStates:
             assert again["status"] == "not_found"
 
             # Reproducibility through the API path: same seed, same state.
-            app.cache.update({"elo_ratings": dict(app.cache["elo_ratings"])})
+            from web.derived import holder as _holder2
+            _cache2 = dict(_holder2.read_data("ucl"))
+            _cache2.update({"elo_ratings": dict(_cache2["elo_ratings"])})
+            _holder2.publish_data("ucl", _cache2, mode=_holder2.read_mode("ucl"),
+                                  stamp=_holder2.read_stamp("ucl"))
             r2 = client.post("/api/simulate",
                              json={"iterations": 3, "seed": 4242})
             task_id2 = r2.json()["task_id"]

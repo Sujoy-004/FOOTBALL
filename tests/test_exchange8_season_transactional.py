@@ -44,11 +44,13 @@ def ucl_data_dir(tmp_path, monkeypatch):
     """Copy the real UCL data dir to a temp location and point web.ucl_app
     at it, so POST /api/season never mutates real data."""
     import web.ucl_app as ucl_app
+    from web.derived import holder
     dst = tmp_path / "ucl_data"
     shutil.copytree(UCL_DATA, dst, dirs_exist_ok=True)
     monkeypatch.setattr(ucl_app, "DATA_DIR", dst)
-    ucl_app.cache = {}
-    ucl_app.sim_cache = {}
+    holder.reset("ucl")
+    holder.clear_sim("ucl")
+    monkeypatch.setattr(ucl_app, "compute_all", lambda: {})
     return dst
 
 
