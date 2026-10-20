@@ -81,11 +81,14 @@ def ucl_dir(tmp_path, monkeypatch):
 def laliga_dir(tmp_path, monkeypatch):
     """Full copy of the real LaLiga data dir; cache rebuilt."""
     import web.laliga_app as laliga_app
+    from web.derived import holder
 
     dst = tmp_path / "laliga_data"
     shutil.copytree(ROOT / "competitions" / "laliga" / "data", dst)
     monkeypatch.setattr(laliga_app, "DATA_DIR", dst)
-    laliga_app.cache = laliga_app.compute_all()
+    _data = laliga_app.compute_all()
+    holder.publish_data("laliga", _data, _data.get("mode", "results"),
+                        laliga_app._observed_stamp())
     _pin_snapshot()
     try:
         yield dst
@@ -202,6 +205,7 @@ class TestUCLLaLigaAvailability:
 
     def test_laliga_reason_parity_and_healthy_omits_reason(self, laliga_dir):
         import web.laliga_app as laliga_app
+        from web.derived import holder
 
         with TestClient(laliga_app.laliga_app) as client:
             data = client.get("/api/data").json()
@@ -211,7 +215,9 @@ class TestUCLLaLigaAvailability:
         active = season_store.active_season(laliga_dir)
         target = season_store.season_dir(laliga_dir, active) / "results.json"
         target.unlink()
-        laliga_app.cache = laliga_app.compute_all()
+        _data = laliga_app.compute_all()
+        holder.publish_data("laliga", _data, _data.get("mode", "results"),
+                            laliga_app._observed_stamp())
         with TestClient(laliga_app.laliga_app) as client:
             data = client.get("/api/data").json()
             assert data["availability"]["results"] == "missing"
@@ -237,8 +243,11 @@ class TestUCLLaLigaAvailability:
 
     def test_laliga_payload_key_set_unchanged(self, laliga_dir):
         import web.laliga_app as laliga_app
+        from web.derived import holder
 
-        laliga_app.cache = laliga_app.compute_all()
+        _data = laliga_app.compute_all()
+        holder.publish_data("laliga", _data, _data.get("mode", "results"),
+                            laliga_app._observed_stamp())
         with TestClient(laliga_app.laliga_app) as client:
             data = client.get("/api/data").json()
             expected = {
