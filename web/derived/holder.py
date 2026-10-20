@@ -212,3 +212,37 @@ def reset(comp: str | None = None) -> None:
     _SIMS.pop(comp, None)
     with _BOOT_LOCK:
         _BOOTS.pop(comp, None)
+
+
+def thaw(obj):
+    """Return a plain, mutable copy of a value read out of the holder.
+
+    The holder freezes every nested ``dict`` into a ``MappingProxyType`` and
+    every nested ``list`` into a ``tuple``, so a reader can never corrupt
+    state another reader will see. A consumer that hands the value to a
+    competition brain — which is written against plain ``dict``/``list`` and
+    type-checks them with ``isinstance`` — needs the mutable shape back.
+
+    This is the ONE place that conversion is allowed to happen: the freeze is
+    an implementation detail of this module, and the brains keep their
+    plain-data contract.
+
+    Args:
+        obj: Any value (frozen or not).
+
+    Returns:
+        The same value with every frozen container replaced by its plain
+        equivalent. Opaque values (numbers, strings, dataclasses) pass
+        through unchanged.
+    """
+    if isinstance(obj, MappingProxyType):
+        return {key: thaw(value) for key, value in obj.items()}
+    if isinstance(obj, tuple):
+        return [thaw(value) for value in obj]
+    if isinstance(obj, list):
+        return [thaw(value) for value in obj]
+    if isinstance(obj, frozenset):
+        return {thaw(value) for value in obj}
+    if isinstance(obj, set):
+        return {thaw(value) for value in obj}
+    return obj

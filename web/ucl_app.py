@@ -811,9 +811,17 @@ def _simulation_bracket_state() -> dict | None:
     try:
         current = get_current_season(DATA_DIR)
         active_season = current.get("season") if current and isinstance(current, dict) else None
+        # The holder publishes the sim payload FROZEN (dict -> MappingProxyType,
+        # list -> tuple). The brain is written against plain dicts/lists and
+        # type-checks them, so the frozen value is thawed back here — at the
+        # web/brain boundary, where the freeze belongs.
         return build_competition_state(str(DATA_DIR), mode="simulation",
-                                       sim_payload=sim_payload, active_season=active_season)
-    except Exception:
+                                       sim_payload=holder.thaw(sim_payload),
+                                       active_season=active_season)
+    except Exception as exc:
+        # Never swallow this silently: a missing bracket used to look like
+        # "nothing has happened" when the frozen shape was rejected.
+        logger.warning("[UCL] simulated bracket unavailable: %s", exc)
         return None
 
 
