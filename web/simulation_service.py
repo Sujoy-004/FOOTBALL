@@ -26,8 +26,8 @@ run response is shaped, so every competition app inherits it:
 
 * an omitted seed is generated SERVER-SIDE and RETURNED, so the client can
   reproduce the run; the same resolved seed is handed to the runner
-* every ack and terminal result carries ``seed``, ``n_simulations`` and
-  ``provenance == "simulated"``
+* every ack, poll and terminal result carries ``seed``, ``n_simulations``
+  and ``provenance == "simulated"``
 * a second concurrent run for the same competition is rejected (HTTP 409)
   instead of queueing a second CPU-bound run
 """
@@ -155,6 +155,8 @@ class SimulationTaskService:
                 "progress": 0.0,
                 "iteration": 0,
                 "total_iterations": count,
+                "n_simulations": count,
+                "seed": resolved_seed,
                 "stage": "Starting...",
                 "t0": time.time(),
                 "elapsed": 0.0,
@@ -236,6 +238,14 @@ class SimulationTaskService:
                 "progress": entry["progress"],
                 "iteration": entry["iteration"],
                 "total_iterations": entry["total_iterations"],
+                # The poll response is a RUN response: it declares the same
+                # contract as the ack, so a client that only polls can still
+                # read (and copy) the reproducibility handle — even while the
+                # run is still in flight.
+                "n_simulations": entry.get("n_simulations",
+                                           entry["total_iterations"]),
+                "seed": entry.get("seed"),
+                "provenance": ResultProvenance.SIMULATED.value,
                 "stage": entry.get("stage", ""),
                 "elapsed": entry.get("elapsed", 0.0),
                 "error": entry.get("error"),
