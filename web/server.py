@@ -149,10 +149,11 @@ async def lifespan(app: fastapi.FastAPI):
     # Route through compute_all so every on-disk state gets the truthful
     # boot: real results -> results view; no/partial results -> honest
     # simulation-available view (never an empty cache).
-    _wc.cache = await _boot_step("World Cup compute_overview",
-                                 _wc.compute_overview) or {}
+    _wc_data = await _boot_step("World Cup compute_overview",
+                                _wc.compute_overview) or {}
     _ucl_data = await _boot_step("UCL compute_all", _ucl.compute_all) or {}
     from web.derived import holder as _holder
+    _holder.publish_data("worldcup", _wc_data, "results", _wc._observed_stamp())
     _holder.publish_data("ucl", _ucl_data, _ucl_data.get("mode", "results"),
                          _ucl._observed_stamp())
 

@@ -9,8 +9,10 @@ Layering: adapters live in the WEB layer because they hold FastAPI
 sub-apps and closures over app modules. They never import football_core
 internals, never own tournament rules, and never shape competition
 payloads - those stay in the brains. All callables read module attributes
-dynamically at call time because the apps rebind globals (cache/sim_cache)
-during refreshes.
+dynamically at call time; the derived state itself lives in the race-free
+holder (``web.derived.holder``) - each app publishes one frozen snapshot per
+competition and serves it through its own ``_snap()`` seam, so a status
+read never races a refresh.
 
 Acquisition (Exchange 4 v2, plan 02-06): each adapter exposes
 ``refresh()``, a competition-scoped acquisition entry point that attempts
@@ -189,10 +191,11 @@ def build_default_registry() -> CompetitionRegistry:
     registry = CompetitionRegistry()
 
     def wc_status() -> dict[str, Any]:
-        phase = wc_app.cache.get("phase") or {}
+        snap = wc_app._snap()
+        phase = snap.get("phase") or {}
         return {
             "phase": phase,
-            "n_played": wc_app.cache.get("n_played", 0),
+            "n_played": snap.get("n_played", 0),
             "n_unplayed": wc_app.unplayed_match_count(),
             "mode": None,  # WC has no mode concept; real data always shown
             "availability": dict(phase.get("stores", {})),
