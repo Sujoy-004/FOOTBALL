@@ -198,43 +198,103 @@ def test_a_store_write_during_the_build_cannot_publish_a_newer_stamp(tmp_path):
     )
 
 
-def test_a_stale_publish_does_not_overwrite_a_newer_snapshot():
-    """A late-arriving older publish is refused, not applied.
+def test_publishing_an_older_stamp_is_allowed():
+    """An older-stamped publish is allowed — and that is deliberate.
 
-    The comparison and the assignment happen under the same per-competition
-    lock, so the check cannot be raced. This matters because the publish
-    path is reachable from more than one thread (a request handler and a
-    background run).
+    A stamp says which store generation was observed; it cannot say whether
+    the DATA that accompanies it is stale. Refusing an older-stamped publish
+    would therefore refuse legitimate work — a test installing a scenario at
+    the current disk generation, or a concurrent publish that sampled its
+    stamp a moment earlier — in order to prevent a problem (one redundant
+    rebuild) that no reader can observe. The dangerous pair is (older data,
+    NEWER stamp), and only the sample-before-build ORDER rules that out.
+
+    This test exists so the decision is explicit: if someone re-adds a
+    stamp-regression refusal, this fails and the reasoning has to be
+    revisited.
     """
-    newer = _stamp(200)
-    older = _stamp(100)
+    holder.publish_data("laliga", {"n": 2}, "results", _stamp(200))
+    holder.publish_data("laliga", {"n": 1}, "results", _stamp(100))
 
-    holder.publish_data("laliga", {"n": 2}, "results", newer)
-    holder.publish_data("laliga", {"n": 1}, "results", older)
+    assert holder.read_stamp("laliga") == _stamp(100)
+    assert holder.read_data("laliga")["n"] == 1
+    # The next request observes a MISMATCH and rebuilds — the older stamp is
+    # detectable, so the stale payload is never served as current.
+    rebuilt = holder.get_or_rebuild("laliga", _stamp(200), lambda: ({"n": 9}, "results"))
+    assert rebuilt["n"] == 9
+    assert holder.read_stamp("laliga") == _stamp(200)
 
-    assert holder.read_stamp("laliga") == newer, (
-        "a strictly older publish overwrote the newer snapshot"
-    )
+
+def test_publishing_without_a_stamp_neither_crashes_nor_poisons_the_slot():
+    """A snapshot published with no stamp must not break later publishes.
+
+    ``tests/arch_util.py::restore_cache_state`` publishes with
+    ``holder.read_stamp(comp)``, which is ``None`` when the competition was
+    never published. A publish must accept that (a snapshot with no
+    freshness information simply never matches, so the next request
+    rebuilds) and must not make every LATER publish fail.
+    """
+    holder.publish_data("laliga", {"n": 1}, "results", None)
+    assert holder.read_stamp("laliga") is None
+    assert holder.read_data("laliga")["n"] == 1
+
+    # A later publish with a real stamp must still land.
+    holder.publish_data("laliga", {"n": 2}, "results", _stamp(200))
+    assert holder.read_stamp("laliga") == _stamp(200)
     assert holder.read_data("laliga")["n"] == 2
 
 
-def test_a_publish_with_an_unknown_role_is_not_treated_as_older():
-    """A deleted or added store is a real change, never a stale observation.
+def test_the_wc_ingest_hook_retires_the_simulation_before_it_publishes(monkeypatch):
+    """The WC hook publishes the new facts itself, so it retires the sim HERE.
 
-    ``is_strictly_older_than`` must refuse to call a stamp older when the
-    two disagree about WHICH roles exist — otherwise a store deletion would
-    freeze the published state forever.
+    ``web/wc_app.py::_fetch_live_data`` calls ``_publish_snapshot`` — the
+    new facts are published from inside the ingest hook, BEFORE the
+    endpoint's own ``clear_sim`` runs. The hook must therefore retire the
+    simulation at the store write, or there is a window in which
+    ``GET /api/simulation`` serves the previous run next to the new facts.
     """
-    with_results = StoreStamp(entries=(("results", 100, 10),))
-    without_results = StoreStamp(entries=(("fixtures", 100, 10),))
+    import competitions.worldcup.src.pipeline as pipeline
+    import web.wc_app as wc_app
 
-    assert not with_results.is_strictly_older_than(without_results)
-    assert not without_results.is_strictly_older_than(with_results)
-    # Same roles, smaller mtime -> strictly older.
-    assert _stamp(100).is_strictly_older_than(_stamp(200))
-    assert not _stamp(200).is_strictly_older_than(_stamp(100))
-    # Equal mtime is not "strictly older" either.
-    assert not _stamp(100).is_strictly_older_than(_stamp(100))
+    recorder = _Recorder()
+    holder.publish_sim("worldcup", {"status": "completed", "n": 1})
+    seen: dict[str, object] = {}
+
+    # before-the-ingest, after-the-ingest, and the publish's own sample
+    stamps = [_stamp(1), _stamp(2), _stamp(2)]
+    monkeypatch.setattr(
+        wc_app, "_observed_stamp",
+        lambda: (recorder.stamp(), stamps.pop(0))[1])
+    monkeypatch.setattr(
+        wc_app, "_build_state",
+        lambda: (recorder.build(), ({"n": 1}, "results"))[1])
+    monkeypatch.setattr(
+        pipeline, "fetch_live_data",
+        lambda *a, **k: {"provider": "stub", "attempted": True, "success": True,
+                         "stale": False, "finished": {}, "stages": []})
+
+    real_publish = holder.publish_data
+    real_clear = holder.clear_sim
+
+    def fake_publish(c, data, mode, stamp):
+        seen["sim_at_publish"] = dict(holder.read_sim(c))
+        recorder.publish()
+        real_publish(c, data, mode, stamp)
+
+    def fake_clear(c):
+        recorder.clear_sim()
+        real_clear(c)
+
+    monkeypatch.setattr(holder, "publish_data", fake_publish)
+    monkeypatch.setattr(holder, "clear_sim", fake_clear)
+
+    wc_app._fetch_live_data()
+
+    assert seen["sim_at_publish"] == {}, (
+        "the WC ingest hook published the new facts while the previous "
+        f"simulation was still served: {seen['sim_at_publish']!r}"
+    )
+    assert recorder.calls.index("clear_sim") < recorder.calls.index("publish")
 
 
 # --------------------------------------------------------------------------

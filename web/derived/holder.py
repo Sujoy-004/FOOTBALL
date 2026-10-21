@@ -21,7 +21,7 @@ Locking discipline (D-04):
   ``build()`` callback may safely call ``append_boot``/``boot_step`` while the
   rebuild lock is held - the two locks are never nested on the same thread.
 
-Stamp discipline (D-09):
+Stamp discipline (STAMP-BEFORE-BUILD):
 
 * The stamp is sampled BEFORE the data is built, at every publish site. A
   store write that lands during the build therefore publishes the OLDER
@@ -29,11 +29,18 @@ Stamp discipline (D-09):
   after the build would publish (older data, newer stamp) - a pair a later
   request would MATCH and serve as current, permanently. That is the state
   the phase goal forbids.
-* ``publish_data`` refuses a stamp that is strictly older than the published
-  one, so a late-arriving stale publish cannot overwrite a newer snapshot.
+* The ORDER is what enforces it, not a comparison of stamps. A stamp says
+  which store generation was observed; it cannot say whether the DATA that
+  accompanies it is stale. Publishing an OLDER stamp is harmless (the next
+  request sees the mismatch and rebuilds); publishing a NEWER stamp next to
+  older data is the dangerous pair, and only the order rules it out.
 
-The callbacks (``build``) are caller-supplied and MUST be lock-free with
-respect to this module: only the rebind is inside the lock.
+The callbacks (``build``) are caller-supplied and MUST NOT publish for the
+same competition: :func:`publish_data` takes the same per-competition lock,
+so a build callback that publishes is re-entrant. That case is guarded
+explicitly in :func:`get_or_rebuild` (it raises) rather than hanging or
+recursing forever. A build callback may still touch the boot ledger, which
+has its own distinct lock.
 
 Read-path contract: every value reachable from :attr:`DerivedState.data` is
 recursively frozen by :func:`_freeze` (dict→``MappingProxyType``,
@@ -110,12 +117,15 @@ class DerivedState:
     Attributes:
         stamp: The :class:`~football_core.store_stamp.StoreStamp` this data was
             built from — the ONE value a request compares to decide freshness.
+            ``None`` when the publisher had no freshness information; such a
+            snapshot never matches an observed stamp, so the next request
+            rebuilds.
         data: The recursively-frozen derived dict.
         mode: The folded display mode (``"results"``/``"simulation"``/…) that
             was current when the snapshot was built.
     """
 
-    stamp: StoreStamp
+    stamp: StoreStamp | None
     data: MappingProxyType
     mode: str | None
 
@@ -203,7 +213,8 @@ def read_stamp(comp: str) -> StoreStamp | None:
     return current.stamp if current is not None else None
 
 
-def publish_data(comp: str, data: dict, mode: str | None, stamp: StoreStamp) -> None:
+def publish_data(comp: str, data: dict, mode: str | None,
+                 stamp: StoreStamp | None) -> None:
     """Publish a complete frozen ``DerivedState`` for *comp* in ONE assignment.
 
     The stamp MUST be sampled BEFORE the data was built. A store write that
@@ -212,30 +223,29 @@ def publish_data(comp: str, data: dict, mode: str | None, stamp: StoreStamp) -> 
     build would publish (older data, newer stamp): a later request would
     MATCH that stamp and serve the stale payload as current, permanently,
     because the match suppresses any rebuild. That pair is the exact state
-    the phase goal forbids, so it is refused here as well as avoided at the
-    call sites.
+    the phase goal forbids, and the ORDER is what prevents it — not a
+    comparison of stamps, because a stamp cannot say whether the DATA it
+    accompanies is stale. A publish of an OLDER stamp is harmless (the next
+    request sees the mismatch and rebuilds); a publish of a NEWER stamp
+    paired with older data is the dangerous one, and only the order rules
+    it out.
 
-    A publish whose stamp is strictly older than the already-published one is
-    REFUSED: a late-arriving stale publish must not overwrite a newer
-    snapshot. The comparison and the assignment happen under the same
-    per-competition lock, so the check cannot be raced.
+    The assignment is a single dict store, which is atomic under the GIL,
+    so a reader sees either the whole previous snapshot or the whole new
+    one — never a half-built one.
 
     Args:
         comp: Competition id.
         data: The derived state (frozen on publish; never mutated after).
         mode: The display mode folded into the snapshot.
-        stamp: The freshness stamp the data was built against.
+        stamp: The freshness stamp the data was built against, or ``None``
+            when the caller has no freshness information to offer.
     """
-    lock = _rebuild_lock(comp)
-    with lock:
-        current = _STATES.get(comp)
-        if current is not None and stamp.is_strictly_older_than(current.stamp):
-            return  # a stale publish never overwrites a newer snapshot
-        _STATES[comp] = DerivedState(
-            stamp=stamp,
-            data=MappingProxyType(_freeze(data)),
-            mode=mode,
-        )
+    _STATES[comp] = DerivedState(
+        stamp=stamp,
+        data=MappingProxyType(_freeze(data)),
+        mode=mode,
+    )
 
 
 def read_sim(comp: str) -> MappingProxyType:

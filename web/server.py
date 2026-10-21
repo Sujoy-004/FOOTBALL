@@ -150,7 +150,7 @@ async def lifespan(app: fastapi.FastAPI):
     # boot: real results -> results view; no/partial results -> honest
     # simulation-available view (never an empty cache).
     #
-    # D-09: each stamp is sampled BEFORE its build. A store write that lands
+    # STAMP-BEFORE-BUILD: each stamp is sampled BEFORE its build. A store write that lands
     # during the build then publishes the OLDER stamp, and the next request
     # sees a mismatch and rebuilds. Sampling after the build would publish
     # (older data, newer stamp) — stale data served as current, permanently.

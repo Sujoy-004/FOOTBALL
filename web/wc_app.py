@@ -182,7 +182,7 @@ def _publish_snapshot(report: dict | None = None) -> None:
     The report and the derived data travel together, so a reader can never
     see a fresh refresh verdict next to data from an older generation.
 
-    D-09: the stamp is sampled BEFORE the build. A store write that lands
+    STAMP-BEFORE-BUILD: the stamp is sampled BEFORE the build. A store write that lands
     during the build then publishes the OLDER stamp, and the next request
     sees a mismatch and rebuilds. Sampling after the build would publish
     (older data, newer stamp) — stale data served as current, permanently.
@@ -239,7 +239,7 @@ def compute_blend_info():
 
 
 def _fetch_live_data() -> dict:
-    """Fetch live match data + signal caches — delegates to pipeline.
+    """Fetch live match data + signal caches - delegates to pipeline.
 
     Returns the refresh report (provider/success/error/staleness/ingestion
     counters). The report is published INTO the holder snapshot (together
@@ -247,6 +247,9 @@ def _fetch_live_data() -> dict:
     API surface serves one generation-consistent view.
     """
     from competitions.worldcup.src.pipeline import fetch_live_data as _pipeline_fetch
+    # The stamp is sampled before the ingest so the post-ingest sample can
+    # tell whether the canonical stores actually changed.
+    stamp_before = _observed_stamp()
     try:
         report = _pipeline_fetch(
             _bsd_key(), _football_data_org_key(), DATA_DIR)
@@ -255,6 +258,12 @@ def _fetch_live_data() -> dict:
         report = {"provider": None, "attempted": True, "success": False,
                   "error": "live refresh failed", "stale": True,
                   "finished": {}}
+    if _observed_stamp() != stamp_before:
+        # D-06: this hook publishes the new facts itself, so the simulation
+        # must be retired HERE — at the store write, before the publish.
+        # Retiring it after the publish left a window in which
+        # GET /api/simulation served the previous run next to the new facts.
+        holder.clear_sim("worldcup")
     _publish_snapshot(report)
     return report
 
@@ -304,7 +313,7 @@ def api_refresh():
     from web.competitions import REGISTRY
 
     try:
-        # D-09: the stamp is sampled BEFORE the build, so the published pair
+        # STAMP-BEFORE-BUILD: the stamp is sampled BEFORE the build, so the published pair
         # is never (older data, newer stamp). The pre-ingest sample is what
         # tells us whether the ingest actually wrote the canonical stores.
         stamp_before = _observed_stamp()
