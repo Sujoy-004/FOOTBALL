@@ -356,6 +356,9 @@ def _fetch_live_data():
                                active_season=active_season)
         return None
     try:
+        # The stamp is sampled before the ingest, so the post-ingest sample
+        # can tell whether the canonical stores actually changed.
+        stamp_before = _observed_stamp()
         summary = _brain_fetch(
             str(DATA_DIR),
             bsd_api_key=_bsd_key(),
@@ -406,6 +409,13 @@ def _fetch_live_data():
     if ok:
         logger.info("[LaLiga] CONNECTED via %s: %s raw matches, %s updated",
                     provider_name, n_raw, n_updated)
+        # D-06: this hook publishes the new facts itself (via
+        # _recompute_cache), so the simulation must be retired HERE — at the
+        # store write, before that publish. Retiring it after the publish
+        # left a window in which GET /api/simulation served the previous
+        # run next to the new facts.
+        if _observed_stamp() != stamp_before:
+            holder.clear_sim("laliga")
         _recompute_cache()
     return summary
 

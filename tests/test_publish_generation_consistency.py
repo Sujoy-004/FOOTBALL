@@ -1,4 +1,4 @@
-"""Publication-generation consistency for the derived-state holder (D-09).
+"""Publication-generation consistency for the derived-state holder.
 
 Phase 04's verification found two blockers in the code the phase itself
 delivered. Both are about the ORDER of two operations, so both are pinned
@@ -293,6 +293,121 @@ def test_the_wc_ingest_hook_retires_the_simulation_before_it_publishes(monkeypat
     assert seen["sim_at_publish"] == {}, (
         "the WC ingest hook published the new facts while the previous "
         f"simulation was still served: {seen['sim_at_publish']!r}"
+    )
+    assert recorder.calls.index("clear_sim") < recorder.calls.index("publish")
+
+
+def test_the_ucl_ingest_hook_retires_the_simulation_before_it_publishes(monkeypatch):
+    """The UCL hook may publish the new facts itself — so it retires the sim.
+
+    ``web/ucl_app.py::_fetch_live_data`` calls
+    ``_maybe_recompute_cache_after_ingest``, which rebuilds and publishes.
+    The simulation must be retired at the store write, before that publish.
+    """
+    import competitions.ucl.src.pipeline as pipeline
+    import web.ucl_app as ucl_app
+
+    recorder = _Recorder()
+    holder.publish_sim("ucl", {"status": "completed", "n": 1})
+    seen: dict[str, object] = {}
+
+    stamps = [_stamp(1), _stamp(2), _stamp(2)]
+    monkeypatch.setattr(
+        ucl_app, "_observed_stamp",
+        lambda: (recorder.stamp(), stamps.pop(0))[1])
+    monkeypatch.setattr(
+        ucl_app, "_build_state",
+        lambda: (recorder.build(), ({"n": 1}, "results"))[1])
+    monkeypatch.setattr(
+        ucl_app, "_maybe_recompute_cache_after_ingest",
+        lambda summary: holder.publish_data("ucl", {"n": 1}, "results", _stamp(2)))
+    monkeypatch.setattr(
+        pipeline, "fetch_live_data",
+        lambda *a, **k: {"report": {"success": True, "finished": {}},
+                         "status": "ok", "provider_name": "stub",
+                         "n_raw": 1, "n_updated": 1, "per_season": {}})
+
+    real_publish = holder.publish_data
+    real_clear = holder.clear_sim
+
+    def fake_publish(c, data, mode, stamp):
+        seen.setdefault("sim_at_publish", dict(holder.read_sim(c)))
+        recorder.publish()
+        real_publish(c, data, mode, stamp)
+
+    def fake_clear(c):
+        recorder.clear_sim()
+        real_clear(c)
+
+    monkeypatch.setattr(holder, "publish_data", fake_publish)
+    monkeypatch.setattr(holder, "clear_sim", fake_clear)
+
+    ucl_app._fetch_live_data()
+
+    assert seen.get("sim_at_publish") == {}, (
+        "the UCL ingest hook published the new facts while the previous "
+        f"simulation was still served: {seen.get('sim_at_publish')!r}"
+    )
+    assert recorder.calls.index("clear_sim") < recorder.calls.index("publish")
+
+
+def test_the_laliga_ingest_hook_retires_the_simulation_before_it_publishes(monkeypatch):
+    """The LaLiga hook publishes the new facts itself — so it retires the sim.
+
+    ``web/laliga_app.py::_fetch_live_data`` calls ``_recompute_cache``,
+    which rebuilds and publishes. The simulation must be retired at the
+    store write, before that publish.
+    """
+    import competitions.laliga.src.pipeline as pipeline
+    import web.laliga_app as laliga_app
+
+    recorder = _Recorder()
+    holder.publish_sim("laliga", {"status": "completed", "n": 1})
+    seen: dict[str, object] = {}
+
+    stamps = [_stamp(1), _stamp(2), _stamp(2)]
+    monkeypatch.setattr(
+        laliga_app, "_observed_stamp",
+        lambda: (recorder.stamp(), stamps.pop(0))[1])
+    monkeypatch.setattr(
+        laliga_app, "compute_all",
+        lambda: {"n": 1, "mode": "results"})
+
+    real_publish = holder.publish_data
+    real_clear = holder.clear_sim
+
+    def fake_publish(c, data, mode, stamp):
+        seen.setdefault("sim_at_publish", dict(holder.read_sim(c)))
+        recorder.publish()
+        real_publish(c, data, mode, stamp)
+
+    def fake_clear(c):
+        recorder.clear_sim()
+        real_clear(c)
+
+    monkeypatch.setattr(holder, "publish_data", fake_publish)
+    monkeypatch.setattr(holder, "clear_sim", fake_clear)
+
+    def fake_brain_fetch(*a, **k):
+        return {"report": {"success": True, "finished": {}},
+                "status": "ok", "provider_name": "stub",
+                "n_raw": 1, "n_updated": 1, "odds": {}}
+
+    monkeypatch.setattr(pipeline, "fetch_live_data", fake_brain_fetch)
+    monkeypatch.setattr(
+        laliga_app, "_brain_fetch", fake_brain_fetch, raising=False)
+    # The app imports the brain fetch under a local alias; patch the module
+    # attribute the app actually calls.
+    monkeypatch.setattr(
+        laliga_app, "_fetch_live_data", laliga_app._fetch_live_data)
+    monkeypatch.setattr(
+        laliga_app, "get_data_provider", lambda *a, **k: object(), raising=False)
+
+    laliga_app._fetch_live_data()
+
+    assert seen.get("sim_at_publish") == {}, (
+        "the LaLiga ingest hook published the new facts while the previous "
+        f"simulation was still served: {seen.get('sim_at_publish')!r}"
     )
     assert recorder.calls.index("clear_sim") < recorder.calls.index("publish")
 

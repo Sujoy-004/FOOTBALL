@@ -451,6 +451,9 @@ def _fetch_live_data() -> None:
         return
 
     try:
+        # The stamp is sampled before the ingest, so the post-ingest sample
+        # can tell whether the canonical stores actually changed.
+        stamp_before = _observed_stamp()
         summary = _brain_fetch(
             str(DATA_DIR), _bsd_key(),
             football_data_org_key=_football_data_org_key(),
@@ -503,6 +506,13 @@ def _fetch_live_data() -> None:
     # Exchange 5: if a new season was activated by the ingest, recompute
     # the cache so the API serves fresh data immediately.
     if ok:
+        # D-06: this hook may publish the new facts itself (via
+        # _maybe_recompute_cache_after_ingest), so the simulation must be
+        # retired HERE — at the store write, before that publish. Retiring
+        # it after the publish left a window in which GET /api/simulation
+        # served the previous run next to the new facts.
+        if _observed_stamp() != stamp_before:
+            holder.clear_sim("ucl")
         _maybe_recompute_cache_after_ingest(summary)
 
 

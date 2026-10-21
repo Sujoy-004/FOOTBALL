@@ -14,9 +14,13 @@ Locking discipline (D-04):
   hot path.
 * Only the **rebuild** takes ``_REBUILD_LOCKS[comp]`` (a RE-ENTRANT
   ``threading.RLock``, pre-created so there is no lock-creation race) and
-  double-checks the stamp before rebuilding. The same lock serialises
-  ``publish_data``, so a publish can never interleave with a rebuild's
-  rebind.
+  double-checks the stamp before rebuilding. The lock keeps two concurrent
+  rebuilds of the same competition from doing the same work twice.
+* ``publish_data`` does NOT take that lock. Its assignment is a single dict
+  store, which is atomic under the GIL, so a reader sees either the whole
+  previous snapshot or the whole new one. A publish can therefore interleave
+  with a rebuild — harmlessly, because every published pair is
+  generation-consistent (see the stamp discipline below).
 * ``_BOOT_LOCK`` is a DISTINCT lock from ``_REBUILD_LOCKS[*]``, so a
   ``build()`` callback may safely call ``append_boot``/``boot_step`` while the
   rebuild lock is held - the two locks are never nested on the same thread.
@@ -35,12 +39,11 @@ Stamp discipline (STAMP-BEFORE-BUILD):
   request sees the mismatch and rebuilds); publishing a NEWER stamp next to
   older data is the dangerous pair, and only the order rules it out.
 
-The callbacks (``build``) are caller-supplied and MUST NOT publish for the
-same competition: :func:`publish_data` takes the same per-competition lock,
-so a build callback that publishes is re-entrant. That case is guarded
-explicitly in :func:`get_or_rebuild` (it raises) rather than hanging or
-recursing forever. A build callback may still touch the boot ledger, which
-has its own distinct lock.
+The callbacks (``build``) are caller-supplied. A build callback that calls
+:func:`get_or_rebuild` again for the SAME competition is re-entrant, which
+is guarded explicitly there (it raises a ``RuntimeError``) rather than
+hanging or recursing forever. A build callback may still touch the boot
+ledger, which has its own distinct lock.
 
 Read-path contract: every value reachable from :attr:`DerivedState.data` is
 recursively frozen by :func:`_freeze` (dict→``MappingProxyType``,
@@ -75,10 +78,9 @@ _BOOTS: dict[str, tuple[dict, ...]] = {}
 _BOOT_LOCK = threading.Lock()
 
 #: One lock per shipped competition, pre-created to avoid a lock-creation
-#: race. It is RE-ENTRANT on purpose: :func:`publish_data` takes the SAME
-#: lock as :func:`get_or_rebuild`, so a build callback that publishes (a
-#: contract violation, but a possible one) must deadlock-by-hang never
-#: happen. Re-entrancy is guarded explicitly inside
+#: race. It is RE-ENTRANT on purpose: a build callback that calls
+#: get_or_rebuild again for the same competition would deadlock-by-hang on a
+#: plain Lock. Re-entrancy is guarded explicitly inside
 #: :func:`get_or_rebuild` instead, so the hazard is a loud error rather than
 #: an invisible hang.
 _REBUILD_LOCKS: dict[str, threading.RLock] = {
