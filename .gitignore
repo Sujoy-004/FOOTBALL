@@ -74,6 +74,7 @@ manager_effect_cache.json
 # tests/fixtures/wc_bracket/teams.json.
 /teams.json
 /elo_update_log.json
+/test_results.txt
 
 # AI-generated responses, agent context files, and one-time reports
 /RESPONSE.md
