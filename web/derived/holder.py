@@ -9,15 +9,28 @@ vice versa (the "photo that includes its own timestamp").
 
 Locking discipline (D-04):
 
-* The **fast path is lock-free** — ``read_*`` and the stamp comparison read a
+* The **fast path is lock-free** - ``read_*`` and the stamp comparison read a
   single dict item, which is atomic under the GIL. No lock is taken on the
   hot path.
-* Only the **rebuild** takes ``_REBUILD_LOCKS[comp]`` (a non-reentrant
-  ``threading.Lock``, pre-created so there is no lock-creation race) and
-  double-checks the stamp before rebuilding.
+* Only the **rebuild** takes ``_REBUILD_LOCKS[comp]`` (a RE-ENTRANT
+  ``threading.RLock``, pre-created so there is no lock-creation race) and
+  double-checks the stamp before rebuilding. The same lock serialises
+  ``publish_data``, so a publish can never interleave with a rebuild's
+  rebind.
 * ``_BOOT_LOCK`` is a DISTINCT lock from ``_REBUILD_LOCKS[*]``, so a
   ``build()`` callback may safely call ``append_boot``/``boot_step`` while the
-  rebuild lock is held — the two locks are never nested on the same thread.
+  rebuild lock is held - the two locks are never nested on the same thread.
+
+Stamp discipline (D-09):
+
+* The stamp is sampled BEFORE the data is built, at every publish site. A
+  store write that lands during the build therefore publishes the OLDER
+  stamp, and the next request observes a mismatch and rebuilds. Sampling
+  after the build would publish (older data, newer stamp) - a pair a later
+  request would MATCH and serve as current, permanently. That is the state
+  the phase goal forbids.
+* ``publish_data`` refuses a stamp that is strictly older than the published
+  one, so a late-arriving stale publish cannot overwrite a newer snapshot.
 
 The callbacks (``build``) are caller-supplied and MUST be lock-free with
 respect to this module: only the rebind is inside the lock.
@@ -54,21 +67,40 @@ _BOOTS: dict[str, tuple[dict, ...]] = {}
 #: Distinct from the rebuild locks: build() may append to the boot ledger.
 _BOOT_LOCK = threading.Lock()
 
-#: One non-reentrant lock per shipped competition, pre-created to avoid a
-#: lock-creation race.
-_REBUILD_LOCKS: dict[str, threading.Lock] = {
-    "worldcup": threading.Lock(),
-    "ucl": threading.Lock(),
-    "laliga": threading.Lock(),
+#: One lock per shipped competition, pre-created to avoid a lock-creation
+#: race. It is RE-ENTRANT on purpose: :func:`publish_data` takes the SAME
+#: lock as :func:`get_or_rebuild`, so a build callback that publishes (a
+#: contract violation, but a possible one) must deadlock-by-hang never
+#: happen. Re-entrancy is guarded explicitly inside
+#: :func:`get_or_rebuild` instead, so the hazard is a loud error rather than
+#: an invisible hang.
+_REBUILD_LOCKS: dict[str, threading.RLock] = {
+    "worldcup": threading.RLock(),
+    "ucl": threading.RLock(),
+    "laliga": threading.RLock(),
 }
 
 #: Fallback for a competition id outside the three shipped ones.
-_FALLBACK_LOCK = threading.Lock()
+_FALLBACK_LOCK = threading.RLock()
+
+#: Per-thread record of the competitions this thread is currently rebuilding.
+#: Used to turn a re-entrant rebuild (the D-04 contract violation the threat
+#: model tracks) into an explicit error instead of unbounded recursion.
+_REBUILDING = threading.local()
 
 
-def _rebuild_lock(comp: str) -> threading.Lock:
+def _rebuild_lock(comp: str) -> threading.RLock:
     """The rebuild lock for *comp* (pre-created, or the shared fallback)."""
     return _REBUILD_LOCKS.get(comp, _FALLBACK_LOCK)
+
+
+def _rebuilding_comps() -> set:
+    """The set of competitions THIS thread is currently rebuilding."""
+    comps = getattr(_REBUILDING, "comps", None)
+    if comps is None:
+        comps = set()
+        _REBUILDING.comps = comps
+    return comps
 
 
 @dataclass(frozen=True)
@@ -130,7 +162,20 @@ def get_or_rebuild(
         current = _STATES.get(comp)  # double-check after acquiring the lock
         if current is not None and current.stamp == observed:
             return current.data
-        data, mode = build()
+        active = _rebuilding_comps()
+        if comp in active:
+            # A build callback that calls get_or_rebuild for the SAME
+            # competition is the D-04 contract violation. Fail loudly instead
+            # of recursing forever or hanging on a non-reentrant lock.
+            raise RuntimeError(
+                f"re-entrant rebuild for {comp!r}: the build callback must not "
+                f"call get_or_rebuild for the same competition"
+            )
+        active.add(comp)
+        try:
+            data, mode = build()
+        finally:
+            active.discard(comp)
         fresh = DerivedState(
             stamp=observed,
             data=MappingProxyType(_freeze(data)),
@@ -159,12 +204,38 @@ def read_stamp(comp: str) -> StoreStamp | None:
 
 
 def publish_data(comp: str, data: dict, mode: str | None, stamp: StoreStamp) -> None:
-    """Publish a complete frozen ``DerivedState`` for *comp* in ONE assignment."""
-    _STATES[comp] = DerivedState(
-        stamp=stamp,
-        data=MappingProxyType(_freeze(data)),
-        mode=mode,
-    )
+    """Publish a complete frozen ``DerivedState`` for *comp* in ONE assignment.
+
+    The stamp MUST be sampled BEFORE the data was built. A store write that
+    lands during the build then yields the OLDER stamp, and the next request
+    observes a MISMATCH and rebuilds — the safe direction. Sampling after the
+    build would publish (older data, newer stamp): a later request would
+    MATCH that stamp and serve the stale payload as current, permanently,
+    because the match suppresses any rebuild. That pair is the exact state
+    the phase goal forbids, so it is refused here as well as avoided at the
+    call sites.
+
+    A publish whose stamp is strictly older than the already-published one is
+    REFUSED: a late-arriving stale publish must not overwrite a newer
+    snapshot. The comparison and the assignment happen under the same
+    per-competition lock, so the check cannot be raced.
+
+    Args:
+        comp: Competition id.
+        data: The derived state (frozen on publish; never mutated after).
+        mode: The display mode folded into the snapshot.
+        stamp: The freshness stamp the data was built against.
+    """
+    lock = _rebuild_lock(comp)
+    with lock:
+        current = _STATES.get(comp)
+        if current is not None and stamp.is_strictly_older_than(current.stamp):
+            return  # a stale publish never overwrites a newer snapshot
+        _STATES[comp] = DerivedState(
+            stamp=stamp,
+            data=MappingProxyType(_freeze(data)),
+            mode=mode,
+        )
 
 
 def read_sim(comp: str) -> MappingProxyType:

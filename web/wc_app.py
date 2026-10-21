@@ -181,11 +181,17 @@ def _publish_snapshot(report: dict | None = None) -> None:
 
     The report and the derived data travel together, so a reader can never
     see a fresh refresh verdict next to data from an older generation.
+
+    D-09: the stamp is sampled BEFORE the build. A store write that lands
+    during the build then publishes the OLDER stamp, and the next request
+    sees a mismatch and rebuilds. Sampling after the build would publish
+    (older data, newer stamp) — stale data served as current, permanently.
     """
+    stamp = _observed_stamp()
     data, mode = _build_state()
     if report is not None:
         data["refresh"] = report
-    holder.publish_data("worldcup", data, mode, _observed_stamp())
+    holder.publish_data("worldcup", data, mode, stamp)
 
 
 def build_chronological_matches() -> dict:
@@ -298,10 +304,20 @@ def api_refresh():
     from web.competitions import REGISTRY
 
     try:
+        # D-09: the stamp is sampled BEFORE the build, so the published pair
+        # is never (older data, newer stamp). The pre-ingest sample is what
+        # tells us whether the ingest actually wrote the canonical stores.
+        stamp_before = _observed_stamp()
         report = dict(REGISTRY.get("worldcup").refresh())
+        stamp_after = _observed_stamp()
+        if stamp_after != stamp_before:
+            # D-06: the simulation is retired AT the store write, BEFORE the
+            # rebuild publishes the new facts. Clearing it after the rebuild
+            # left a window in which GET /api/simulation still served the
+            # previous run while GET /api/data served the new facts.
+            holder.clear_sim("worldcup")
         data, mode = _build_state()
-        holder.publish_data("worldcup", data, mode, _observed_stamp())
-        holder.clear_sim("worldcup")  # D-06: a data change retires the simulation
+        holder.publish_data("worldcup", data, mode, stamp_after)
     except Exception as e:
         return error_response(
             e, status=503, context="worldcup refresh",

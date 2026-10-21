@@ -149,20 +149,28 @@ async def lifespan(app: fastapi.FastAPI):
     # Route through compute_all so every on-disk state gets the truthful
     # boot: real results -> results view; no/partial results -> honest
     # simulation-available view (never an empty cache).
+    #
+    # D-09: each stamp is sampled BEFORE its build. A store write that lands
+    # during the build then publishes the OLDER stamp, and the next request
+    # sees a mismatch and rebuilds. Sampling after the build would publish
+    # (older data, newer stamp) — stale data served as current, permanently.
+    _wc_stamp = _wc._observed_stamp()
     _wc_data = await _boot_step("World Cup compute_overview",
                                 _wc.compute_overview) or {}
+    _ucl_stamp = _ucl._observed_stamp()
     _ucl_data = await _boot_step("UCL compute_all", _ucl.compute_all) or {}
     from web.derived import holder as _holder
-    _holder.publish_data("worldcup", _wc_data, "results", _wc._observed_stamp())
+    _holder.publish_data("worldcup", _wc_data, "results", _wc_stamp)
     _holder.publish_data("ucl", _ucl_data, _ucl_data.get("mode", "results"),
-                         _ucl._observed_stamp())
+                         _ucl_stamp)
 
     import web.laliga_app as _laliga
 
+    _laliga_stamp = _laliga._observed_stamp()
     _laliga_data = await _boot_step("LaLiga compute_all",
                                     _laliga.compute_all) or {}
     _holder.publish_data("laliga", _laliga_data, _laliga_data.get("mode", "results"),
-                         _laliga._observed_stamp())
+                         _laliga_stamp)
     yield
 
 

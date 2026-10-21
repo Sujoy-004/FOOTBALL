@@ -412,12 +412,17 @@ def _fetch_live_data():
 
 def _recompute_cache() -> None:
     try:
+        # D-09: sample the stamp BEFORE the build. A store write that lands
+        # during the build then publishes the OLDER stamp, and the next
+        # request sees a mismatch and rebuilds. Sampling after the build
+        # would publish (older data, newer stamp) — stale data served as
+        # current, permanently.
+        stamp = _observed_stamp()
         result = compute_all()
         if result.get("error"):
             logger.warning("[LaLiga] Cache recomputation failed: %s", result["error"])
             return
-        holder.publish_data("laliga", result, result.get("mode", "results"),
-                            _observed_stamp())
+        holder.publish_data("laliga", result, result.get("mode", "results"), stamp)
     except Exception as exc:
         logger.warning("[LaLiga] Cache recomputation failed: %s", exc)
 
@@ -453,8 +458,10 @@ async def lifespan(app: fastapi.FastAPI):
     # validated on-disk stores; reads stay pure and ingestion happens only
     # via the explicit refresh endpoint, FOOTBALL_PRELOAD_ALL preload or a
     # test (plan 02-06).
+    # D-09: the stamp is sampled BEFORE the build (see _recompute_cache).
+    stamp = _observed_stamp()
     data, mode = _build_state()
-    holder.publish_data("laliga", data, mode, _observed_stamp())
+    holder.publish_data("laliga", data, mode, stamp)
     yield
 
 
@@ -803,8 +810,10 @@ def _store_laliga_sim_result(result: dict, count: int, seed) -> dict:
 @laliga_app.post("/api/reset")
 def api_reset():
     try:
+        # D-09: sample the stamp BEFORE the build (see _recompute_cache).
+        stamp = _observed_stamp()
         data, mode = _build_state()
-        holder.publish_data("laliga", data, mode, _observed_stamp())
+        holder.publish_data("laliga", data, mode, stamp)
         return JSONResponse({"status": "ok", "mode": holder.read_mode("laliga")})
     except Exception as e:
         return error_response(e, context="laliga reset")
@@ -824,10 +833,20 @@ def api_refresh():
     from web.competitions import REGISTRY
 
     try:
+        # D-09: the stamp is sampled BEFORE the build, so the published pair
+        # is never (older data, newer stamp). The pre-ingest sample is what
+        # tells us whether the ingest actually wrote the canonical stores.
+        stamp_before = _observed_stamp()
         report = dict(REGISTRY.get("laliga").refresh())
+        stamp_after = _observed_stamp()
+        if stamp_after != stamp_before:
+            # D-06: the simulation is retired AT the store write, BEFORE the
+            # rebuild publishes the new facts. Clearing it after the rebuild
+            # left a window in which GET /api/simulation still served the
+            # previous run while GET /api/data served the new facts.
+            holder.clear_sim("laliga")
         data, mode = _build_state()
-        holder.publish_data("laliga", data, mode, _observed_stamp())
-        holder.clear_sim("laliga")  # D-06: sim cleared the moment refresh writes stores
+        holder.publish_data("laliga", data, mode, stamp_after)
     except Exception as e:
         return error_response(
             e, status=503, context="laliga refresh",

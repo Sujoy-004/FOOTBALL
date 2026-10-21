@@ -520,12 +520,15 @@ def _maybe_recompute_cache_after_ingest(summary: dict) -> None:
         return
     try:
         old_mode = holder.read_mode("ucl")
+        # D-09: sample the stamp BEFORE the build, so the published pair is
+        # never (older data, newer stamp) — the pair a later request would
+        # match and serve as current, permanently.
+        stamp = _observed_stamp()
         new_result = compute_all()
         if new_result.get("error"):
             logger.warning("[UCL] Cache recomputation failed: %s", new_result["error"])
             return
-        holder.publish_data("ucl", new_result, new_result.get("mode", "results"),
-                            _observed_stamp())
+        holder.publish_data("ucl", new_result, new_result.get("mode", "results"), stamp)
         if new_result.get("mode") != old_mode:
             logger.info("[UCL] Cache recomputed: mode changed from %s to %s",
                         old_mode, new_result.get("mode"))
@@ -621,8 +624,10 @@ async def lifespan(app: fastapi.FastAPI):
     # validated on-disk stores; reads stay pure and ingestion happens only
     # via the explicit refresh endpoint, FOOTBALL_PRELOAD_ALL preload or a
     # test (plan 02-06).
+    # D-09: the stamp is sampled BEFORE the build (see _recompute_cache).
+    stamp = _observed_stamp()
     data, mode = _build_state()
-    holder.publish_data("ucl", data, mode, _observed_stamp())
+    holder.publish_data("ucl", data, mode, stamp)
     yield
 
 
@@ -723,8 +728,12 @@ def api_set_season(req: dict = None):
     pointer = set_current_season(DATA_DIR, season, basis=basis, provider=provider)
     try:
         holder.clear_sim("ucl")
+        # D-09: the season pointer just flipped, so the stamp is sampled
+        # AFTER the switch but BEFORE the build — the published pair is never
+        # (older data, newer stamp).
+        stamp = _observed_stamp()
         data, mode = _build_state()
-        holder.publish_data("ucl", data, mode, _observed_stamp())
+        holder.publish_data("ucl", data, mode, stamp)
     except Exception:
         # Transactional rollback: the pointer was flipped above, but a
         # downstream step (compute_all) failed — restore current.json to
@@ -1138,8 +1147,10 @@ def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
 @ucl_app.post("/api/reset")
 def api_reset():
     try:
+        # D-09: sample the stamp BEFORE the build (see _recompute_cache).
+        stamp = _observed_stamp()
         data, mode = _build_state()
-        holder.publish_data("ucl", data, mode, _observed_stamp())
+        holder.publish_data("ucl", data, mode, stamp)
         return JSONResponse({"status": "ok", "mode": holder.read_mode("ucl")})
     except Exception as e:
         return error_response(e, context="ucl reset")
@@ -1159,10 +1170,20 @@ def api_refresh():
     from web.competitions import REGISTRY
 
     try:
+        # D-09: the stamp is sampled BEFORE the build, so the published pair
+        # is never (older data, newer stamp). The pre-ingest sample is what
+        # tells us whether the ingest actually wrote the canonical stores.
+        stamp_before = _observed_stamp()
         report = dict(REGISTRY.get("ucl").refresh())
+        stamp_after = _observed_stamp()
+        if stamp_after != stamp_before:
+            # D-06: the simulation is retired AT the store write, BEFORE the
+            # rebuild publishes the new facts. Clearing it after the rebuild
+            # left a window in which GET /api/simulation still served the
+            # previous run while GET /api/data served the new facts.
+            holder.clear_sim("ucl")
         data, mode = _build_state()
-        holder.publish_data("ucl", data, mode, _observed_stamp())
-        holder.clear_sim("ucl")  # D-06: sim cleared the moment refresh writes stores
+        holder.publish_data("ucl", data, mode, stamp_after)
     except Exception as e:
         return error_response(
             e, status=503, context="ucl refresh",

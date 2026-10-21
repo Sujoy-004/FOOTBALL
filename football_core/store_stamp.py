@@ -50,6 +50,37 @@ class StoreStamp:
         """``role -> [mtime_ns, size]`` for a JSON-friendly view of the stamp."""
         return {role: [mtime_ns, size] for role, mtime_ns, size in self.entries}
 
+    def is_strictly_older_than(self, other: StoreStamp) -> bool:
+        """True when this stamp is provably an OLDER observation than *other*.
+
+        "Provably older" means: every role this stamp knows about is also
+        known to *other*, with a strictly larger ``mtime_ns``. A role that only
+        one side knows about (a store added, or a store deleted) makes the
+        comparison undecidable, so neither side counts as older — a deletion
+        is a real change and must never be mistaken for a stale observation.
+
+        This is the ordering the holder uses to refuse publishing a snapshot
+        whose stamp is behind the one already published: a late-arriving
+        older publish must not overwrite a newer one. It is deliberately
+        conservative — it returns True only when the older reading is
+        unambiguous.
+
+        Args:
+            other: The stamp to compare against.
+
+        Returns:
+            True when this stamp is strictly older than *other*.
+        """
+        mine = {role: mtime for role, mtime, _size in self.entries}
+        theirs = {role: mtime for role, mtime, _size in other.entries}
+        if not mine:
+            return False  # an empty stamp observes nothing; it is not "older"
+        for role, mtime_ns in mine.items():
+            other_mtime = theirs.get(role)
+            if other_mtime is None or other_mtime <= mtime_ns:
+                return False
+        return True
+
 
 def stamp_store(data_dir: Path, roles: Mapping[str, str]) -> StoreStamp:
     """Stamp every PRESENT store file in *data_dir*, keyed by logical role.
