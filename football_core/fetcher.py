@@ -298,6 +298,11 @@ class IngestReport:
     written_files: list = field(default_factory=list)
     deferred: bool = False
     reason: str | None = None
+    #: Phase 5 (D-05/D-06): the brain→web edge is a DATA edge. ``changed``
+    #: means the STORE CONTENT changed — not "the file was rewritten".
+    #: ``changed_match_ids`` names the ids whose stored content changed.
+    changed: bool = False
+    changed_match_ids: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """JSON-safe plain-dict form of the report."""
@@ -313,5 +318,6 @@ class IngestReport:
             "written_files": list(self.written_files),
             "deferred": self.deferred,
             "reason": self.reason,
+            "changed": bool(self.changed),
+            "changed_match_ids": list(self.changed_match_ids),
         }
-
