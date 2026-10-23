@@ -782,6 +782,7 @@ def ingest_ucl_events(
     n_league_changed = 0
     n_playoff_changed = 0
     n_knockout_changed = 0
+    changed_ids: set[str] = set()
     written_files: list[str] = []
 
     # ── validate + partition incoming events ─────────────────────────
@@ -863,6 +864,7 @@ def ingest_ucl_events(
                 entry["away_score"] = away_score
                 results_dirty = True
                 n_league_changed += 1
+                changed_ids.add(match_id)
                 logger.info("[UCL] League %s: %s %d-%d %s",
                             match_id, ev["home_team"], home_score, away_score, ev["away_team"])
         else:
@@ -876,6 +878,7 @@ def ingest_ucl_events(
             by_id[match_id] = league_rows[-1]
             results_dirty = True
             n_league_changed += 1
+            changed_ids.add(match_id)
             logger.info("[UCL] League %s: %s %d-%d %s",
                         match_id, ev["home_team"], home_score, away_score, ev["away_team"])
         stats["ingested"] += 1
@@ -944,6 +947,7 @@ def ingest_ucl_events(
                 else:
                     n_knockout_changed += 1
                     logger.info("[UCL] %s %s vs %s updated", rnd, target.get("team_a"), target.get("team_b"))
+                changed_ids.add(str(target.get("match_id") or ""))
         slots_filled += _cascade_slots(matches)
 
     champion_changed = _update_champion(matches)
@@ -1021,6 +1025,9 @@ def ingest_ucl_events(
             "detail": str(matches.get("champion")) if matches.get("champion") else "final undecided",
         },
     ]
+    changed_ids.discard("")
+    report.changed = bool(changed_ids)
+    report.changed_match_ids = sorted(changed_ids)
     return report
 
 
@@ -1249,11 +1256,11 @@ def _upsert_season_results(
     season: str,
     finished_events: list[dict],
     provider_name: str,
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int, int, list[str]]:
     """Append finished events into season's results.json, attaching to known fixtures.
 
     Returns (results_added, results_updated, skipped_no_target,
-    skipped_missing_score).
+    skipped_missing_score, changed_ids).
     """
     sd = season_dir(data_dir, season)
     sd.mkdir(parents=True, exist_ok=True)
@@ -1284,6 +1291,7 @@ def _upsert_season_results(
     results_updated = 0
     skipped_no_target = 0
     skipped_missing_score = 0
+    changed_ids: list[str] = []
 
     for ev in finished_events:
         home = ev.get("home_team", "").strip()
@@ -1349,14 +1357,16 @@ def _upsert_season_results(
                 ex["home_score"] = home_score
                 ex["away_score"] = away_score
                 results_updated += 1
+                changed_ids.append(fid)
         else:
             existing_matches.append(entry)
             existing_by_id[fid] = entry
             results_added += 1
+            changed_ids.append(fid)
 
     res_doc["matches"] = existing_matches
     _atomic_write_json(res_doc, res_path)
-    return results_added, results_updated, skipped_no_target, skipped_missing_score
+    return results_added, results_updated, skipped_no_target, skipped_missing_score, changed_ids
 
 
 def ingest_ucl_events_multi_season(
@@ -1427,6 +1437,7 @@ def ingest_ucl_events_multi_season(
                 "results_count": report.finished["ingested"],
                 "skipped_no_target": report.finished["skipped_no_target"],
                 "skipped_missing_score": report.finished.get("skipped_missing_score", 0),
+                "changed_match_ids": sorted(report.changed_match_ids),
             }
             written_files.extend(report.written_files)
         else:
@@ -1482,7 +1493,7 @@ def ingest_ucl_events_multi_season(
             fx_added, fx_updated, fx_total = _upsert_season_fixtures(
                 dp, season_display, fixture_source_events, provider_name
             )
-            res_added, res_updated, skipped, skipped_missing_score = _upsert_season_results(
+            res_added, res_updated, skipped, skipped_missing_score, season_changed_ids = _upsert_season_results(
                 dp, season_display, finished, provider_name
             )
             total_skipped_no_target += skipped
@@ -1523,6 +1534,7 @@ def ingest_ucl_events_multi_season(
                     len(finished) - skipped - skipped_missing_score - n_no_team
                 ),
                 "skipped_unmatchable": n_no_team,
+                "changed_match_ids": sorted(season_changed_ids),
             }
 
     # Build combined report. D-13: success is DERIVED from the combined
@@ -1565,6 +1577,13 @@ def ingest_ucl_events_multi_season(
     if combined_success:
         combined_report.last_success_at = datetime.now(timezone.utc).isoformat()
     combined_report.written_files = written_files
+
+    combined_ids: set[str] = set()
+    for _sk, sv in per_season_summary.items():
+        for _mid in sv.get("changed_match_ids") or []:
+            combined_ids.add(str(_mid))
+    combined_report.changed = bool(combined_ids)
+    combined_report.changed_match_ids = sorted(combined_ids)
 
     # Exchange 5: propagate stages from per-season reports (especially legacy)
     # so downstream consumers (pipeline n_updated, test stage-checklist) work.
