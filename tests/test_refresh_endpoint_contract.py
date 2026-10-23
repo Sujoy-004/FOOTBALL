@@ -415,3 +415,35 @@ def test_stage_row_builders_follow_the_report_vocabulary():
         assert row["key"] == "results"
         assert row["label"] == "Match results"
         assert isinstance(row["count"], int)
+
+
+def test_report_contract_carries_the_changed_channel():
+    """D-05/D-06: the reporting channel is part of the report contract.
+
+    ``changed`` means the store CONTENT changed; ``changed_match_ids``
+    names the ids. The pair is plain DATA on the value a brain returns —
+    the brain→web edge is never a call (C-01).
+    """
+    from web.common import not_attempted_report, refresh_response_body
+
+    assert "changed" in REPORT_KEYS
+    assert "changed_match_ids" in REPORT_KEYS
+
+    # Every mode carries the pair, and the normaliser never overwrites a
+    # brain-supplied value.
+    for body in (
+        refresh_response_body({"attempted": True, "success": True}),
+        refresh_response_body({"attempted": True, "success": False,
+                               "error": "boom", "stale": True}),
+        refresh_response_body({"attempted": False}),
+        not_attempted_report(),
+    ):
+        assert isinstance(body["changed"], bool), body
+        assert isinstance(body["changed_match_ids"], list), body
+        assert all(isinstance(mid, str) for mid in body["changed_match_ids"]), body
+
+    # The served list is a copy, not an alias of the dataclass's own list.
+    report = IngestReport(provider=None, attempted=False, success=False, error=None)
+    body = report.to_dict()
+    body["changed_match_ids"].append("M73")
+    assert report.changed_match_ids == [], report.changed_match_ids
