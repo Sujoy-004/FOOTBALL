@@ -197,7 +197,21 @@ def process_matches(
     played: dict[str, dict] | set[str],
     played_event_ids: set[str] | None = None,
     ingestion_stats: dict | None = None,
+    changed_ids: list | None = None,
 ) -> list[dict]:
+    """Process knockout matches against the bracket.
+
+    Args:
+        raw_matches: Raw event dictionaries from provider.
+        teams: Known teams dictionary.
+        bracket: Knockout bracket match list.
+        aliases: Team spelling alias lookup dictionary.
+        played: Already-ingested played matches store or set.
+        played_event_ids: Mutable set tracking provider event IDs across passes.
+        ingestion_stats: Tracking counters dictionary.
+        changed_ids: Optional list to collect match_ids whose stored content
+            changed (appended at the mutation site).
+    """
     from football_core.fetcher import (
         new_ingestion_stats, count_finished, note_unmatchable,
         note_no_target, summarize_ingestion,
@@ -291,11 +305,15 @@ def process_matches(
             # as ingested so received == normalized == ingested + skipped_*
             # holds when a provider re-sends a corrected finished result.
             istats["ingested"] += 1
+            if changed_ids is not None:
+                changed_ids.append(bracket_id)
             continue
 
         # New result.
         results.append(entry)
         istats["ingested"] += 1
+        if changed_ids is not None:
+            changed_ids.append(bracket_id)
 
     summarize_ingestion(istats, logger, "knockout")
     return results
@@ -309,7 +327,21 @@ def process_group_matches(
     played_groups: dict[str, dict] | set[str],
     played_bsd_event_ids: set[str] | None = None,
     ingestion_stats: dict | None = None,
+    changed_ids: list | None = None,
 ) -> list[dict]:
+    """Process group stage matches.
+
+    Args:
+        raw_matches: Raw event dictionaries from provider.
+        teams: Known teams dictionary.
+        groups: Tournament groups dictionary.
+        aliases: Team spelling alias lookup dictionary.
+        played_groups: Already-ingested played group matches store or set.
+        played_bsd_event_ids: Mutable set tracking provider event IDs.
+        ingestion_stats: Tracking counters dictionary.
+        changed_ids: Optional list to collect match_ids whose stored content
+            changed (appended at the mutation site).
+    """
     from football_core.fetcher import (
         new_ingestion_stats, count_finished, note_unmatchable,
         note_no_target, summarize_ingestion,
@@ -427,10 +459,14 @@ def process_group_matches(
             # as ingested so the counter invariant holds for corrected
             # re-offers too (mirrors the knockout processor).
             istats["ingested"] += 1
+            if changed_ids is not None:
+                changed_ids.append(match_id)
             continue
 
         results.append(entry)
         istats["ingested"] += 1
+        if changed_ids is not None:
+            changed_ids.append(match_id)
 
     summarize_ingestion(istats, logger, "group stage")
     return results
