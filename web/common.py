@@ -77,6 +77,8 @@ def not_attempted_report() -> dict:
         "error": None,
         "stale": True,
         "reason": NOT_ATTEMPTED_REASON,
+        "changed": False,
+        "changed_match_ids": [],
     }
     from web.startup import is_snapshot_mode
 
@@ -173,6 +175,8 @@ def refresh_response_body(report: dict, mode: str | None = None) -> dict:
     body.setdefault("written_files", [])
     body.setdefault("deferred", False)
     body.setdefault("reason", None)
+    body.setdefault("changed", False)
+    body.setdefault("changed_match_ids", [])
     if not body.get("last_success_at"):
         # A successful run IS the last success; the adapter entries record
         # `last_refresh` (attempt instant), which equals it for that run.
