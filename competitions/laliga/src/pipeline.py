@@ -463,6 +463,9 @@ def fetch_live_data(
     Providers return BSD-compatible flat events; each is normalized onto
     the shipped canonical team vocabulary and written to the season store.
     Returns the truth-ingestion summary the web layer records.
+    The returned ``report`` carries ``changed`` / ``changed_match_ids`` (the
+    ids whose stored content changed, D-05/D-06). ``n_updated`` and
+    ``finished['ingested']`` remain RECEIVED counts.
     """
     if provider is None:
         report = IngestReport(provider=None, attempted=False, success=False,
@@ -560,8 +563,56 @@ def fetch_live_data(
     }
     results_payload = {"provider": type(provider).__name__, "error": None,
                        "matches": results}
-    _season_store.write_fixtures(fixtures_payload, data_dir, SHIPPED_SEASON)
-    _season_store.write_results(results_payload, data_dir, SHIPPED_SEASON)
+
+    # D-16: the season-store writes become CONTENT-CONDITIONAL. The store's
+    # mtime IS the stamp, and the stamp is the retirement trigger - an
+    # idempotent re-ingest that rewrites an identical file would move the
+    # stamp and (under the old whole-stamp comparison) destroy a live
+    # simulation. The results comparison is PER MATCH, not a document
+    # diff, and it detects REMOVALS too: the store is replaced by exactly
+    # the rows the provider returned, so a provider that returns fewer
+    # matches would otherwise silently delete real results.
+    season_path = _season_store.season_dir(data_dir, SHIPPED_SEASON)
+    prev_results_payload, prev_results_state, _prev_detail = load_json_store(
+        season_path / "results.json"
+    )
+    prev_rows: dict[str, dict] = {}
+    if isinstance(prev_results_payload, dict):
+        for _row in prev_results_payload.get("matches") or []:
+            if isinstance(_row, dict) and _row.get("match_id"):
+                prev_rows[str(_row["match_id"])] = _row
+    new_rows: dict[str, dict] = {
+        str(_r["match_id"]): _r for _r in results if _r.get("match_id")
+    }
+
+    def _factual(_row: dict) -> tuple:
+        """The factual content of a result row - the fields a real result owns."""
+        return (_row.get("home_score"), _row.get("away_score"),
+                _row.get("winner"), _row.get("status"))
+
+    changed_ids = sorted(
+        _mid for _mid, _row in new_rows.items()
+        if _factual(prev_rows.get(_mid) or {}) != _factual(_row)
+    )
+    removed_ids = sorted(set(prev_rows) - set(new_rows))
+    results_changed = bool(changed_ids or removed_ids)
+
+    prev_fixtures_payload, prev_fixtures_state, _fx_detail = load_json_store(
+        season_path / "fixtures.json"
+    )
+    prev_fixture_rows = (
+        prev_fixtures_payload.get("fixtures")
+        if isinstance(prev_fixtures_payload, dict) else None
+    )
+    fixtures_changed = (
+        prev_fixtures_state is not DataAvailability.AVAILABLE
+        or prev_fixture_rows != fixtures
+    )
+
+    if fixtures_changed:
+        _season_store.write_fixtures(fixtures_payload, data_dir, SHIPPED_SEASON)
+    if results_changed:
+        _season_store.write_results(results_payload, data_dir, SHIPPED_SEASON)
 
     odds_summary = acquire_laliga_odds(data_dir, SHIPPED_SEASON, bsd_api_key)
     odds_public = {k: v for k, v in odds_summary.items() if k != "matches"}
@@ -581,6 +632,8 @@ def fetch_live_data(
     report = IngestReport(provider=provider_label, attempted=True, success=success,
                           error=None, stale=not success, reason=reason)
     report.finished = finished
+    report.changed = bool(changed_ids or removed_ids)
+    report.changed_match_ids = sorted(changed_ids)
     report.stages = [
         _results_stage_row(
             "ok" if success else "error",
@@ -627,3 +680,18 @@ def laliga_insight_text(ta, tb, signals, form_trends, h2h, outcome, eval_data) -
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+def _write_results_if_changed(path: Path | str, payload: dict) -> bool:
+    """Content-conditional write for LaLiga results store.
+
+    Returns True if the file was written (content changed), False otherwise.
+    """
+    from football_core.state import atomic_write_text
+    target = Path(path)
+    existing_payload, availability, _ = load_json_store(target)
+    if availability is DataAvailability.AVAILABLE and isinstance(existing_payload, dict):
+        if existing_payload == payload or existing_payload.get("matches") == payload.get("matches"):
+            return False
+
+    atomic_write_text(target, json.dumps(payload, indent=2, ensure_ascii=False))
+    return True
