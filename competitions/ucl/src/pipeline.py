@@ -362,6 +362,8 @@ def fetch_live_data(
     Returns a superset of the legacy refresh dict — ``status`` (ok/skip),
     ``n_raw``, ``n_updated``, ``provider_name`` — plus ``report`` holding
     the structured :class:`~football_core.fetcher.IngestReport` payload.
+    The returned ``report`` carries ``changed`` / ``changed_match_ids`` (the
+    ids whose stored content changed, D-05/D-06).
     """
     from football_core.fetcher import (
         IngestReport,
@@ -628,6 +630,8 @@ def fetch_live_data(
         report.written_files = report_dict.get("written_files", [])
         report.deferred = bool(report_dict.get("deferred", False))
         report.reason = report_dict.get("reason")
+        report.changed = bool(report_dict.get("changed", False))
+        report.changed_match_ids = list(report_dict.get("changed_match_ids") or [])
     else:
         report = _IR(provider=provider_label, attempted=True, success=False, error=None)
 
