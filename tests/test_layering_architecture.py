@@ -60,12 +60,26 @@ To reproduce either one: add the line, run
 ``python -m pytest tests/test_layering_architecture.py``, delete the line
 again. Case 1 (kernel upward) deliberately does not fire on either injection —
 both land in a brain, which is why case 2 exists.
+
+Phase 5 (RECON-02) additions
+----------------------------
+
+Three injections were added, observed to fail, and removed byte-wise; none was
+ever committed:
+
+1. ``from web.reconciliation import reconcile_now`` in
+   ``competitions/worldcup/src/pipeline.py`` -> assertion (A) and (B) fire.
+2. ``on_store_written: Callable[[dict], None] = None`` added to a brain's
+   ``fetch_live_data`` signature -> assertion (C) fires.
+3. ``hook: Callable = None`` added to ``IngestReport`` -> assertion (D) fires.
 """
 
 from __future__ import annotations
 
 import ast
+import dataclasses
 import importlib
+import inspect
 import pathlib
 import re
 import socket
@@ -114,7 +128,24 @@ NO_NETWORK_MODULES = (
     "competitions.worldcup.src.pipeline",
     "competitions.ucl.src.pipeline",
     "competitions.laliga.src.pipeline",
+    "football_core.reconcile",
 )
+
+#: Public names of the web-layer invalidation owner (Phase 5). A competition
+#: brain must never reach for one of these: the brain REPORTS what changed
+#: as data on its IngestReport, and the web layer decides (C-01, C-06).
+FORBIDDEN_RECONCILER_SYMBOLS = frozenset({
+    "reconcile_now",
+    "reconcile_if_needed",
+    "reconciliation_block",
+    "reconcile",
+    "retire_matching",
+    "retire_whole_snapshot",
+    "publish_sim_state",
+    "clear_sim",
+    "invalidate",
+    "retire",
+})
 
 
 def _rel(path: pathlib.Path) -> str:
@@ -186,6 +217,27 @@ def _imported_modules(
             src = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
             for alias in node.names:
                 found.append((node.lineno, alias.name, (alias.name,), src))
+    return found
+
+
+def _named_symbols(path: pathlib.Path) -> list[tuple[int, str, str]]:
+    """``(lineno, symbol, source line)`` for every identifier a module NAMES.
+
+    Walks ``ast.Name`` (load context) and ``ast.Attribute`` (the attribute
+    part), so a brain that reaches for the owner through either
+    ``reconcile_now(...)`` or ``owner.reconcile_now(...)`` is caught.
+    """
+    text = path.read_text(encoding="utf-8")
+    tree = ast.parse(text, filename=str(path))
+    lines = text.splitlines()
+    found: list[tuple[int, str, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            src = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
+            found.append((node.lineno, node.id, src))
+        elif isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Load):
+            src = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
+            found.append((node.lineno, node.attr, src))
     return found
 
 
@@ -374,3 +426,77 @@ def test_kernel_and_brains_import_without_network(
     monkeypatch.setattr(socket, "create_connection", _blocked)
     for name in NO_NETWORK_MODULES:
         importlib.import_module(name)
+
+
+def test_brains_never_name_a_reconciler_symbol() -> None:
+    """Assertion B (Phase 5, C-06): brains report data only, never name reconciler symbols."""
+    violations: list[str] = []
+    for path in _brain_files():
+        for lineno, sym, src in _named_symbols(path):
+            if sym in FORBIDDEN_RECONCILER_SYMBOLS:
+                violations.append(f"{_rel(path)}:{lineno}  {src}")
+    assert not violations, (
+        "competitions/*/src must never name a reconciler symbol; "
+        "violations found:\n" + "\n".join(sorted(violations))
+    )
+
+
+def test_fetch_live_data_has_no_hook_parameter() -> None:
+    """Assertion C (Phase 5, C-01): fetch_live_data has no hook/callback parameter."""
+    brain_modules = (
+        "competitions.worldcup.src.pipeline",
+        "competitions.ucl.src.pipeline",
+        "competitions.laliga.src.pipeline",
+    )
+    for mod_name in brain_modules:
+        mod = importlib.import_module(mod_name)
+        if hasattr(mod, "fetch_live_data"):
+            sig = inspect.signature(mod.fetch_live_data)
+            for param in sig.parameters.values():
+                name_lower = param.name.lower()
+                is_hook = (
+                    name_lower.startswith("on_")
+                    or "hook" in name_lower
+                    or "callback" in name_lower
+                    or "invalidate" in name_lower
+                )
+                assert not is_hook, (
+                    f"forbidden hook parameter in {mod_name}.fetch_live_data: {param.name}"
+                )
+                ann_str = str(param.annotation)
+                assert "Callable" not in ann_str, (
+                    f"forbidden Callable annotation in {mod_name}.fetch_live_data: {param.name}"
+                )
+
+
+def test_ingest_report_has_no_callable_field() -> None:
+    """Assertion D (Phase 5, D-05): IngestReport has no Callable-typed field."""
+    from football_core.fetcher import IngestReport
+
+    for f in dataclasses.fields(IngestReport):
+        ann = str(f.type)
+        assert "Callable" not in ann and "callable" not in ann, (
+            f"IngestReport field {f.name} has callable type annotation: {ann}"
+        )
+
+
+def test_ingest_report_carries_the_changed_channel() -> None:
+    """Assertion E (Phase 5, D-05/D-06): IngestReport has changed and changed_match_ids."""
+    from football_core.fetcher import IngestReport
+
+    field_names = {f.name for f in dataclasses.fields(IngestReport)}
+    assert "changed" in field_names
+    assert "changed_match_ids" in field_names
+
+    d = IngestReport(provider=None, attempted=False, success=False, error=None).to_dict()
+    assert "changed" in d
+    assert "changed_match_ids" in d
+
+
+def test_reconcile_kernel_is_importable_and_network_free() -> None:
+    """Assertion F (Phase 5, C-02): football_core.reconcile is network-free and imports no web/competitions."""
+    assert "football_core.reconcile" in NO_NETWORK_MODULES
+    mod = importlib.import_module("football_core.reconcile")
+    path = pathlib.Path(mod.__file__)
+    for _lineno, m, _names, _src in _imported_modules(path):
+        assert not _matches(m, KERNEL_ROOTS), f"reconcile imports forbidden module: {m}"
