@@ -29,7 +29,10 @@ from football_core.state import atomic_write_text
 # The brain owns its own evaluation module: this module no longer imports
 # from ``web`` (plan 01-06, D-13).
 from competitions.worldcup.src.evaluation import compute_signal_eval
-from football_core.fetcher import new_ingestion_stats  # type: ignore[import-untyped]
+from football_core.fetcher import (
+    IngestReport,
+    new_ingestion_stats,
+)  # type: ignore[import-untyped]
 from football_core.signal import PredictionContext  # type: ignore[import-untyped]
 
 # Pathological pass cap: the retry-set breaks (no unresolved events, or a
@@ -122,6 +125,8 @@ def _build_report(
     skipped_reason=None,
     stages=None,
     written_files=None,
+    changed: bool = False,
+    changed_match_ids: list | None = None,
 ) -> dict:
     """Single refresh-report shape for EVERY fetch_live_data exit path (02-03).
 
@@ -135,19 +140,21 @@ def _build_report(
     (best-effort, never raising) so stale data can't masquerade as fresh;
     deferred/snapshot exits don't write.
     """
-    report = {
-        "provider": provider,
-        "attempted": attempted,
-        "success": success,
-        "error": error,
-        "stale": stale,
-        "reason": reason,
-        "last_success_at": last_success_at,
-        "finished": finished,
-        "stages": [dict(stage) for stage in (stages or [])],
-        "written_files": list(written_files) if written_files is not None else [],
-        "deferred": reason in ("deferred", "deferred/provider-empty"),
-    }
+    report = IngestReport(
+        provider=provider,
+        attempted=attempted,
+        success=success,
+        error=error,
+        stale=stale,
+        last_success_at=last_success_at,
+        finished=finished,
+        stages=[dict(stage) for stage in (stages or [])],
+        written_files=list(written_files) if written_files is not None else [],
+        deferred=reason in ("deferred", "deferred/provider-empty"),
+        reason=reason,
+        changed=changed,
+        changed_match_ids=list(changed_match_ids or []),
+    ).to_dict()
     if skipped_reason is not None:
         report["skipped_reason"] = skipped_reason
     if attempted:
@@ -369,10 +376,12 @@ def fetch_live_data(
             if played_groups_path.exists()
             else {}
         )
+        changed_ids: list[str] = []
         grp_before = json.dumps(played_groups, sort_keys=True, ensure_ascii=False)
         new_grp = process_group_matches(
             group_events, teams, groups, aliases, played_groups, set(),
             ingestion_stats=group_stats,
+            changed_ids=changed_ids,
         )
         for m in new_grp:
             played_groups[m["match_id"]] = m
@@ -439,6 +448,7 @@ def fetch_live_data(
             new_ko = process_matches(
                 batch, teams, resolved_bracket, aliases, played,
                 ingestion_stats=pass_stats,
+                changed_ids=changed_ids,
             )
             for m in new_ko:
                 played[m["match_id"]] = m
@@ -516,6 +526,8 @@ def fetch_live_data(
         error=None,
         stale=not success,
         reason=reason,
+        changed=(group_stats.get("ingested", 0) + ko_stats.get("ingested", 0)) > 0,
+        changed_match_ids=sorted(set(changed_ids)),
         last_success_at=(
             datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
             if success
