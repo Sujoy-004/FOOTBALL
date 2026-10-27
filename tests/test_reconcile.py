@@ -1,7 +1,7 @@
 """Unit suite for the pure reconciliation kernel contract (Phase 5, RECON-01).
 
 Defends:
-* Mathematical correctness of the set algebra (factual ∩ sim \ retired).
+* Mathematical correctness of the set algebra (factual ∩ sim - retired).
 * Mode derivation rules (real / partial / not_applicable).
 * Aggregated DataAvailability ranking.
 * Immutability and provenance invariants of Retirement records.
@@ -157,6 +157,7 @@ def test_availability_table_never_claims_currency(avail: DataAvailability):
             has_live_answers=True,
             new_facts=frozenset(),
             sim_ids=frozenset({"M73"}),
+            availability=avail,
         )
         assert mode != "real" or avail == DataAvailability.AVAILABLE
 

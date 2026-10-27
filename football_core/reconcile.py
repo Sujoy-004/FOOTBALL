@@ -84,12 +84,23 @@ def derive_mode(
     new_facts: frozenset[str],
     sim_ids: frozenset[str],
     has_stale_descendants: bool = False,
+    availability: DataAvailability = DataAvailability.AVAILABLE,
 ) -> str:
-    """Derive the reconciliation mode string.
-
-    Implemented in Plan 05-06.
-    """
-    raise NotImplementedError("derive_mode: implemented in Plan 05-06")
+    """Derive the reconciliation mode string."""
+    if not has_live_answers:
+        return "not_applicable"
+    if availability is not DataAvailability.AVAILABLE:
+        return "partial"
+    uncovered = new_facts - sim_ids
+    if uncovered:
+        # A real fact landed that the simulation does not cover (the World
+        # Cup group-stage case) - the verdict must NOT imply currency.
+        return "partial"
+    if has_stale_descendants:
+        # A retired answer's descendant is still simulated (a corrected
+        # upstream result left a downstream answer stale).
+        return "partial"
+    return "real"
 
 
 def retire_matching(
@@ -104,11 +115,23 @@ def retire_matching(
     store_stamp_at_retirement: Mapping[str, Any],
     reason: str = "real_result_ingested",
 ) -> tuple[Retirement, ...]:
-    """Retire simulation answers matching new factual ids.
-
-    Implemented in Plan 05-06.
-    """
-    raise NotImplementedError("retire_matching: implemented in Plan 05-06")
+    """Retire simulation answers matching new factual ids."""
+    covered = (factual_ids & sim_ids) - already_retired
+    return tuple(
+        Retirement(
+            match_id=mid,
+            competition=competition,
+            retired_at=retired_at,
+            reason=reason,
+            real_match_id=mid,
+            store_stamp_at_retirement=store_stamp_at_retirement,
+            provenance=ResultProvenance.SIMULATED,
+            superseded_answer=superseded_answers.get(mid, {}),
+            real_result=real_results.get(mid),
+            scope="match",
+        )
+        for mid in sorted(covered)
+    )
 
 
 def retire_whole_snapshot(
@@ -119,18 +142,58 @@ def retire_whole_snapshot(
     store_stamp_at_retirement: Mapping[str, Any],
     reason: str = "store_replaced",
 ) -> Retirement:
-    """Retire an entire simulation snapshot.
-
-    Implemented in Plan 05-06.
-    """
-    raise NotImplementedError("retire_whole_snapshot: implemented in Plan 05-06")
+    """Retire an entire simulation snapshot."""
+    return Retirement(
+        match_id=None,
+        competition=competition,
+        retired_at=retired_at,
+        reason=reason,
+        real_match_id=None,
+        store_stamp_at_retirement=store_stamp_at_retirement,
+        provenance=ResultProvenance.SIMULATED,
+        superseded_answer=superseded_answer,
+        scope="snapshot",
+        real_result=None,
+    )
 
 
 def aggregate_availability(
     availabilities: Iterable[DataAvailability],
 ) -> DataAvailability:
-    """Aggregate multiple DataAvailability values taking the worst state.
+    """Aggregate multiple DataAvailability values taking the worst state."""
+    worst = DataAvailability.AVAILABLE
+    for state in availabilities:
+        candidate = DataAvailability(state)
+        if AVAILABILITY_SEVERITY.index(candidate) > AVAILABILITY_SEVERITY.index(worst):
+            worst = candidate
+    return worst
 
-    Implemented in Plan 05-06.
-    """
-    raise NotImplementedError("aggregate_availability: implemented in Plan 05-06")
+
+def assemble_reconciliation(
+    *,
+    retired: Iterable[Retirement],
+    still_valid: Iterable[str],
+    availability: DataAvailability,
+    has_live_answers: bool,
+    new_facts: frozenset[str],
+    sim_ids: frozenset[str],
+    has_stale_descendants: bool = False,
+    whole_snapshot_retired: bool = False,
+    not_established: bool = False,
+) -> Reconciliation:
+    """Assemble a Reconciliation verdict."""
+    mode = derive_mode(
+        has_live_answers=has_live_answers,
+        new_facts=new_facts,
+        sim_ids=sim_ids,
+        has_stale_descendants=has_stale_descendants,
+        availability=availability,
+    )
+    return Reconciliation(
+        retired=tuple(retired),
+        still_valid=tuple(still_valid),
+        mode=mode,
+        availability=availability,
+        whole_snapshot_retired=whole_snapshot_retired,
+        not_established=not_established,
+    )
