@@ -7,7 +7,7 @@ import {
   configureCompetitionRefresh,
   renderSimulationShell, bindSimulationShell,
   renderEloView, renderBlendView, loadModelViews,
-  renderAvailabilityBanner, renderAvailPanel, refreshButtonHtml,
+  renderAvailabilityBanner, renderAvailPanel, refreshButtonHtml, retiredCountLine,
 } from "./shared.js";
 
 const API = "/ucl/api";
@@ -304,7 +304,8 @@ function updateStatus() {
   if (!d) return;
   _renderTopbar();
   updateStatusBar(
-    d.n_teams + " teams  |  " + (d.n_played != null ? d.n_played + " matches played" : "no match data"),
+    d.n_teams + " teams  |  " + (d.n_played != null ? d.n_played + " matches played" : "no match data")
+      + retiredCountLine(d.simulation),
     renderAvailabilityBanner(_currentBanner().state, _currentBanner().ctx)
   );
 }

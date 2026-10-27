@@ -10,7 +10,7 @@ import {
   configureCompetitionRefresh,
   renderSimulationShell, bindSimulationShell,
   renderEloView, renderBlendView, loadModelViews,
-  renderAvailabilityBanner, renderAvailPanel, refreshButtonHtml,
+  renderAvailabilityBanner, renderAvailPanel, refreshButtonHtml, retiredCountLine,
 } from "./shared.js";
 
 const API = "/laliga/api";
@@ -209,7 +209,8 @@ function _applyStatus() {
   updateStatusBar(
     _esc(appState.season || "") + " &middot; " + appState.n_played + "/"
       + (appState.n_played + appState.n_unplayed) + " played &middot; "
-      + _esc(sigInfo()),
+      + _esc(sigInfo())
+      + retiredCountLine((appState.data && appState.data.simulation) || null),
     renderAvailabilityBanner(_currentBanner().state, _currentBanner().ctx)
   );
 }

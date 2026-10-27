@@ -5,7 +5,7 @@ import {
   configureCompetitionRefresh, renderSimulationShell, bindSimulationShell,
   renderEloView, renderBlendView, loadModelViews,
   renderAcquisitionPanel, renderAvailabilityBanner, renderAvailPanel,
-  refreshButtonHtml,
+  refreshButtonHtml, retiredCountLine,
 } from "./shared.js";
 
 const API = "/worldcup/api";
@@ -199,7 +199,8 @@ function updateStatus() {
   _renderTopbar();
   updateStatusBar(
     d.n_teams + " teams  |  " + (d.n_played != null ? d.n_played + " matches played" : "no match data")
-      + "  |  " + nActive + " active signals",
+      + "  |  " + nActive + " active signals"
+      + retiredCountLine(d.simulation),
     renderAvailabilityBanner(_currentBanner().state, _currentBanner().ctx)
   );
 }
@@ -460,9 +461,12 @@ function _esc(s) {
 }
 
 // Map a knockout_tree node onto the shared renderer's match shape.
-function _mapWcMatch(m, simById) {
+function _mapWcMatch(m, simById, retiredIds) {
   const isPlayed = !!(m.played || m.winner);
-  const simM = (!isPlayed && simById[m.match_id]) ? simById[m.match_id] : null;
+  const retired = !!(retiredIds && retiredIds.has(m.match_id));
+  // A retired answer stays VISIBLE: it is superseded, not erased (SIM-04).
+  // A plain played match still suppresses the simulated overlay.
+  const simM = ((!isPlayed || retired) && simById[m.match_id]) ? simById[m.match_id] : null;
 
   // Score string: real result > sim projection (marked) > placeholder.
   let resultLine;
@@ -492,6 +496,7 @@ function _mapWcMatch(m, simById) {
     teamA: m.team_a || null,
     teamB: m.team_b || null,
     status,
+    retired: retired || undefined,
     provenance: m.provenance || "official",
     winner: m.winner || null,
     resultLine,
@@ -572,6 +577,16 @@ function renderBracket() {
     }
   }
 
+  // The retired ids come from the payload the LIVE POLL reloads — the
+  // overview (`appState.data` IS the overview payload; refreshLive does
+  // NOT reload /api/data). A retired answer stays visible: it is
+  // superseded, not erased (SIM-04).
+  const retiredIds = new Set(
+    (((appState.data && appState.data.simulation && appState.data.simulation.retired) || [])
+      .map(r => r && r.match_id)
+      .filter(Boolean))
+  );
+
   // Stage order and col-head labels preserved exactly from the previous
   // tree build; TPP stays between SF and FINAL as its own list column so
   // connector semantics are unchanged (SF -> TPP drawn; FINAL has no direct
@@ -589,7 +604,7 @@ function renderBracket() {
       id: d.key,
       label: d.label,
       layout: d.layout,
-      matches: (koTree[d.key] || []).map(m => _mapWcMatch(m, simById)),
+      matches: (koTree[d.key] || []).map(m => _mapWcMatch(m, simById, retiredIds)),
     })),
   };
 
