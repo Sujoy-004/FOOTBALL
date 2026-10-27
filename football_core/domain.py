@@ -14,7 +14,7 @@ Stdlib only, competition-agnostic: no imports from competitions/* or web/*.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
@@ -109,9 +109,9 @@ class CanonicalMatch:
     """
 
     match_id: str
-    competition: str
-    home_team: str
-    away_team: str
+    competition: str = ""
+    home_team: str = ""
+    away_team: str = ""
     status: MatchStatus = MatchStatus.UNKNOWN
     home_goals: Optional[int] = None   # regulation + extra time, excludes penalties
     away_goals: Optional[int] = None
@@ -121,8 +121,14 @@ class CanonicalMatch:
     kickoff_utc: Optional[str] = None  # ISO string; absent time is None, never ""
     stage: Optional[StageRef] = None
     provenance: ResultProvenance = ResultProvenance.OFFICIAL
+    team_a: InitVar[Optional[str]] = None
+    team_b: InitVar[Optional[str]] = None
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, team_a: Optional[str] = None, team_b: Optional[str] = None) -> None:
+        if team_a is not None and not self.home_team:
+            self.home_team = team_a
+        if team_b is not None and not self.away_team:
+            self.away_team = team_b
         self.winner = _normalize_winner(self.winner)
 
     def effective_status(self) -> MatchStatus:
