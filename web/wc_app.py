@@ -6,7 +6,7 @@ wires transport, the freshness ledger and the simulation task service.
 State lives in the race-free holder (``web.derived.holder``): one frozen
 snapshot per competition, rebound in ONE assignment, with the store stamp
 folded in — reads go through ``_snap()``, writes through
-``holder.publish_data`` / ``publish_sim`` / ``clear_sim``. No mutable module
+``holder.publish_data`` / ``publish_sim``. No mutable module
 globals.
 """
 
@@ -14,6 +14,7 @@ import json, os
 import logging
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any, Optional
 from datetime import datetime, timezone
 
 import fastapi
@@ -23,7 +24,9 @@ from dotenv import load_dotenv
 from football_core.freshness import UNREADABLE, read_ledger, served_stale, store_mtime
 from football_core.state import atomic_write_text
 from football_core.domain import DataAvailability, load_json_store
-from football_core.store_stamp import StoreStamp, stamp_store
+from football_core.store_stamp import StoreStamp, stamp_store, sub_stamp
+from web.derived.stamps import WC_RESULTS_ROLES, WC_ROLES
+from web import reconciliation
 from competitions.worldcup.src import constants, elo
 from competitions.worldcup.src.knockout import run_full_simulation, resolve_knockout_slot_teams
 from competitions.worldcup.src.state import load_groups, load_annex_c
@@ -55,7 +58,6 @@ from web.common import (
     refresh_response_body,
 )
 from web.derived import holder
-from web.derived.stamps import WC_ROLES
 from web.simulation_service import (
     SimulationTaskService, build_simulation_meta,
 )
@@ -156,6 +158,136 @@ def _observed_stamp() -> StoreStamp:
     return stamp_store(DATA_DIR, WC_ROLES)
 
 
+def _store_ids(payload: Any) -> frozenset[str]:
+    """The ids a World Cup results store holds — the store's OWN keys.
+
+    The World Cup stores are dicts keyed by the bracket slot id, so the
+    keys ARE the ids. Never re-derive a fixture id to compare (C-11).
+    """
+    if not isinstance(payload, dict):
+        return frozenset()
+    return frozenset(str(key) for key in payload.keys())
+
+
+def _store_rows(payload: Any) -> Mapping[str, Any]:
+    """id -> the stored row, for the ledger's ``real_result`` block."""
+    if not isinstance(payload, dict):
+        return {}
+    return {str(key): row for key, row in payload.items() if isinstance(row, dict)}
+
+
+def _wc_sim_ids(payload: Mapping[str, Any]) -> frozenset[str]:
+    """The badgeable per-answer ids — exactly the ``full_bracket`` entries.
+
+    ``sim_result`` and ``top_teams`` are per-TEAM aggregates over the whole
+    run and SURVIVE a retirement: a real result does not falsify "Spain has
+    a 12% chance of winning the World Cup" (D-17, RESEARCH §C.3).
+    """
+    bracket = payload.get("full_bracket") or {}
+    rounds = bracket.get("rounds") or {}
+    ids: set[str] = set()
+    for entries in rounds.values():
+        for entry in entries or []:
+            if isinstance(entry, dict) and entry.get("match_id"):
+                ids.add(str(entry["match_id"]))
+    return frozenset(ids)
+
+
+def _wc_sim_answers(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    """id -> the simulated answer, VERBATIM (the ledger's superseded_answer).
+
+    D-07: the record carries the ANSWER, not just tombstone metadata —
+    otherwise "which simulated answers were wrong, and when did we learn it"
+    cannot be answered after a restart.
+    """
+    bracket = payload.get("full_bracket") or {}
+    rounds = bracket.get("rounds") or {}
+    answers: dict[str, Any] = {}
+    for entries in rounds.values():
+        for entry in entries or []:
+            if isinstance(entry, dict) and entry.get("match_id"):
+                answers[str(entry["match_id"])] = dict(entry)
+    return answers
+
+
+def _wc_has_stale_descendants(retired_ids: frozenset[str],
+                              payload: Mapping[str, Any]) -> bool:
+    """True when a retired answer has a DESCENDANT that is still simulated.
+
+    The parent→child DAG is ``bracket.json``'s ``source_matches`` (validated
+    by ``football_core/state.py:validate_bracket``). A corrected upstream
+    result leaves a downstream answer stale even though the ids do not
+    intersect — the propagation case (D-11's extension, D-17).
+    """
+    if not retired_ids:
+        return False
+    remaining = _wc_sim_ids(payload) - set(retired_ids)
+    if not remaining:
+        return False
+    doc, availability, _detail = load_json_store(DATA_DIR / "bracket.json")
+    if availability is not DataAvailability.AVAILABLE or not isinstance(doc, list):
+        return False
+    children: dict[str, list[str]] = {}
+    for entry in doc:
+        if not isinstance(entry, dict):
+            continue
+        child = entry.get("match_id")
+        if not child:
+            continue
+        for parent in entry.get("source_matches") or []:
+            children.setdefault(str(parent), []).append(str(child))
+    for retired in retired_ids:
+        for child in children.get(str(retired), ()):
+            if child in remaining:
+                return True
+    return False
+
+
+def _wc_known_fact_ids() -> frozenset[str]:
+    """The real-result ids known RIGHT NOW — the facts a run is computed against."""
+    ids: set[str] = set()
+    for name in ("played.json", "played_groups.json"):
+        payload, availability, _detail = load_json_store(DATA_DIR / name)
+        if availability is DataAvailability.AVAILABLE and isinstance(payload, dict):
+            ids.update(str(key) for key in payload.keys())
+    return frozenset(ids)
+
+
+def _reconciliation_spec() -> reconciliation.ReconciliationSpec:
+    """The World Cup's reconciliation description — the owner's input.
+
+    The World Cup retires PER MATCH: its knockout ids (``M73``-``M96``,
+    ``QF_1``-``QF_4``, ``SF_1``, ``SF_2``, ``TPP``, ``FINAL``) are set-equal
+    to the simulated bracket's ids. Its group-stage ids (``GS_A_01`` …) do
+    NOT intersect the bracket at all — that is the accepted limitation
+    D-10 records, and it is why the ``mode`` verdict must be able to say
+    ``"partial"``.
+    """
+    return reconciliation.ReconciliationSpec(
+        competition="worldcup",
+        ledger_path=reconciliation.retirement_ledger_path(DATA_DIR),
+        result_stores=(
+            reconciliation.ResultStore(
+                role="played",
+                path=DATA_DIR / "played.json",
+                ids=_store_ids,
+                rows=_store_rows,
+            ),
+            reconciliation.ResultStore(
+                role="played_groups",
+                path=DATA_DIR / "played_groups.json",
+                ids=_store_ids,
+                rows=_store_rows,
+            ),
+        ),
+        observed_stamp=_observed_stamp,
+        granularity="match",
+        sim_ids=_wc_sim_ids,
+        sim_answers=_wc_sim_answers,
+        stale_descendants=_wc_has_stale_descendants,
+    )
+
+
 def _build_state() -> tuple[dict, str]:
     """Build the WC derived snapshot: the overview plus the constant mode.
 
@@ -172,8 +304,18 @@ def _build_state() -> tuple[dict, str]:
 
 
 def _snap():
-    """The frozen WC snapshot for this request (rebuilt only when stale)."""
-    return holder.get_or_rebuild("worldcup", _observed_stamp(), _build_state)
+    """The frozen WC snapshot for this request (rebuilt only when stale).
+
+    D-01: the reconciler is invoked HERE, on every read, because this is the
+    only seam every read already goes through. Its per-request cost is ONE
+    tuple comparison (the results sub-stamp vs the simulation's recorded
+    sub-stamp); the store read happens ONLY on a mismatch. A CLI backfill or
+    a ``git checkout`` of the partly-gitignored data dir leaves no report,
+    so this is the path that gives them tombstones too.
+    """
+    snap = holder.get_or_rebuild("worldcup", _observed_stamp(), _build_state)
+    reconciliation.reconcile_if_needed(_reconciliation_spec())
+    return snap
 
 
 def _publish_snapshot(report: dict | None = None) -> None:
@@ -258,12 +400,21 @@ def _fetch_live_data() -> dict:
         report = {"provider": None, "attempted": True, "success": False,
                   "error": "live refresh failed", "stale": True,
                   "finished": {}}
-    if _observed_stamp() != stamp_before:
-        # D-06: this hook publishes the new facts itself, so the simulation
-        # must be retired HERE — at the store write, before the publish.
-        # Retiring it after the publish left a window in which
-        # GET /api/simulation served the previous run next to the new facts.
-        holder.clear_sim("worldcup")
+    # D-01: the retirement happens BEFORE the new facts publish (Phase 4's
+    # D-06 invariant), and the comparison is NARROWED to the RESULTS
+    # roles — a teams.json Elo update, a groups.json refresh or a
+    # bracket.json correction must NOT trigger a retirement.
+    if (sub_stamp(_observed_stamp(), WC_RESULTS_ROLES)
+            != sub_stamp(stamp_before, WC_RESULTS_ROLES)):
+        try:
+            reconciliation.reconcile_now(_reconciliation_spec(), report=report)
+        except Exception:
+            # D-03: a lost durable write must never look like a successful
+            # one — log loudly and let the refresh report the failure.
+            logger.exception(
+                "worldcup reconciliation FAILED — the retirement was NOT persisted"
+            )
+            raise
     _publish_snapshot(report)
     return report
 
@@ -319,12 +470,19 @@ def api_refresh():
         stamp_before = _observed_stamp()
         report = dict(REGISTRY.get("worldcup").refresh())
         stamp_after = _observed_stamp()
-        if stamp_after != stamp_before:
-            # D-06: the simulation is retired AT the store write, BEFORE the
-            # rebuild publishes the new facts. Clearing it after the rebuild
-            # left a window in which GET /api/simulation still served the
-            # previous run while GET /api/data served the new facts.
-            holder.clear_sim("worldcup")
+        if (sub_stamp(stamp_after, WC_RESULTS_ROLES)
+                != sub_stamp(stamp_before, WC_RESULTS_ROLES)):
+            # D-01: this is the SECOND reconciliation on one POST (the
+            # registry calls _fetch_live_data first). The set operation is
+            # idempotent BY CONSTRUCTION, so the second run retires
+            # nothing new and retired_count does not climb.
+            try:
+                reconciliation.reconcile_now(_reconciliation_spec(), report=report)
+            except Exception:
+                logger.exception(
+                    "worldcup reconciliation FAILED — the retirement was NOT persisted"
+                )
+                raise
         data, mode = _build_state()
         holder.publish_data("worldcup", data, mode, stamp_after)
     except Exception as e:
@@ -336,8 +494,94 @@ def api_refresh():
     return JSONResponse(refresh_response_body(report, mode="results"))
 
 
+def simulation_eligibility() -> tuple[bool, Optional[str], str]:
+    """Shared eligibility truth (adapter + handler both use this)."""
+    remaining = unplayed_match_count()
+    if remaining is None:
+        return False, "store_unavailable", (
+            "Played-result stores are unavailable; cannot evaluate "
+            "simulation eligibility.")
+    if remaining == 0:
+        return False, "no_unplayed_matches", (
+            "All competition results are already known from real match "
+            "data. Simulation is not needed.")
+    return True, None, ""
+
+
+def has_simulation() -> bool:
+    return bool(holder.read_sim("worldcup").get("status") == "completed")
+
+
+def _run_wc_simulation(progress_cb, count: int, seed: Optional[int],
+                       weights=None, show_ci: str = "auto") -> dict:
+    from competitions.worldcup.src.pipeline import run_simulation_compute
+    # D-18: sample the facts and the results-role sub-stamp BEFORE the run
+    # reads the stores — the recorded generation is never newer than the
+    # data it describes (Phase 4's STAMP-BEFORE-BUILD discipline).
+    stamp = sub_stamp(_observed_stamp(), WC_RESULTS_ROLES)
+    facts = _wc_known_fact_ids()
+    result = run_simulation_compute(
+        DATA_DIR, iterations=count, seed=seed, weights=weights,
+        bsd_api_key=_bsd_key(), football_data_org_key=_football_data_org_key(),
+        progress_cb=progress_cb,
+    )
+    result["sim_results_stamp"] = stamp
+    result["sim_facts"] = tuple(sorted(facts))
+    return result
+
+
+def _store_wc_sim_result(result: dict, count: int, seed: Optional[int],
+                         weights=None, show_ci: str = "auto") -> dict:
+    """Cache/snapshot side effects. Returns the public task summary.
+
+    The payload is assembled FIRST and published with ONE assignment: a
+    concurrent ``GET /api/simulation`` reader can never observe a payload
+    that is missing ``n_unplayed`` (or any other key).
+    """
+    remaining = unplayed_match_count()
+    sim_meta = result.get("simulation_meta", {})
+    extra = {
+        "weights": weights,
+        "show_ci": show_ci,
+        "n_top_teams": len(result["top_teams"]),
+        "n_signals_evaluated": len(result["eval_metrics"]),
+    }
+    if remaining is not None:
+        extra["unplayed_matches"] = remaining
+    payload = {
+        "top_teams": result["top_teams"][:20],
+        "signal_eval": result["eval_metrics"],
+        "simulation_meta": build_simulation_meta(
+            requested_count=count,
+            actual_count=sim_meta.get("n_simulations", count),
+            seed=sim_meta.get("seed"),
+            provenance_extra=sim_meta.get("provenance") or {},
+            engine_version=sim_meta.get("engine_version"),
+            extra=extra,
+        ),
+        "full_bracket": result["full_bracket"],
+        "sim_result": result.get("sim_result"),
+        "sim_facts": tuple(result.get("sim_facts") or ()),
+        "sim_results_stamp": result.get("sim_results_stamp"),
+        "status": "completed",
+    }
+    if remaining is not None:
+        payload["n_unplayed"] = remaining
+    snapshot = result["snapshot"]
+    snapshot["show_ci"] = show_ci
+    atomic_write_text(
+        DATA_DIR / "snapshot.json",
+        json.dumps(snapshot, indent=2, default=str, ensure_ascii=False),
+    )
+    holder.publish_sim("worldcup", payload)  # ONE atomic assignment; never mutate after
+    ack = {}
+    if remaining is not None:
+        ack["n_unplayed"] = remaining
+    return ack
+
+
 def _simulation_state_block() -> dict:
-    """Shared product contract: availability + request lifecycle."""
+    """Shared product contract: availability + request lifecycle + reconciliation."""
     eligible, reason, _msg = simulation_eligibility()
     sim_status = holder.read_sim("worldcup").get("status", "not_requested")
     request_state = {
@@ -345,11 +589,16 @@ def _simulation_state_block() -> dict:
         "completed": "completed",
         "failed": "failed",
     }.get(sim_status, "not_requested")
-    return {
+    block = {
         "availability": "available" if eligible else "not_needed",
         "reason": reason,
         "request_state": request_state,
     }
+    # C-05/D-12: the reconciliation verdict rides the SAME block in every
+    # endpoint, so the dashboard can never see one shape here and another
+    # there. The keys are ADDED — the existing ones never change.
+    block.update(reconciliation.reconciliation_block(_reconciliation_spec()))
+    return block
 
 
 def _refresh_report_path() -> Path:
@@ -418,6 +667,7 @@ def api_overview():
         "phase": snap.get("phase", {}),
 
         "has_simulation": has_sim,
+        "simulation": _simulation_state_block(),
         "lifecycle": snap.get("lifecycle", {}),
         "availability": availability,
     }
@@ -432,6 +682,9 @@ def api_overview():
 
 @wc_app.get("/api/simulation")
 def api_simulation():
+    # D-01/D-14.7: this endpoint does not go through _snap(), so the
+    # reconciler is invoked here explicitly.
+    reconciliation.reconcile_if_needed(_reconciliation_spec())
     sim = holder.read_sim("worldcup")
     payload = {
         "top_teams": sim.get("top_teams", []),
@@ -528,80 +781,7 @@ def api_blend():
 
 
 
-def simulation_eligibility() -> tuple[bool, Optional[str], str]:
-    """Shared eligibility truth (adapter + handler both use this)."""
-    remaining = unplayed_match_count()
-    if remaining is None:
-        return False, "store_unavailable", (
-            "Played-result stores are unavailable; cannot evaluate "
-            "simulation eligibility.")
-    if remaining == 0:
-        return False, "no_unplayed_matches", (
-            "All competition results are already known from real match "
-            "data. Simulation is not needed.")
-    return True, None, ""
 
-
-def has_simulation() -> bool:
-    return bool(holder.read_sim("worldcup").get("status") == "completed")
-
-
-def _run_wc_simulation(progress_cb, count: int, seed: Optional[int],
-                       weights=None, show_ci: str = "auto") -> dict:
-    from competitions.worldcup.src.pipeline import run_simulation_compute
-    return run_simulation_compute(
-        DATA_DIR, iterations=count, seed=seed, weights=weights,
-        bsd_api_key=_bsd_key(), football_data_org_key=_football_data_org_key(),
-        progress_cb=progress_cb,
-    )
-
-
-def _store_wc_sim_result(result: dict, count: int, seed: Optional[int],
-                         weights=None, show_ci: str = "auto") -> dict:
-    """Cache/snapshot side effects. Returns the public task summary.
-
-    The payload is assembled FIRST and published with ONE assignment: a
-    concurrent ``GET /api/simulation`` reader can never observe a payload
-    that is missing ``n_unplayed`` (or any other key).
-    """
-    remaining = unplayed_match_count()
-    sim_meta = result.get("simulation_meta", {})
-    extra = {
-        "weights": weights,
-        "show_ci": show_ci,
-        "n_top_teams": len(result["top_teams"]),
-        "n_signals_evaluated": len(result["eval_metrics"]),
-    }
-    if remaining is not None:
-        extra["unplayed_matches"] = remaining
-    payload = {
-        "top_teams": result["top_teams"][:20],
-        "signal_eval": result["eval_metrics"],
-        "simulation_meta": build_simulation_meta(
-            requested_count=count,
-            actual_count=sim_meta.get("n_simulations", count),
-            seed=sim_meta.get("seed"),
-            provenance_extra=sim_meta.get("provenance") or {},
-            engine_version=sim_meta.get("engine_version"),
-            extra=extra,
-        ),
-        "full_bracket": result["full_bracket"],
-        "sim_result": result.get("sim_result"),
-        "status": "completed",
-    }
-    if remaining is not None:
-        payload["n_unplayed"] = remaining
-    snapshot = result["snapshot"]
-    snapshot["show_ci"] = show_ci
-    atomic_write_text(
-        DATA_DIR / "snapshot.json",
-        json.dumps(snapshot, indent=2, default=str, ensure_ascii=False),
-    )
-    holder.publish_sim("worldcup", payload)  # ONE atomic assignment; never mutate after
-    ack = {}
-    if remaining is not None:
-        ack["n_unplayed"] = remaining
-    return ack
 
 
 @wc_app.post("/api/simulate")
