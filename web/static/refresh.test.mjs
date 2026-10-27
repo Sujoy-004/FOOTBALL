@@ -357,6 +357,18 @@ test("caption renders only when the report carries counters", () => {
   assert.ok(!el2.innerHTML.includes(".acq-caption"), "no caption without counters");
 });
 
+test("caption sums stage-partitioned counters (G-02-4)", () => {
+  const el = { innerHTML: "" };
+  shared.renderAcquisitionPanel(el, {
+    competition: "World Cup 2026", source: "live", mode: "live", stages: [],
+    finished: {
+      group_stage: { ingested: 2, skipped_unmatchable: 1, not_finished: 0 },
+      knockout: { ingested: 1, skipped_no_target: 2, not_finished: 1 },
+    },
+  });
+  assert.ok(el.innerHTML.includes("Ingested 3 · Skipped 3 · Not finished 1"), "sums stage counters");
+});
+
 test("legacy SNAPSHOT/STALE/DEFERRED wording is byte-identical", () => {
   assert.equal(shared.renderAvailabilityBanner("snapshot", {}).includes("SNAPSHOT - showing stored data (live refresh skipped)"), true);
   assert.equal(shared.renderAvailabilityBanner("stale", {}).includes("STALE - live refresh failed; showing last known data"), true);

@@ -514,6 +514,8 @@ function _mapWcMatch(m, simById, retiredIds) {
 function renderBracket() {
   const tab = document.getElementById("tab-bracket");
   if (!tab) return;
+  const blocked = _blockingAvailability();
+  if (blocked) { tab.innerHTML = renderAvailPanel(blocked); return; }
   const bd = appState.bracketData;
   if (!bd) {
     tab.innerHTML = '<div class="dim" style="padding:20px">Bracket data not available yet.</div>';

@@ -836,12 +836,29 @@ function _acqCaptionHtml(acq) {
   const f = acq && acq.finished;
   if (!f || typeof f !== "object") return "";
   const n = (v) => (typeof v === "number" && isFinite(v) ? v : null);
-  const ingested = n(f.ingested);
+
+  let ingested = n(f.ingested);
+  let skipped = null;
+  let notFinished = null;
+
+  if (ingested === null) {
+    // Check if finished is stage-partitioned (e.g. World Cup {group_stage: {...}, knockout: {...}})
+    const stageValues = Object.values(f).filter(v => v && typeof v === "object" && typeof v.ingested === "number");
+    if (stageValues.length > 0) {
+      ingested = stageValues.reduce((sum, st) => sum + (n(st.ingested) || 0), 0);
+      skipped = stageValues.reduce((sum, st) => sum + (n(st.skipped_unmatchable) || 0) + (n(st.skipped_no_target) || 0)
+        + (n(st.skipped_missing_score) || 0) + (n(st.skipped_no_change) || 0), 0);
+      notFinished = stageValues.reduce((sum, st) => sum + (n(st.not_finished) != null ? n(st.not_finished)
+        : (n(st.skipped_not_finished) != null ? n(st.skipped_not_finished) : 0)), 0);
+    }
+  } else {
+    skipped = (n(f.skipped_unmatchable) || 0) + (n(f.skipped_no_target) || 0)
+      + (n(f.skipped_missing_score) || 0) + (n(f.skipped_no_change) || 0);
+    notFinished = n(f.not_finished) != null ? n(f.not_finished)
+      : (n(f.skipped_not_finished) != null ? n(f.skipped_not_finished) : 0);
+  }
+
   if (ingested === null) return "";
-  const skipped = (n(f.skipped_unmatchable) || 0) + (n(f.skipped_no_target) || 0)
-    + (n(f.skipped_missing_score) || 0) + (n(f.skipped_no_change) || 0);
-  const notFinished = n(f.not_finished) != null ? n(f.not_finished)
-    : (n(f.skipped_not_finished) != null ? n(f.skipped_not_finished) : 0);
   return '<div class="acq-caption">Ingested ' + ingested + " · Skipped " + skipped + " · Not finished " + notFinished + "</div>";
 }
 
