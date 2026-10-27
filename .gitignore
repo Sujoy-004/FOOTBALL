@@ -41,6 +41,7 @@ competitions/worldcup/data/played_groups.json
 competitions/worldcup/data/probability_log.json
 competitions/worldcup/data/prediction_history.json
 competitions/worldcup/data/snapshot.json
+competitions/worldcup/data/retirements.json
 
 # World Cup — TTL-based signal caches (regeneratable by re-fetching)
 competitions/worldcup/data/odds_cache.json
@@ -112,6 +113,7 @@ web/cache.json
 # UCL data — runtime simulation state (regeneratable)
 competitions/ucl/data/*.bak
 competitions/ucl/data/snapshot.json
+competitions/ucl/data/retirements.json
 competitions/ucl/data/results.json
 competitions/ucl/data/knockout_results.json
 competitions/ucl/data/replay_2025_26.json
@@ -132,6 +134,7 @@ competitions/laliga/data/seasons/2026_27/*
 competitions/laliga/data/current.json
 competitions/laliga/data/refresh_report.json
 competitions/laliga/data/snapshot.json
+competitions/laliga/data/retirements.json
 
 
 # Private interview study guide (local only, never commit)
