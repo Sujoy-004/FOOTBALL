@@ -1,5 +1,6 @@
 """UEFA Champions League — FastAPI sub-app mounted under /ucl."""
 from __future__ import annotations
+from typing import Any, Mapping
 
 import logging
 
@@ -49,11 +50,12 @@ from web.common import (
     refresh_response_body,
     ts,
 )
-from football_core.domain import DataAvailability, load_json_store
-from football_core.store_stamp import StoreStamp, stamp_store
+from football_core.domain import DataAvailability, load_json_store, DataAvailability, load_json_store
+from football_core.store_stamp import StoreStamp, stamp_store, sub_stamp
+from web.derived.stamps import UCL_RESULTS_ROLES, UCL_ROLES
+from web import reconciliation
 from web.common import RobustJSONResponse as JSONResponse
 from web.derived import holder
-from web.derived.stamps import UCL_ROLES
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 UCL_LEAGUE_ID: int = 7
@@ -161,13 +163,163 @@ def _observed_stamp() -> StoreStamp:
     return stamp_store(_active_dir(), UCL_ROLES)
 
 
+def _ucl_league_ids(payload: Any) -> frozenset[str]:
+    """The fixture ids the league results store holds."""
+    if not isinstance(payload, dict):
+        return frozenset()
+    ids: set[str] = set()
+    for row in payload.get("matches") or []:
+        if isinstance(row, dict) and row.get("match_id"):
+            ids.add(str(row["match_id"]))
+    return frozenset(ids)
+
+
+def _ucl_league_rows(payload: Any) -> Mapping[str, Any]:
+    """id -> the stored league row, for the ledger's ``real_result`` block."""
+    if not isinstance(payload, dict):
+        return {}
+    return {
+        str(row["match_id"]): row
+        for row in payload.get("matches") or []
+        if isinstance(row, dict) and row.get("match_id")
+    }
+
+
+def _ucl_knockout_ids(payload: Any) -> frozenset[str]:
+    """The tie ids the v2 knockout store holds.
+
+    The v2 document nests the entries under
+    ``matches.playoff``, ``matches.rounds.<ROUND>`` and ``matches.final``;
+    every entry carries a ``match_id`` (``r16_01``, ``qf_01``, ``sf_01``,
+    ``final_01``, ``playoff_t1``).
+    """
+    if not isinstance(payload, dict):
+        return frozenset()
+    matches = payload.get("matches")
+    if not isinstance(matches, dict):
+        return frozenset()
+    groups: list[list] = []
+    if isinstance(matches.get("playoff"), list):
+        groups.append(matches["playoff"])
+    rounds = matches.get("rounds")
+    if isinstance(rounds, dict):
+        for entries in rounds.values():
+            if isinstance(entries, list):
+                groups.append(entries)
+    if isinstance(matches.get("final"), list):
+        groups.append(matches["final"])
+    ids: set[str] = set()
+    for entries in groups:
+        for entry in entries:
+            if isinstance(entry, dict) and entry.get("match_id"):
+                ids.add(str(entry["match_id"]))
+    return frozenset(ids)
+
+
+def _ucl_knockout_rows(payload: Any) -> Mapping[str, Any]:
+    """id -> the stored knockout entry, for the ledger's ``real_result``."""
+    if not isinstance(payload, dict):
+        return {}
+    matches = payload.get("matches")
+    if not isinstance(matches, dict):
+        return {}
+    rows: dict[str, Any] = {}
+    groups: list[list] = []
+    if isinstance(matches.get("playoff"), list):
+        groups.append(matches["playoff"])
+    rounds = matches.get("rounds")
+    if isinstance(rounds, dict):
+        for entries in rounds.values():
+            if isinstance(entries, list):
+                groups.append(entries)
+    if isinstance(matches.get("final"), list):
+        groups.append(matches["final"])
+    for entries in groups:
+        for entry in entries:
+            if isinstance(entry, dict) and entry.get("match_id"):
+                rows[str(entry["match_id"])] = entry
+    return rows
+
+
+def _ucl_snapshot_summary(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    """A BOUNDED summary of the retired run.
+
+    The whole UCL payload carries 36 standings rows, odds, signals and
+    elo ratings — hundreds of KB per record. The summary preserves what
+    a backtest needs (the SEED is the reproduction key, the champion
+    distribution is the answer) at about 1 KB per record; the full run is
+    reproducible from the seed (SIM-02).
+    """
+    meta = payload.get("simulation_meta") or {}
+    return {
+        "seed": meta.get("seed"),
+        "n_simulations": meta.get("n_simulations"),
+        "champion": payload.get("champion"),
+        "n_standings": len(payload.get("standings") or []),
+        "status": payload.get("status"),
+    }
+
+
+def _ucl_known_fact_ids() -> frozenset[str]:
+    """The real-result ids known RIGHT NOW — the facts a run is computed against."""
+    ids: set[str] = set()
+    for name in ("results.json", "knockout_results.json"):
+        payload, availability, _detail = load_json_store(_active_dir() / name)
+        if availability is not DataAvailability.AVAILABLE:
+            continue
+        ids |= _ucl_league_ids(payload)
+        ids |= _ucl_knockout_ids(payload)
+    return frozenset(ids)
+
+
+def _reconciliation_spec() -> reconciliation.ReconciliationSpec:
+    """UCL's reconciliation description — the owner's input.
+
+    UCL retires the WHOLE RUN by decision (D-10): its simulation payload
+    carries no per-match answer list, so there is nothing to enumerate
+    per match. This is a DELIBERATE coarse choice, not a structural
+    impossibility — the v2 knockout store already carries ``match_id``
+    slots (D-14.3) — and it stays that way until fixture identity is
+    unified (C-11).
+    """
+    return reconciliation.ReconciliationSpec(
+        competition="ucl",
+        ledger_path=reconciliation.retirement_ledger_path(DATA_DIR),
+        result_stores=(
+            reconciliation.ResultStore(
+                role="league_results",
+                path=_active_dir() / "results.json",
+                ids=_ucl_league_ids,
+                rows=_ucl_league_rows,
+            ),
+            reconciliation.ResultStore(
+                role="knockout_results",
+                path=_active_dir() / "knockout_results.json",
+                ids=_ucl_knockout_ids,
+                rows=_ucl_knockout_rows,
+            ),
+        ),
+        observed_stamp=_observed_stamp,
+        granularity="snapshot",
+        snapshot_summary=_ucl_snapshot_summary,
+    )
+
+
 def _build_state() -> tuple[dict, str]:
     data = compute_all()          # global-free; returns dict with "mode" key
     return data, data.get("mode", "results")
 
 
 def _snap():
-    return holder.get_or_rebuild("ucl", _observed_stamp(), _build_state)
+    """The frozen UCL snapshot for this request (rebuilt only when stale).
+
+    D-01: the reconciler is invoked HERE, on every read. Its per-request
+    cost is ONE tuple comparison; the store read happens only on a
+    results-role sub-stamp mismatch.
+    """
+    snap = holder.get_or_rebuild("ucl", _observed_stamp(), _build_state)
+    reconciliation.reconcile_if_needed(_reconciliation_spec())
+    return snap
 
 
 def _refresh_report_path() -> Path:
@@ -511,8 +663,15 @@ def _fetch_live_data() -> None:
         # retired HERE — at the store write, before that publish. Retiring
         # it after the publish left a window in which GET /api/simulation
         # served the previous run next to the new facts.
-        if _observed_stamp() != stamp_before:
-            holder.clear_sim("ucl")
+        if (sub_stamp(_observed_stamp(), UCL_RESULTS_ROLES)
+                != sub_stamp(stamp_before, UCL_RESULTS_ROLES)):
+            try:
+                reconciliation.reconcile_now(_reconciliation_spec())
+            except Exception:
+                logger.exception(
+                    "[UCL] reconciliation FAILED — the retirement was NOT persisted"
+                )
+                raise
         _maybe_recompute_cache_after_ingest(summary)
 
 
@@ -737,7 +896,7 @@ def api_set_season(req: dict = None):
     provider = None if season == LOCAL_HISTORICAL_SEASON else f"ucl.draw.{season.replace('/', '_')}"
     pointer = set_current_season(DATA_DIR, season, basis=basis, provider=provider)
     try:
-        holder.clear_sim("ucl")
+        reconciliation.reconcile_now(_reconciliation_spec(), reason="store_replaced")
         # STAMP-BEFORE-BUILD: the season pointer just flipped, so the stamp is sampled
         # AFTER the switch but BEFORE the build — the published pair is never
         # (older data, newer stamp).
@@ -779,6 +938,9 @@ def api_boot():
 
 @ucl_app.get("/api/simulation")
 def api_simulation():
+    # D-01/D-14.7: this endpoint does not go through _snap(), so the
+    # reconciler is invoked here explicitly.
+    reconciliation.reconcile_if_needed(_reconciliation_spec())
     sim = holder.read_sim("ucl")
     payload = {
         "odds": sim.get("odds", []),
@@ -1067,7 +1229,7 @@ def _simulation_state_block() -> dict:
         "failed": "failed",
     }.get(sim_status, "not_requested")
     if not undecided:
-        return {
+        block = {
             "availability": "not_needed",
             "reason": None,
             "request_state": request_state,
@@ -1075,12 +1237,16 @@ def _simulation_state_block() -> dict:
             # history analysis; the UI must label it accordingly.
             "what_if": True,
         }
-    return {
+        block.update(reconciliation.reconciliation_block(_reconciliation_spec()))
+        return block
+    block = {
         "availability": "available",
         "reason": None,
         "request_state": request_state,
         "what_if": False,
     }
+    block.update(reconciliation.reconciliation_block(_reconciliation_spec()))
+    return block
 
 
 def _ucl_sim_runner(progress_cb, count: int, seed):
@@ -1100,12 +1266,16 @@ def _ucl_sim_runner(progress_cb, count: int, seed):
         else:
             progress_cb(value, total, stage)
 
+    stamp = sub_stamp(_observed_stamp(), UCL_RESULTS_ROLES)
+    facts = _ucl_known_fact_ids()
     result = _run_mc_simulation_pipeline(
         str(DATA_DIR), n_iterations=count, seed=seed,
         weights=None, show_ci="auto", bsd_api_key=_bsd_key(),
         team_aliases=_BSD_TEAM_ALIASES, progress_cb=_normalized_progress,
         elo_ratings_override=cached_elo,
     )
+    result["sim_results_stamp"] = stamp
+    result["sim_facts"] = tuple(sorted(facts))
     return result
 
 
@@ -1123,6 +1293,8 @@ def _store_ucl_sim_result(result: dict, count: int, seed) -> dict:
     )
     payload["status"] = "completed"
     payload["simulation_meta"] = meta
+    payload["sim_facts"] = tuple(result.get("sim_facts") or ())
+    payload["sim_results_stamp"] = result.get("sim_results_stamp")
     snapshot_data = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "mode": result.get("mode", "simulation"),
@@ -1186,12 +1358,15 @@ def api_refresh():
         stamp_before = _observed_stamp()
         report = dict(REGISTRY.get("ucl").refresh())
         stamp_after = _observed_stamp()
-        if stamp_after != stamp_before:
-            # D-06: the simulation is retired AT the store write, BEFORE the
-            # rebuild publishes the new facts. Clearing it after the rebuild
-            # left a window in which GET /api/simulation still served the
-            # previous run while GET /api/data served the new facts.
-            holder.clear_sim("ucl")
+        if (sub_stamp(stamp_after, UCL_RESULTS_ROLES)
+                != sub_stamp(stamp_before, UCL_RESULTS_ROLES)):
+            try:
+                reconciliation.reconcile_now(_reconciliation_spec())
+            except Exception:
+                logger.exception(
+                    "[UCL] reconciliation FAILED — the retirement was NOT persisted"
+                )
+                raise
         data, mode = _build_state()
         holder.publish_data("ucl", data, mode, stamp_after)
     except Exception as e:
