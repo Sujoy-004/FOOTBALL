@@ -30,7 +30,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Iterable, Mapping
 
 
 @dataclass(frozen=True)
@@ -74,3 +74,27 @@ def stamp_store(data_dir: Path, roles: Mapping[str, str]) -> StoreStamp:
             continue
         entries.append((role, st.st_mtime_ns, st.st_size))
     return StoreStamp(tuple(entries))
+
+
+def sub_stamp(stamp: StoreStamp | None, roles: Iterable[str]) -> StoreStamp | None:
+    """The sub-stamp over *roles* only — a pure filter of an already-collected stamp.
+
+    Zero extra I/O: the entries were already stat'ed for the full stamp, so
+    narrowing to the results roles costs one tuple filter, not another
+    ``os.stat`` pass. A role absent from the stamp stays ABSENT (absence is
+    a fact about the generation, never a fabricated zero entry), and the
+    original tuple order is preserved so two sub-stamps compare equal
+    exactly when the same roles were present with the same metadata.
+
+    Args:
+        stamp: The full stamp, or ``None`` when the caller has none.
+        roles: The logical roles to keep.
+
+    Returns:
+        A :class:`StoreStamp` over the requested roles, or ``None`` when
+        *stamp* is ``None``.
+    """
+    if stamp is None:
+        return None
+    wanted = set(roles)
+    return StoreStamp(tuple(entry for entry in stamp.entries if entry[0] in wanted))
