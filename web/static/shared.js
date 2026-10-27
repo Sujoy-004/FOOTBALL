@@ -585,6 +585,7 @@ function _matchStatusClass(m) {
 function _buildMatchCard(m, adapter) {
   const card = document.createElement("div");
   card.className = "match-card " + _matchStatusClass(m)
+    + (m.retired ? " mc-retired" : "")
     + (adapter.cardThemeClass ? " " + adapter.cardThemeClass : "");
   card.dataset.mid = m.id || "";
   card.dataset.parents = JSON.stringify(m.parents || []);
@@ -596,7 +597,10 @@ function _buildMatchCard(m, adapter) {
     + '<span class="m-score">' + (m.resultLine != null ? _esc(m.resultLine) : "?-?") + "</span>"
     + '<span class="m-team' + (m.winner && m.winner === m.teamB ? " winner" : "") + '">' + _esc(tb) + "</span></div>";
 
-  if (m.provenance === "simulated") {
+  if (m.retired) {
+    // A retired answer is retired, not merely simulated (SIM-04) — badge-retired.
+    inner += retiredBadgeHtml(adapter.retiredLabel);
+  } else if (m.provenance === "simulated") {
     inner += '<span class="badge-sim">' + _esc(adapter.simLabel || "SIM") + "</span>";
   } else if (m.provenance === "manual") {
     inner += '<span class="badge-manual">' + _esc(adapter.manualLabel || "MAN") + "</span>";
@@ -839,6 +843,31 @@ function _acqCaptionHtml(acq) {
   const notFinished = n(f.not_finished) != null ? n(f.not_finished)
     : (n(f.skipped_not_finished) != null ? n(f.skipped_not_finished) : 0);
   return '<div class="acq-caption">Ingested ' + ingested + " · Skipped " + skipped + " · Not finished " + notFinished + "</div>";
+}
+
+// ── Retirement marker (Phase 05) ──
+// DOM-free string builders: node-testable, every dynamic value passes _esc().
+
+// One retired-count segment for the status bar's LEFT slot.
+// Returns "" (OMITTED) when the count is unknown — a MISSING/UNAVAILABLE
+// ledger or store, or a reconciliation that was never established.
+// A zero count would read as "up to date", which is the misreading D-12
+// forbids: an unknown count is ABSENT, never a number. The literal the
+// phase forbids is spelled out in the phase notes — it must not appear in
+// this file, or the static contract in task 3 would fail on itself.
+function retiredCountLine(simulation) {
+  if (!simulation || typeof simulation !== "object") return "";
+  if (simulation.not_established) return "";
+  const n = simulation.retired_count;
+  if (typeof n !== "number" || !isFinite(n)) return "";
+  if (n <= 0) return "";
+  return "  |  " + n + " retired";
+}
+
+// The retired badge markup. Retired is NOT failure: the treatment is
+// muted (--ink-3), never --foul.
+function retiredBadgeHtml(label) {
+  return '<span class="badge-retired">' + _esc(label || "Retired") + "</span>";
 }
 
 // ── Status bar helpers ──
@@ -1233,4 +1262,6 @@ export {
   activateCompetitionRefresh,
   requestCompetitionRefresh,
   stopAllCompetitionRefresh,
+  retiredCountLine,
+  retiredBadgeHtml,
 };

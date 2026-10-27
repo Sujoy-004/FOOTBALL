@@ -1339,13 +1339,22 @@ body.landing .app-sidebar {
 .match-card.mc-upcoming { border-left: 3px solid var(--ink-3); }
 .match-card.mc-tbd { border-left: 3px solid var(--void); opacity: 0.5; }
 .match-card .badge-sim,
+.match-card .badge-retired,
 .match-card .badge-manual {
   position: absolute; top: 2px; right: 4px; font-size: 8px; letter-spacing: 0.5px;
   padding: 0 4px; border-radius: 3px; line-height: 1.5;
 }
 .match-card .badge-sim { color: #8E44AD; border: 1px solid rgba(142,68,173,0.45); background: rgba(142,68,173,0.12); }
 .match-card .badge-manual { color: var(--ink-3); border: 1px solid color-mix(in srgb, var(--ink-3) 45%, transparent); background: color-mix(in srgb, var(--ink-3) 12%, transparent); }
+/* Retired = superseded, not failed. --foul stays reserved for failure. */
+.match-card .badge-retired {
+  color: var(--ink-3);
+  border: 1px solid color-mix(in srgb, var(--ink-3) 45%, transparent);
+  background: color-mix(in srgb, var(--ink-3) 12%, transparent);
+  text-decoration: line-through;
+}
 .m-sim-line { font-size: 9px; color: #8E44AD; text-align: center; line-height: 1.2; margin-top: 1px; }
+.match-card.mc-retired .m-sim-line { text-decoration: line-through; opacity: 0.72; }
 .tie-detail { margin-top: 3px; font-size: 9px; color: color-mix(in srgb, var(--ink-1) 53%, transparent); line-height: 1.5; }
 .champ-banner {
   border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent);

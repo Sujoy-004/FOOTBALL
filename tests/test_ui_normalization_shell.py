@@ -275,3 +275,37 @@ def test_new_primitives_are_competition_palette_bounded():
     assert ".competition-worldcup .sim-provenance" in CSS
     assert ".competition-laliga .phase-card" in CSS
     assert ".competition-worldcup .phase-card" in CSS
+
+# ── Phase 05 — the retirement marker ──────────────────────────────────
+
+def test_retired_badge_and_count_builder_are_present():
+    """Phase 05 — the retirement marker is wired into the shared shell."""
+    assert "function retiredCountLine" in SHARED
+    assert "function retiredBadgeHtml" in SHARED
+    assert ".badge-retired" in CSS
+    assert "mc-retired" in SHARED
+    assert ".match-card.mc-retired .m-sim-line" in CSS
+
+
+def test_retired_badge_is_muted_and_never_foul_red():
+    """Retired is superseded, not failed — --foul stays reserved for failure."""
+    start = CSS.index(".match-card .badge-retired {")
+    block = CSS[start:CSS.index("}", start)]
+    assert "--foul" not in block, block
+    assert "--ink-3" in block, block
+    assert "line-through" in block, block
+
+
+def test_retired_count_line_is_omitted_when_unknown():
+    """"0 retired" is the most dishonest string this phase could emit."""
+    start = SHARED.index("function retiredCountLine")
+    body = SHARED[start:SHARED.index("\n}", start)]
+    assert 'if (simulation.not_established) return "";' in body
+    assert 'if (n <= 0) return "";' in body
+    assert "0 retired" not in SHARED
+
+
+def test_retired_bracket_card_keeps_data_mid_and_parents():
+    """The SVG connectors read data-mid / data-parents — they must survive."""
+    assert 'card.dataset.mid = m.id || "";' in SHARED
+    assert "card.dataset.parents = JSON.stringify(m.parents || []);" in SHARED

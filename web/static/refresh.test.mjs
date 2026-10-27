@@ -382,3 +382,32 @@ test("I6 predicate: panel replaces table only for unhealthy states", () => {
   h.resolveReload().r();
   await flush();
 });
+
+// ── Phase 05 — the retirement marker builders (DOM-free) ──
+// shared.js was already imported (and its document/window globals already
+// stubbed) at the top of this file, so the builders are in scope here.
+
+test("retiredCountLine omits an unknown count", () => {
+  assert.equal(shared.retiredCountLine(undefined), "");
+  assert.equal(shared.retiredCountLine(null), "");
+  assert.equal(shared.retiredCountLine({}), "");
+  assert.equal(shared.retiredCountLine({ retired_count: null }), "");
+  assert.equal(shared.retiredCountLine({ retired_count: "3" }), "");
+  assert.equal(shared.retiredCountLine({ retired_count: 0 }), "");
+  assert.equal(shared.retiredCountLine({ retired_count: -2 }), "");
+  // A reconciliation that was never established may never show a count.
+  assert.equal(shared.retiredCountLine({ retired_count: 3, not_established: true }), "");
+});
+
+test("retiredCountLine renders a positive count", () => {
+  assert.equal(shared.retiredCountLine({ retired_count: 3 }), "  |  3 retired");
+  assert.equal(shared.retiredCountLine({ retired_count: 1 }), "  |  1 retired");
+});
+
+test("retiredBadgeHtml escapes its label", () => {
+  assert.equal(shared.retiredBadgeHtml(), '<span class="badge-retired">Retired</span>');
+  assert.equal(
+    shared.retiredBadgeHtml('<script>'),
+    '<span class="badge-retired">&lt;script&gt;</span>'
+  );
+});
