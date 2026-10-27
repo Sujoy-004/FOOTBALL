@@ -10,10 +10,13 @@ service.
 State lives in the race-free holder (``web.derived.holder``): one frozen
 snapshot per competition, rebound in ONE assignment, with the store
 stamp folded in — reads go through ``_snap()``, writes through
-``holder.publish_data`` / ``publish_sim`` / ``clear_sim``. No mutable
+``holder.publish_data`` / ``publish_sim``. No mutable
 module globals.
 """
 from __future__ import annotations
+from typing import Any, Mapping
+
+from football_core.domain import DataAvailability, load_json_store
 
 from football_core.freshness import (
     UNREADABLE,
@@ -23,7 +26,9 @@ from football_core.freshness import (
     update_ledger,
 )
 from football_core.state import atomic_write_text
-from football_core.store_stamp import StoreStamp, stamp_store
+from football_core.store_stamp import StoreStamp, stamp_store, sub_stamp
+from web.derived.stamps import LALIGA_RESULTS_ROLES, LALIGA_ROLES
+from web import reconciliation
 
 import json
 import logging
@@ -66,7 +71,6 @@ from web.common import (
     ts,
 )
 from web.derived import holder
-from web.derived.stamps import LALIGA_ROLES
 from web.simulation_service import SimulationTaskService, build_simulation_meta
 
 logger = logging.getLogger(__name__)
@@ -96,13 +100,90 @@ def _observed_stamp() -> StoreStamp:
     return stamp_store(_active_dir(), LALIGA_ROLES)
 
 
+def _laliga_result_ids(payload: Any) -> frozenset[str]:
+    """The fixture ids the season results store holds."""
+    if not isinstance(payload, dict):
+        return frozenset()
+    ids: set[str] = set()
+    for row in payload.get("matches") or []:
+        if isinstance(row, dict) and row.get("match_id"):
+            ids.add(str(row["match_id"]))
+    return frozenset(ids)
+
+
+def _laliga_result_rows(payload: Any) -> Mapping[str, Any]:
+    """id -> the stored row, for the ledger's ``real_result`` block."""
+    if not isinstance(payload, dict):
+        return {}
+    return {
+        str(row["match_id"]): row
+        for row in payload.get("matches") or []
+        if isinstance(row, dict) and row.get("match_id")
+    }
+
+
+def _laliga_snapshot_summary(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    """A BOUNDED summary of the retired run (see the UCL analogue)."""
+    meta = payload.get("simulation_meta") or {}
+    return {
+        "seed": meta.get("seed"),
+        "n_simulations": meta.get("n_iterations"),
+        "champion": payload.get("champion"),
+        "n_standings": len(payload.get("standings") or []),
+        "status": payload.get("status"),
+    }
+
+
+def _laliga_known_fact_ids() -> frozenset[str]:
+    """The real-result ids known RIGHT NOW — the facts a run is computed against."""
+    payload, availability, _detail = load_json_store(
+        _active_dir() / "results.json"
+    )
+    if availability is not DataAvailability.AVAILABLE:
+        return frozenset()
+    return _laliga_result_ids(payload)
+
+
+def _reconciliation_spec() -> reconciliation.ReconciliationSpec:
+    """LaLiga's reconciliation description — the owner's input.
+
+    LaLiga retires the WHOLE RUN by decision (D-10): its simulation
+    payload carries no per-match answer list. Its single results store
+    is the ACTIVE SEASON's ``results.json`` — the same directory the
+    stamp covers.
+    """
+    return reconciliation.ReconciliationSpec(
+        competition="laliga",
+        ledger_path=reconciliation.retirement_ledger_path(DATA_DIR),
+        result_stores=(
+            reconciliation.ResultStore(
+                role="results",
+                path=_active_dir() / "results.json",
+                ids=_laliga_result_ids,
+                rows=_laliga_result_rows,
+            ),
+        ),
+        observed_stamp=_observed_stamp,
+        granularity="snapshot",
+        snapshot_summary=_laliga_snapshot_summary,
+    )
+
+
 def _build_state() -> tuple[dict, str]:
     data = compute_all()          # global-free; returns dict with "mode" key
     return data, data.get("mode", "results")
 
 
 def _snap():
-    return holder.get_or_rebuild("laliga", _observed_stamp(), _build_state)
+    """The frozen LaLiga snapshot for this request (rebuilt only when stale).
+
+    D-01: the reconciler is invoked HERE, on every read. Its per-request
+    cost is ONE tuple comparison; the store read happens only on a
+    results-role sub-stamp mismatch.
+    """
+    snap = holder.get_or_rebuild("laliga", _observed_stamp(), _build_state)
+    reconciliation.reconcile_if_needed(_reconciliation_spec())
+    return snap
 
 
 def _refresh_report_path() -> Path:
@@ -170,7 +251,7 @@ _LALIGA_ELO_FILE = "elo_seed.json"
 
 def _live_availability() -> tuple[dict, dict]:
     """``(map, reasons)`` from ``load_json_store`` over the active season dir."""
-    from football_core.domain import DataAvailability, load_json_store
+    from football_core.domain import DataAvailability, load_json_store, DataAvailability, load_json_store
 
     adir = Path(season_store.season_dir(DATA_DIR, _active_season_token()))
     mapping: dict = {}
@@ -414,8 +495,15 @@ def _fetch_live_data():
         # store write, before that publish. Retiring it after the publish
         # left a window in which GET /api/simulation served the previous
         # run next to the new facts.
-        if _observed_stamp() != stamp_before:
-            holder.clear_sim("laliga")
+        if (sub_stamp(_observed_stamp(), LALIGA_RESULTS_ROLES)
+                != sub_stamp(stamp_before, LALIGA_RESULTS_ROLES)):
+            try:
+                reconciliation.reconcile_now(_reconciliation_spec())
+            except Exception:
+                logger.exception(
+                    "[LaLiga] reconciliation FAILED — the retirement was NOT persisted"
+                )
+                raise
         _recompute_cache()
     return summary
 
@@ -551,7 +639,7 @@ def api_set_season(req: dict = None):
         DATA_DIR, season, basis="shipped" if season == SHIPPED_SEASON else "catalog",
         provider=(None if season == SHIPPED_SEASON else f"laliga.{season.replace('/', '_')}"),
     )
-    holder.clear_sim("laliga")
+    reconciliation.reconcile_now(_reconciliation_spec(), reason="store_replaced")
     _recompute_cache()
     return JSONResponse({"status": "ok", "current": pointer,
                          "mode": holder.read_mode("laliga")})
@@ -574,6 +662,9 @@ def api_boot():
 
 @laliga_app.get("/api/simulation")
 def api_simulation():
+    # D-01/D-14.7: this endpoint does not go through _snap(), so the
+    # reconciler is invoked here explicitly.
+    reconciliation.reconcile_if_needed(_reconciliation_spec())
     sim = holder.read_sim("laliga")
     return JSONResponse({
         "odds": sim.get("odds", []),
@@ -649,10 +740,14 @@ def _simulation_state_block() -> dict:
         "running": "running", "completed": "completed", "failed": "failed",
     }.get(sim_status, "not_requested")
     if not undecided:
-        return {"availability": "not_needed", "reason": None,
-                "request_state": request_state, "what_if": True}
-    return {"availability": "available", "reason": None,
-            "request_state": request_state, "what_if": False}
+        block = {"availability": "not_needed", "reason": None,
+                 "request_state": request_state, "what_if": True}
+        block.update(reconciliation.reconciliation_block(_reconciliation_spec()))
+        return block
+    block = {"availability": "available", "reason": None,
+             "request_state": request_state, "what_if": False}
+    block.update(reconciliation.reconciliation_block(_reconciliation_spec()))
+    return block
 
 
 def _seed_as_of() -> str:
@@ -768,11 +863,16 @@ def _laliga_sim_runner(progress_cb, count: int, seed):
         else:
             progress_cb(value, total, stage)
 
-    return _run_mc_simulation_pipeline(
+    stamp = sub_stamp(_observed_stamp(), LALIGA_RESULTS_ROLES)
+    facts = _laliga_known_fact_ids()
+    result = _run_mc_simulation_pipeline(
         str(DATA_DIR), n_iterations=count, seed=seed,
         weights=None, show_ci="auto", progress_cb=_normalized_progress,
         elo_ratings_override=cached_elo,
     )
+    result["sim_results_stamp"] = stamp
+    result["sim_facts"] = tuple(sorted(facts))
+    return result
 
 
 def _store_laliga_sim_result(result: dict, count: int, seed) -> dict:
@@ -789,6 +889,8 @@ def _store_laliga_sim_result(result: dict, count: int, seed) -> dict:
     )
     payload["status"] = "completed"
     payload["simulation_meta"] = meta
+    payload["sim_facts"] = tuple(result.get("sim_facts") or ())
+    payload["sim_results_stamp"] = result.get("sim_results_stamp")
     snapshot_data = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "mode": result.get("mode", "simulation"),
@@ -849,12 +951,15 @@ def api_refresh():
         stamp_before = _observed_stamp()
         report = dict(REGISTRY.get("laliga").refresh())
         stamp_after = _observed_stamp()
-        if stamp_after != stamp_before:
-            # D-06: the simulation is retired AT the store write, BEFORE the
-            # rebuild publishes the new facts. Clearing it after the rebuild
-            # left a window in which GET /api/simulation still served the
-            # previous run while GET /api/data served the new facts.
-            holder.clear_sim("laliga")
+        if (sub_stamp(stamp_after, LALIGA_RESULTS_ROLES)
+                != sub_stamp(stamp_before, LALIGA_RESULTS_ROLES)):
+            try:
+                reconciliation.reconcile_now(_reconciliation_spec())
+            except Exception:
+                logger.exception(
+                    "[LaLiga] reconciliation FAILED — the retirement was NOT persisted"
+                )
+                raise
         data, mode = _build_state()
         holder.publish_data("laliga", data, mode, stamp_after)
     except Exception as e:
