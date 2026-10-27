@@ -43,3 +43,33 @@ ROLES: dict[str, dict[str, str]] = {
     "ucl": UCL_ROLES,
     "laliga": LALIGA_ROLES,
 }
+
+#: World Cup RESULTS-only roles (Phase 5). Excludes ``teams``, ``groups``,
+#: ``bracket`` and ``annex_c``: a teams.json Elo update or a bracket.json
+#: catalogue correction must NOT trigger a reconciliation pass (D-01).
+WC_RESULTS_ROLES: dict[str, str] = {
+    "played": "played.json",
+    "played_groups": "played_groups.json",
+}
+
+#: UCL RESULTS-only roles (Phase 5). Excludes ``fixtures``: a draw-derived
+#: fixture refresh carries no result and must not trigger a retirement.
+UCL_RESULTS_ROLES: dict[str, str] = {
+    "league_results": "results.json",
+    "knockout_results": "knockout_results.json",
+}
+
+#: LaLiga RESULTS-only roles (Phase 5). Excludes ``fixtures``.
+LALIGA_RESULTS_ROLES: dict[str, str] = {
+    "results": "results.json",
+}
+
+#: Competition id -> RESULTS-only role map (Phase 5). The reconciliation
+#: trigger compares the results SUB-STAMP; everything else in the full role
+#: map is deliberately outside the trigger.
+RESULTS_ROLES: dict[str, dict[str, str]] = {
+    "worldcup": WC_RESULTS_ROLES,
+    "ucl": UCL_RESULTS_ROLES,
+    "laliga": LALIGA_RESULTS_ROLES,
+}
+

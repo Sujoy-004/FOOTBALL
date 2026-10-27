@@ -4,7 +4,7 @@ D-01/D-04 substrate: one ``DerivedState`` per competition — the computed
 derived dict (standings, bracket, signal caches) **plus** the freshness
 :class:`~football_core.store_stamp.StoreStamp` **plus** the folded display mode
 — carried in a single frozen object behind a ``MappingProxyType`` and rebound
-in ONE assignment. A reader can never observe new data with an old stamp or
+in ONE assignment via ``holder.publish_data`` / ``publish_sim`` / ``publish_sim_state`` / ``clear_sim``. A reader can never observe new data with an old stamp or
 vice versa (the "photo that includes its own timestamp").
 
 Locking discipline (D-04):
@@ -67,8 +67,13 @@ from football_core.store_stamp import StoreStamp
 #: previous one, never a half-built one.
 _STATES: dict[str, DerivedState] = {}
 
-#: Simulated results slot — frozen payload, rebound (never mutated in place).
-_SIMS: dict[str, MappingProxyType] = {}
+#: Simulation-state slot (Phase 5, D-02) — a frozen object carrying the
+#: payload AND its tombstones AND the reconciliation verdict, rebound in
+#: ONE assignment. A reader can never observe a payload without its
+#: tombstones. This REPLACES the former ``SIM_STORE`` store: two stores cannot
+#: satisfy D-02's one-assignment clause, and two owners of the same state
+#: are the regression risk D-02 names.
+_SIM_STATES: dict[str, MappingProxyType] = {}
 
 #: Boot-diagnostic ledger — a SEPARATE single-ref slot per competition, an
 #: immutable tuple rebind; appends happen under one lock.
@@ -252,17 +257,59 @@ def publish_data(comp: str, data: dict, mode: str | None,
 
 def read_sim(comp: str) -> MappingProxyType:
     """The published simulation payload for *comp*, or ``{}`` when never published."""
-    return _SIMS.get(comp, MappingProxyType({}))
+    state = _SIM_STATES.get(comp)
+    return state["payload"] if state is not None else MappingProxyType({})
+
+
+def read_sim_state(comp: str) -> MappingProxyType:
+    """The full published simulation state for *comp*.
+
+    Carries ``payload``, ``tombstones``, ``reconciliation`` and ``mode``.
+    Returns ``{}`` when nothing is published.
+    """
+    return _SIM_STATES.get(comp, MappingProxyType({}))
 
 
 def publish_sim(comp: str, payload: dict) -> None:
     """Publish a complete frozen simulation payload in ONE assignment."""
-    _SIMS[comp] = MappingProxyType(_freeze(payload))
+    publish_sim_state(comp, payload=payload)
+
+
+def publish_sim_state(comp: str, *, payload: dict, tombstones: tuple = (),
+                      reconciliation: dict | None = None,
+                      mode: str | None = None) -> None:
+    """Publish the simulation state AND its tombstones in ONE assignment.
+
+    The payload and its tombstones travel inside ONE frozen object behind
+    ONE dict store, so a reader can never observe a payload without its
+    tombstones (D-02). The assignment is a single dict store, which is
+    atomic under the GIL: a reader sees either the whole previous state or
+    the whole new one.
+    """
+    _SIM_STATES[comp] = MappingProxyType(_freeze({
+        "payload": payload,
+        "tombstones": tuple(tombstones),
+        "reconciliation": dict(reconciliation or {}),
+        "mode": mode,
+    }))
 
 
 def clear_sim(comp: str) -> None:
-    """Rebind the sim slot to ``{}`` (D-06) — never mutate in place."""
-    _SIMS[comp] = MappingProxyType({})
+    """Retire the published simulation WITHOUT deleting its trail (Phase 5).
+
+    This is NOT a delete: the payload is emptied but the tombstones and the
+    reconciliation verdict are preserved, so the provenance trail survives.
+    It exists only so the six legacy call sites keep working until plans
+    05-08/05-09 replace them with reconciler calls; the reconciler is the
+    only sanctioned way to retire a simulation.
+    """
+    state = _SIM_STATES.get(comp)
+    _SIM_STATES[comp] = MappingProxyType(_freeze({
+        "payload": {},
+        "tombstones": tuple(state["tombstones"]) if state is not None else (),
+        "reconciliation": dict(state["reconciliation"]) if state is not None else {},
+        "mode": state["mode"] if state is not None else None,
+    }))
 
 
 def read_boot(comp: str) -> tuple[dict, ...]:
@@ -287,12 +334,12 @@ def reset(comp: str | None = None) -> None:
     """Test seam: clear the state/sim/boot slots for *comp*, or all when ``None``."""
     if comp is None:
         _STATES.clear()
-        _SIMS.clear()
+        _SIM_STATES.clear()
         with _BOOT_LOCK:
             _BOOTS.clear()
         return
     _STATES.pop(comp, None)
-    _SIMS.pop(comp, None)
+    _SIM_STATES.pop(comp, None)
     with _BOOT_LOCK:
         _BOOTS.pop(comp, None)
 
