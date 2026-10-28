@@ -21,16 +21,16 @@ def _build_match_score(played_m):
     return played_m.get("score")
 
 
-def compute_bracket_display(groups, teams, bracket, annex_c, played, played_groups):
+def compute_bracket_display(groups, teams, bracket, annex_c, played, played_groups, allow_simulation: bool = False):
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
     known_winners = {mid: data["winner"] for mid, data in played.items() if data.get("winner")}
-    slot_teams = resolve_knockout_slot_teams(groups, teams, played_groups, bracket, annex_c, known_winners)
+    slot_teams = resolve_knockout_slot_teams(groups, teams, played_groups, bracket, annex_c, known_winners, allow_simulation=allow_simulation)
     matchups = []
     for mid, st in sorted(slot_teams.items()):
         ta, tb = st["team_a"], st["team_b"]
         prob_a = round(elo.expected_score(elo_ratings.get(ta, 1500), elo_ratings.get(tb, 1500)), 4) if ta in elo_ratings and tb in elo_ratings else 0.5
         played_m = played.get(mid)
-        matchups.append({
+        matchup_dict = {
             "match_id": mid,
             "team_a": ta,
             "team_b": tb,
@@ -38,7 +38,12 @@ def compute_bracket_display(groups, teams, bracket, annex_c, played, played_grou
             "winner": played_m.get("winner") if played_m else None,
             "score": _build_match_score(played_m),
             "played": mid in played,
-        })
+        }
+        if "slot_a" in st:
+            matchup_dict["slot_a"] = st["slot_a"]
+        if "slot_b" in st:
+            matchup_dict["slot_b"] = st["slot_b"]
+        matchups.append(matchup_dict)
     return {"rounds": {"R32": matchups}, "n_matchups": len(matchups)}
 
 
@@ -60,11 +65,11 @@ def _prob_availability(ta, tb, elo_ratings):
     return True, None
 
 
-def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups, engine_predictions=None):
+def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups, engine_predictions=None, allow_simulation: bool = False):
     from competitions.worldcup.src.evaluation import compute_team_strengths_from_predictions
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
     known_winners = {mid: data["winner"] for mid, data in played.items() if data.get("winner")}
-    slot_teams = resolve_knockout_slot_teams(groups, teams, played_groups, bracket, annex_c, known_winners)
+    slot_teams = resolve_knockout_slot_teams(groups, teams, played_groups, bracket, annex_c, known_winners, allow_simulation=allow_simulation)
     resolved = {}
 
     def _entry_for(mid):
@@ -94,8 +99,10 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
         return {}, 0.5
 
     for mid, st in slot_teams.items():
-        ta, tb = st["team_a"], st["team_b"]
+        if mid.startswith("R32_") and any(k.startswith("M") for k in slot_teams):
+            continue
         be = _entry_for(mid)
+        ta, tb = st["team_a"], st["team_b"]
         rnd = be["round"] if be else "R32"
         prob_a = round(elo.expected_score(elo_ratings.get(ta, 1500), elo_ratings.get(tb, 1500)), 4) \
             if ta in elo_ratings and tb in elo_ratings else 0.5
@@ -103,7 +110,7 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
         status, provenance = _match_truth_fields(mid, played_m, ta, tb)
         p_avail, p_reason = _prob_availability(ta, tb, elo_ratings)
         sigs, elo_p = _signal_probs(ta, tb)
-        resolved[mid] = {
+        match_item = {
             "match_id": mid, "round": rnd,
             "team_a": ta, "team_b": tb,
             "prob_a": prob_a,
@@ -117,6 +124,11 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
             "source_matches": be.get("source_matches") if be else None,
             "signals": sigs,
         }
+        if "slot_a" in st:
+            match_item["slot_a"] = st["slot_a"]
+        if "slot_b" in st:
+            match_item["slot_b"] = st["slot_b"]
+        resolved[mid] = match_item
 
     def _resolve_teams_from_source(entry):
         sms = entry.get("source_matches", [])
@@ -150,7 +162,7 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
         status, provenance = _match_truth_fields(mid, played_m, ta, tb)
         p_avail, p_reason = _prob_availability(ta or "", tb or "", elo_ratings)
         sigs, elo_p = _signal_probs(ta or "", tb or "")
-        resolved[mid] = {
+        match_item = {
             "match_id": mid, "round": entry["round"],
             "team_a": ta, "team_b": tb,
             "prob_a": prob_a,
@@ -164,6 +176,15 @@ def compute_full_bracket(groups, teams, bracket, annex_c, played, played_groups,
             "source_matches": entry.get("source_matches"),
             "signals": sigs,
         }
+        sms = entry.get("source_matches", [])
+        if not ta and not tb and sms and not allow_simulation and not played_groups:
+            if entry["round"] == "TPP":
+                match_item["slot_a"] = f"Loser {sms[0]}" if len(sms) > 0 else "Loser SF_1"
+                match_item["slot_b"] = f"Loser {sms[1]}" if len(sms) > 1 else "Loser SF_2"
+            else:
+                match_item["slot_a"] = f"Winner {sms[0]}" if len(sms) > 0 else "TBD"
+                match_item["slot_b"] = f"Winner {sms[1]}" if len(sms) > 1 else "TBD"
+        resolved[mid] = match_item
 
     # Resolved at CALL time, never module scope: this module is imported by
     # pipeline.py, so a module-scope `from ...pipeline import` would close an

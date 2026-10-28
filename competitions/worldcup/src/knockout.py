@@ -104,28 +104,90 @@ def resolve_knockout_slot_teams(
     bracket: list[dict],
     annex_c: dict,
     known_winners: dict[str, str],
+    allow_simulation: bool = False,
 ) -> dict[str, dict]:
-    import random
+    groups_dict = groups.get("groups", groups) if isinstance(groups, dict) else groups
+    total_group_matches = sum(len(g.get("matches", [])) for g in groups_dict.values())
+    all_group_matches_played = (
+        total_group_matches > 0
+        and len(played_groups) >= total_group_matches
+        and all(
+            m["match_id"] in played_groups
+            for g in groups_dict.values()
+            for m in g.get("matches", [])
+        )
+    )
 
     elo_ratings = {n: d["elo"] for n, d in teams.items()}
-    rng = random.Random(0)
-
-    lambdas = precompute_matchup_lambdas(groups, elo_ratings, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
-    results = simulate_group_matches(
-        groups, teams, elo_ratings, rng,
-        played_groups=played_groups, matchup_lambdas=lambdas,
-        base_rate=constants.EXPECTED_GOALS_BASE_RATE,
-    )
-    standings = compute_standings(results, elo_ratings)
-    third_ranked = rank_third_placed(standings)
-    advancers = select_advancers(standings, third_ranked)
-    r32_matchups = resolve_r32_matchups(advancers, standings, third_ranked, annex_c)
-
     slot_teams: dict[str, dict] = {}
     winner_progression: dict[str, str] = dict(known_winners)
 
-    for mid, m in r32_matchups.items():
-        slot_teams[mid] = {"team_a": m["team_a"], "team_b": m["team_b"]}
+    if all_group_matches_played:
+        results = {}
+        for gl, g in groups_dict.items():
+            results[gl] = {
+                m["match_id"]: {
+                    "team_a": m["team_a"],
+                    "team_b": m["team_b"],
+                    "score_a": played_groups[m["match_id"]]["home_score"],
+                    "score_b": played_groups[m["match_id"]]["away_score"],
+                    "winner": played_groups[m["match_id"]].get("winner"),
+                    "yellow_cards_a": played_groups[m["match_id"]].get("yellow_cards_a", 0),
+                    "red_cards_a": played_groups[m["match_id"]].get("red_cards_a", 0),
+                    "yellow_cards_b": played_groups[m["match_id"]].get("yellow_cards_b", 0),
+                    "red_cards_b": played_groups[m["match_id"]].get("red_cards_b", 0),
+                }
+                for m in g.get("matches", [])
+            }
+        standings = compute_standings(results, elo_ratings)
+        third_ranked = rank_third_placed(standings)
+        advancers = select_advancers(standings, third_ranked)
+        r32_matchups = resolve_r32_matchups(advancers, standings, third_ranked, annex_c)
+        for mid, m in r32_matchups.items():
+            slot_teams[mid] = {"team_a": m["team_a"], "team_b": m["team_b"]}
+    elif allow_simulation:
+        import random
+
+        rng = random.Random(0)
+        lambdas = precompute_matchup_lambdas(groups, elo_ratings, base_rate=constants.EXPECTED_GOALS_BASE_RATE)
+        results = simulate_group_matches(
+            groups, teams, elo_ratings, rng,
+            played_groups=played_groups, matchup_lambdas=lambdas,
+            base_rate=constants.EXPECTED_GOALS_BASE_RATE,
+        )
+        standings = compute_standings(results, elo_ratings)
+        third_ranked = rank_third_placed(standings)
+        advancers = select_advancers(standings, third_ranked)
+        r32_matchups = resolve_r32_matchups(advancers, standings, third_ranked, annex_c)
+        for mid, m in r32_matchups.items():
+            slot_teams[mid] = {"team_a": m["team_a"], "team_b": m["team_b"]}
+    else:
+        def _format_slot(spec: dict | None) -> str:
+            if not spec:
+                return "TBD"
+            if isinstance(spec, str):
+                return spec
+            kind = spec.get("kind")
+            if kind == "group_position":
+                return f"{spec.get('position', '')}{spec.get('group', '')}"
+            if kind == "annex_c_third":
+                gw = spec.get("group_winner", "")
+                return f"3rd ({gw})" if gw else "3rd"
+            return str(spec)
+
+        r32_entries = [e for e in bracket if e.get("round") == "R32"]
+        for i, entry in enumerate(r32_entries, 1):
+            mid = entry["match_id"]
+            slot_a = entry.get("slot_a") or _format_slot(entry.get("home"))
+            slot_b = entry.get("slot_b") or _format_slot(entry.get("away"))
+            item = {
+                "team_a": None,
+                "team_b": None,
+                "slot_a": slot_a,
+                "slot_b": slot_b,
+            }
+            slot_teams[mid] = item
+            slot_teams[f"R32_{i}"] = item
 
     round_map = _build_round_map(bracket)
     resolution_order = ["R16", "QF", "SF", "TPP", "FINAL"]
