@@ -361,6 +361,7 @@ def _store_refresh_report(
     active_season: str | None = None, deferred: bool = False,
     reason: str | None = None, status: str | None = None,
     odds_status: dict | None = None,
+    shortfall: dict | None = None,
 ) -> dict:
     """Record the LaLiga refresh outcome for the API surface + ledger.
 
@@ -386,6 +387,7 @@ def _store_refresh_report(
         **({"reason": reason} if reason is not None else {}),
         **({"status": status} if status is not None else {}),
         **({"odds_status": odds_status} if odds_status is not None else {}),
+        **({"shortfall": shortfall} if shortfall is not None else {}),
     }
     if active_season:
         cache_entry[str(active_season)] = _refresh_report
@@ -395,6 +397,8 @@ def _store_refresh_report(
         entry["mode"] = provider_name
         entry["n_matches"] = n_matches or 0
         entry["n_updated"] = n_updated or 0
+        if shortfall:
+            entry["shortfall"] = shortfall
         # Single-writer ledger (D-18): football_core.freshness owns the lock,
         # the atomic write and the loud failure — no hand-rolled RMW here.
         update_ledger(refresh_path, "laliga", entry)
@@ -481,7 +485,8 @@ def _fetch_live_data():
                            stages=report.get("stages"),
                            active_season=active_season,
                            deferred=deferred, reason=reason, status=status,
-                           odds_status=summary.get("odds"))
+                           odds_status=summary.get("odds"),
+                           shortfall=summary.get("shortfall"))
     holder.append_boot("laliga", {
         "step": "LaLiga live fetch", "status": "deferred" if deferred else ("ok" if ok else "skip"),
         "elapsed": 0.0,

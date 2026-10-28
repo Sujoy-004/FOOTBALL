@@ -473,7 +473,8 @@ def fetch_live_data(
         report.stages = [
             _results_stage_row("unavailable", 0, "no data provider configured")]
         return {"report": report.to_dict(), "status": "error", "reason": "no_provider",
-                "provider_name": None, "n_raw": 0, "n_updated": 0, "per_season": {}}
+                "provider_name": None, "n_raw": 0, "n_updated": 0, "per_season": {},
+                "shortfall": None}
 
     alias_lookup = _alias_lookup(data_dir)
     try:
@@ -508,7 +509,7 @@ def fetch_live_data(
             _results_stage_row("error", 0, f"{exc.__class__.__name__}: {exc}")]
         return {"report": report.to_dict(), "status": "error", "reason": "fetch_error",
                 "provider_name": type(provider).__name__, "n_raw": 0, "n_updated": 0,
-                "per_season": {}}
+                "per_season": {}, "shortfall": None}
 
     events = events or []
     fixtures: list[dict] = []
@@ -563,6 +564,34 @@ def fetch_live_data(
     }
     results_payload = {"provider": type(provider).__name__, "error": None,
                        "matches": results}
+
+    n_fixtures = len(fixtures)
+    shortfall = None
+    if n_fixtures < 380:
+        shortfall = {
+            "provider": type(provider).__name__,
+            "expected": 380,
+            "actual": n_fixtures,
+            "missing": 380 - n_fixtures,
+            "schedule_complete": False,
+        }
+        from competitions.laliga.src.schedule_generator import generate_berger_schedule
+        canonical_teams = sorted(list(canonical))
+        if len(canonical_teams) != 20:
+            fallback_lookup = _alias_lookup(data_dir)
+            if len(fallback_lookup) > 0:
+                canonical_teams = sorted(list(set(fallback_lookup.values())))
+        if len(canonical_teams) == 20:
+            generated = generate_berger_schedule(canonical_teams, season_token=SHIPPED_SEASON)
+            existing_pairs = {(f["home_team"], f["away_team"]) for f in fixtures}
+            merged_fixtures = list(fixtures)
+            for gen_m in generated:
+                if (gen_m["home_team"], gen_m["away_team"]) not in existing_pairs:
+                    merged_fixtures.append(gen_m)
+            fixtures = sorted(merged_fixtures, key=lambda m: (m.get("matchday") or 0, m.get("event_date") or ""))
+            fixtures_payload["fixtures"] = fixtures
+            fixtures_payload["availability"]["n_fixtures"] = len(fixtures)
+            fixtures_payload["shortfall"] = shortfall
 
     # D-16: the season-store writes become CONTENT-CONDITIONAL. The store's
     # mtime IS the stamp, and the stamp is the retirement trigger - an
@@ -654,6 +683,7 @@ def fetch_live_data(
         "n_updated": len(results),
         "per_season": {SHIPPED_SEASON: {"fixtures": len(fixtures), "results": len(results)}},
         "odds": odds_public,
+        "shortfall": shortfall,
     }
 
 
