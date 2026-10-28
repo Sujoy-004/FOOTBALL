@@ -10,7 +10,7 @@ from __future__ import annotations
 from competitions.laliga.src import seasons as _season_store
 from competitions.laliga.src.constants import DATA_DIR
 from competitions.laliga.src.groups import compute_laliga_standings, played_map_from_rows
-from competitions.laliga.src.pipeline import load_elo_ratings, load_fixtures, load_results
+from competitions.laliga.src.pipeline import load_elo_ratings, load_fixtures, load_results, load_team_names
 
 
 def build_competition_state(
@@ -29,7 +29,8 @@ def build_competition_state(
     if standings is None:
         results = load_results(data_dir, season_token)
         elo_ratings = load_elo_ratings(data_dir, season_token)
-        standings = compute_laliga_standings(played_map_from_rows(results), elo_ratings)
+        team_names = load_team_names(data_dir, season_token)
+        standings = compute_laliga_standings(played_map_from_rows(results), elo_ratings, team_names=team_names)
     else:
         results = load_results(data_dir, season_token)
     score_by_id: dict[str, tuple] = {}

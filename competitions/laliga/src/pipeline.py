@@ -350,7 +350,8 @@ def compute_deterministic(data_dir=DATA_DIR, season_token=None) -> dict:
     elo_ratings = load_elo_ratings(data_dir, season_token)
 
     played = played_map_from_rows(results)
-    standings = compute_laliga_standings(played, elo_ratings)
+    team_names = load_team_names(data_dir, season_token)
+    standings = compute_laliga_standings(played, elo_ratings, team_names=team_names)
 
     finished_ids = set(played)
     odds = []
