@@ -10,11 +10,12 @@ Asserts:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import shutil
-import tempfile
 import time
+from collections.abc import Sequence
 from typing import Any
 
 import pytest
@@ -43,6 +44,46 @@ def _get_laliga_stages_standings(client: TestClient) -> list[dict[str, Any]]:
         return data["stages"]["league"]["standings"]
     state = client.get("/api/state").json()
     return state["stages"]["league"]["standings"]
+
+
+def _dir_hashes(directory: pathlib.Path, filenames: Sequence[str]) -> dict[str, str]:
+    hashes = {}
+    for name in filenames:
+        p = directory / name
+        if p.exists():
+            hashes[name] = hashlib.sha256(p.read_bytes()).hexdigest()
+    return hashes
+
+
+def _run_simulation(
+    client: TestClient,
+    sim_url: str = "/api/simulate",
+    progress_url: str = "/api/simulation/progress/",
+    iterations: int = 2,
+    seed: int = 42,
+    timeout: float = 15.0,
+) -> dict[str, Any]:
+    res = client.post(sim_url, json={"iterations": iterations, "seed": seed})
+    assert res.status_code == 200, f"POST {sim_url} failed: {res.text}"
+    body = res.json()
+    if body.get("status") == "not_needed":
+        return body
+
+    task_id = body.get("task_id")
+    assert task_id, f"Expected task_id in simulation response, got: {body}"
+
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        p_res = client.get(f"{progress_url}{task_id}")
+        assert p_res.status_code == 200, f"GET {progress_url}{task_id} failed: {p_res.text}"
+        p_body = p_res.json()
+        status = p_body.get("status")
+        if status in ("completed", "failed"):
+            assert status == "completed", f"Simulation failed with error: {p_body.get('error')}"
+            return p_body
+        time.sleep(0.05)
+
+    raise TimeoutError(f"Simulation {task_id} did not complete within {timeout}s")
 
 
 class TestZeroMatchStandingsBaselines:
@@ -176,3 +217,107 @@ class TestZeroMatchStandingsBaselines:
                 assert row["played"] == 0
                 assert (row.get("points") == 0) or (row.get("pts") == 0)
                 assert (row.get("goal_diff") == 0) or (row.get("gd") == 0)
+
+
+class TestStandingsSimulationInvariance:
+    """Simulation-toggle byte-identical standings invariance contract across all three competitions (D-04)."""
+
+    def test_wc_simulation_standings_invariance(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+        """World Cup /api/standings JSON is 100% byte-identical before vs after POST /api/simulate."""
+        wc_tmp = tmp_path / "wc"
+        wc_tmp.mkdir()
+        for fname in ("teams.json", "groups.json", "bracket.json", "annex_c.json", "played_groups.json"):
+            shutil.copy(wc_mod.DATA_DIR / fname, wc_tmp / fname)
+        # Empty played.json leaves unplayed knockout matches so simulation is eligible
+        (wc_tmp / "played.json").write_text("{}", encoding="utf-8")
+
+        monkeypatch.setattr(wc_mod, "DATA_DIR", wc_tmp)
+        import competitions.worldcup.src.overview as wc_ov
+        monkeypatch.setattr(wc_ov, "DATA_DIR", wc_tmp)
+
+        holder.publish_data("worldcup", wc_ov.compute_overview(), "results", wc_mod._observed_stamp())
+
+        factual_files = ("teams.json", "groups.json", "bracket.json", "annex_c.json", "played.json", "played_groups.json")
+        hashes_before = _dir_hashes(wc_tmp, factual_files)
+
+        with TestClient(wc_app) as client:
+            before_json = json.dumps(client.get("/api/standings").json()["standings"], sort_keys=True)
+            _run_simulation(client)
+            after_json = json.dumps(client.get("/api/standings").json()["standings"], sort_keys=True)
+            assert before_json == after_json, "World Cup /api/standings mutated after simulation"
+
+        hashes_after = _dir_hashes(wc_tmp, factual_files)
+        assert hashes_before == hashes_after, "World Cup canonical factual stores were modified by simulation"
+
+    def test_ucl_simulation_standings_invariance(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+        """UCL /api/standings and stages.league.standings are 100% byte-identical before vs after POST /api/simulate."""
+        ucl_tmp = tmp_path / "ucl"
+        shutil.copytree(ucl_mod.DATA_DIR, ucl_tmp, dirs_exist_ok=True)
+        (ucl_tmp / "snapshot.json").unlink(missing_ok=True)
+
+        monkeypatch.setattr(ucl_mod, "DATA_DIR", ucl_tmp)
+        ucl_data = ucl_mod.compute_all()
+        holder.publish_data("ucl", ucl_data, "results", ucl_mod._observed_stamp())
+
+        season_results = ucl_tmp / "seasons" / "2026_27" / "results.json"
+        season_fixtures = ucl_tmp / "seasons" / "2026_27" / "fixtures.json"
+        hashes_before = {
+            "results": hashlib.sha256(season_results.read_bytes()).hexdigest() if season_results.exists() else "",
+            "fixtures": hashlib.sha256(season_fixtures.read_bytes()).hexdigest() if season_fixtures.exists() else "",
+        }
+
+        with TestClient(ucl_app) as client:
+            before_api = json.dumps(client.get("/api/standings").json()["standings"], sort_keys=True)
+            before_state = json.dumps(_get_ucl_stages_standings(client), sort_keys=True)
+
+            _run_simulation(client)
+
+            after_api = json.dumps(client.get("/api/standings").json()["standings"], sort_keys=True)
+            after_state = json.dumps(_get_ucl_stages_standings(client), sort_keys=True)
+
+            assert before_api == after_api, "UCL /api/standings mutated after simulation"
+            assert before_state == after_state, "UCL stages.league.standings mutated after simulation"
+
+        hashes_after = {
+            "results": hashlib.sha256(season_results.read_bytes()).hexdigest() if season_results.exists() else "",
+            "fixtures": hashlib.sha256(season_fixtures.read_bytes()).hexdigest() if season_fixtures.exists() else "",
+        }
+        assert hashes_before == hashes_after, "UCL canonical factual stores were modified by simulation"
+
+    def test_laliga_simulation_standings_invariance(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+        """LaLiga /api/standings and stages.league.standings are 100% byte-identical before vs after POST /api/simulate."""
+        laliga_tmp = tmp_path / "laliga"
+        shutil.copytree(laliga_mod.DATA_DIR, laliga_tmp, dirs_exist_ok=True)
+        (laliga_tmp / "snapshot.json").unlink(missing_ok=True)
+
+        monkeypatch.setattr(laliga_mod, "DATA_DIR", laliga_tmp)
+        import competitions.laliga.src.pipeline as laliga_pl
+        monkeypatch.setattr(laliga_pl, "DATA_DIR", laliga_tmp)
+
+        laliga_data = laliga_mod.compute_all()
+        holder.publish_data("laliga", laliga_data, "results", laliga_mod._observed_stamp())
+
+        season_results = laliga_tmp / "seasons" / "2026_27" / "results.json"
+        season_fixtures = laliga_tmp / "seasons" / "2026_27" / "fixtures.json"
+        hashes_before = {
+            "results": hashlib.sha256(season_results.read_bytes()).hexdigest() if season_results.exists() else "",
+            "fixtures": hashlib.sha256(season_fixtures.read_bytes()).hexdigest() if season_fixtures.exists() else "",
+        }
+
+        with TestClient(laliga_app) as client:
+            before_api = json.dumps(client.get("/api/standings").json()["standings"], sort_keys=True)
+            before_state = json.dumps(_get_laliga_stages_standings(client), sort_keys=True)
+
+            _run_simulation(client)
+
+            after_api = json.dumps(client.get("/api/standings").json()["standings"], sort_keys=True)
+            after_state = json.dumps(_get_laliga_stages_standings(client), sort_keys=True)
+
+            assert before_api == after_api, "LaLiga /api/standings mutated after simulation"
+            assert before_state == after_state, "LaLiga stages.league.standings mutated after simulation"
+
+        hashes_after = {
+            "results": hashlib.sha256(season_results.read_bytes()).hexdigest() if season_results.exists() else "",
+            "fixtures": hashlib.sha256(season_fixtures.read_bytes()).hexdigest() if season_fixtures.exists() else "",
+        }
+        assert hashes_before == hashes_after, "LaLiga canonical factual stores were modified by simulation"
