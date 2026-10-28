@@ -27,16 +27,39 @@ def load_json(data_dir, name: str) -> dict:
         return dict(json.load(f))
 
 
-def compute_real_standings(groups_data: dict, played_groups: dict) -> list[dict]:
-    """Compute deterministic real standings from played group matches.
+def compute_real_standings(
+    groups_data: dict,
+    played_groups: dict,
+    teams: dict | None = None,
+) -> list[dict]:
+    """Compute deterministic real standings from played group matches with FIFA tiebreakers.
 
     Returns a flat list sorted by group, then position:
-    [{group, position, team, pts, gd, gs, ga, played}, ...]
+    [{group, position, team, pts, gd, gs, ga, played, ...}, ...]
     """
+    from football_core.constants import DEFAULT_ELO
+    from football_core.groups import _compute_conduct_score, _tiebreak_group
+
+    elo_ratings = {n: d.get("elo", DEFAULT_ELO) for n, d in teams.items()} if teams else {}
     standings = []
     for group_letter in sorted(groups_data.keys()):
         group = groups_data[group_letter]
         team_stats: dict[str, dict] = {}
+        for team in group.get("teams", []):
+            team_stats[team] = {
+                "team": team,
+                "group": group_letter,
+                "pts": 0,
+                "gd": 0,
+                "gs": 0,
+                "ga": 0,
+                "played": 0,
+                "yellow_cards": 0,
+                "red_cards": 0,
+                "conduct_score": 0,
+                "elo": elo_ratings.get(team, float(DEFAULT_ELO)),
+            }
+        group_results: dict[str, dict] = {}
         for match in group.get("matches", []):
             mid = match["match_id"]
             if mid not in played_groups:
@@ -45,21 +68,79 @@ def compute_real_standings(groups_data: dict, played_groups: dict) -> list[dict]
             ta, tb = m["team_a"], m["team_b"]
             hs = m.get("home_score", 0)
             aw = m.get("away_score", 0)
-            for team, gs, ga in [(ta, hs, aw), (tb, aw, hs)]:
-                if team not in team_stats:
-                    team_stats[team] = {"team": team, "group": group_letter, "pts": 0, "gd": 0, "gs": 0, "ga": 0, "played": 0}
-                team_stats[team]["gs"] += gs
-                team_stats[team]["ga"] += ga
-                team_stats[team]["gd"] += (gs - ga)
-                team_stats[team]["played"] += 1
+            yca = m.get("yellow_cards_a", 0)
+            rca = m.get("red_cards_a", 0)
+            ycb = m.get("yellow_cards_b", 0)
+            rcb = m.get("red_cards_b", 0)
+
+            if ta not in team_stats:
+                team_stats[ta] = {
+                    "team": ta,
+                    "group": group_letter,
+                    "pts": 0,
+                    "gd": 0,
+                    "gs": 0,
+                    "ga": 0,
+                    "played": 0,
+                    "yellow_cards": 0,
+                    "red_cards": 0,
+                    "conduct_score": 0,
+                    "elo": elo_ratings.get(ta, float(DEFAULT_ELO)),
+                }
+            if tb not in team_stats:
+                team_stats[tb] = {
+                    "team": tb,
+                    "group": group_letter,
+                    "pts": 0,
+                    "gd": 0,
+                    "gs": 0,
+                    "ga": 0,
+                    "played": 0,
+                    "yellow_cards": 0,
+                    "red_cards": 0,
+                    "conduct_score": 0,
+                    "elo": elo_ratings.get(tb, float(DEFAULT_ELO)),
+                }
+
+            ts_a, ts_b = team_stats[ta], team_stats[tb]
+            ts_a["played"] += 1
+            ts_b["played"] += 1
+            ts_a["gs"] += hs
+            ts_a["ga"] += aw
+            ts_a["gd"] += (hs - aw)
+            ts_b["gs"] += aw
+            ts_b["ga"] += hs
+            ts_b["gd"] += (aw - hs)
+            ts_a["yellow_cards"] += yca
+            ts_a["red_cards"] += rca
+            ts_b["yellow_cards"] += ycb
+            ts_b["red_cards"] += rcb
             if hs > aw:
-                team_stats[ta]["pts"] += 3
+                ts_a["pts"] += 3
             elif aw > hs:
-                team_stats[tb]["pts"] += 3
+                ts_b["pts"] += 3
             else:
-                team_stats[ta]["pts"] += 1
-                team_stats[tb]["pts"] += 1
-        sorted_teams = sorted(team_stats.values(), key=lambda t: (-t["pts"], -t["gd"], -t["gs"]))
+                ts_a["pts"] += 1
+                ts_b["pts"] += 1
+
+            group_results[mid] = {
+                "team_a": ta,
+                "team_b": tb,
+                "score_a": hs,
+                "score_b": aw,
+                "yellow_cards_a": yca,
+                "red_cards_a": rca,
+                "yellow_cards_b": ycb,
+                "red_cards_b": rcb,
+            }
+
+        for stats in team_stats.values():
+            stats["conduct_score"] = _compute_conduct_score(
+                stats["yellow_cards"], stats["red_cards"]
+            )
+
+        team_list = list(team_stats.values())
+        sorted_teams = _tiebreak_group(team_list, group_results)
         for i, t in enumerate(sorted_teams, 1):
             t["position"] = i
             standings.append(t)
@@ -117,8 +198,14 @@ def compute_overview() -> dict:
     total_played += sum(1 for m in played_groups.values() if m.get("winner"))
 
     gs = boot_step("Group Standings", lambda:
-        compute_real_standings(groups_data, played_groups)
+        compute_real_standings(groups_data, played_groups, teams)
     , boot_log) or []
+
+    from competitions.worldcup.src.groups import rank_third_placed
+    standings_by_group: dict[str, list[dict]] = {}
+    for row in gs:
+        standings_by_group.setdefault(row["group"], []).append(row)
+    data["third_place"] = rank_third_placed(standings_by_group)
 
     bracket_display = boot_step("Bracket Resolution", lambda:
         compute_bracket_display(ld["groups"], teams, bracket, annex_c, played, played_groups)
