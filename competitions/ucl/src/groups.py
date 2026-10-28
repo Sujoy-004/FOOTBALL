@@ -96,7 +96,8 @@ def compute_swiss_standings(
         "opponents": set[str](),
     })
 
-    for result in matches.values():
+    match_list = list(matches.values()) if isinstance(matches, dict) else list(matches)
+    for result in match_list:
         ta, tb = result["team_a"], result["team_b"]
         sa, sb = result["score_a"], result["score_b"]
 
@@ -188,10 +189,13 @@ def compute_swiss_standings(
         else:
             zone = "eliminated"
 
+        played = stats["wins"] + stats["draws"] + stats["losses"]
+        coeff_val = uefa_coefficients.get(team, 0.0) if uefa_coefficients else 0.0
         standings.append({
             "team": team,
             "position": pos,
             "zone": zone,
+            "played": played,
             "pts": stats["pts"],
             "gd": stats["gd"],
             "gs": stats["gs"],
@@ -209,8 +213,9 @@ def compute_swiss_standings(
             "opp_gd": opponent_stats[team]["opp_gd"],
             "opp_gs": opponent_stats[team]["opp_gs"],
             "conduct_score": stats["conduct_score"],
-            "uefa_coefficient": uefa_coefficients.get(team, 0.0),
-            "elo": elo_ratings.get(team, float(DEFAULT_ELO)),
+            "uefa_coefficient": coeff_val,
+            "coeff": coeff_val,
+            "elo": elo_ratings.get(team, float(DEFAULT_ELO)) if elo_ratings else float(DEFAULT_ELO),
         })
 
     return standings
