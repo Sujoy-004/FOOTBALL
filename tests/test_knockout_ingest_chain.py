@@ -88,7 +88,7 @@ def bracket_events(
     played: dict[str, dict] = {}
     if seed_r32_winners:
         r32_slots = resolve_knockout_slot_teams(
-            groups, teams, {}, bracket, annex_c, {}
+            groups, teams, {}, bracket, annex_c, {}, allow_simulation=True
         )
         for entry in bracket:
             if entry["round"] != "R32":
@@ -115,7 +115,7 @@ def bracket_events(
     for _ in range(8):
         known = {mid: d["winner"] for mid, d in played.items() if d.get("winner")}
         slots = resolve_knockout_slot_teams(
-            groups, teams, {}, bracket, annex_c, known
+            groups, teams, {}, bracket, annex_c, known, allow_simulation=True
         )
         progressed = False
         for entry in bracket:
