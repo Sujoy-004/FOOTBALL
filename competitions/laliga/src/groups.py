@@ -35,6 +35,7 @@ def played_map_from_rows(results: list[dict]) -> dict[str, dict]:
 def compute_laliga_standings(
     flat_results: dict[str, dict],
     elo_ratings: dict[str, float] | None = None,
+    team_names: list[str] | None = None,
 ) -> list[dict]:
     """Full league table over a flat {match_id: match} result map.
 
@@ -44,6 +45,13 @@ def compute_laliga_standings(
     """
     elo_ratings = elo_ratings or {}
     table: dict[str, dict] = {}
+    if team_names:
+        for t in team_names:
+            table[t] = {
+                "team": t, "played": 0, "wins": 0, "draws": 0,
+                "losses": 0, "goals_for": 0, "goals_against": 0,
+                "gd": 0, "pts": 0,
+            }
     for match in flat_results.values():
         ta, tb = match["team_a"], match["team_b"]
         sa = match.get("score_a") or 0
@@ -85,8 +93,29 @@ def compute_laliga_standings(
     ordered = _tiebreak_group(team_data, flat_results)
     out = []
     for i, row in enumerate(ordered):
+        pos = i + 1
+        if pos == 1:
+            zone, zone_label = "champion", "Champions"
+        elif 2 <= pos <= 4:
+            zone, zone_label = "ucl", "Champions League"
+        elif pos == 5:
+            zone, zone_label = "uel", "Europa League"
+        elif pos == 6:
+            zone, zone_label = "uecl", "Conference League"
+        elif 7 <= pos <= 17:
+            zone, zone_label = "safe", ""
+        else:
+            zone, zone_label = "relegation", "Relegation"
+
         row = dict(row)
-        row["goal_diff"] = row.pop("gd")
-        row["points"] = row.pop("pts")
-        out.append({"position": i + 1, **row})
+        pts = row.get("pts", 0)
+        gd = row.get("gd", 0)
+        row["points"] = pts
+        row["goal_diff"] = gd
+        out.append({
+            "position": pos,
+            **row,
+            "zone": zone,
+            "zone_label": zone_label,
+        })
     return out
