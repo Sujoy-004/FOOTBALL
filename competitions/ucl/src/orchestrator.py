@@ -1059,6 +1059,8 @@ def run_deterministic_compute(
                 "avg_position": 0.0,
             })
 
+        from competitions.ucl.src.pipeline import compute_deterministic_standings
+
         return {
             "mode": "results",
             "availability": {
@@ -1077,7 +1079,7 @@ def run_deterministic_compute(
             "seed": 0,
             "snapshot_date": f"{active_season_value} Season — Upcoming",
             "champion": None,
-            "standings": [],
+            "standings": compute_deterministic_standings([], team_names=team_names),
             "playoff": [],
             "bracket_rounds": {},
             "league_matchdays": {},

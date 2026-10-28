@@ -546,7 +546,11 @@ def _fallback_phase(data_dir: Path) -> dict:
     }
 
 
-def _league_stage(data_dir: Path, league_availability: DataAvailability) -> dict:
+def _league_stage(
+    data_dir: Path,
+    league_availability: DataAvailability,
+    standings: list[dict] | None = None,
+) -> dict:
     matchdays: dict = {}
     if league_availability is DataAvailability.AVAILABLE:
         try:
@@ -556,13 +560,32 @@ def _league_stage(data_dir: Path, league_availability: DataAvailability) -> dict
                 load_results,
             )
             matchdays = build_league_matchdays(
-                load_results(data_dir), build_matchday_map(data_dir))
+                load_results(data_dir), build_matchday_map(data_dir)
+            )
         except Exception:
             matchdays = _fallback_matchdays(data_dir)
+
+    if standings is None:
+        try:
+            from competitions.ucl.src.pipeline import (
+                compute_deterministic_standings,
+                load_results,
+            )
+            fixtures_payload, fixtures_avail, _ = load_json_store(data_dir / "fixtures.json")
+            team_names = None
+            if fixtures_avail is DataAvailability.AVAILABLE and isinstance(fixtures_payload, dict):
+                teams_data = fixtures_payload.get("schedule", {}).get("teams", [])
+                if teams_data:
+                    team_names = [t["name"] if isinstance(t, dict) else t for t in teams_data]
+            standings = compute_deterministic_standings(load_results(data_dir), team_names=team_names)
+        except Exception:
+            standings = []
+
     return {
         "id": "league",
         "label": _STAGE_LABELS["league"],
         "layout": "list",
+        "standings": standings or [],
         "matchdays": matchdays,
     }
 
@@ -724,7 +747,16 @@ def build_competition_state(data_dir, mode: str = MODE_RESULTS, sim_payload: Opt
     else:
         ko_store = _empty_ko_store()
 
-    stages: dict = {"league": _league_stage(_active_dp, league_availability) if _is_new_season else _league_stage(dp, league_availability)}
+    _target_dp = _active_dp if _is_new_season else dp
+    from competitions.ucl.src.pipeline import compute_deterministic_standings, load_results
+    fixtures_payload, fixtures_avail, _ = load_json_store(_target_dp / "fixtures.json")
+    team_names = None
+    if fixtures_avail is DataAvailability.AVAILABLE and isinstance(fixtures_payload, dict):
+        teams_data = fixtures_payload.get("schedule", {}).get("teams", [])
+        if teams_data:
+            team_names = [t["name"] if isinstance(t, dict) else t for t in teams_data]
+    factual_standings = compute_deterministic_standings(load_results(_target_dp), team_names=team_names)
+    stages: dict = {"league": _league_stage(_target_dp, league_availability, standings=factual_standings)}
 
     if mode == MODE_RESULTS:
         default_provenance = "manual"
