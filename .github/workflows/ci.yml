@@ -1,0 +1,61 @@
+name: CI Quality Gate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FOOTBALL_SNAPSHOT: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  quality-gate:
+    name: Lint, Invariants, Typecheck & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install mypy types-requests httpx
+
+      - name: Step 1 - Linting (ruff)
+        run: |
+          ruff check .
+
+      - name: Step 2 - Type Checking (mypy)
+        run: |
+          mypy football_core
+
+      - name: Step 3 - Architecture & Quality Invariants
+        run: |
+          pytest -v tests/test_quality_gates.py tests/test_layering_architecture.py tests/test_atomic_store_writes.py tests/test_hard02_swallow_sites.py
+
+      - name: Step 4 - Test Suite & Coverage Floor
+        run: |
+          pytest --cov=football_core --cov-report=term-missing
+
+      - name: Step 5 - Frontend UI Unit Tests (Node)
+        run: |
+          node --test web/static/refresh.test.mjs
