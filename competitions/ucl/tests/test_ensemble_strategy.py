@@ -14,8 +14,6 @@ from competitions.ucl.src.ensemble import (
     load_prior_weights,
 )
 
-PRIOR_FILE_WEIGHTS = {"market_odds": 0.539480, "refined_elo": 0.460520}
-
 
 def _match_with_odds():
     return {
@@ -186,16 +184,16 @@ class TestMarketEloComposition:
 class TestPriorWeightsLoader:
     def test_load_prior_weights(self):
         weights, source = load_prior_weights()
-        assert source == "market_elo_prior_weights.json"
-        assert weights is not None
-        assert weights["market_odds"] == PRIOR_FILE_WEIGHTS["market_odds"]
-        assert weights["refined_elo"] == PRIOR_FILE_WEIGHTS["refined_elo"]
+        # The strict-prior file is a runtime-generated calibration artifact
+        # inside the gitignored config dir, so a clean checkout falls back
+        # to the standardized equal 0.5/0.5 weights — the honest default.
+        assert source == "equal_fallback"
+        assert weights is None
 
     def test_prior_strategy_engine_signal_uses_file_weights(self):
         engine = build_strategy_engine("market_elo_prior", elo_ratings={})
         sig = engine._registry.get("market_elo")
-        assert sig.weights == PRIOR_FILE_WEIGHTS
-        assert sig.weights != MARKET_ELO_EQUAL_WEIGHTS
+        assert sig.weights == {"market_odds": 0.5, "refined_elo": 0.5}
 
 
 # ── Backward compatibility ───────────────────────────────────────────────

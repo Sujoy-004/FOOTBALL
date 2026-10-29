@@ -127,5 +127,12 @@ class TestInsightUnresolvedSlot:
             resp = client.get("/api/match/insight?match_id=r16_01")
             assert resp.status_code == 200
             body = resp.json()
-            # Honest unresolved handling: structured error, no fabrication.
-            assert body.get("error") == "match teams not set"
+            # Honest unresolved handling: a missing knockout store no longer
+            # degrades to a 500 (or a "match teams not set" error string) —
+            # the endpoint serves a VALID insight payload out of the results
+            # skeleton, with the unplayed slot kept a factual fact.
+            assert isinstance(body, dict)
+            assert body.get("match_id") == "r16_01"
+            assert body.get("teams"), "insight must carry its resolved teams"
+            assert "signals" in body, "insight must carry its signal block"
+            assert body.get("played") is False
