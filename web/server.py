@@ -21,6 +21,7 @@ Environment flags:
                             (default unset = lazy).
 """
 
+import argparse
 import logging
 import mimetypes
 import os
@@ -198,19 +199,32 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # reads that never recompute server state.
 asgi_app: ASGIApp = _NoCacheASGI(no_store_for_competition_api(app))
 
-if __name__ == "__main__":
-    import argparse
-
+def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m web.server",
-        description="FOOTBALL web server (port 8080)")
+        description="Run the FOOTBALL prediction server.")
     parser.add_argument(
         "--offline", action="store_true",
         help="Explicit OFFLINE execution mode: equivalent to "
              "FOOTBALL_SNAPSHOT=1 — acquisition wrappers self-gate and "
              "make zero network requests; stored data is served as-is.")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--no-preload", action="store_true",
+        help="Skip eager preload at boot; server will serve stored data without "
+             "refreshing latest data.")
+    return parser
+
+
+def configure_server_env(args: argparse.Namespace) -> None:
     if args.offline:
         os.environ["FOOTBALL_SNAPSHOT"] = "1"
+    elif not args.no_preload:
+        os.environ.setdefault("FOOTBALL_PRELOAD_ALL", "1")
+
+
+if __name__ == "__main__":
+    parser = build_arg_parser()
+    args = parser.parse_args()
+    configure_server_env(args)
     uvicorn.run("web.server:asgi_app", host="127.0.0.1", port=8080,
                 reload=False)
