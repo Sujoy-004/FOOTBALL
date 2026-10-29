@@ -55,7 +55,8 @@ def snapshot_env(monkeypatch):
     # force the startup decision without running interactive flow
     import web.startup as startup
     startup.set_session_decision(startup.StartupDecision("snapshot", ""))
-    return prov
+    yield prov
+    startup.set_session_decision(None)
 
 
 def test_wc_snapshot_mode_zero_live_calls(snapshot_env, tmp_path):
@@ -215,28 +216,31 @@ def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch, tmp_path):
     """
     import web.startup as startup
     startup.set_session_decision(startup.StartupDecision("snapshot", ""))
-    import competitions.ucl.src.elo_fetcher as ucl_ef
-    import football_core.clubelo as clubelo
+    try:
+        import competitions.ucl.src.elo_fetcher as ucl_ef
+        import football_core.clubelo as clubelo
 
-    calls = {"clubelo": 0, "urlopen": 0}
+        calls = {"clubelo": 0, "urlopen": 0}
 
-    def _no_clubelo(*a, **k):
-        calls["clubelo"] += 1
-        raise AssertionError("ClubElo fetched during snapshot boot")
+        def _no_clubelo(*a, **k):
+            calls["clubelo"] += 1
+            raise AssertionError("ClubElo fetched during snapshot boot")
 
-    real_urlopen = clubelo.urllib.request.urlopen
+        real_urlopen = clubelo.urllib.request.urlopen
 
-    def _counting_urlopen(*a, **k):
-        calls["urlopen"] += 1
-        return real_urlopen(*a, **k)
+        def _counting_urlopen(*a, **k):
+            calls["urlopen"] += 1
+            return real_urlopen(*a, **k)
 
-    monkeypatch.setattr(ucl_ef, "refresh_elos_if_stale", _no_clubelo)
-    monkeypatch.setattr(ucl_ef, "fetch_team_elos", _no_clubelo)
-    monkeypatch.setattr(clubelo.urllib.request, "urlopen", _counting_urlopen)
+        monkeypatch.setattr(ucl_ef, "refresh_elos_if_stale", _no_clubelo)
+        monkeypatch.setattr(ucl_ef, "fetch_team_elos", _no_clubelo)
+        monkeypatch.setattr(clubelo.urllib.request, "urlopen", _counting_urlopen)
 
-    from competitions.ucl.src.orchestrator import run_deterministic_compute
-    data_dir = _historical_ucl_data(tmp_path)
-    result = run_deterministic_compute(str(data_dir), bsd_api_key="")
-    assert "error" not in result, result.get("error")
-    assert len(result.get("standings", [])) == 36
-    assert calls == {"clubelo": 0, "urlopen": 0}, calls
+        from competitions.ucl.src.orchestrator import run_deterministic_compute
+        data_dir = _historical_ucl_data(tmp_path)
+        result = run_deterministic_compute(str(data_dir), bsd_api_key="")
+        assert "error" not in result, result.get("error")
+        assert len(result.get("standings", [])) == 36
+        assert calls == {"clubelo": 0, "urlopen": 0}, calls
+    finally:
+        startup.set_session_decision(None)
