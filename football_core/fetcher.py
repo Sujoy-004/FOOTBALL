@@ -287,7 +287,7 @@ class IngestReport:
     unavailable``.
     """
 
-    provider: str
+    provider: str | None
     attempted: bool
     success: bool
     error: str | None

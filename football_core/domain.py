@@ -268,6 +268,7 @@ def canonical_simulated_result(
     confused with real results downstream.
     """
     level = home_goals == away_goals
+    winner: str | None
     if pens_home is not None and pens_away is not None and pens_home != pens_away:
         status = MatchStatus.PLAYED_PENS
         winner = home_team if pens_home > pens_away else away_team

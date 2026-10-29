@@ -13,6 +13,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from football_core.blender import EnsembleEngine
 from football_core.fetcher import (
@@ -146,7 +147,7 @@ class LaligaReplayResultProvider:
                     "is_draw": (m.get("home_score") or 0) == (m.get("away_score") or 0),
                     "event_date": m.get("event_date") or str(m.get("match_id", "")),
                 })
-        out.sort(key=lambda r: r["event_date"], reverse=True)
+        out.sort(key=lambda r: str(r["event_date"]), reverse=True)
         return out[:limit]
 
 
@@ -193,9 +194,10 @@ def run_calibration_task(
     if progress_cb:
         progress_cb(10, f"Loading replay data from {os.path.basename(replay_path)}...")
 
-    squad_values_path = str(dp / "squad_values.json")
-    if not os.path.exists(squad_values_path):
-        squad_values_path = None
+    squad_values_candidate = str(dp / "squad_values.json")
+    squad_values_path: str | None = (
+        squad_values_candidate if os.path.exists(squad_values_candidate) else None
+    )
 
     config = run_calibration(
         replay_data_path=replay_path,
@@ -360,6 +362,7 @@ def compute_deterministic(data_dir=DATA_DIR, season_token=None) -> dict:
         if mid in finished_ids:
             m = played[mid]
             sa, sb = m["score_a"], m["score_b"]
+            probs: tuple[float | None, float | None, float | None]
             if sa > sb:
                 probs = (1.0, 0.0, 0.0)
             elif sb > sa:
@@ -556,7 +559,7 @@ def fetch_live_data(
                 "winner": winner, "status": STATUS_FINISHED,
             })
 
-    fixtures_payload = {
+    fixtures_payload: dict[str, Any] = {
         "provider": type(provider).__name__,
         "availability": {"all_played": bool(fixtures) and len(results) == len(fixtures),
                          "fully_received": bool(fixtures), "n_fixtures": len(fixtures),

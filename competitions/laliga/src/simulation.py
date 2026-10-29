@@ -66,7 +66,9 @@ class LeagueSimulationRules:
 
     def simulate_one(self, context: RunContext) -> Mapping[str, Any]:
         rng = context.rng
-        sim_results: dict[str, dict] = dict(self.played)
+        sim_results: dict[str, dict[str, Any]] = {
+            k: dict(v) for k, v in self.played.items()
+        }
         elo = dict(self.elo_ratings)
         for f in self.playable:
             ta, tb = f["team_a"], f["team_b"]
@@ -185,7 +187,7 @@ def run_mc_simulation(
     champion_counts = aggregates.get("champion", {}).get("counts", {})
     positions_hist = aggregates.get("positions", {}) or {}
 
-    odds_display = []
+    odds_display: list[dict] = []
     for team in sorted(champion_counts, key=lambda t: (-champion_counts[t], t)):
         buckets = positions_hist.get(team, {})
         total = sum(buckets.values()) or 0
@@ -254,7 +256,7 @@ def _signal_stats(engine, elo_ratings: dict, fixtures: list[dict]) -> dict:
         elo_ratings=elo_ratings,
     )
     blobs = [engine.evaluate(m, ctx) for m in ctx.fixtures]
-    sig_data: dict[str, dict] = {}
+    sig_data: dict[str, Any] = {}
     for bp in blobs:
         for sig, sd in bp.signal_breakdown.items():
             bucket = sig_data.setdefault(sig, {"probs": [], "n": 0, "available": 0})

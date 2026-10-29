@@ -515,7 +515,7 @@ def classwise_ece(
         else:
             values[name] = ece
 
-    retained = [values[name] for name in class_names if values[name] is not None]
+    retained = [v for v in (values[name] for name in class_names) if v is not None]
     macro = round(sum(retained) / len(retained), 6) if retained else None
 
     return {

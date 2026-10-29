@@ -4,6 +4,7 @@ import functools
 import math
 import random
 from collections import defaultdict
+from collections.abc import Mapping
 
 from football_core import constants
 
@@ -251,7 +252,7 @@ def _compute_h2h(
 
 def _resolve_by_values(
     cluster: list[dict],
-    values: dict[str, int | float],
+    values: Mapping[str, int | float],
     results: dict[str, dict],
     depth: int,
     *,
@@ -430,8 +431,8 @@ def simulate_league_matches(
     for matchday in schedule["matchdays"]:
         for match in matchday:
             mid = match["match_id"]
-            ta: str = match["team_a"]
-            tb: str = match["team_b"]
+            ta = match["team_a"]
+            tb = match["team_b"]
 
             pair_key = (ta, tb)
             if pair_key in played_lookup:

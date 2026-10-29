@@ -74,6 +74,10 @@ def parse_odds_response(
             match_id = find_group_match(home_norm, away_norm, group_letter,
                 round_number, groups)
         else:
+            if bracket is None:
+                logger.debug("Skipping event %s: no bracket data for %s vs %s",
+                             event.get("id"), home_name, away_name)
+                continue
             match_id = find_bracket_match(home_norm, away_norm, bracket)
 
         if match_id is None:

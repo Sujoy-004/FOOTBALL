@@ -118,7 +118,7 @@ class _FakeResp:
         return self._payload
 
 
-def _seed(data_dir: Path) -> dict[str, str]:
+def _seed(data_dir: Path) -> None:
     (data_dir / "team_aliases.json").write_text(
         json.dumps(ALIASES, ensure_ascii=False), encoding="utf-8")
 

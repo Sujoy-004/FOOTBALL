@@ -57,6 +57,7 @@ import json
 import logging
 import math
 import os
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -183,7 +184,7 @@ def _alias_lookup(data_dir=Path("data")) -> dict[str, str]:
     return lookup
 
 
-def canonicalize_names(home: str, away: str, alias_lookup: dict[str, str]) -> tuple[str, str]:
+def canonicalize_names(home: str | None, away: str | None, alias_lookup: dict[str, str]) -> tuple[str, str]:
     return (
         alias_lookup.get(fold_team_key(str(home)), str(home)),
         alias_lookup.get(fold_team_key(str(away)), str(away)),
@@ -266,7 +267,7 @@ class TheOddsApiOddsProvider(OddsProvider):
     def _normalize_event(self, ev: dict, url: str) -> dict:
         home, away = str(ev.get("home_team") or ""), str(ev.get("away_team") or "")
         book = self._select_book(ev.get("bookmakers") or [], home, away)
-        prices = (None, None, None)
+        prices: tuple = (None, None, None)
         bookmaker = bookmaker_key = provider_last_update = None
         if book is not None:
             bookmaker = str(book.get("title") or book.get("key") or "")
@@ -306,7 +307,7 @@ class TheOddsApiOddsProvider(OddsProvider):
         return None
 
     @staticmethod
-    def _h2h_prices(book: dict, home: str, away: str) -> tuple | None:
+    def _h2h_prices(book: dict, home: str, away: str) -> tuple:
         """(home, draw, away) decimal prices for the first complete h2h market."""
         for m in book.get("markets") or []:
             if not isinstance(m, dict) or m.get("key") != "h2h":
@@ -376,7 +377,7 @@ class BSDOddsProvider(OddsProvider):
 # ── provider resolution ──────────────────────────────────────────────────
 
 
-def resolve_odds_provider(mode: str | None = None, *, env: dict | None = None,
+def resolve_odds_provider(mode: str | None = None, *, env: Mapping[str, str] | None = None,
                           the_odds_api_key: str | None = None,
                           bsd_api_key: str | None = None
                           ) -> tuple[str | None, OddsProvider | None]:
@@ -566,19 +567,19 @@ def acquire_odds_store(
              "expires_at": (now + timedelta(hours=ODDS_MAX_AGE_HOURS)).isoformat(),
              "matches": records,
              "iso_note": iso_note}
-    store_path = Path(store_path)
+    written: Path | None = None
     try:
         atomic_write_text(
-            store_path, json.dumps(store, indent=2, ensure_ascii=False)
+            Path(store_path), json.dumps(store, indent=2, ensure_ascii=False)
         )
+        written = Path(store_path)
     except OSError as exc:
         logger.warning("odds store write failed: %s", exc)
-        store_path = None
 
     state = _aggregate_state(counts, bool(seen))
     return {**base, "state": state, "reason": None,
             "fetched_at": now.isoformat(), "expires_at": store.get("expires_at"),
-            "store_path": str(store_path) if store_path else None,
+            "store_path": str(written) if written else None,
             "n_events": len(seen), "counts": counts, "matches": records}
 
 

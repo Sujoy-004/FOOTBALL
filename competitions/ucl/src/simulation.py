@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import math
 import random
+from typing import Callable
 
 from competitions.ucl.src.groups import (
     compute_swiss_standings,
@@ -409,7 +410,7 @@ def run_monte_carlo(
     team_aliases: dict[str, str] | None = None,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
     compute_ci: bool = False,
-    progress_cb: callable | None = None,
+    progress_cb: Callable[[int, int], None] | None = None,
     season: str = "2025/26",
 ) -> dict:
     """Run Monte Carlo simulation of UCL league phase.
@@ -523,7 +524,8 @@ def run_monte_carlo(
                 best_counts.get(value, 0) / n)
 
     if compute_ci:
-        cis = compute_bootstrap_ci(champion_counts, n, seed=resolved_seed)
+        ci_seed = resolved_seed if resolved_seed is not None else seed
+        cis = compute_bootstrap_ci(champion_counts, n, seed=ci_seed)
         small_cis = compute_bootstrap_ci_small_sample(champion_counts, n)
         for team, entry in teams_out.items():
             ci_lo, ci_hi = cis.get(team, (0.0, 0.0))

@@ -46,6 +46,7 @@ from football_core.evaluation import (
     ranked_probability_score,
     tournament_trps,
 )
+from football_core.signal import Signal
 from football_core.signals.market_odds import MarketOddsSignal
 from football_core.signals.refined_elo import RefinedEloSignal
 from football_core.signals.rest_days import RestDaysSignal
@@ -289,7 +290,7 @@ def signal_output(name: str, match: dict, ctx, season_matches: list[dict], harne
 
 
 def build_engine(signals: list[str], weights: dict[str, float], provider) -> EnsembleEngine:
-    registry: dict[str, object] = {
+    registry: dict[str, Signal] = {
         "market_odds": MarketOddsSignal(),
         "refined_elo": RefinedEloSignal(),
         "rest_days": RestDaysSignal(),
@@ -608,7 +609,7 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
     holdout_probs: dict[str, list] = {c: [] for c in configs}
     holdout_actuals: dict[str, list] = {c: [] for c in configs}
     holdout_caches: dict[str, dict] = {c: {} for c in configs}
-    holdout_ens_rows: dict[str, list] = {}
+    holdout_ens_rows: dict[str, list[tuple[list[float], int, dict]]] = {}
     holdout["per_season"] = {}
     for s in seasons:
         matches, elo = season_data[s]
@@ -623,17 +624,24 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
             actuals: list[int] = []
             if cfg == "uniform":
                 for m in season_completed:
+                    idx = harness.outcome_index(m)
+                    if idx is None:
+                        continue  # unreachable: season_completed filtered on outcome_index
                     probs.append([1 / 3, 1 / 3, 1 / 3])
-                    actuals.append(harness.outcome_index(m))
+                    actuals.append(idx)
             elif cfg == "freq":
                 for m in season_completed:
                     idx = harness.outcome_index(m)
+                    if idx is None:
+                        continue  # unreachable: season_completed filtered on outcome_index
                     probs.append([holdout_freq["home"], holdout_freq["draw"],
                                   holdout_freq["away"]])
                     actuals.append(idx)
             else:
                 signal_name = {"ensemble": None, "elo_only": "refined_elo",
                                "market_only": "market_odds"}[cfg]
+                if signal_name is None:
+                    raise ValueError(cfg)  # unreachable: "ensemble" handled above
                 for m in season_test:
                     idx = harness.outcome_index(m)
                     if idx is None:
@@ -652,7 +660,7 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
             holdout_actuals[cfg].extend(actuals)
             if actuals:
                 cache_merge(holdout_caches[cfg], cfg, probs, actuals)
-        row = {"n_test": len(season_test)}
+        row: dict = {"n_test": len(season_test)}
         for cfg in configs:
             row[cfg] = (metrics_from(probs_by_cfg[cfg], actuals_by_cfg[cfg])
                         if actuals_by_cfg[cfg] else {"n": 0})
@@ -738,12 +746,12 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
                 continue
             strength = {t: 0.0 for t in teams}
             points = {t: 0 for t in teams}
-            for probs, idx, m in rows:
+            for row_probs, idx, m in rows:
                 pa, pb = m.get("team_a"), m.get("team_b")
                 if pa in strength:
-                    strength[pa] += probs[0] + 0.5 * probs[1]
+                    strength[pa] += row_probs[0] + 0.5 * row_probs[1]
                 if pb in strength:
-                    strength[pb] += probs[2] + 0.5 * probs[1]
+                    strength[pb] += row_probs[2] + 0.5 * row_probs[1]
                 if idx == 0 and pa in points:
                     points[pa] += 3
                 elif idx == 2 and pb in points:
@@ -816,7 +824,7 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
     results["holdout"] = holdout
 
     # ─────────────────────── leave-one-signal-out ───────────────────────
-    configs = {
+    ablate = {
         "full": signal_order,
         "without_elo": [x for x in signal_order if x != "refined_elo"],
         "without_odds": [x for x in signal_order if x != "market_odds"],
@@ -826,14 +834,14 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
     for s in seasons:
         matches, elo = season_data[s]
         provider = harness.replay_provider(harness.order_matches(matches))
-        row: dict = {"n": len(matches)}
-        for cfg, sigs in configs.items():
+        row = {"n": len(matches)}
+        for cfg, sigs in ablate.items():
             eng = build_engine(sigs, prod_renorm, provider)
             row[cfg] = eval_config(matches, elo, eng, harness)
         results["ablation"][s] = row
 
     pooled_abl: dict = {"n": len([m for s in seasons for m in season_data[s][0]])}
-    for cfg, sigs in configs.items():
+    for cfg, sigs in ablate.items():
         probs_, actuals_ = [], []
         for s in seasons:
             matches, elo = season_data[s]
@@ -862,7 +870,7 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
             prior.append((pm, pe))
 
         # per-signal log-loss over the strictly-prior training pool
-        sig_probs = {n: {"probs": [], "actuals": []} for n in signal_order}
+        sig_probs: dict[str, dict[str, list]] = {n: {"probs": [], "actuals": []} for n in signal_order}
         for pm, pe in prior:
             for m in pm:
                 idx = harness.outcome_index(m)
@@ -884,6 +892,10 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
         eng = build_engine(signal_order, wts,
                            harness.replay_provider(harness.order_matches(tmatches)))
         ev = eval_config(tmatches, telo, eng, harness)
+        if ev is None:
+            raise ValueError(
+                f"no scored matches in {target} for learned-weights evaluation"
+            )
         ev["weights_source"] = f"train:{'+'.join(seasons[:i])} -> eval:{target}"
         learned[target] = {
             "train_pool_n": sum(len(p) for p, _ in prior),
@@ -979,7 +991,7 @@ def write_season_dataset(historical_dir: str, season: str, label: str,
                          ordered: list[dict], elo_map_used: dict[str, float],
                          check: dict, sources: dict) -> dict:
     """Write matches.json / elo_ratings.json / PROVENANCE.json; return file hashes."""
-    prov = {
+    prov: dict = {
         "schema": PROVENANCE_SCHEMA,
         "season": label,
         "storage_deviation": (

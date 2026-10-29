@@ -214,6 +214,8 @@ def acquire_laliga_odds(
         return _not_configured(base, "no_odds_credential", now)
     try:
         if provider is None:
+            if key is None:  # unreachable: caught by the no-credential gate above
+                return _not_configured(base, "no_odds_credential", now)
             provider = BSDDataProvider(key, league_id=LALIGA_BSD_LEAGUE_ID)
         events = list(provider.fetch_matches() or [])
     except Exception as exc:
