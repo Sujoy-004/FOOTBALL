@@ -28,8 +28,11 @@ the same detectors (non-vacuity self-checks, D-32 pattern from
 from __future__ import annotations
 
 import ast
+import inspect
 import json
 import pathlib
+import re
+import subprocess
 
 import pytest
 
@@ -696,3 +699,156 @@ def test_simulation_run_provenance() -> None:
     # The run is non-vacuous: rules actually produced aggregate output.
     assert result.aggregates["c"]["counts"] == {"win": 10}
     assert result.aggregates["c"]["n"] == 10
+
+
+# ---------------------------------------------------------------------------
+# Section J invariant 7: standings simulation invariance (FMT-04)
+# ---------------------------------------------------------------------------
+
+_FMT04_CONTRACT_METHODS: tuple[str, ...] = (
+    "test_wc_simulation_standings_invariance",
+    "test_ucl_simulation_standings_invariance",
+    "test_laliga_simulation_standings_invariance",
+)
+
+
+def _assert_invariance_contract(contract_class: type) -> None:
+    """Pin the FMT-04 contract suite's presence and fixture wiring.
+
+    The Phase 06 invariance tests are fixture-wired real contract tests
+    (monkeypatch + tmp_path; they run in every full suite pass). This gate
+    enforces that the contract suite keeps covering all three competitions —
+    deleting or renaming a method, or stripping its fixtures so it stops
+    being a real test, fails this gate.
+    """
+    for name in _FMT04_CONTRACT_METHODS:
+        method = getattr(contract_class, name, None)
+        assert method is not None, f"FMT-04 contract method missing: {name}"
+        assert callable(method), f"FMT-04 contract method not callable: {name}"
+        params = inspect.signature(method).parameters
+        assert "monkeypatch" in params, (
+            f"{name} must be fixture-wired (monkeypatch) to be a real contract"
+        )
+        assert "tmp_path" in params, (
+            f"{name} must be fixture-wired (tmp_path) to be a real contract"
+        )
+
+
+def _load_invariance_contract_class() -> type:
+    """Load the Phase 06 FMT-04 contract class by module file path.
+
+    Importing via ``tests.<module>`` is unreliable under pytest rootdir
+    path modes, so the contract module is loaded directly from its
+    resolved location — same mechanics the verifier of this repo uses.
+    """
+    import importlib.util
+
+    contract_path = ROOT / "tests" / "test_standings_simulation_invariance.py"
+    spec = importlib.util.spec_from_file_location(
+        "test_standings_simulation_invariance", contract_path
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    contract_class = getattr(module, "TestStandingsSimulationInvariance", None)
+    assert contract_class is not None, (
+        "TestStandingsSimulationInvariance missing from contract module"
+    )
+    return contract_class
+
+
+def test_standings_simulation_invariance_contract() -> None:
+    _assert_invariance_contract(_load_invariance_contract_class())
+
+
+def test_gate_invariance_contract_rejects_stub_class() -> None:
+    """Non-vacuity: a stubbed/unwired class fails the contract gate."""
+    class _Stub:
+        test_wc_simulation_standings_invariance = lambda self: None  # noqa: E731
+        test_ucl_simulation_standings_invariance = lambda self: None
+        test_laliga_simulation_standings_invariance = lambda self: None
+
+    with pytest.raises(AssertionError):
+        _assert_invariance_contract(_Stub)
+
+
+# ---------------------------------------------------------------------------
+# Section J invariant 9: secret hygiene (zero committed API keys)
+# ---------------------------------------------------------------------------
+
+_SECRET_KEY_PATTERN = re.compile(
+    r"(BSD_API_KEY|FOOTBALL_DATA_ORG_KEY|THE_ODDS_API_KEY)"
+    r"\s*[\"']?\s*[=:]\s*[\"']([A-Za-z0-9\-_]{16,})[\"']"
+)
+
+# Loose floors: the tracked-universe scan must never pass vacuously just
+# because git enumeration returned nothing (291 py / 191 json today).
+_MIN_TRACKED_PY = 200
+_MIN_TRACKED_JSON = 100
+
+
+def _tracked_source_files() -> list[str]:
+    """Tracked ``*.py``/``*.json`` paths tracked by git in this repo."""
+    proc = subprocess.run(
+        ["git", "ls-files", "--", "*.py", "*.json"],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return sorted(line for line in proc.stdout.splitlines() if line.strip())
+
+
+def _find_committed_keys(content: str) -> list[str]:
+    """Return the env-names whose quoted literal value looks like a key."""
+    return [match.group(1) for match in _SECRET_KEY_PATTERN.finditer(content)]
+
+
+def test_zero_committed_api_keys() -> None:
+    """No committed BSD / football-data.org / Odds API credentials."""
+    tracked = _tracked_source_files()
+    py_files = [rel for rel in tracked if rel.endswith(".py")]
+    json_files = [rel for rel in tracked if rel.endswith(".json")]
+    assert len(py_files) >= _MIN_TRACKED_PY, (
+        f"Tracked python universe floor failed: {len(py_files)}"
+    )
+    assert len(json_files) >= _MIN_TRACKED_JSON, (
+        f"Tracked json universe floor failed: {len(json_files)}"
+    )
+
+    offenders: list[str] = []
+    for rel in tracked:
+        path = ROOT / rel
+        content = path.read_text(encoding="utf-8", errors="ignore")
+        if _find_committed_keys(content):
+            offenders.append(rel)
+    assert offenders == [], f"Committed API keys found in: {offenders}"
+
+
+def test_gate_secret_scanner_flags_synthetic_keys() -> None:
+    """Non-vacuity: the secret scanner must flag synthetic key literals.
+
+    Positive samples are assembled from concatenated fragments so this
+    tracked source file never itself contains a matching literal.
+    """
+    # env-style single-quote name + double-quoted value.
+    committed_key = "BSD_API" + '_KEY = "aBcDeFgH1234567890Zx"'
+    assert _find_committed_keys(committed_key) == ["BSD_API_KEY"]
+
+    # JSON-style: quoted name, colon, quoted value.
+    json_style = (
+        '{"FOOTBALL_DATA' + '_ORG_KEY": "1234567890abcdefgh"}'
+    )
+    assert _find_committed_keys(json_style) == ["FOOTBALL_DATA_ORG_KEY"]
+
+    # Single-quoted name, colon, rounded single-quoted value (YAML-like).
+    colons_kv = "THE_ODDS_API" + "_KEY: 'ZxWvUtSrQpOnMlKj-98'"
+    assert _find_committed_keys(colons_kv) == ["THE_ODDS_API_KEY"]
+
+    # Negative controls: env reads and short/dashed values are not keys.
+    env_read = 'os.environ.get("BSD_API_KEY", "")'
+    assert _find_committed_keys(env_read) == []
+    short_value = "BSD_API_KEY = \"short\""
+    assert _find_committed_keys(short_value) == []
+    empty_env = 'THE_ODDS_API_KEY = ""'
+    assert _find_committed_keys(empty_env) == []
