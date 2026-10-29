@@ -641,19 +641,25 @@ def run_evaluation(out_path: str, historical_dir: str, seasons: list[str],
                 signal_name = {"ensemble": None, "elo_only": "refined_elo",
                                "market_only": "market_odds"}[cfg]
                 if signal_name is None:
-                    raise ValueError(cfg)  # unreachable: "ensemble" handled above
-                for m in season_test:
-                    idx = harness.outcome_index(m)
-                    if idx is None:
-                        continue
-                    ctx = harness.build_context(m, matches, elo_ratings=elo)
-                    if cfg == "ensemble":
+                    # cfg == "ensemble": the composite engine blends every
+                    # registered signal; there is no single-signal name.
+                    for m in season_test:
+                        idx = harness.outcome_index(m)
+                        if idx is None:
+                            continue
+                        ctx = harness.build_context(m, matches, elo_ratings=elo)
                         bp = eng.evaluate(m, ctx)
                         probs.append([bp.home_prob, bp.draw_prob, bp.away_prob])
-                    else:
+                        actuals.append(idx)
+                else:
+                    for m in season_test:
+                        idx = harness.outcome_index(m)
+                        if idx is None:
+                            continue
+                        ctx = harness.build_context(m, matches, elo_ratings=elo)
                         out = signal_output(signal_name, m, ctx, matches, harness)
                         probs.append([out.home_prob, out.draw_prob, out.away_prob])
-                    actuals.append(idx)
+                        actuals.append(idx)
             probs_by_cfg[cfg] = probs
             actuals_by_cfg[cfg] = actuals
             holdout_probs[cfg].extend(probs)
