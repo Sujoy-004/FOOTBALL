@@ -118,18 +118,18 @@ def _not_configured(base: dict, reason: str, now: datetime) -> dict:
 
 def _unavailable(base: dict, exc: Exception, now: datetime) -> dict:
     logger = core.logger
-    logger.warning("odds provider fetch raised: %s", exc)
+    logger.warning("odds provider fetch raised: %s", core.redact_secrets(str(exc)))
     return {**base, "state": STATE_CONFIGURED_BUT_UNAVAILABLE,
-            "reason": f"{exc.__class__.__name__}: {exc}",
+            "reason": core.redact_secrets(f"{exc.__class__.__name__}: {exc}"),
             "fetched_at": now.isoformat(), "store_path": None, "matches": {},
             "counts": {"available": 0, "missing": 0, "invalid": 0, "stale": 0,
                        "skipped_status": 0, "unmappable": 0, "kickoff_mismatch": 0}}
 
 
 def _parser_error(base: dict, exc: Exception, now: datetime) -> dict:
-    core.logger.warning("odds provider parse failure: %s", exc)
+    core.logger.warning("odds provider parse failure: %s", core.redact_secrets(str(exc)))
     return {**base, "state": STATE_PARSER_ERROR,
-            "reason": f"{exc.__class__.__name__}: {exc}",
+            "reason": core.redact_secrets(f"{exc.__class__.__name__}: {exc}"),
             "fetched_at": now.isoformat(), "store_path": None, "matches": {},
             "counts": {"available": 0, "missing": 0, "invalid": 0, "stale": 0,
                        "skipped_status": 0, "unmappable": 0, "kickoff_mismatch": 0}}
@@ -189,6 +189,8 @@ def acquire_laliga_odds(
             return _unavailable(base, exc, now)
         except (core.ProviderParseError, ValueError, TypeError) as exc:
             return _parser_error(base, exc, now)
+        except Exception as exc:
+            return _unavailable(base, exc, now)
         bookmaker = (odds_provider.primary_book
                      if isinstance(odds_provider, core.TheOddsApiOddsProvider) else "BSD")
         iso_note = ("provider_last_update kept per record (selected book); "

@@ -64,6 +64,7 @@ from pathlib import Path
 import requests
 
 from football_core.data_providers.bsd_provider import BSDDataProvider
+from football_core.domain import redact_secrets
 from football_core.fetcher import fold_team_key
 from football_core.predictors.odds import remove_vig
 from football_core.state import atomic_write_text
@@ -251,8 +252,16 @@ class TheOddsApiOddsProvider(OddsProvider):
         url = self.endpoint_for(competition)
         params = {"apiKey": self.api_key, "regions": self.regions,
                   "markets": self.markets, "oddsFormat": self.odds_format}
-        resp = (http_fn(url, params) if http_fn is not None
-                else requests.get(url, params=params, timeout=self.timeout))
+        try:
+            resp = (http_fn(url, params) if http_fn is not None
+                    else requests.get(url, params=params, timeout=self.timeout))
+        except Exception as exc:
+            msg = redact_secrets(str(exc))
+            if self.api_key and self.api_key in (msg or ""):
+                msg = (msg or "").replace(self.api_key, "[REDACTED]")
+            raise ProviderUnavailableError(
+                f"the-odds-api transport error: {exc.__class__.__name__}: {msg}"
+            ) from None
         if getattr(resp, "status_code", None) != 200:
             raise ProviderUnavailableError(
                 f"the-odds-api http {getattr(resp, 'status_code', 'unknown')} for {sport!r}")

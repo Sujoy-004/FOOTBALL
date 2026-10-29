@@ -55,6 +55,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from fastapi import FastAPI
+from football_core.domain import redact_secrets
 
 
 class UnknownCompetitionError(KeyError):
@@ -111,7 +112,7 @@ class CompetitionAdapter:
             report = self.refresh_fn()
         except Exception as e:
             return {"provider": None, "attempted": True, "success": False,
-                    "error": f"{e.__class__.__name__}: {e}",
+                    "error": redact_secrets(f"{e.__class__.__name__}: {e}"),
                     "stale": True}
         if isinstance(report, dict):
             return dict(report)

@@ -7,6 +7,14 @@ import pytest
 from web.server import build_arg_parser, configure_server_env
 
 
+@pytest.fixture(autouse=True)
+def isolate_env():
+    orig = dict(os.environ)
+    yield
+    os.environ.clear()
+    os.environ.update(orig)
+
+
 def test_server_cli_defaults_to_preload_all(monkeypatch):
     monkeypatch.delenv("FOOTBALL_PRELOAD_ALL", raising=False)
     monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)

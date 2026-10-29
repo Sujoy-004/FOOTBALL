@@ -39,6 +39,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Receive, Scope, Send
 import uvicorn
+from football_core.domain import redact_secrets
 
 
 class _NoCacheASGI:
@@ -109,7 +110,7 @@ async def _boot_step(label: str, fn, *args):
     try:
         return await run_in_threadpool(fn, *args)
     except Exception as exc:
-        logger.error("[boot] %s failed: %s", label, exc)
+        logger.error("[boot] %s failed: %s", label, redact_secrets(str(exc)))
         return None
 
 
@@ -157,21 +158,60 @@ async def lifespan(app: fastapi.FastAPI):
     # (older data, newer stamp) — stale data served as current, permanently.
     _wc_stamp = _wc._observed_stamp()
     _wc_data = await _boot_step("World Cup compute_overview",
-                                _wc.compute_overview) or {}
+                                _wc.compute_overview)
     _ucl_stamp = _ucl._observed_stamp()
-    _ucl_data = await _boot_step("UCL compute_all", _ucl.compute_all) or {}
+    _ucl_data = await _boot_step("UCL compute_all", _ucl.compute_all)
     from web.derived import holder as _holder
-    _holder.publish_data("worldcup", _wc_data, "results", _wc_stamp)
-    _holder.publish_data("ucl", _ucl_data, _ucl_data.get("mode", "results"),
-                         _ucl_stamp)
+
+    if _wc_data:
+        _holder.publish_data("worldcup", _wc_data, "results", _wc_stamp)
+    else:
+        _holder.publish_data(
+            "worldcup",
+            {
+                "competition": "worldcup",
+                "mode": "unavailable",
+                "availability": "UNAVAILABLE",
+                "error": "boot computation failed",
+            },
+            "unavailable",
+            None,
+        )
+
+    if _ucl_data:
+        _holder.publish_data("ucl", _ucl_data, _ucl_data.get("mode", "results"), _ucl_stamp)
+    else:
+        _holder.publish_data(
+            "ucl",
+            {
+                "competition": "ucl",
+                "mode": "unavailable",
+                "availability": "UNAVAILABLE",
+                "error": "boot computation failed",
+            },
+            "unavailable",
+            None,
+        )
 
     import web.laliga_app as _laliga
 
     _laliga_stamp = _laliga._observed_stamp()
     _laliga_data = await _boot_step("LaLiga compute_all",
-                                    _laliga.compute_all) or {}
-    _holder.publish_data("laliga", _laliga_data, _laliga_data.get("mode", "results"),
-                         _laliga_stamp)
+                                    _laliga.compute_all)
+    if _laliga_data:
+        _holder.publish_data("laliga", _laliga_data, _laliga_data.get("mode", "results"), _laliga_stamp)
+    else:
+        _holder.publish_data(
+            "laliga",
+            {
+                "competition": "laliga",
+                "mode": "unavailable",
+                "availability": "UNAVAILABLE",
+                "error": "boot computation failed",
+            },
+            "unavailable",
+            None,
+        )
     yield
 
 

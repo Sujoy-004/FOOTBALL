@@ -14,6 +14,8 @@ Stdlib only, competition-agnostic: no imports from competitions/* or web/*.
 from __future__ import annotations
 
 import json
+import os
+import re
 from dataclasses import InitVar, dataclass
 from enum import Enum
 from pathlib import Path
@@ -329,3 +331,39 @@ def load_json_store(path: str | Path) -> tuple[Any | None, DataAvailability, Opt
     if is_semantically_empty(payload):
         return payload, DataAvailability.EMPTY, None
     return payload, DataAvailability.AVAILABLE, None
+
+
+# ── secrets redaction ────────────────────────────────────────────────────────
+
+
+def redact_secrets(text: str | None) -> str | None:
+    """Sanitize sensitive credentials, API keys, tokens, and query strings.
+
+    Protects against leaking API keys, bearer tokens, or query strings in logs,
+    exception messages, and client payloads.
+    """
+    if text is None:
+        return None
+    s = str(text)
+    if not s:
+        return s
+
+    for k, v in os.environ.items():
+        if any(term in k.upper() for term in ("KEY", "TOKEN", "SECRET", "PASS")):
+            val = v.strip()
+            if len(val) >= 4 and val in s:
+                s = s.replace(val, "[REDACTED]")
+
+    s = re.sub(
+        r'''(["']?(?:api[_-]?key|token|secret|password|access[_-]?token)["']?\s*[:=]\s*["']?)([^"'&\s,}\]]+)(["']?)''',
+        r'\1[REDACTED]\3',
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r'((?:Bearer|Token)\s+)[A-Za-z0-9_\-\.~+/]+=*',
+        r'\1[REDACTED]',
+        s,
+        flags=re.IGNORECASE,
+    )
+    return s

@@ -50,7 +50,7 @@ from web.common import (
     refresh_response_body,
     ts,
 )
-from football_core.domain import DataAvailability, load_json_store, DataAvailability, load_json_store
+from football_core.domain import DataAvailability, load_json_store, redact_secrets
 from football_core.store_stamp import StoreStamp, stamp_store, sub_stamp
 from web.derived.stamps import UCL_RESULTS_ROLES, UCL_ROLES
 from web import reconciliation
@@ -614,7 +614,7 @@ def _fetch_live_data() -> None:
         )
     except Exception as exc:  # never let a refresh crash the request path
         logger.warning("[UCL] live fetch raised: %s — UCL data may be STALE", exc)
-        _store_refresh_report(False, f"{exc.__class__.__name__}: {exc}",
+        _store_refresh_report(False, redact_secrets(f"{exc.__class__.__name__}: {exc}"),
                               type(provider).__name__, active_season=active_season)
         return
     report = summary.get("report") or {}

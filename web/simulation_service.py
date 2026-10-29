@@ -39,7 +39,7 @@ import time
 import uuid
 from typing import Any, Callable, Optional
 
-from football_core.domain import ResultProvenance
+from football_core.domain import ResultProvenance, redact_secrets
 from football_core.simulation import (
     SimulationContractError,
     generate_seed,
@@ -203,7 +203,7 @@ class SimulationTaskService:
                 with self._lock:
                     entry = self._tasks[task_id]
                     entry["status"] = "failed"
-                    entry["error"] = str(exc)
+                    entry["error"] = redact_secrets(str(exc))
                     entry["elapsed"] = round(time.time() - entry["t0"], 2)
 
         threading.Thread(target=_worker, daemon=True).start()

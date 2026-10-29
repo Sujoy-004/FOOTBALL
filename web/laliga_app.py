@@ -16,7 +16,7 @@ module globals.
 from __future__ import annotations
 from typing import Any, Mapping
 
-from football_core.domain import DataAvailability, load_json_store
+from football_core.domain import DataAvailability, load_json_store, redact_secrets
 
 from football_core.freshness import (
     UNREADABLE,
@@ -251,7 +251,7 @@ _LALIGA_ELO_FILE = "elo_seed.json"
 
 def _live_availability() -> tuple[dict, dict]:
     """``(map, reasons)`` from ``load_json_store`` over the active season dir."""
-    from football_core.domain import DataAvailability, load_json_store, DataAvailability, load_json_store
+    from football_core.domain import DataAvailability, load_json_store, redact_secrets, DataAvailability, load_json_store
 
     adir = Path(season_store.season_dir(DATA_DIR, _active_season_token()))
     mapping: dict = {}
@@ -454,7 +454,7 @@ def _fetch_live_data():
         )
     except Exception as exc:
         logger.warning("[LaLiga] live fetch raised: %s", exc)
-        _store_refresh_report(False, f"{exc.__class__.__name__}: {exc}",
+        _store_refresh_report(False, redact_secrets(f"{exc.__class__.__name__}: {exc}"),
                                type(provider).__name__, active_season=active_season)
         return None
 
