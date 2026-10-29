@@ -103,6 +103,8 @@ def wc_events_from_snapshot(groups_raw, played, played_groups) -> list:
             "id": mid,
             "match_id": mid,
             "status": "finished",
+            "stage": "knockout",
+            "stage_name": "knockout",
             "home_team": entry["team_a"],
             "away_team": entry["team_b"],
             "home_score": entry["home_score"],

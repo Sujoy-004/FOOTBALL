@@ -79,14 +79,14 @@ def test_wc_stale_undecided_provider_cannot_wipe_penalty_decisions(
     wc_dir = au.seed_wc_dir(tmp_path / "wc")
     before = au.snapshot_tree(wc_dir)
     groups, played, played_groups = au.wc_repo_snapshot()
-    pk = [m for m in played.values()
+    pk = [(mid, m) for mid, m in played.items()
           if m["home_score"] == m["away_score"] and not m.get("is_draw")]
     assert len(pk) == 4
     stale_events = []
-    for entry in pk:
+    for mid, entry in pk:
         stale_events.append({
-            "id": entry["match_id"],
-            "match_id": entry["match_id"],
+            "id": mid,
+            "match_id": mid,
             "status": "finished",
             "home_team": entry["team_a"],
             "away_team": entry["team_b"],
@@ -107,9 +107,9 @@ def test_wc_stale_undecided_provider_cannot_wipe_penalty_decisions(
     assert report["success"] is True
 
     after = json.loads((wc_dir / "played.json").read_text(encoding="utf-8"))
-    for entry in pk:
-        assert after[entry["match_id"]]["winner"] == entry["winner"]
-        assert after[entry["match_id"]]["is_draw"] is False
+    for mid, entry in pk:
+        assert after[mid]["winner"] == entry["winner"]
+        assert after[mid]["is_draw"] is False
     assert (wc_dir / "played.json").read_bytes() == before["played.json"]
     assert (
         wc_dir / "played_groups.json"

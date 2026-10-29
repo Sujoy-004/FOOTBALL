@@ -48,8 +48,18 @@ def _mod(comp: str):
 
 
 def _stamp(gen: int) -> StoreStamp:
-    """A synthetic stamp whose single role carries *gen* as its mtime."""
-    return StoreStamp(entries=(("results", gen, gen),))
+    """A synthetic stamp carrying every app's results-role vocabulary.
+
+    Each web app narrows its retire check to its OWN results roles via
+    ``sub_stamp`` (WC: played/played_groups, UCL: league_results/
+    knockout_results, LaLiga: results), so a one-role stamp filters to
+    EMPTY for two of the three apps — the narrowing then sees no change
+    and the retire leg never fires. One entry per role vocabulary, all
+    sharing *gen*, matches every app's narrow comparison.
+    """
+    return StoreStamp(entries=(("results", gen, gen),
+                               ("played", gen, gen),
+                               ("league_results", gen, gen)))
 
 
 @pytest.fixture(autouse=True)
@@ -81,6 +91,29 @@ class _Recorder:
         self.calls.append("clear_sim")
         return "clear_sim"
 
+    def retire(self) -> str:
+        self.calls.append("retire")
+        return "retire"
+
+
+def _patch_reconcile(monkeypatch, recorder: _Recorder) -> None:
+    """Stub the sanctioned retirement pass and record its seam call.
+
+    Since plans 05-08/05-09 the retirement leg is the reconciler
+    (``web.reconciliation.reconcile_now``); the apps call it through the
+    module attribute, so the replacement here intercepts every call.
+    A full stub (not a delegate) keeps these ordering tests hermetic — the
+    reconciler's own tombstone behaviour is pinned in
+    ``tests/test_reconciliation_flow.py``.
+    """
+    import web.reconciliation as reconciliation_mod
+
+    def fake_reconcile(spec, report=None, reason="test"):
+        recorder.retire()
+        return {"mode": "real", "retired": [], "still_valid": []}
+
+    monkeypatch.setattr(reconciliation_mod, "reconcile_now", fake_reconcile)
+
 
 def _drive_refresh(comp: str, monkeypatch, recorder: _Recorder,
                    stamps: list[StoreStamp]) -> int:
@@ -97,7 +130,7 @@ def _drive_refresh(comp: str, monkeypatch, recorder: _Recorder,
 
     def fake_observed_stamp() -> StoreStamp:
         recorder.stamp()
-        return pending.pop(0)
+        return pending.pop(0) if pending else stamps[-1]
 
     def fake_build_state():
         recorder.build()
@@ -139,6 +172,11 @@ def test_refresh_publishes_a_stamp_sampled_before_the_build(comp, monkeypatch):
     observed after it.
     """
     recorder = _Recorder()
+    # The role-rich stamps make the wrapper's narrowed retire check fire
+    # for every app; the reconciler is stubbed so this ORDER test stays
+    # hermetic (zero repo writes) — its tombstone behaviour is pinned in
+    # tests/test_reconciliation_flow.py.
+    _patch_reconcile(monkeypatch, recorder)
     # The post-ingest sample is the NEWER one; if the publish used a stamp
     # sampled after the build, the recorded order would put a "stamp" call
     # after "build".
@@ -244,27 +282,31 @@ def test_publishing_without_a_stamp_neither_crashes_nor_poisons_the_slot():
     assert holder.read_data("laliga")["n"] == 2
 
 
-def test_the_wc_ingest_hook_retires_the_simulation_before_it_publishes(monkeypatch):
-    """The WC hook publishes the new facts itself, so it retires the sim HERE.
+def test_the_wc_ingest_hook_runs_the_retire_pass_before_it_publishes(monkeypatch):
+    """The WC hook publishes the new facts itself, so the retire pass runs HERE.
 
     ``web/wc_app.py::_fetch_live_data`` calls ``_publish_snapshot`` — the
     new facts are published from inside the ingest hook, BEFORE the
-    endpoint's own ``clear_sim`` runs. The hook must therefore retire the
-    simulation at the store write, or there is a window in which
+    endpoint's own clear path runs. The hook must therefore run the
+    sanctioned retirement (``reconciliation.reconcile_now`` since plans
+    05-08/05-09) at the store write, or there is a window in which
     ``GET /api/simulation`` serves the previous run next to the new facts.
     """
     import competitions.worldcup.src.pipeline as pipeline
     import web.wc_app as wc_app
 
     recorder = _Recorder()
+    _patch_reconcile(monkeypatch, recorder)
     holder.publish_sim("worldcup", {"status": "completed", "n": 1})
     seen: dict[str, object] = {}
 
     # before-the-ingest, after-the-ingest, and the publish's own sample
     stamps = [_stamp(1), _stamp(2), _stamp(2)]
+    pending = list(stamps)
     monkeypatch.setattr(
         wc_app, "_observed_stamp",
-        lambda: (recorder.stamp(), stamps.pop(0))[1])
+        lambda: (recorder.stamp(),
+                 pending.pop(0) if pending else stamps[-1])[1])
     monkeypatch.setattr(
         wc_app, "_build_state",
         lambda: (recorder.build(), ({"n": 1}, "results"))[1])
@@ -274,47 +316,52 @@ def test_the_wc_ingest_hook_retires_the_simulation_before_it_publishes(monkeypat
                          "stale": False, "finished": {}, "stages": []})
 
     real_publish = holder.publish_data
-    real_clear = holder.clear_sim
 
     def fake_publish(c, data, mode, stamp):
-        seen["sim_at_publish"] = dict(holder.read_sim(c))
+        seen["published"] = True
         recorder.publish()
         real_publish(c, data, mode, stamp)
 
-    def fake_clear(c):
-        recorder.clear_sim()
-        real_clear(c)
-
     monkeypatch.setattr(holder, "publish_data", fake_publish)
-    monkeypatch.setattr(holder, "clear_sim", fake_clear)
 
     wc_app._fetch_live_data()
 
-    assert seen["sim_at_publish"] == {}, (
-        "the WC ingest hook published the new facts while the previous "
-        f"simulation was still served: {seen['sim_at_publish']!r}"
+    calls = recorder.calls
+    assert seen.get("published") is True, (
+        "the WC ingest hook did not publish the new facts: {calls!r}"
     )
-    assert recorder.calls.index("clear_sim") < recorder.calls.index("publish")
+    assert calls.index("retire") < calls.index("publish"), (
+        "the WC ingest hook ran the retire pass AFTER it published the new "
+        f"facts: {calls}"
+    )
 
 
-def test_the_ucl_ingest_hook_retires_the_simulation_before_it_publishes(monkeypatch):
-    """The UCL hook may publish the new facts itself — so it retires the sim.
+def test_the_ucl_ingest_hook_runs_the_retire_pass_before_it_publishes(monkeypatch):
+    """The UCL hook may publish the new facts itself — retire pass runs first.
 
     ``web/ucl_app.py::_fetch_live_data`` calls
     ``_maybe_recompute_cache_after_ingest``, which rebuilds and publishes.
-    The simulation must be retired at the store write, before that publish.
+    The sanctioned retirement (``reconciliation.reconcile_now`` since plans
+    05-08/05-09) must run at the store write, before that publish.
     """
     import competitions.ucl.src.pipeline as pipeline
     import web.ucl_app as ucl_app
+    import web.common as common
+
+    class _StubProvider:
+        last_error = None
 
     recorder = _Recorder()
+    _patch_reconcile(monkeypatch, recorder)
     holder.publish_sim("ucl", {"status": "completed", "n": 1})
     seen: dict[str, object] = {}
 
     stamps = [_stamp(1), _stamp(2), _stamp(2)]
+    pending = list(stamps)
     monkeypatch.setattr(
         ucl_app, "_observed_stamp",
-        lambda: (recorder.stamp(), stamps.pop(0))[1])
+        lambda: (recorder.stamp(),
+                 pending.pop(0) if pending else stamps[-1])[1])
     monkeypatch.setattr(
         ucl_app, "_build_state",
         lambda: (recorder.build(), ({"n": 1}, "results"))[1])
@@ -326,67 +373,77 @@ def test_the_ucl_ingest_hook_retires_the_simulation_before_it_publishes(monkeypa
         lambda *a, **k: {"report": {"success": True, "finished": {}},
                          "status": "ok", "provider_name": "stub",
                          "n_raw": 1, "n_updated": 1, "per_season": {}})
+    # The hook's own seams: snapshot gate, provider resolution, and the
+    # season-freshness ledger writes are all stubbed so the test stays
+    # hermetic (zero repo writes, zero provider calls).
+    import web.startup as startup
+    monkeypatch.setattr(startup, "is_snapshot_mode", lambda: False)
+    monkeypatch.setattr(common, "get_data_provider", lambda *a, **k: _StubProvider())
+    monkeypatch.setattr(
+        ucl_app, "_active_season_token", lambda: "2025/26", raising=False)
+    monkeypatch.setattr(
+        ucl_app, "_store_refresh_report",
+        lambda *a, **k: None, raising=False)
 
     real_publish = holder.publish_data
-    real_clear = holder.clear_sim
 
     def fake_publish(c, data, mode, stamp):
-        seen.setdefault("sim_at_publish", dict(holder.read_sim(c)))
+        seen.setdefault("published", True)
         recorder.publish()
         real_publish(c, data, mode, stamp)
 
-    def fake_clear(c):
-        recorder.clear_sim()
-        real_clear(c)
-
     monkeypatch.setattr(holder, "publish_data", fake_publish)
-    monkeypatch.setattr(holder, "clear_sim", fake_clear)
 
     ucl_app._fetch_live_data()
 
-    assert seen.get("sim_at_publish") == {}, (
-        "the UCL ingest hook published the new facts while the previous "
-        f"simulation was still served: {seen.get('sim_at_publish')!r}"
+    calls = recorder.calls
+    assert seen.get("published") is True, (
+        f"the UCL ingest hook did not publish the new facts: {calls!r}"
     )
-    assert recorder.calls.index("clear_sim") < recorder.calls.index("publish")
+    assert calls.index("retire") < calls.index("publish"), (
+        "the UCL ingest hook ran the retire pass AFTER it published the new "
+        f"facts: {calls}"
+    )
 
 
-def test_the_laliga_ingest_hook_retires_the_simulation_before_it_publishes(monkeypatch):
-    """The LaLiga hook publishes the new facts itself — so it retires the sim.
+def test_the_laliga_ingest_hook_runs_the_retire_pass_before_it_publishes(monkeypatch):
+    """The LaLiga hook publishes the new facts itself — retire pass runs first.
 
     ``web/laliga_app.py::_fetch_live_data`` calls ``_recompute_cache``,
-    which rebuilds and publishes. The simulation must be retired at the
-    store write, before that publish.
+    which rebuilds and publishes. The sanctioned retirement
+    (``reconciliation.reconcile_now`` since plans 05-08/05-09) must run at
+    the store write, before that publish.
     """
     import competitions.laliga.src.pipeline as pipeline
     import web.laliga_app as laliga_app
+    import web.common as common
+
+    class _StubProvider:
+        last_error = None
 
     recorder = _Recorder()
+    _patch_reconcile(monkeypatch, recorder)
     holder.publish_sim("laliga", {"status": "completed", "n": 1})
     seen: dict[str, object] = {}
 
     stamps = [_stamp(1), _stamp(2), _stamp(2)]
+    pending = list(stamps)
     monkeypatch.setattr(
         laliga_app, "_observed_stamp",
-        lambda: (recorder.stamp(), stamps.pop(0))[1])
+        lambda: (recorder.stamp(),
+                 pending.pop(0) if pending else stamps[-1])[1])
     monkeypatch.setattr(
         laliga_app, "compute_all",
         lambda: {"n": 1, "mode": "results"})
 
     real_publish = holder.publish_data
-    real_clear = holder.clear_sim
 
     def fake_publish(c, data, mode, stamp):
-        seen.setdefault("sim_at_publish", dict(holder.read_sim(c)))
+        seen.setdefault("published", True)
         recorder.publish()
         real_publish(c, data, mode, stamp)
 
-    def fake_clear(c):
-        recorder.clear_sim()
-        real_clear(c)
-
     monkeypatch.setattr(holder, "publish_data", fake_publish)
-    monkeypatch.setattr(holder, "clear_sim", fake_clear)
 
     def fake_brain_fetch(*a, **k):
         return {"report": {"success": True, "finished": {}},
@@ -394,22 +451,29 @@ def test_the_laliga_ingest_hook_retires_the_simulation_before_it_publishes(monke
                 "n_raw": 1, "n_updated": 1, "odds": {}}
 
     monkeypatch.setattr(pipeline, "fetch_live_data", fake_brain_fetch)
+    # The hook imports the brain fetch under a local alias each call, so
+    # patching the source module's attribute is what it actually calls.
+    # Snapshot gate, provider resolution and the freshness-ledger writes
+    # are stubbed for hermeticity (zero repo writes, zero provider calls).
+    import web.startup as startup
+    monkeypatch.setattr(startup, "is_snapshot_mode", lambda: False)
+    monkeypatch.setattr(common, "get_data_provider", lambda *a, **k: _StubProvider())
     monkeypatch.setattr(
-        laliga_app, "_brain_fetch", fake_brain_fetch, raising=False)
-    # The app imports the brain fetch under a local alias; patch the module
-    # attribute the app actually calls.
+        laliga_app, "_active_season_token", lambda: "shipped-season", raising=False)
     monkeypatch.setattr(
-        laliga_app, "_fetch_live_data", laliga_app._fetch_live_data)
-    monkeypatch.setattr(
-        laliga_app, "get_data_provider", lambda *a, **k: object(), raising=False)
+        laliga_app, "_store_refresh_report",
+        lambda *a, **k: None, raising=False)
 
     laliga_app._fetch_live_data()
 
-    assert seen.get("sim_at_publish") == {}, (
-        "the LaLiga ingest hook published the new facts while the previous "
-        f"simulation was still served: {seen.get('sim_at_publish')!r}"
+    calls = recorder.calls
+    assert seen.get("published") is True, (
+        f"the LaLiga ingest hook did not publish the new facts: {calls!r}"
     )
-    assert recorder.calls.index("clear_sim") < recorder.calls.index("publish")
+    assert calls.index("retire") < calls.index("publish"), (
+        "the LaLiga ingest hook ran the retire pass AFTER it published the "
+        f"new facts: {calls}"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -420,23 +484,26 @@ def test_the_laliga_ingest_hook_retires_the_simulation_before_it_publishes(monke
 @pytest.mark.parametrize("comp", COMP_IDS)
 def test_refresh_retires_the_simulation_before_publishing_the_new_facts(
         comp, monkeypatch):
-    """``clear_sim`` runs BEFORE the new data is published.
+    """The sanctioned retirement runs BEFORE the new data is published.
 
     Clearing it after the rebuild left a window in which
     ``GET /api/simulation`` served the previous run while ``GET /api/data``
-    served the newly ingested facts. The only intermediate state that is
-    honest is (old facts, no simulation).
+    served the newly ingested facts. Since plans 05-08/05-09 the retire leg
+    is the reconciler (``holder.clear_sim`` was retired in favour of
+    ``reconciliation.reconcile_now``), so the same ordering rule now applies
+    to the reconcile pass: it runs at the store write, before any publish.
     """
     recorder = _Recorder()
+    _patch_reconcile(monkeypatch, recorder)
     # The ingest wrote the stores: the post-ingest stamp differs.
     status = _drive_refresh(comp, monkeypatch, recorder, [_stamp(1), _stamp(2)])
     assert status == 200
 
     calls = recorder.calls
-    assert "clear_sim" in calls, f"the simulation was never retired: {calls}"
-    clear_at = calls.index("clear_sim")
+    assert "retire" in calls, f"the simulation was never retired: {calls}"
+    retire_at = calls.index("retire")
     publish_at = calls.index("publish")
-    assert clear_at < publish_at, (
+    assert retire_at < publish_at, (
         f"the simulation was retired AFTER the new facts were published: {calls}"
     )
 
@@ -463,39 +530,53 @@ def test_a_refresh_that_writes_nothing_keeps_the_simulation(comp, monkeypatch):
 
 
 @pytest.mark.parametrize("comp", COMP_IDS)
-def test_the_simulation_is_empty_from_the_moment_the_stores_change(
-        comp, monkeypatch):
-    """At the instant the new facts are published, no simulation is served."""
+def test_retire_pass_precedes_the_publish_of_the_new_facts(comp, monkeypatch):
+    """At the instant the new facts are published, the retire pass ran first.
+
+    Since plans 05-08/05-09 the previous run is retired by the reconciler,
+    which tombstones it inside ONE atomic ``publish_sim_state`` (the payload
+    is never emptied). The old "empty payload at publish" property is no
+    longer the contract; the pinned invariant is the ORDER: the reconcile
+    pass runs before the hook's own publish of the new facts.
+    """
     recorder = _Recorder()
     holder.publish_sim(comp, {"status": "completed", "n": 1})
 
     seen: dict[str, object] = {}
+    order: list[str] = []
 
     real_publish = holder.publish_data
 
+    def fake_reconcile(spec, report=None, reason="test"):
+        order.append("retire")
+        return {"mode": "real", "retired": [], "still_valid": []}
+
     def fake_publish(c, data, mode, stamp):
         # The state a reader observes AT the moment the new facts land.
-        seen["sim_at_publish"] = dict(holder.read_sim(c))
+        seen["sim_state"] = dict(holder.read_sim_state(c))
+        order.append("publish")
         real_publish(c, data, mode, stamp)
+
+    import web.reconciliation as reconciliation_mod
+    monkeypatch.setattr(reconciliation_mod, "reconcile_now", fake_reconcile)
 
     mod = _mod(comp)
     monkeypatch.setattr(mod, "_fetch_live_data", lambda: None)
-    pending = [_stamp(1), _stamp(2)]
+    stamps = [_stamp(1), _stamp(2)]
+    pending = list(stamps)
     monkeypatch.setattr(
         mod, "_observed_stamp",
-        lambda: (recorder.stamp(), pending.pop(0))[1])
+        lambda: (recorder.stamp(),
+                 pending.pop(0) if pending else stamps[-1])[1])
     monkeypatch.setattr(
         mod, "_build_state",
         lambda: (recorder.build(), ({"n": 1}, "results"))[1])
     monkeypatch.setattr(holder, "publish_data", fake_publish)
-    real_clear = holder.clear_sim
-    monkeypatch.setattr(
-        holder, "clear_sim",
-        lambda c: (recorder.clear_sim(), real_clear(c))[1])
 
     response = mod.api_refresh()
     assert response.status_code == 200
-    assert seen["sim_at_publish"] == {}, (
-        "a simulation was still served at the moment the new facts were "
-        f"published: {seen['sim_at_publish']!r}"
+    assert "retire" in order and "publish" in order, order
+    assert order.index("retire") < order.index("publish"), (
+        "the retire pass ran after the new facts were published: "
+        f"{order} (sim state at publish: {seen['sim_state']!r})"
     )

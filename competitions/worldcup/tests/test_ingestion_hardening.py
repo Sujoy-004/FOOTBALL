@@ -511,7 +511,7 @@ def test_live_run_on_complete_snapshot_is_stable(monkeypatch, tmp_path):
     class FakeProvider:
         last_error = None
 
-        def fetch_matches(self, competition_id="WC"):
+        def fetch_matches(self, competition_id="WC", **kwargs):
             return group_events + ko_events
 
     monkeypatch.setattr(
