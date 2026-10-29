@@ -24,3 +24,27 @@ ignore = ["F401", "F841", "F811", "F541", "F601"]
 python_version = "3.11"
 explicit_package_bases = true
 ignore_missing_imports = true
+
+# HARD-04 / D-02: explicit numeric coverage floor on the prediction kernel.
+# Enforced only when coverage is explicitly requested (pytest --cov=football_core);
+# single-test iteration stays fast because fail_under lives in coverage's own
+# config, not in pytest addopts.
+[tool.coverage.run]
+source = ["football_core"]
+branch = false
+omit = [
+    "*/tests/*",
+    "football_core/tests/*",
+]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
