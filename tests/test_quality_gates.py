@@ -28,7 +28,10 @@ the same detectors (non-vacuity self-checks, D-32 pattern from
 from __future__ import annotations
 
 import ast
+import json
 import pathlib
+
+import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -413,3 +416,283 @@ def test_gate_write_detector_flags_synthetic_violations() -> None:
         "    fh = open(path)\n"
     )
     assert _file_write_calls(ast.parse(open_read_default)) == []
+
+
+# ---------------------------------------------------------------------------
+# Section J invariant 5: ingestion contract on zero matches (D-13)
+# ---------------------------------------------------------------------------
+
+
+def test_ingestion_zero_matches_cannot_be_success() -> None:
+    """D-13 contract: ``success`` is derived from counters, never declared.
+
+    Pins the full ``derive_success(provider, attempted, finished)`` decision
+    table — the zero-match path can never report success, and every
+    counter-inconsistent shape fails closed.
+    """
+    from football_core.fetcher import derive_success
+
+    # Nothing attempted -> deferred, never success.
+    assert derive_success("p", False, {"received": 5}) == (False, "deferred")
+
+    # Attempted but zero received (HTTP 200 with empty body) -> provider-empty.
+    assert derive_success("p", True, {"received": 0}) == (
+        False, "deferred/provider-empty",
+    )
+    assert derive_success("p", True, {}) == (False, "deferred/provider-empty")
+
+    # Zero ingested matches with zero re-offers -> counters broken -> False.
+    assert derive_success("p", True, {
+        "received": 1, "normalized": 1, "ingested": 0,
+        "skipped_unmatchable": 0, "skipped_no_target": 0,
+        "skipped_missing_score": 0,
+    }) == (False, "counter_inconsistent")
+
+    # Inconsistent shape #2: measured > counted.
+    assert derive_success("p", True, {
+        "received": 2, "normalized": 2, "ingested": 3,
+        "skipped_unmatchable": 0, "skipped_no_target": 0,
+        "skipped_missing_score": 0,
+    }) == (False, "counter_inconsistent")
+
+    # Incomplete counters -> fails closed.
+    assert derive_success("p", True, {"received": 1}) == (
+        False, "counter_inconsistent",
+    )
+
+    # D-14 re-offer bucket present but with a bad value -> fails closed.
+    assert derive_success("p", True, {
+        "received": 1, "normalized": 1, "ingested": 0,
+        "skipped_unmatchable": 0, "skipped_no_target": 0,
+        "skipped_missing_score": 0, "skipped_no_change": "two",
+    }) == (False, "counter_inconsistent")
+
+    # Consistent, real work -> success.
+    assert derive_success("p", True, {
+        "received": 1, "normalized": 1, "ingested": 1,
+        "skipped_unmatchable": 0, "skipped_no_target": 0,
+        "skipped_missing_score": 0,
+    }) == (True, None)
+
+    # Consistent partition across skip buckets -> legit success.
+    assert derive_success("p", True, {
+        "received": 2, "normalized": 2, "ingested": 0,
+        "skipped_unmatchable": 1, "skipped_no_target": 1,
+        "skipped_missing_score": 0,
+    }) == (True, None)
+
+    # D-14 re-offer bucket consistent -> legit success.
+    assert derive_success("p", True, {
+        "received": 2, "normalized": 2, "ingested": 1,
+        "skipped_unmatchable": 0, "skipped_no_target": 0,
+        "skipped_missing_score": 0, "skipped_no_change": 1,
+    }) == (True, None)
+
+
+# ---------------------------------------------------------------------------
+# Section J invariant 6: fixture uniqueness + orphan prevention
+# ---------------------------------------------------------------------------
+
+# Loose floors so refactors of source lists cannot starve the gate silently.
+_WC_MIN_FIXTURES = 100  # 72 group fixtures + 32 knockout entities
+_UCL_MIN_FIXTURES = 100  # 8 Swiss matchdays x 18
+_LALIGA_MIN_FIXTURES = 100  # >= 300 for a full 380-fixture season
+
+
+def _duplicates_in(values: list) -> list:
+    """Return duplicates from ``values`` preserving first-seen order."""
+    seen: set = set()
+    duplicates: list = []
+    for value in values:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+    return duplicates
+
+
+def _wc_fixture_ids() -> list[str]:
+    wc_data = ROOT / "competitions" / "worldcup" / "data"
+    groups = json.loads((wc_data / "groups.json").read_text(encoding="utf-8"))
+    bracket = json.loads((wc_data / "bracket.json").read_text(encoding="utf-8"))
+
+    fixture_ids: list[str] = []
+    for group in groups.get("groups", {}).values():
+        for match in group.get("matches", []):
+            if "match_id" in match:
+                fixture_ids.append(match["match_id"])
+    bracket_matches: list = (
+        bracket if isinstance(bracket, list) else bracket.get("matches", [])
+    )
+    for match in bracket_matches:
+        if "match_id" in match:
+            fixture_ids.append(match["match_id"])
+    return fixture_ids
+
+
+def test_wc_fixture_uniqueness_and_no_orphans() -> None:
+    """World Cup: fixture IDs unique across group+bracket; played store maps."""
+    fixture_ids = _wc_fixture_ids()
+    assert len(fixture_ids) >= _WC_MIN_FIXTURES
+    duplicates = _duplicates_in(fixture_ids)
+    assert duplicates == [], f"Duplicate World Cup fixture IDs: {duplicates}"
+    id_set = set(fixture_ids)
+
+    wc_data = ROOT / "competitions" / "worldcup" / "data"
+    for basename in ("played_groups.json", "played.json"):
+        path = wc_data / basename
+        if not path.exists():
+            # gitignored runtime store absent on a fresh checkout: the
+            # zero-played state has no orphans to check.
+            pytest.skip(f"{basename} absent (fresh checkout)")
+        played = json.loads(path.read_text(encoding="utf-8"))
+        orphans = [match_id for match_id in played if match_id not in id_set]
+        assert orphans == [], f"Orphan played matches in {basename}: {orphans}"
+
+
+def test_ucl_fixture_uniqueness_and_no_orphans() -> None:
+    """UCL: unique Swiss-phase fixture IDs; results map to known fixtures."""
+    ucl_data = ROOT / "competitions" / "ucl" / "data"
+    fixtures = json.loads(
+        (ucl_data / "fixtures.json").read_text(encoding="utf-8")
+    )
+
+    mids: list[str] = []
+    if isinstance(fixtures, dict):
+        schedule = fixtures.get("schedule", {})
+        matchdays = schedule.get("matchdays", []) if isinstance(schedule, dict) else []
+        for matchday in matchdays:
+            if isinstance(matchday, list):
+                entries = matchday
+            elif isinstance(matchday, dict):
+                entries = matchday.get("matches", [])
+            else:
+                entries = []
+            for match in entries:
+                if not isinstance(match, dict):
+                    continue
+                mid = match.get("match_id") or match.get("id")
+                if mid:
+                    mids.append(mid)
+        for stage in ("playoffs", "knockout"):
+            for match in fixtures.get(stage, []):
+                if not isinstance(match, dict):
+                    continue
+                mid = match.get("match_id") or match.get("id")
+                if mid:
+                    mids.append(mid)
+
+    assert len(mids) >= _UCL_MIN_FIXTURES, "No UCL fixtures extracted"
+    duplicates = _duplicates_in(mids)
+    assert duplicates == [], f"Duplicate UCL fixture IDs: {duplicates}"
+    id_set = set(mids)
+
+    results_file = ucl_data / "results.json"
+    if not results_file.exists():
+        pytest.skip("ucl results.json absent (gitignored runtime store)")
+    results = json.loads(results_file.read_text(encoding="utf-8"))
+    orphans = []
+    for played in results.get("matches", []):
+        if not isinstance(played, dict):
+            continue
+        rmid = played.get("match_id") or played.get("id")
+        if rmid and rmid not in id_set:
+            orphans.append(rmid)
+    assert orphans == [], f"Orphan UCL played results: {orphans}"
+
+
+def test_laliga_fixture_uniqueness_and_no_orphans() -> None:
+    """LaLiga: every season's fixtures unique; results map to fixtures."""
+    seasons_root = ROOT / "competitions" / "laliga" / "data" / "seasons"
+    season_dirs = sorted(
+        d for d in seasons_root.iterdir() if d.is_dir()
+    ) if seasons_root.exists() else []
+    assert season_dirs, "LaLiga seasons directory missing entirely"
+
+    audited_seasons = 0
+    for season_dir in season_dirs:
+        fix_file = season_dir / "fixtures.json"
+        if not fix_file.exists():
+            continue
+        fix_data = json.loads(fix_file.read_text(encoding="utf-8"))
+        matches: list = (
+            fix_data.get("fixtures", []) if isinstance(fix_data, dict) else fix_data
+        )
+        mids = [
+            match["match_id"]
+            for match in matches
+            if isinstance(match, dict) and "match_id" in match
+        ]
+        assert len(mids) >= _LALIGA_MIN_FIXTURES, (
+            f"No fixtures extracted for LaLiga season {season_dir.name}"
+        )
+        duplicates = _duplicates_in(mids)
+        assert duplicates == [], (
+            f"Duplicate LaLiga fixture IDs in {season_dir.name}: {duplicates}"
+        )
+        audited_seasons += 1
+        id_set = set(mids)
+
+        results_file = season_dir / "results.json"
+        if results_file.exists():
+            results = json.loads(results_file.read_text(encoding="utf-8"))
+            result_matches: list = (
+                results.get("matches", []) if isinstance(results, dict) else results
+            )
+            orphans = []
+            for played in result_matches:
+                if not isinstance(played, dict):
+                    continue
+                rmid = played.get("match_id") or played.get("id")
+                if rmid and rmid not in id_set:
+                    orphans.append(rmid)
+            assert orphans == [], (
+                f"Orphan LaLiga results in {season_dir.name}: {orphans}"
+            )
+
+    assert audited_seasons >= 1, "No LaLiga season was audited"
+
+
+def test_gate_duplicate_detector_flags_synthetic_collisions() -> None:
+    """Non-vacuity: the duplicate detector must flag synthetic collisions."""
+    assert _duplicates_in(["a", "b", "a", "c", "b"]) == ["a", "b"]
+    assert _duplicates_in(["unique", "ids"]) == []
+
+
+# ---------------------------------------------------------------------------
+# Section J invariant 8: simulation run provenance (SIM-02)
+# ---------------------------------------------------------------------------
+
+
+def test_simulation_run_provenance() -> None:
+    """SIM-02: sim responses carry non-null seed/n_simulations/provenance."""
+    from football_core.domain import ResultProvenance
+    from football_core.simulation import MonteCarloEngine, SimulationRequest, ValueCounter
+
+    class _OneLaneRules:
+        """Minimal SimulationRules: single ValueCounter lane over a fixed pick."""
+
+        def declare_aggregations(self):
+            return {"c": lambda: ValueCounter("c")}
+
+        def simulate_one(self, context):
+            return {"c": "win"}
+
+        def provenance_attestation(self):
+            return {}
+
+    request = SimulationRequest(
+        competition_id="quality-gate",
+        season="2026_27",
+        n_simulations=10,
+        seed=123,
+    )
+    result = MonteCarloEngine().run(request, _OneLaneRules())
+
+    assert result.metadata.n_simulations == 10
+    assert result.metadata.seed == 123
+    assert result.metadata.provenance == "simulated"
+    # The canonical vocabulary agrees with the string form.
+    assert ResultProvenance.SIMULATED.value == "simulated"
+    # The run is non-vacuous: rules actually produced aggregate output.
+    assert result.aggregates["c"]["counts"] == {"win": 10}
+    assert result.aggregates["c"]["n"] == 10
