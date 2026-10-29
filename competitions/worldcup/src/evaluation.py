@@ -168,8 +168,9 @@ def evaluate_all_matches(
             })
             try:
                 apply_elo_update(m, replay_teams)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "apply_elo_update failed for %s: %s", m.get("match_id"), exc)
         if not predictions:
             return {
                 "model": "elo-only", "phase": "13",
