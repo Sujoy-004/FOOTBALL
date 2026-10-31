@@ -2,6 +2,10 @@
 .opencode/
 .open-design/
 .playwright-mcp/
+.gsd/
+.github/
+Open Design/
+CHANGELOG.md
 
 # Local dev-server logs (regenerable)
 .server-err.log
