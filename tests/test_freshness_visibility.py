@@ -60,6 +60,8 @@ def test_wc_failed_refresh_is_visible_and_marked_stale(monkeypatch, caplog):
 
     import competitions.worldcup.src.pipeline as wc_pipeline
 
+    monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
+    monkeypatch.setattr("football_core.runtime_support._snapshot_session", False)
     monkeypatch.setattr(
         "football_core.runtime_support.get_data_provider",
         lambda *a, **k: type("P", (), {"last_error": "HTTP 400: invalid",
@@ -93,6 +95,8 @@ def test_ucl_empty_fetch_marks_stale(monkeypatch, caplog):
     import logging
 
     dead = _DeadProvider()
+    monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
+    monkeypatch.setattr("football_core.runtime_support._snapshot_session", False)
     monkeypatch.setattr("football_core.runtime_support.get_data_provider", lambda *a, **k: dead)
 
     import web.ucl_app as ucl_app

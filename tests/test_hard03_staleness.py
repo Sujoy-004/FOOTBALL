@@ -394,6 +394,8 @@ def test_ucl_served_refresh_goes_stale_when_the_store_moved_on(tmp_path, monkeyp
     monkeypatch.setattr(ucl_app, "_refresh_report", {})
     monkeypatch.setattr(ucl_app, "_refresh_reports", {})
     monkeypatch.setattr(ucl_app, "_refresh_reports_seeded", False)
+    monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
+    monkeypatch.setattr("football_core.runtime_support._snapshot_session", False)
 
     # control: store older than the recorded refresh => fresh
     _touch(results, NOW - timedelta(minutes=5))

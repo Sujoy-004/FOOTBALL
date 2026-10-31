@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from competitions.ucl.src.pipeline import compute_deterministic_standings
 from competitions.ucl.src.state import SEASON, build_competition_state
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -210,28 +211,13 @@ def test_missing_knockout_store_populates_slots_from_standings(tmp_path):
     dst = _copy_base_data(tmp_path)
     state = build_competition_state(dst)
     results = json.loads((dst / "results.json").read_text(encoding="utf-8"))
-    matches = results["matches"]
-    played = {}
-    for m in matches:
-        if m.get("home_score") is not None and m.get("away_score") is not None:
-            played[m["match_id"]] = m
-    standings: dict[str, dict] = {}
-    for m in played.values():
-        for team in (m["team_a"], m["team_b"]):
-            if team not in standings:
-                standings[team] = {"team": team, "pts": 0, "gd": 0, "gf": 0}
-            standings[team]["gf"] += m["home_score"] if team == m["team_a"] else m["away_score"]
-            standings[team]["gd"] += (m["home_score"] if team == m["team_a"] else m["away_score"]) - \
-                                      (m["away_score"] if team == m["team_a"] else m["home_score"])
-        if m["home_score"] > m["away_score"]:
-            standings[m["team_a"]]["pts"] += 3
-        elif m["home_score"] < m["away_score"]:
-            standings[m["team_b"]]["pts"] += 3
-        else:
-            standings[m["team_a"]]["pts"] += 1
-            standings[m["team_b"]]["pts"] += 1
-    table = sorted(standings.values(), key=lambda r: (-r["pts"], -r["gd"], -r["gf"], r["team"]))
-    position_map = {row["team"]: idx + 1 for idx, row in enumerate(table)}
+    fixtures = json.loads((dst / "fixtures.json").read_text(encoding="utf-8"))
+    team_names = [
+        t["name"] if isinstance(t, dict) else t
+        for t in fixtures["schedule"]["teams"]
+    ]
+    table = compute_deterministic_standings(results["matches"], team_names=team_names)
+    position_map = {row["team"]: row["position"] for row in table}
     po = state["stages"]["playoff"]["matches"]
     pairings = json.loads((dst / "playoff_pairings.json").read_text(encoding="utf-8"))["pairings"]
     for tie_idx, tie in enumerate(pairings, start=1):

@@ -1,5 +1,6 @@
 """Tests for F-20, F-24 (mark UNAVAILABLE on boot failure) and F-25 (secret redaction)."""
 
+import asyncio
 import os
 import pytest
 from unittest.mock import patch, MagicMock
@@ -57,17 +58,17 @@ def test_the_odds_api_provider_redacts_keys_on_transport_failure():
     assert "[REDACTED]" in error_msg
 
 
-@pytest.mark.asyncio
-async def test_server_boot_unavailable_handling():
+def test_server_boot_unavailable_handling():
     from web.server import lifespan, app
 
-    # Reset holder
-    holder.reset("worldcup")
+    async def _run():
+        holder.reset("worldcup")
+        with patch("web.wc_app.compute_overview", side_effect=RuntimeError("Disk corrupted")):
+            async with lifespan(app):
+                wc_data = holder.read_data("worldcup")
+                assert wc_data.get("availability") == "UNAVAILABLE"
+                assert wc_data.get("mode") == "unavailable"
+                assert holder.read_mode("worldcup") == "unavailable"
+                assert holder.read_stamp("worldcup") is None
 
-    with patch("web.wc_app.compute_overview", side_effect=RuntimeError("Disk corrupted")):
-        async with lifespan(app):
-            wc_data = holder.read_data("worldcup")
-            assert wc_data.get("availability") == "UNAVAILABLE"
-            assert wc_data.get("mode") == "unavailable"
-            assert holder.read_mode("worldcup") == "unavailable"
-            assert holder.read_stamp("worldcup") is None
+    asyncio.run(_run())
