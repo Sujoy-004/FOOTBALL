@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "season": "2026/27",
+  "matches": [
+    {
+      "match_id": "gen-4ac782392d1a34de",
+      "team_a": "Club Brugge",
+      "team_b": "Aston Villa",
+      "home_score": 2,
+      "away_score": 3
+    },
+    {
+      "match_id": "gen-f4b6285469c3b0e0",
+      "team_a": "AEK Athens",
+      "team_b": "LASK",
+      "home_score": 1,
+      "away_score": 0
+    },
+    {
+      "match_id": "gen-718aee3152be59d5",
+      "team_a": "Real Madrid",
+      "team_b": "Inter Milan",
+      "home_score": 2,
+      "away_score": 1
+    },
+    {
+      "match_id": "gen-cfa02111ba88e027",
+      "team_a": "Porto",
+      "team_b": "Manchester City",
+      "home_score": 0,
+      "away_score": 2
+    },
+    {
+      "match_id": "gen-398466668835ffd4",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Villarreal",
+      "home_score": 3,
+      "away_score": 2
+    },
+    {
+      "match_id": "gen-2ce302d883e61826",
+      "team_a": "Lille",
+      "team_b": "Real Betis",
+      "home_score": 2,
+      "away_score": 3
+    },
+    {
+      "match_id": "gen-49d88a95bbf3c432",
+      "team_a": "Barcelona",
+      "team_b": "Feyenoord",
+      "home_score": 5,
+      "away_score": 1
+    },
+    {
+      "match_id": "gen-bbc082f26fedfb8e",
+      "team_a": "VfB Stuttgart",
+      "team_b": "Viking",
+      "home_score": 3,
+      "away_score": 1
+    },
+    {
+      "match_id": "gen-f27e3766d7b658cd",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Slovan Bratislava",
+      "home_score": 6,
+      "away_score": 1
+    },
+    {
+      "match_id": "gen-1d60c09f52306eac",
+      "team_a": "Napoli",
+      "team_b": "Arsenal",
+      "home_score": 0,
+      "away_score": 1
+    },
+    {
+      "match_id": "gen-68d61fc9c90ecf52",
+      "team_a": "Sporting CP",
+      "team_b": "Galatasaray",
+      "home_score": 3,
+      "away_score": 1
+    },
+    {
+      "match_id": "gen-ba37659c6fb64ab3",
+      "team_a": "Slavia Prague",
+      "team_b": "Lens",
+      "home_score": 2,
+      "away_score": 3
+    },
+    {
+      "match_id": "gen-5dec7b8731a863ee",
+      "team_a": "Liverpool",
+      "team_b": "Atlético Madrid",
+      "home_score": 2,
+      "away_score": 1
+    },
+    {
+      "match_id": "gen-d2698f08d77f9e47",
+      "team_a": "Bayern Munich",
+      "team_b": "Bodø/Glimt",
+      "home_score": 5,
+      "away_score": 0
+    },
+    {
+      "match_id": "gen-ae9c8005a9837b05",
+      "team_a": "Fenerbahçe",
+      "team_b": "Roma",
+      "home_score": 1,
+      "away_score": 1
+    },
+    {
+      "match_id": "gen-aa825fa9768b6a30",
+      "team_a": "PSV Eindhoven",
+      "team_b": "Shakhtar Donetsk",
+      "home_score": 1,
+      "away_score": 0
+    },
+    {
+      "match_id": "gen-571f9760a45da61c",
+      "team_a": "Como",
+      "team_b": "RB Leipzig",
+      "home_score": 0,
+      "away_score": 2
+    },
+    {
+      "match_id": "gen-b3bc36bb158a34cf",
+      "team_a": "Manchester United",
+      "team_b": "Sabah",
+      "home_score": 3,
+      "away_score": 0
+    }
+  ],
+  "meta": {
+    "provider": "ucl.draw.2026_27"
+  }
+}

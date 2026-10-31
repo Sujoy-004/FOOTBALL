@@ -1,0 +1,3430 @@
+{
+  "schema": 1,
+  "season": "2026/27",
+  "fixtures": [
+    {
+      "match_id": "gen-001139e885adedfd",
+      "team_a": "Real Madrid",
+      "team_b": "RB Leipzig",
+      "event_date": "2026-10-21T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-0409ff27d73bac2b",
+      "team_a": "RB Leipzig",
+      "team_b": "PSV Eindhoven",
+      "event_date": "2026-10-13T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-04b443782a0c9d5c",
+      "team_a": "LASK",
+      "team_b": "Porto",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-04d0b5fe60d6c6b1",
+      "team_a": "Fenerbahçe",
+      "team_b": "Liverpool",
+      "event_date": "2026-11-04T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-04d3bae5486d298e",
+      "team_a": "Roma",
+      "team_b": "Sporting CP",
+      "event_date": "2026-12-08T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-07ee1c037fac7ea8",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Inter Milan",
+      "event_date": "2026-12-09T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-0b5fd6a01c5bdc36",
+      "team_a": "Roma",
+      "team_b": "Lille",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-0d13d951a8e3200d",
+      "team_a": "Real Betis",
+      "team_b": "Como",
+      "event_date": "2026-12-09T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-0d1af29a391e8acd",
+      "team_a": "Atlético Madrid",
+      "team_b": "Fenerbahçe",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-0d1ff7d0f5d416f2",
+      "team_a": "Aston Villa",
+      "team_b": "Borussia Dortmund",
+      "event_date": "2027-01-19T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-0fdf8ca064d1bc49",
+      "team_a": "Lille",
+      "team_b": "Slovan Bratislava",
+      "event_date": "2027-01-19T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-11410b53dc3786e5",
+      "team_a": "Barcelona",
+      "team_b": "Aston Villa",
+      "event_date": "2026-11-03T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-1387bdef5a54c6fb",
+      "team_a": "Porto",
+      "team_b": "Napoli",
+      "event_date": "2026-11-04T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-13907eab5aeb82e1",
+      "team_a": "Lens",
+      "team_b": "Bodø/Glimt",
+      "event_date": "2026-12-09T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-145b648896250ba1",
+      "team_a": "Sporting CP",
+      "team_b": "Barcelona",
+      "event_date": "2027-01-20T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-14780746885626a7",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "AEK Athens",
+      "event_date": "2026-10-14T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-16df0d9823a234cc",
+      "team_a": "PSV Eindhoven",
+      "team_b": "VfB Stuttgart",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-1a17007c89eb7177",
+      "team_a": "Viking",
+      "team_b": "Feyenoord",
+      "event_date": "2026-12-08T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 1,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-1a2d89e47295a002",
+      "team_a": "Atlético Madrid",
+      "team_b": "Bayern Munich",
+      "event_date": "2026-11-03T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-1d60c09f52306eac",
+      "team_a": "Napoli",
+      "team_b": "Arsenal",
+      "event_date": "2026-09-09T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-1dfc8a8991ad890e",
+      "team_a": "VfB Stuttgart",
+      "team_b": "Lille",
+      "event_date": "2026-12-09T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-1e9bd8125da5ff31",
+      "team_a": "Manchester City",
+      "team_b": "Napoli",
+      "event_date": "2026-11-24T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-2637feb3f505c4f9",
+      "team_a": "Lens",
+      "team_b": "Como",
+      "event_date": "2026-11-04T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-271337131da2e40d",
+      "team_a": "AEK Athens",
+      "team_b": "Real Madrid",
+      "event_date": "2026-11-04T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-292ccc2bbd2efc21",
+      "team_a": "Slovan Bratislava",
+      "team_b": "Shakhtar Donetsk",
+      "event_date": "2026-12-09T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-2a83ca4e669d42e4",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Real Betis",
+      "event_date": "2026-11-04T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-2ae71f18a1008722",
+      "team_a": "Bayern Munich",
+      "team_b": "Arsenal",
+      "event_date": "2026-10-21T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-2c8bb42e3a85a749",
+      "team_a": "Aston Villa",
+      "team_b": "Paris Saint-Germain",
+      "event_date": "2026-12-08T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-2ce302d883e61826",
+      "team_a": "Lille",
+      "team_b": "Real Betis",
+      "event_date": "2026-09-08T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-3100368fcd272251",
+      "team_a": "Arsenal",
+      "team_b": "Real Madrid",
+      "event_date": "2026-12-09T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-346f252483da880e",
+      "team_a": "Fenerbahçe",
+      "team_b": "Villarreal",
+      "event_date": "2027-01-20T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-34b19eaea1a292b4",
+      "team_a": "Manchester City",
+      "team_b": "Paris Saint-Germain",
+      "event_date": "2026-10-14T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-35f6d524798ed684",
+      "team_a": "Lille",
+      "team_b": "Bayern Munich",
+      "event_date": "2026-11-25T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-3899e1001f00126e",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "Fenerbahçe",
+      "event_date": "2026-11-25T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-398466668835ffd4",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Villarreal",
+      "event_date": "2026-09-08T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-3d06fa5c823f86f3",
+      "team_a": "Feyenoord",
+      "team_b": "Porto",
+      "event_date": "2026-11-24T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 2,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-3d8b1400bfe44f72",
+      "team_a": "Napoli",
+      "team_b": "Club Brugge",
+      "event_date": "2026-12-08T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-4032eafbf5f04514",
+      "team_a": "Slavia Prague",
+      "team_b": "Villarreal",
+      "event_date": "2026-11-25T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-4089612767d08b0c",
+      "team_a": "Slovan Bratislava",
+      "team_b": "Inter Milan",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-42005b013414044b",
+      "team_a": "Sabah",
+      "team_b": "Barcelona",
+      "event_date": "2026-11-25T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-463d25fa39500319",
+      "team_a": "Slavia Prague",
+      "team_b": "Aston Villa",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-49d88a95bbf3c432",
+      "team_a": "Barcelona",
+      "team_b": "Feyenoord",
+      "event_date": "2026-09-09T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-4a6bb35d8682e776",
+      "team_a": "Bodø/Glimt",
+      "team_b": "LASK",
+      "event_date": "2026-11-24T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-4ac782392d1a34de",
+      "team_a": "Club Brugge",
+      "team_b": "Aston Villa",
+      "event_date": "2026-09-08T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-4b6641910aeb743c",
+      "team_a": "Lille",
+      "team_b": "Galatasaray",
+      "event_date": "2026-10-21T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-4e0490d00ec17f65",
+      "team_a": "Arsenal",
+      "team_b": "Lille",
+      "event_date": "2026-10-13T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-4ecd54b2bbefb070",
+      "team_a": "Real Betis",
+      "team_b": "Feyenoord",
+      "event_date": "2026-10-21T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-4f4f7a4d174ab691",
+      "team_a": "Real Madrid",
+      "team_b": "PSV Eindhoven",
+      "event_date": "2026-11-24T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-50bf87f8b909bebd",
+      "team_a": "Club Brugge",
+      "team_b": "Bodø/Glimt",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-54de0afe39fa1844",
+      "team_a": "Villarreal",
+      "team_b": "Manchester United",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-552ab488815f6dfb",
+      "team_a": "Feyenoord",
+      "team_b": "Inter Milan",
+      "event_date": "2026-11-03T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-55f504ed0b3266d0",
+      "team_a": "Lens",
+      "team_b": "Sporting CP",
+      "event_date": "2026-10-13T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-571f9760a45da61c",
+      "team_a": "Como",
+      "team_b": "RB Leipzig",
+      "event_date": "2026-09-10T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-593529bfa4d673eb",
+      "team_a": "Slavia Prague",
+      "team_b": "Arsenal",
+      "event_date": "2026-11-04T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 3,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-59ce44637c2ac147",
+      "team_a": "Arsenal",
+      "team_b": "Sabah",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-5b32aac774435b2a",
+      "team_a": "Sabah",
+      "team_b": "Slavia Prague",
+      "event_date": "2026-10-13T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-5b3613099a46709c",
+      "team_a": "Roma",
+      "team_b": "Slovan Bratislava",
+      "event_date": "2026-10-20T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-5c3a8de868104628",
+      "team_a": "Real Betis",
+      "team_b": "Porto",
+      "event_date": "2026-10-14T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-5cf3e5d07ce01ae9",
+      "team_a": "Galatasaray",
+      "team_b": "Aston Villa",
+      "event_date": "2026-11-24T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-5d5baaccc119d0d1",
+      "team_a": "Como",
+      "team_b": "Manchester United",
+      "event_date": "2026-10-21T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-5dec7b8731a863ee",
+      "team_a": "Liverpool",
+      "team_b": "Atlético Madrid",
+      "event_date": "2026-09-09T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-5ef28c53db74e742",
+      "team_a": "Villarreal",
+      "team_b": "Sabah",
+      "event_date": "2026-12-08T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-613cafa4fc6a791d",
+      "team_a": "PSV Eindhoven",
+      "team_b": "Club Brugge",
+      "event_date": "2026-11-04T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-61a12c24a8cf0c36",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "Real Madrid",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-680a0aa91efc0ebb",
+      "team_a": "Feyenoord",
+      "team_b": "RB Leipzig",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-68d61fc9c90ecf52",
+      "team_a": "Sporting CP",
+      "team_b": "Galatasaray",
+      "event_date": "2026-09-09T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-6c4cc5345f009fe9",
+      "team_a": "Liverpool",
+      "team_b": "Lens",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-6d15c19a65f835ab",
+      "team_a": "Manchester United",
+      "team_b": "Roma",
+      "event_date": "2026-11-03T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-6f8b3c33d32c4ecc",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Roma",
+      "event_date": "2026-11-25T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-718aee3152be59d5",
+      "team_a": "Real Madrid",
+      "team_b": "Inter Milan",
+      "event_date": "2026-09-08T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-729c733ee5d13908",
+      "team_a": "Inter Milan",
+      "team_b": "Club Brugge",
+      "event_date": "2026-10-13T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-7538b1d248781782",
+      "team_a": "Slovan Bratislava",
+      "team_b": "VfB Stuttgart",
+      "event_date": "2026-10-14T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 4,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-75ea0fab7ddf9318",
+      "team_a": "Borussia Dortmund",
+      "team_b": "AEK Athens",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-7b818e85950d12ac",
+      "team_a": "AEK Athens",
+      "team_b": "Roma",
+      "event_date": "2027-01-19T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-7e2c99531058328d",
+      "team_a": "Atlético Madrid",
+      "team_b": "Viking",
+      "event_date": "2026-11-25T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-7fc3d33a0aad5361",
+      "team_a": "Galatasaray",
+      "team_b": "VfB Stuttgart",
+      "event_date": "2026-11-03T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-813b035fb1d90194",
+      "team_a": "Manchester City",
+      "team_b": "Sporting CP",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-817543726d71ae10",
+      "team_a": "Roma",
+      "team_b": "Real Madrid",
+      "event_date": "2026-10-14T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-822aa91c5a003f21",
+      "team_a": "Manchester United",
+      "team_b": "Bayern Munich",
+      "event_date": "2027-01-20T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-82302761d7260499",
+      "team_a": "Real Betis",
+      "team_b": "Arsenal",
+      "event_date": "2027-01-20T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-8874471fc8fe3a07",
+      "team_a": "Viking",
+      "team_b": "Sabah",
+      "event_date": "2026-11-04T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-88d49fec37fb064a",
+      "team_a": "Napoli",
+      "team_b": "Bodø/Glimt",
+      "event_date": "2026-10-20T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-8b017838492ac2c0",
+      "team_a": "LASK",
+      "team_b": "Liverpool",
+      "event_date": "2026-10-14T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-8bd81d79ded72f69",
+      "team_a": "Bodø/Glimt",
+      "team_b": "Borussia Dortmund",
+      "event_date": "2026-10-14T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-8e78a664f82ace2c",
+      "team_a": "Liverpool",
+      "team_b": "Porto",
+      "event_date": "2026-12-09T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-924fd566f62d07b4",
+      "team_a": "Bayern Munich",
+      "team_b": "Slavia Prague",
+      "event_date": "2026-12-08T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-936c477c568267f7",
+      "team_a": "Arsenal",
+      "team_b": "Borussia Dortmund",
+      "event_date": "2026-11-24T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-94fc752bacf8cda4",
+      "team_a": "Viking",
+      "team_b": "PSV Eindhoven",
+      "event_date": "2027-01-20T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-954f9d19de046558",
+      "team_a": "Barcelona",
+      "team_b": "Manchester City",
+      "event_date": "2026-12-08T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-9584809aa8707176",
+      "team_a": "Barcelona",
+      "team_b": "Como",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 5,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-968d8b69c826a446",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Barcelona",
+      "event_date": "2026-10-20T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-9be516c8dcd00cfa",
+      "team_a": "Fenerbahçe",
+      "team_b": "Slavia Prague",
+      "event_date": "2026-10-20T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-9e05b94f056b0f95",
+      "team_a": "Bayern Munich",
+      "team_b": "Real Betis",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-9e79d7ed9136dfab",
+      "team_a": "Sabah",
+      "team_b": "Borussia Dortmund",
+      "event_date": "2026-10-20T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-a01c089bec7b4d58",
+      "team_a": "VfB Stuttgart",
+      "team_b": "Atlético Madrid",
+      "event_date": "2026-10-20T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-a12cb74c9e8fa9df",
+      "team_a": "Galatasaray",
+      "team_b": "Feyenoord",
+      "event_date": "2027-01-19T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-a6976b690cdbf0be",
+      "team_a": "LASK",
+      "team_b": "Fenerbahçe",
+      "event_date": "2026-12-09T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-a79e1996a933b52f",
+      "team_a": "Manchester United",
+      "team_b": "RB Leipzig",
+      "event_date": "2026-12-08T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-aa825fa9768b6a30",
+      "team_a": "PSV Eindhoven",
+      "team_b": "Shakhtar Donetsk",
+      "event_date": "2026-09-10T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-aab145292e261491",
+      "team_a": "Napoli",
+      "team_b": "Viking",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-ae9c8005a9837b05",
+      "team_a": "Fenerbahçe",
+      "team_b": "Roma",
+      "event_date": "2026-09-10T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-b3ad40b47ffd40ce",
+      "team_a": "Sporting CP",
+      "team_b": "Manchester United",
+      "event_date": "2026-11-25T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-b3bc36bb158a34cf",
+      "team_a": "Manchester United",
+      "team_b": "Sabah",
+      "event_date": "2026-09-10T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-b542c6a6703e7c00",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "Sporting CP",
+      "event_date": "2026-11-03T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-b6270f9dd0e2bd03",
+      "team_a": "Manchester City",
+      "team_b": "AEK Athens",
+      "event_date": "2026-10-20T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-b8303c00a68b7264",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Galatasaray",
+      "event_date": "2027-01-27T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 8,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-b87fae1ffee88283",
+      "team_a": "Club Brugge",
+      "team_b": "Lens",
+      "event_date": "2026-10-21T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-ba37659c6fb64ab3",
+      "team_a": "Slavia Prague",
+      "team_b": "Lens",
+      "event_date": "2026-09-10T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 6,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-baefc7ab921bb8fb",
+      "team_a": "RB Leipzig",
+      "team_b": "Lens",
+      "event_date": "2026-11-24T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-bbc082f26fedfb8e",
+      "team_a": "VfB Stuttgart",
+      "team_b": "Viking",
+      "event_date": "2026-09-09T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-bda9b4c43abf4bcf",
+      "team_a": "Liverpool",
+      "team_b": "Villarreal",
+      "event_date": "2026-10-20T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-c73310241184336f",
+      "team_a": "Como",
+      "team_b": "AEK Athens",
+      "event_date": "2026-11-24T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-c8b2ffb61d5c309d",
+      "team_a": "Sporting CP",
+      "team_b": "LASK",
+      "event_date": "2026-10-21T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-c94b19a95ff790bc",
+      "team_a": "Galatasaray",
+      "team_b": "Barcelona",
+      "event_date": "2026-10-13T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-cc641f82cba838a6",
+      "team_a": "Villarreal",
+      "team_b": "Paris Saint-Germain",
+      "event_date": "2026-11-03T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-cfa02111ba88e027",
+      "team_a": "Porto",
+      "team_b": "Manchester City",
+      "event_date": "2026-09-08T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-cfa3a0d0b5c3f5d9",
+      "team_a": "Atlético Madrid",
+      "team_b": "Manchester United",
+      "event_date": "2026-10-13T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-cff9bc9f2072d1e9",
+      "team_a": "PSV Eindhoven",
+      "team_b": "Atlético Madrid",
+      "event_date": "2026-12-09T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-d2698f08d77f9e47",
+      "team_a": "Bayern Munich",
+      "team_b": "Bodø/Glimt",
+      "event_date": "2026-09-10T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-d9b3a1345228c1ed",
+      "team_a": "Inter Milan",
+      "team_b": "Liverpool",
+      "event_date": "2027-01-19T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-d9c0be17b26e51b6",
+      "team_a": "RB Leipzig",
+      "team_b": "Manchester City",
+      "event_date": "2026-11-04T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-da38ca0ccdaa8d94",
+      "team_a": "Slovan Bratislava",
+      "team_b": "Real Betis",
+      "event_date": "2026-11-24T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-dbec2df197f0d93f",
+      "team_a": "Club Brugge",
+      "team_b": "Liverpool",
+      "event_date": "2026-11-25T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-de60fbee8e3531b6",
+      "team_a": "AEK Athens",
+      "team_b": "Galatasaray",
+      "event_date": "2026-12-08T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 6,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-e0372d4a37ad8899",
+      "team_a": "Lens",
+      "team_b": "Manchester City",
+      "event_date": "2027-01-20T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-e0e34bb5ec4f34de",
+      "team_a": "Como",
+      "team_b": "Paris Saint-Germain",
+      "event_date": "2027-01-20T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 7,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-e2ebbb41e0085dd1",
+      "team_a": "Real Madrid",
+      "team_b": "LASK",
+      "event_date": "2027-01-19T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-e3ad19d27b4ff168",
+      "team_a": "Sabah",
+      "team_b": "Napoli",
+      "event_date": "2027-01-20T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-e66c1ef72d3a4d15",
+      "team_a": "Bodø/Glimt",
+      "team_b": "Atlético Madrid",
+      "event_date": "2027-01-19T17:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-e8defe066271c28a",
+      "team_a": "Villarreal",
+      "team_b": "Napoli",
+      "event_date": "2026-10-13T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-ed697a84419e3a71",
+      "team_a": "Inter Milan",
+      "team_b": "Shakhtar Donetsk",
+      "event_date": "2026-10-21T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f0ca44f73b9bf5cf",
+      "team_a": "Porto",
+      "team_b": "PSV Eindhoven",
+      "event_date": "2026-10-20T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f27e3766d7b658cd",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Slovan Bratislava",
+      "event_date": "2026-09-09T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f3a20c8422f4a86e",
+      "team_a": "Aston Villa",
+      "team_b": "Viking",
+      "event_date": "2026-10-21T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 3,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f48c9afbdc8a8f56",
+      "team_a": "LASK",
+      "team_b": "Slovan Bratislava",
+      "event_date": "2026-11-03T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f4b6285469c3b0e0",
+      "team_a": "AEK Athens",
+      "team_b": "LASK",
+      "event_date": "2026-09-08T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 1,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f4f057d898c4aa8f",
+      "team_a": "Feyenoord",
+      "team_b": "Como",
+      "event_date": "2026-10-14T16:45:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f5d421049f8b1ac4",
+      "team_a": "Porto",
+      "team_b": "Slavia Prague",
+      "event_date": "2027-01-19T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f66d1613a6a668b3",
+      "team_a": "Viking",
+      "team_b": "Bayern Munich",
+      "event_date": "2026-10-13T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f69c25805cced358",
+      "team_a": "VfB Stuttgart",
+      "team_b": "Club Brugge",
+      "event_date": "2027-01-19T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f9b4e66d750622eb",
+      "team_a": "RB Leipzig",
+      "team_b": "Shakhtar Donetsk",
+      "event_date": "2027-01-20T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 7,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-f9d86dca5eabc51c",
+      "team_a": "Aston Villa",
+      "team_b": "Fenerbahçe",
+      "event_date": "2026-10-14T19:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "finished",
+      "official_matchday": 2,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-fa7cd3d340f83e3d",
+      "team_a": "Inter Milan",
+      "team_b": "VfB Stuttgart",
+      "event_date": "2026-11-25T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 5,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    },
+    {
+      "match_id": "gen-fafc29018d4d56f9",
+      "team_a": "Bodø/Glimt",
+      "team_b": "Lille",
+      "event_date": "2026-11-03T20:00:00Z",
+      "stage": "LEAGUE_STAGE",
+      "status": "timed",
+      "official_matchday": 4,
+      "simulation_matchday": 8,
+      "provenance": {
+        "fixture": "authoritative",
+        "schedule": "derived"
+      }
+    }
+  ],
+  "availability": {
+    "fixtures_count": 144,
+    "results_count": 0,
+    "partial": true
+  },
+  "meta": {
+    "provider": "ucl.draw.2026_27"
+  },
+  "schedule": {
+    "source": "derived",
+    "authoritative": false,
+    "status": "temporary",
+    "grouping_method": "deterministic_v1",
+    "official_matchdays_known": false,
+    "teams": [
+      {
+        "name": "Paris Saint-Germain",
+        "pot": 1,
+        "clubelo_name": "Paris Saint-Germain",
+        "coefficient": 132.0
+      },
+      {
+        "name": "Bayern Munich",
+        "pot": 1,
+        "clubelo_name": "Bayern Munich",
+        "coefficient": 147.5
+      },
+      {
+        "name": "Real Madrid",
+        "pot": 1,
+        "clubelo_name": "Real Madrid",
+        "coefficient": 144.5
+      },
+      {
+        "name": "Liverpool",
+        "pot": 1,
+        "clubelo_name": "Liverpool",
+        "coefficient": 130.0
+      },
+      {
+        "name": "Inter Milan",
+        "pot": 1,
+        "clubelo_name": "Inter Milan",
+        "coefficient": 127.0
+      },
+      {
+        "name": "Manchester City",
+        "pot": 1,
+        "clubelo_name": "Manchester City",
+        "coefficient": 125.5
+      },
+      {
+        "name": "Arsenal",
+        "pot": 1,
+        "clubelo_name": "Arsenal",
+        "coefficient": 119.0
+      },
+      {
+        "name": "Barcelona",
+        "pot": 1,
+        "clubelo_name": "Barcelona",
+        "coefficient": 113.25
+      },
+      {
+        "name": "Atlético Madrid",
+        "pot": 1,
+        "clubelo_name": "Atlético Madrid",
+        "coefficient": 104.75
+      },
+      {
+        "name": "Borussia Dortmund",
+        "pot": 2,
+        "clubelo_name": "Borussia Dortmund",
+        "coefficient": 100.75
+      },
+      {
+        "name": "Roma",
+        "pot": 2,
+        "clubelo_name": "Roma",
+        "coefficient": 97.75
+      },
+      {
+        "name": "Sporting CP",
+        "pot": 2,
+        "clubelo_name": "Sporting CP",
+        "coefficient": 84.0
+      },
+      {
+        "name": "Aston Villa",
+        "pot": 2,
+        "clubelo_name": "Aston Villa",
+        "coefficient": 83.0
+      },
+      {
+        "name": "Porto",
+        "pot": 2,
+        "clubelo_name": "Porto",
+        "coefficient": 80.75
+      },
+      {
+        "name": "Manchester United",
+        "pot": 2,
+        "clubelo_name": "Manchester United",
+        "coefficient": 76.5
+      },
+      {
+        "name": "Club Brugge",
+        "pot": 2,
+        "clubelo_name": "Club Brugge",
+        "coefficient": 75.25
+      },
+      {
+        "name": "Real Betis",
+        "pot": 2,
+        "clubelo_name": "Real Betis",
+        "coefficient": 74.5
+      },
+      {
+        "name": "PSV Eindhoven",
+        "pot": 2,
+        "clubelo_name": "PSV Eindhoven",
+        "coefficient": 71.25
+      },
+      {
+        "name": "Feyenoord",
+        "pot": 3,
+        "clubelo_name": "Feyenoord",
+        "coefficient": 71.0
+      },
+      {
+        "name": "Lille",
+        "pot": 3,
+        "clubelo_name": "Lille",
+        "coefficient": 68.75
+      },
+      {
+        "name": "Bodø/Glimt",
+        "pot": 3,
+        "clubelo_name": "Bodø/Glimt",
+        "coefficient": 64.0
+      },
+      {
+        "name": "Napoli",
+        "pot": 3,
+        "clubelo_name": "Napoli",
+        "coefficient": 63.0
+      },
+      {
+        "name": "RB Leipzig",
+        "pot": 3,
+        "clubelo_name": "RB Leipzig",
+        "coefficient": 61.0
+      },
+      {
+        "name": "Villarreal",
+        "pot": 3,
+        "clubelo_name": "Villarreal",
+        "coefficient": 59.0
+      },
+      {
+        "name": "Fenerbahçe",
+        "pot": 3,
+        "clubelo_name": "Fenerbahçe",
+        "coefficient": 57.75
+      },
+      {
+        "name": "Shakhtar Donetsk",
+        "pot": 3,
+        "clubelo_name": "Shakhtar Donetsk",
+        "coefficient": 56.25
+      },
+      {
+        "name": "Galatasaray",
+        "pot": 3,
+        "clubelo_name": "Galatasaray",
+        "coefficient": 53.5
+      },
+      {
+        "name": "Slavia Prague",
+        "pot": 4,
+        "clubelo_name": "Slavia Prague",
+        "coefficient": 44.0
+      },
+      {
+        "name": "Slovan Bratislava",
+        "pot": 4,
+        "clubelo_name": "Slovan Bratislava",
+        "coefficient": 36.0
+      },
+      {
+        "name": "VfB Stuttgart",
+        "pot": 4,
+        "clubelo_name": "VfB Stuttgart",
+        "coefficient": 27.5
+      },
+      {
+        "name": "AEK Athens",
+        "pot": 4,
+        "clubelo_name": "AEK Athens",
+        "coefficient": 24.0
+      },
+      {
+        "name": "LASK",
+        "pot": 4,
+        "clubelo_name": "LASK",
+        "coefficient": 21.0
+      },
+      {
+        "name": "Como",
+        "pot": 4,
+        "clubelo_name": "Como",
+        "coefficient": 19.989
+      },
+      {
+        "name": "Lens",
+        "pot": 4,
+        "clubelo_name": "Lens",
+        "coefficient": 16.699
+      },
+      {
+        "name": "Viking",
+        "pot": 4,
+        "clubelo_name": "Viking",
+        "coefficient": 8.247
+      },
+      {
+        "name": "Sabah",
+        "pot": 4,
+        "clubelo_name": "Sabah",
+        "coefficient": 6.0
+      }
+    ],
+    "matchdays": [
+      [
+        {
+          "match_id": "gen-001139e885adedfd",
+          "team_a": "Real Madrid",
+          "team_b": "RB Leipzig",
+          "home_pot": 1,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-0409ff27d73bac2b",
+          "team_a": "RB Leipzig",
+          "team_b": "PSV Eindhoven",
+          "home_pot": 3,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-04b443782a0c9d5c",
+          "team_a": "LASK",
+          "team_b": "Porto",
+          "home_pot": 4,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-04d0b5fe60d6c6b1",
+          "team_a": "Fenerbahçe",
+          "team_b": "Liverpool",
+          "home_pot": 3,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-04d3bae5486d298e",
+          "team_a": "Roma",
+          "team_b": "Sporting CP",
+          "home_pot": 2,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-07ee1c037fac7ea8",
+          "team_a": "Borussia Dortmund",
+          "team_b": "Inter Milan",
+          "home_pot": 2,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-0b5fd6a01c5bdc36",
+          "team_a": "Roma",
+          "team_b": "Lille",
+          "home_pot": 2,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-0d13d951a8e3200d",
+          "team_a": "Real Betis",
+          "team_b": "Como",
+          "home_pot": 2,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-0d1af29a391e8acd",
+          "team_a": "Atlético Madrid",
+          "team_b": "Fenerbahçe",
+          "home_pot": 1,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-0d1ff7d0f5d416f2",
+          "team_a": "Aston Villa",
+          "team_b": "Borussia Dortmund",
+          "home_pot": 2,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-0fdf8ca064d1bc49",
+          "team_a": "Lille",
+          "team_b": "Slovan Bratislava",
+          "home_pot": 3,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-11410b53dc3786e5",
+          "team_a": "Barcelona",
+          "team_b": "Aston Villa",
+          "home_pot": 1,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-1387bdef5a54c6fb",
+          "team_a": "Porto",
+          "team_b": "Napoli",
+          "home_pot": 2,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-13907eab5aeb82e1",
+          "team_a": "Lens",
+          "team_b": "Bodø/Glimt",
+          "home_pot": 4,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-145b648896250ba1",
+          "team_a": "Sporting CP",
+          "team_b": "Barcelona",
+          "home_pot": 2,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-14780746885626a7",
+          "team_a": "Shakhtar Donetsk",
+          "team_b": "AEK Athens",
+          "home_pot": 3,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-16df0d9823a234cc",
+          "team_a": "PSV Eindhoven",
+          "team_b": "VfB Stuttgart",
+          "home_pot": 2,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-1a17007c89eb7177",
+          "team_a": "Viking",
+          "team_b": "Feyenoord",
+          "home_pot": 4,
+          "away_pot": 3,
+          "event_date": null
+        }
+      ],
+      [
+        {
+          "match_id": "gen-1a2d89e47295a002",
+          "team_a": "Atlético Madrid",
+          "team_b": "Bayern Munich",
+          "home_pot": 1,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-1d60c09f52306eac",
+          "team_a": "Napoli",
+          "team_b": "Arsenal",
+          "home_pot": 3,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-1dfc8a8991ad890e",
+          "team_a": "VfB Stuttgart",
+          "team_b": "Lille",
+          "home_pot": 4,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-1e9bd8125da5ff31",
+          "team_a": "Manchester City",
+          "team_b": "Napoli",
+          "home_pot": 1,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-2637feb3f505c4f9",
+          "team_a": "Lens",
+          "team_b": "Como",
+          "home_pot": 4,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-271337131da2e40d",
+          "team_a": "AEK Athens",
+          "team_b": "Real Madrid",
+          "home_pot": 4,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-292ccc2bbd2efc21",
+          "team_a": "Slovan Bratislava",
+          "team_b": "Shakhtar Donetsk",
+          "home_pot": 4,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-2a83ca4e669d42e4",
+          "team_a": "Borussia Dortmund",
+          "team_b": "Real Betis",
+          "home_pot": 2,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-2ae71f18a1008722",
+          "team_a": "Bayern Munich",
+          "team_b": "Arsenal",
+          "home_pot": 1,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-2c8bb42e3a85a749",
+          "team_a": "Aston Villa",
+          "team_b": "Paris Saint-Germain",
+          "home_pot": 2,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-2ce302d883e61826",
+          "team_a": "Lille",
+          "team_b": "Real Betis",
+          "home_pot": 3,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-3100368fcd272251",
+          "team_a": "Arsenal",
+          "team_b": "Real Madrid",
+          "home_pot": 1,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-346f252483da880e",
+          "team_a": "Fenerbahçe",
+          "team_b": "Villarreal",
+          "home_pot": 3,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-34b19eaea1a292b4",
+          "team_a": "Manchester City",
+          "team_b": "Paris Saint-Germain",
+          "home_pot": 1,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-35f6d524798ed684",
+          "team_a": "Lille",
+          "team_b": "Bayern Munich",
+          "home_pot": 3,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-3899e1001f00126e",
+          "team_a": "Shakhtar Donetsk",
+          "team_b": "Fenerbahçe",
+          "home_pot": 3,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-398466668835ffd4",
+          "team_a": "Borussia Dortmund",
+          "team_b": "Villarreal",
+          "home_pot": 2,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-3d06fa5c823f86f3",
+          "team_a": "Feyenoord",
+          "team_b": "Porto",
+          "home_pot": 3,
+          "away_pot": 2,
+          "event_date": null
+        }
+      ],
+      [
+        {
+          "match_id": "gen-3d8b1400bfe44f72",
+          "team_a": "Napoli",
+          "team_b": "Club Brugge",
+          "home_pot": 3,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-4032eafbf5f04514",
+          "team_a": "Slavia Prague",
+          "team_b": "Villarreal",
+          "home_pot": 4,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-4089612767d08b0c",
+          "team_a": "Slovan Bratislava",
+          "team_b": "Inter Milan",
+          "home_pot": 4,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-42005b013414044b",
+          "team_a": "Sabah",
+          "team_b": "Barcelona",
+          "home_pot": 4,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-463d25fa39500319",
+          "team_a": "Slavia Prague",
+          "team_b": "Aston Villa",
+          "home_pot": 4,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-49d88a95bbf3c432",
+          "team_a": "Barcelona",
+          "team_b": "Feyenoord",
+          "home_pot": 1,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-4a6bb35d8682e776",
+          "team_a": "Bodø/Glimt",
+          "team_b": "LASK",
+          "home_pot": 3,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-4ac782392d1a34de",
+          "team_a": "Club Brugge",
+          "team_b": "Aston Villa",
+          "home_pot": 2,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-4b6641910aeb743c",
+          "team_a": "Lille",
+          "team_b": "Galatasaray",
+          "home_pot": 3,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-4e0490d00ec17f65",
+          "team_a": "Arsenal",
+          "team_b": "Lille",
+          "home_pot": 1,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-4ecd54b2bbefb070",
+          "team_a": "Real Betis",
+          "team_b": "Feyenoord",
+          "home_pot": 2,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-4f4f7a4d174ab691",
+          "team_a": "Real Madrid",
+          "team_b": "PSV Eindhoven",
+          "home_pot": 1,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-50bf87f8b909bebd",
+          "team_a": "Club Brugge",
+          "team_b": "Bodø/Glimt",
+          "home_pot": 2,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-54de0afe39fa1844",
+          "team_a": "Villarreal",
+          "team_b": "Manchester United",
+          "home_pot": 3,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-552ab488815f6dfb",
+          "team_a": "Feyenoord",
+          "team_b": "Inter Milan",
+          "home_pot": 3,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-55f504ed0b3266d0",
+          "team_a": "Lens",
+          "team_b": "Sporting CP",
+          "home_pot": 4,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-571f9760a45da61c",
+          "team_a": "Como",
+          "team_b": "RB Leipzig",
+          "home_pot": 4,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-593529bfa4d673eb",
+          "team_a": "Slavia Prague",
+          "team_b": "Arsenal",
+          "home_pot": 4,
+          "away_pot": 1,
+          "event_date": null
+        }
+      ],
+      [
+        {
+          "match_id": "gen-59ce44637c2ac147",
+          "team_a": "Arsenal",
+          "team_b": "Sabah",
+          "home_pot": 1,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-5b32aac774435b2a",
+          "team_a": "Sabah",
+          "team_b": "Slavia Prague",
+          "home_pot": 4,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-5b3613099a46709c",
+          "team_a": "Roma",
+          "team_b": "Slovan Bratislava",
+          "home_pot": 2,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-5c3a8de868104628",
+          "team_a": "Real Betis",
+          "team_b": "Porto",
+          "home_pot": 2,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-5cf3e5d07ce01ae9",
+          "team_a": "Galatasaray",
+          "team_b": "Aston Villa",
+          "home_pot": 3,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-5d5baaccc119d0d1",
+          "team_a": "Como",
+          "team_b": "Manchester United",
+          "home_pot": 4,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-5dec7b8731a863ee",
+          "team_a": "Liverpool",
+          "team_b": "Atlético Madrid",
+          "home_pot": 1,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-5ef28c53db74e742",
+          "team_a": "Villarreal",
+          "team_b": "Sabah",
+          "home_pot": 3,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-613cafa4fc6a791d",
+          "team_a": "PSV Eindhoven",
+          "team_b": "Club Brugge",
+          "home_pot": 2,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-61a12c24a8cf0c36",
+          "team_a": "Shakhtar Donetsk",
+          "team_b": "Real Madrid",
+          "home_pot": 3,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-680a0aa91efc0ebb",
+          "team_a": "Feyenoord",
+          "team_b": "RB Leipzig",
+          "home_pot": 3,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-68d61fc9c90ecf52",
+          "team_a": "Sporting CP",
+          "team_b": "Galatasaray",
+          "home_pot": 2,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-6c4cc5345f009fe9",
+          "team_a": "Liverpool",
+          "team_b": "Lens",
+          "home_pot": 1,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-6d15c19a65f835ab",
+          "team_a": "Manchester United",
+          "team_b": "Roma",
+          "home_pot": 2,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-6f8b3c33d32c4ecc",
+          "team_a": "Paris Saint-Germain",
+          "team_b": "Roma",
+          "home_pot": 1,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-718aee3152be59d5",
+          "team_a": "Real Madrid",
+          "team_b": "Inter Milan",
+          "home_pot": 1,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-729c733ee5d13908",
+          "team_a": "Inter Milan",
+          "team_b": "Club Brugge",
+          "home_pot": 1,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-7538b1d248781782",
+          "team_a": "Slovan Bratislava",
+          "team_b": "VfB Stuttgart",
+          "home_pot": 4,
+          "away_pot": 4,
+          "event_date": null
+        }
+      ],
+      [
+        {
+          "match_id": "gen-75ea0fab7ddf9318",
+          "team_a": "Borussia Dortmund",
+          "team_b": "AEK Athens",
+          "home_pot": 2,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-7b818e85950d12ac",
+          "team_a": "AEK Athens",
+          "team_b": "Roma",
+          "home_pot": 4,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-7e2c99531058328d",
+          "team_a": "Atlético Madrid",
+          "team_b": "Viking",
+          "home_pot": 1,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-7fc3d33a0aad5361",
+          "team_a": "Galatasaray",
+          "team_b": "VfB Stuttgart",
+          "home_pot": 3,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-813b035fb1d90194",
+          "team_a": "Manchester City",
+          "team_b": "Sporting CP",
+          "home_pot": 1,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-817543726d71ae10",
+          "team_a": "Roma",
+          "team_b": "Real Madrid",
+          "home_pot": 2,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-822aa91c5a003f21",
+          "team_a": "Manchester United",
+          "team_b": "Bayern Munich",
+          "home_pot": 2,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-82302761d7260499",
+          "team_a": "Real Betis",
+          "team_b": "Arsenal",
+          "home_pot": 2,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-8874471fc8fe3a07",
+          "team_a": "Viking",
+          "team_b": "Sabah",
+          "home_pot": 4,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-88d49fec37fb064a",
+          "team_a": "Napoli",
+          "team_b": "Bodø/Glimt",
+          "home_pot": 3,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-8b017838492ac2c0",
+          "team_a": "LASK",
+          "team_b": "Liverpool",
+          "home_pot": 4,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-8bd81d79ded72f69",
+          "team_a": "Bodø/Glimt",
+          "team_b": "Borussia Dortmund",
+          "home_pot": 3,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-8e78a664f82ace2c",
+          "team_a": "Liverpool",
+          "team_b": "Porto",
+          "home_pot": 1,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-924fd566f62d07b4",
+          "team_a": "Bayern Munich",
+          "team_b": "Slavia Prague",
+          "home_pot": 1,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-936c477c568267f7",
+          "team_a": "Arsenal",
+          "team_b": "Borussia Dortmund",
+          "home_pot": 1,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-94fc752bacf8cda4",
+          "team_a": "Viking",
+          "team_b": "PSV Eindhoven",
+          "home_pot": 4,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-954f9d19de046558",
+          "team_a": "Barcelona",
+          "team_b": "Manchester City",
+          "home_pot": 1,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-9584809aa8707176",
+          "team_a": "Barcelona",
+          "team_b": "Como",
+          "home_pot": 1,
+          "away_pot": 4,
+          "event_date": null
+        }
+      ],
+      [
+        {
+          "match_id": "gen-968d8b69c826a446",
+          "team_a": "Paris Saint-Germain",
+          "team_b": "Barcelona",
+          "home_pot": 1,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-9be516c8dcd00cfa",
+          "team_a": "Fenerbahçe",
+          "team_b": "Slavia Prague",
+          "home_pot": 3,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-9e05b94f056b0f95",
+          "team_a": "Bayern Munich",
+          "team_b": "Real Betis",
+          "home_pot": 1,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-9e79d7ed9136dfab",
+          "team_a": "Sabah",
+          "team_b": "Borussia Dortmund",
+          "home_pot": 4,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-a01c089bec7b4d58",
+          "team_a": "VfB Stuttgart",
+          "team_b": "Atlético Madrid",
+          "home_pot": 4,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-a12cb74c9e8fa9df",
+          "team_a": "Galatasaray",
+          "team_b": "Feyenoord",
+          "home_pot": 3,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-a6976b690cdbf0be",
+          "team_a": "LASK",
+          "team_b": "Fenerbahçe",
+          "home_pot": 4,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-a79e1996a933b52f",
+          "team_a": "Manchester United",
+          "team_b": "RB Leipzig",
+          "home_pot": 2,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-aa825fa9768b6a30",
+          "team_a": "PSV Eindhoven",
+          "team_b": "Shakhtar Donetsk",
+          "home_pot": 2,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-aab145292e261491",
+          "team_a": "Napoli",
+          "team_b": "Viking",
+          "home_pot": 3,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-ae9c8005a9837b05",
+          "team_a": "Fenerbahçe",
+          "team_b": "Roma",
+          "home_pot": 3,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-b3ad40b47ffd40ce",
+          "team_a": "Sporting CP",
+          "team_b": "Manchester United",
+          "home_pot": 2,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-b3bc36bb158a34cf",
+          "team_a": "Manchester United",
+          "team_b": "Sabah",
+          "home_pot": 2,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-b542c6a6703e7c00",
+          "team_a": "Shakhtar Donetsk",
+          "team_b": "Sporting CP",
+          "home_pot": 3,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-b6270f9dd0e2bd03",
+          "team_a": "Manchester City",
+          "team_b": "AEK Athens",
+          "home_pot": 1,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-b8303c00a68b7264",
+          "team_a": "Paris Saint-Germain",
+          "team_b": "Galatasaray",
+          "home_pot": 1,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-b87fae1ffee88283",
+          "team_a": "Club Brugge",
+          "team_b": "Lens",
+          "home_pot": 2,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-ba37659c6fb64ab3",
+          "team_a": "Slavia Prague",
+          "team_b": "Lens",
+          "home_pot": 4,
+          "away_pot": 4,
+          "event_date": null
+        }
+      ],
+      [
+        {
+          "match_id": "gen-baefc7ab921bb8fb",
+          "team_a": "RB Leipzig",
+          "team_b": "Lens",
+          "home_pot": 3,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-bbc082f26fedfb8e",
+          "team_a": "VfB Stuttgart",
+          "team_b": "Viking",
+          "home_pot": 4,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-bda9b4c43abf4bcf",
+          "team_a": "Liverpool",
+          "team_b": "Villarreal",
+          "home_pot": 1,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-c73310241184336f",
+          "team_a": "Como",
+          "team_b": "AEK Athens",
+          "home_pot": 4,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-c8b2ffb61d5c309d",
+          "team_a": "Sporting CP",
+          "team_b": "LASK",
+          "home_pot": 2,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-c94b19a95ff790bc",
+          "team_a": "Galatasaray",
+          "team_b": "Barcelona",
+          "home_pot": 3,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-cc641f82cba838a6",
+          "team_a": "Villarreal",
+          "team_b": "Paris Saint-Germain",
+          "home_pot": 3,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-cfa02111ba88e027",
+          "team_a": "Porto",
+          "team_b": "Manchester City",
+          "home_pot": 2,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-cfa3a0d0b5c3f5d9",
+          "team_a": "Atlético Madrid",
+          "team_b": "Manchester United",
+          "home_pot": 1,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-cff9bc9f2072d1e9",
+          "team_a": "PSV Eindhoven",
+          "team_b": "Atlético Madrid",
+          "home_pot": 2,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-d2698f08d77f9e47",
+          "team_a": "Bayern Munich",
+          "team_b": "Bodø/Glimt",
+          "home_pot": 1,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-d9b3a1345228c1ed",
+          "team_a": "Inter Milan",
+          "team_b": "Liverpool",
+          "home_pot": 1,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-d9c0be17b26e51b6",
+          "team_a": "RB Leipzig",
+          "team_b": "Manchester City",
+          "home_pot": 3,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-da38ca0ccdaa8d94",
+          "team_a": "Slovan Bratislava",
+          "team_b": "Real Betis",
+          "home_pot": 4,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-dbec2df197f0d93f",
+          "team_a": "Club Brugge",
+          "team_b": "Liverpool",
+          "home_pot": 2,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-de60fbee8e3531b6",
+          "team_a": "AEK Athens",
+          "team_b": "Galatasaray",
+          "home_pot": 4,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-e0372d4a37ad8899",
+          "team_a": "Lens",
+          "team_b": "Manchester City",
+          "home_pot": 4,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-e0e34bb5ec4f34de",
+          "team_a": "Como",
+          "team_b": "Paris Saint-Germain",
+          "home_pot": 4,
+          "away_pot": 1,
+          "event_date": null
+        }
+      ],
+      [
+        {
+          "match_id": "gen-e2ebbb41e0085dd1",
+          "team_a": "Real Madrid",
+          "team_b": "LASK",
+          "home_pot": 1,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-e3ad19d27b4ff168",
+          "team_a": "Sabah",
+          "team_b": "Napoli",
+          "home_pot": 4,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-e66c1ef72d3a4d15",
+          "team_a": "Bodø/Glimt",
+          "team_b": "Atlético Madrid",
+          "home_pot": 3,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-e8defe066271c28a",
+          "team_a": "Villarreal",
+          "team_b": "Napoli",
+          "home_pot": 3,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-ed697a84419e3a71",
+          "team_a": "Inter Milan",
+          "team_b": "Shakhtar Donetsk",
+          "home_pot": 1,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f0ca44f73b9bf5cf",
+          "team_a": "Porto",
+          "team_b": "PSV Eindhoven",
+          "home_pot": 2,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f27e3766d7b658cd",
+          "team_a": "Paris Saint-Germain",
+          "team_b": "Slovan Bratislava",
+          "home_pot": 1,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f3a20c8422f4a86e",
+          "team_a": "Aston Villa",
+          "team_b": "Viking",
+          "home_pot": 2,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f48c9afbdc8a8f56",
+          "team_a": "LASK",
+          "team_b": "Slovan Bratislava",
+          "home_pot": 4,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f4b6285469c3b0e0",
+          "team_a": "AEK Athens",
+          "team_b": "LASK",
+          "home_pot": 4,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f4f057d898c4aa8f",
+          "team_a": "Feyenoord",
+          "team_b": "Como",
+          "home_pot": 3,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f5d421049f8b1ac4",
+          "team_a": "Porto",
+          "team_b": "Slavia Prague",
+          "home_pot": 2,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f66d1613a6a668b3",
+          "team_a": "Viking",
+          "team_b": "Bayern Munich",
+          "home_pot": 4,
+          "away_pot": 1,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f69c25805cced358",
+          "team_a": "VfB Stuttgart",
+          "team_b": "Club Brugge",
+          "home_pot": 4,
+          "away_pot": 2,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f9b4e66d750622eb",
+          "team_a": "RB Leipzig",
+          "team_b": "Shakhtar Donetsk",
+          "home_pot": 3,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-f9d86dca5eabc51c",
+          "team_a": "Aston Villa",
+          "team_b": "Fenerbahçe",
+          "home_pot": 2,
+          "away_pot": 3,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-fa7cd3d340f83e3d",
+          "team_a": "Inter Milan",
+          "team_b": "VfB Stuttgart",
+          "home_pot": 1,
+          "away_pot": 4,
+          "event_date": null
+        },
+        {
+          "match_id": "gen-fafc29018d4d56f9",
+          "team_a": "Bodø/Glimt",
+          "team_b": "Lille",
+          "home_pot": 3,
+          "away_pot": 3,
+          "event_date": null
+        }
+      ]
+    ]
+  },
+  "_derived": {
+    "schedule": "derived",
+    "authoritative_schedule": false,
+    "grouping_method": "deterministic_v1"
+  }
+}

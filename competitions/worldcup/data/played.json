@@ -1,0 +1,322 @@
+{
+  "M73": {
+    "match_id": "M73",
+    "team_a": "South Africa",
+    "team_b": "Canada",
+    "winner": "Canada",
+    "is_draw": false,
+    "home_score": 0,
+    "away_score": 1,
+    "completed_at": "2026-06-28T19:00:00Z"
+  },
+  "M74": {
+    "match_id": "M74",
+    "team_a": "Germany",
+    "team_b": "Paraguay",
+    "winner": "Paraguay",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-06-29T20:30:00Z"
+  },
+  "M75": {
+    "match_id": "M75",
+    "team_a": "Netherlands",
+    "team_b": "Morocco",
+    "winner": "Morocco",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-06-30T01:00:00Z"
+  },
+  "M76": {
+    "match_id": "M76",
+    "team_a": "Brazil",
+    "team_b": "Japan",
+    "winner": "Brazil",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 1,
+    "completed_at": "2026-06-29T17:00:00Z"
+  },
+  "M77": {
+    "match_id": "M77",
+    "team_a": "France",
+    "team_b": "Sweden",
+    "winner": "France",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 0,
+    "completed_at": "2026-06-30T21:00:00Z"
+  },
+  "M78": {
+    "match_id": "M78",
+    "team_a": "Ivory Coast",
+    "team_b": "Norway",
+    "winner": "Norway",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 2,
+    "completed_at": "2026-06-30T17:00:00Z"
+  },
+  "M79": {
+    "match_id": "M79",
+    "team_a": "Mexico",
+    "team_b": "Ecuador",
+    "winner": "Mexico",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 0,
+    "completed_at": "2026-07-01T02:00:00Z"
+  },
+  "M80": {
+    "match_id": "M80",
+    "team_a": "England",
+    "team_b": "DR Congo",
+    "winner": "England",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 1,
+    "completed_at": "2026-07-01T16:00:00Z"
+  },
+  "M81": {
+    "match_id": "M81",
+    "team_a": "United States",
+    "team_b": "Bosnia and Herzegovina",
+    "winner": "United States",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 0,
+    "completed_at": "2026-07-02T00:00:00Z"
+  },
+  "M82": {
+    "match_id": "M82",
+    "team_a": "Belgium",
+    "team_b": "Senegal",
+    "winner": "Belgium",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 2,
+    "completed_at": "2026-07-01T20:00:00Z"
+  },
+  "M83": {
+    "match_id": "M83",
+    "team_a": "Portugal",
+    "team_b": "Croatia",
+    "winner": "Portugal",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 1,
+    "completed_at": "2026-07-02T23:00:00Z"
+  },
+  "M84": {
+    "match_id": "M84",
+    "team_a": "Spain",
+    "team_b": "Austria",
+    "winner": "Spain",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 0,
+    "completed_at": "2026-07-02T19:00:00Z"
+  },
+  "M85": {
+    "match_id": "M85",
+    "team_a": "Switzerland",
+    "team_b": "Algeria",
+    "winner": "Switzerland",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 0,
+    "completed_at": "2026-07-03T03:00:00Z"
+  },
+  "M86": {
+    "match_id": "M86",
+    "team_a": "Argentina",
+    "team_b": "Cape Verde",
+    "winner": "Argentina",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 2,
+    "completed_at": "2026-07-03T22:00:00Z"
+  },
+  "M87": {
+    "match_id": "M87",
+    "team_a": "Colombia",
+    "team_b": "Ghana",
+    "winner": "Colombia",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 0,
+    "completed_at": "2026-07-04T01:30:00Z"
+  },
+  "M88": {
+    "match_id": "M88",
+    "team_a": "Australia",
+    "team_b": "Egypt",
+    "winner": "Egypt",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 1,
+    "completed_at": "2026-07-03T18:00:00Z"
+  },
+  "M89": {
+    "match_id": "M89",
+    "team_a": "Paraguay",
+    "team_b": "France",
+    "winner": "France",
+    "is_draw": false,
+    "home_score": 0,
+    "away_score": 1,
+    "completed_at": "2026-07-04T21:00:00Z"
+  },
+  "M90": {
+    "match_id": "M90",
+    "team_a": "Canada",
+    "team_b": "Morocco",
+    "winner": "Morocco",
+    "is_draw": false,
+    "home_score": 0,
+    "away_score": 3,
+    "completed_at": "2026-07-04T17:00:00Z"
+  },
+  "M91": {
+    "match_id": "M91",
+    "team_a": "Brazil",
+    "team_b": "Norway",
+    "winner": "Norway",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 2,
+    "completed_at": "2026-07-05T20:00:00Z"
+  },
+  "M92": {
+    "match_id": "M92",
+    "team_a": "Mexico",
+    "team_b": "England",
+    "winner": "England",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 3,
+    "completed_at": "2026-07-06T01:00:00Z"
+  },
+  "M93": {
+    "match_id": "M93",
+    "team_a": "Portugal",
+    "team_b": "Spain",
+    "winner": "Spain",
+    "is_draw": false,
+    "home_score": 0,
+    "away_score": 1,
+    "completed_at": "2026-07-06T19:00:00Z"
+  },
+  "M94": {
+    "match_id": "M94",
+    "team_a": "United States",
+    "team_b": "Belgium",
+    "winner": "Belgium",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 4,
+    "completed_at": "2026-07-07T00:00:00Z"
+  },
+  "M95": {
+    "match_id": "M95",
+    "team_a": "Argentina",
+    "team_b": "Egypt",
+    "winner": "Argentina",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 2,
+    "completed_at": "2026-07-07T16:00:00Z"
+  },
+  "M96": {
+    "match_id": "M96",
+    "team_a": "Switzerland",
+    "team_b": "Colombia",
+    "winner": "Switzerland",
+    "is_draw": false,
+    "home_score": 0,
+    "away_score": 0,
+    "completed_at": "2026-07-07T20:00:00Z"
+  },
+  "QF_1": {
+    "match_id": "QF_1",
+    "team_a": "France",
+    "team_b": "Morocco",
+    "winner": "France",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 0,
+    "completed_at": "2026-07-09T20:00:00Z"
+  },
+  "QF_2": {
+    "match_id": "QF_2",
+    "team_a": "Norway",
+    "team_b": "England",
+    "winner": "England",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 2,
+    "completed_at": "2026-07-11T21:00:00Z"
+  },
+  "QF_3": {
+    "match_id": "QF_3",
+    "team_a": "Spain",
+    "team_b": "Belgium",
+    "winner": "Spain",
+    "is_draw": false,
+    "home_score": 2,
+    "away_score": 1,
+    "completed_at": "2026-07-10T19:00:00Z"
+  },
+  "QF_4": {
+    "match_id": "QF_4",
+    "team_a": "Argentina",
+    "team_b": "Switzerland",
+    "winner": "Argentina",
+    "is_draw": false,
+    "home_score": 3,
+    "away_score": 1,
+    "completed_at": "2026-07-12T01:00:00Z"
+  },
+  "SF_1": {
+    "match_id": "SF_1",
+    "team_a": "France",
+    "team_b": "Spain",
+    "winner": "Spain",
+    "is_draw": false,
+    "home_score": 0,
+    "away_score": 2,
+    "completed_at": "2026-07-14T19:00:00Z"
+  },
+  "SF_2": {
+    "match_id": "SF_2",
+    "team_a": "England",
+    "team_b": "Argentina",
+    "winner": "Argentina",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 2,
+    "completed_at": "2026-07-15T19:00:00Z"
+  },
+  "TPP": {
+    "match_id": "TPP",
+    "team_a": "France",
+    "team_b": "England",
+    "winner": "England",
+    "is_draw": false,
+    "home_score": 4,
+    "away_score": 6,
+    "completed_at": "2026-07-18T21:00:00Z"
+  },
+  "FINAL": {
+    "match_id": "FINAL",
+    "team_a": "Spain",
+    "team_b": "Argentina",
+    "winner": "Spain",
+    "is_draw": false,
+    "home_score": 1,
+    "away_score": 0,
+    "completed_at": "2026-07-19T19:00:00Z"
+  }
+}

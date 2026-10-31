@@ -38,7 +38,9 @@ competitions/worldcup/data/eval_backtest_report.json
 competitions/worldcup/data/eval_baseline_report.json
 competitions/worldcup/data/calibration_params.json
 competitions/worldcup/data/played.json
+!competitions/worldcup/data/played.json
 competitions/worldcup/data/played_groups.json
+!competitions/worldcup/data/played_groups.json
 competitions/worldcup/data/probability_log.json
 competitions/worldcup/data/prediction_history.json
 competitions/worldcup/data/snapshot.json
@@ -116,13 +118,22 @@ competitions/ucl/data/*.bak
 competitions/ucl/data/snapshot.json
 competitions/ucl/data/retirements.json
 competitions/ucl/data/results.json
+!competitions/ucl/data/results.json
 competitions/ucl/data/knockout_results.json
+!competitions/ucl/data/knockout_results.json
 competitions/ucl/data/replay_2025_26.json
 competitions/ucl/data/live/
 competitions/ucl/data/seasons/
+!competitions/ucl/data/seasons/
+competitions/ucl/data/seasons/*
+!competitions/ucl/data/seasons/2026_27/
+competitions/ucl/data/seasons/2026_27/*
+!competitions/ucl/data/seasons/2026_27/fixtures.json
+!competitions/ucl/data/seasons/2026_27/results.json
 # Active-season pointer (runtime state; recreated at boot by
 # web/server.py:_ensure_ucl_default_season when the draw snapshot exists)
 competitions/ucl/data/current.json
+!competitions/ucl/data/current.json
 
 
 # LaLiga data — runtime state (regeneratable); the shipped 2026/27 fallback
