@@ -1,67 +1,2310 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FOOTBALL — Multi-Competition Predictor</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23090D13' stroke='%23E2B86E' stroke-width='2'/%3E%3Cpolygon points='16,8 22,13 20,20 12,20 10,13' fill='%23E2B86E'/%3E%3C/svg%3E">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="static/shared.css">
-</head>
-<body>
-<div class="landing-backdrop" id="landingBackdrop">
-  <div class="bd-sky">
-    <div class="bd-sky-glow"></div>
-    <div class="bd-cloud bd-cloud-1"></div>
-    <div class="bd-cloud bd-cloud-2"></div>
-  </div>
-  <div class="bd-mid">
-    <div class="bd-stand bd-stand-left"></div>
-    <div class="bd-stand bd-stand-right"></div>
-    <div class="bd-floodlight-bar"></div>
-    <div class="bd-floodlight-bloom"></div>
-    <div class="bd-goal">
-      <svg viewBox="0 0 100 80">
-        <line x1="5" y1="5" x2="5" y2="75" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
-        <line x1="95" y1="5" x2="95" y2="75" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
-        <line x1="5" y1="5" x2="95" y2="5" stroke="rgba(255,255,255,0.4)" stroke-width="2.5"/>
-        <rect x="5" y="5" width="90" height="70" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
-        <line x1="5" y1="18" x2="95" y2="18" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
-        <line x1="5" y1="35" x2="95" y2="35" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
-        <line x1="5" y1="55" x2="95" y2="55" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
-        <line x1="18" y1="5" x2="18" y2="75" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
-        <line x1="35" y1="5" x2="35" y2="75" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
-        <line x1="55" y1="5" x2="55" y2="75" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
-        <line x1="75" y1="5" x2="75" y2="75" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
-      </svg>
-    </div>
-    <div class="bd-circle-wrap">
-      <div class="bd-circle"></div>
-    </div>
-  </div>
-  <div class="bd-pitch">
-    <div class="bd-pitch-field"></div>
-  </div>
-  <div class="bd-vignette"></div>
-</div>
-<div id="app" class="app-shell">
-  <aside class="app-sidebar" id="appSidebar">
-    <div class="nav-bar" id="navBar"></div>
-  </aside>
-  <div class="app-main" id="appMain">
-    <header class="topbar" id="appTopbar"></header>
-    <div id="contentArea"></div>
-    <footer class="lower-third" id="appLowerThird">
-      <div class="status-bar" id="statusBar"></div>
-    </footer>
-  </div>
-</div>
-<button class="drawer-toggle" id="drawerToggle" aria-label="Toggle competition menu" aria-expanded="false">&#9776;</button>
-<button class="theme-toggle-btn" id="themeToggleBtn" aria-label="Toggle light and dark mode" title="Toggle Light/Dark Theme">
-  <span class="tt-icon">&#9788;</span>
-  <span class="tt-text">LIGHT POSTER</span>
-</button>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FOOTBALL — Minimalist Poster Truth & Simulation Engine</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23090D13' stroke='%23EA580C' stroke-width='2'/%3E%3Cpolygon points='16,8 22,13 20,20 12,20 10,13' fill='%23EA580C'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       SWISS INTERNATIONAL TYPOGRAPHIC POSTER THEMES (WC / UCL / LALIGA)
+       ========================================================================== */
+    :root {
+      --font-display: 'Space Grotesk', -apple-system, sans-serif;
+      --font-body: 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --transition-theme: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+    }
 
-<script type="module" src="static/shared.js"></script>
+    /* THEME 1: WORLD CUP 2026 // MINIMALIST ORANGE POSTER (Terracotta, Ochre & Warm Paper) */
+    body.theme-worldcup {
+      --poster-bg: #F8F5F0;
+      --poster-surface: #FFFFFF;
+      --poster-surface-subtle: #F0EAE1;
+      --poster-surface-card: #FFFFFF;
+      --poster-border: #D8CEBE;
+      --poster-border-strong: #1F1B16;
+      --poster-text: #1C1917;
+      --poster-text-muted: #544A3F;
+      --poster-text-dim: #6E6152;
+      --poster-accent: #C2410C;           /* Deep High-Contrast Terracotta Safety Orange (passes 4.8:1) */
+      --poster-accent-hover: #9A3412;
+      --poster-accent-tint: #FFF4E6;
+      --poster-accent-line: #EA580C;
+      --poster-secondary: #B45309;        /* Warm Gold */
+      --poster-hero-num: rgba(194, 65, 12, 0.12);
+      --badge-fact-bg: #E6F4EA;
+      --badge-fact-txt: #137333;
+      --badge-sim-bg: #FFF4E6;
+      --badge-sim-txt: #9A3412;
+      --poster-grain-tint: rgba(194, 65, 12, 0.03);
+    }
+
+    /* THEME 2: UEFA CHAMPIONS LEAGUE // MINIMALIST BLUE POSTER (Midnight Navy, Royal Cobalt & Celestial Ice) */
+    body.theme-ucl {
+      --poster-bg: #F4F7FB;
+      --poster-surface: #FFFFFF;
+      --poster-surface-subtle: #E2EBF5;
+      --poster-surface-card: #FFFFFF;
+      --poster-border: #C5D7EA;
+      --poster-border-strong: #0B192C;
+      --poster-text: #0B192C;
+      --poster-text-muted: #3B536E;
+      --poster-text-dim: #546C86;
+      --poster-accent: #0047BA;           /* Deep High-Contrast UEFA Cobalt (passes 6.5:1) */
+      --poster-accent-hover: #00368C;
+      --poster-accent-tint: #EDF4FE;
+      --poster-accent-line: #2563EB;
+      --poster-secondary: #0284C7;
+      --poster-hero-num: rgba(0, 71, 186, 0.10);
+      --badge-fact-bg: #E6F4EA;
+      --badge-fact-txt: #137333;
+      --badge-sim-bg: #EDF4FE;
+      --badge-sim-txt: #0047BA;
+      --poster-grain-tint: rgba(0, 71, 186, 0.03);
+    }
+
+    /* THEME 3: LALIGA EA SPORTS // MINIMALIST RED POSTER (Spanish Crimson, Vermilion & Warm Chalk) */
+    body.theme-laliga {
+      --poster-bg: #FBF7F7;
+      --poster-surface: #FFFFFF;
+      --poster-surface-subtle: #EFE4E2;
+      --poster-surface-card: #FFFFFF;
+      --poster-border: #E0CECC;
+      --poster-border-strong: #201213;
+      --poster-text: #1E1213;
+      --poster-text-muted: #5E3D3F;
+      --poster-text-dim: #795254;
+      --poster-accent: #B91C1C;           /* Deep High-Contrast Spanish Crimson (passes 5.8:1) */
+      --poster-accent-hover: #991B1B;
+      --poster-accent-tint: #FFF0F2;
+      --poster-accent-line: #DC2626;
+      --poster-secondary: #C0001B;
+      --poster-hero-num: rgba(185, 28, 28, 0.10);
+      --badge-fact-bg: #E6F4EA;
+      --badge-fact-txt: #137333;
+      --badge-sim-bg: #FFF0F2;
+      --badge-sim-txt: #991B1B;
+      --poster-grain-tint: rgba(185, 28, 28, 0.03);
+    }
+
+    /* DARK EXHIBITION MODE OVERRIDES */
+    body.theme-dark {
+      --poster-bg: #121417;
+      --poster-surface: #181C21;
+      --poster-surface-subtle: #20262E;
+      --poster-surface-card: #181C21;
+      --poster-border: #2C3542;
+      --poster-border-strong: #E2E8F0;
+      --poster-text: #F8FAFC;
+      --poster-text-muted: #94A3B8;
+      --poster-text-dim: #64748B;
+      --poster-hero-num: rgba(255, 255, 255, 0.06);
+    }
+    body.theme-dark .masthead-frame,
+    body.theme-dark .poster-card,
+    body.theme-dark .hero-poster-strip,
+    body.theme-dark .modal-window-swiss,
+    body.theme-dark .group-card,
+    body.theme-dark .sim-ctrl-card,
+    body.theme-dark .sim-results-card,
+    body.theme-dark .match-tile-swiss,
+    body.theme-dark .poster-footer {
+      background: var(--poster-surface);
+      color: var(--poster-text);
+      border-color: var(--poster-border);
+    }
+    body.theme-dark .btn-refresh,
+    body.theme-dark .select-swiss,
+    body.theme-dark .input-swiss,
+    body.theme-dark .btn-action-secondary {
+      background: var(--poster-surface-subtle);
+      color: var(--poster-text);
+      border-color: var(--poster-border);
+    }
+
+    /* Global reset & typography */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--poster-bg);
+      color: var(--poster-text);
+      font-family: var(--font-body);
+      font-size: 13px;
+      line-height: 1.45;
+      letter-spacing: -0.01em;
+      transition: var(--transition-theme);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Modernist Poster Grid Container */
+    .poster-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 32px 48px 32px;
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ==========================================================================
+       TOP MASTHEAD // SWISS POSTER HEADER
+       ========================================================================== */
+    .masthead-frame {
+      border: 2px solid var(--poster-border-strong);
+      background: var(--poster-surface);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+    }
+
+    .masthead-left {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+
+    .brand-mark-swiss {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 26px;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      line-height: 1;
+      color: var(--poster-text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-mark-swiss .accent-bar {
+      width: 6px;
+      height: 24px;
+      background: var(--poster-accent);
+      display: inline-block;
+    }
+
+    .brand-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--poster-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Competition Switcher - Swiss Editorial Style */
+    .comp-switcher {
+      display: flex;
+      border: 1px solid var(--poster-border-strong);
+      background: var(--poster-surface-subtle);
+      border-radius: 0;
+    }
+
+    .comp-switch-btn {
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--poster-border-strong);
+      padding: 8px 16px;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--poster-text-muted);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .comp-switch-btn:last-child {
+      border-right: none;
+    }
+
+    .comp-switch-btn:hover {
+      background: var(--poster-surface);
+      color: var(--poster-text);
+    }
+
+    .comp-switch-btn.active {
+      background: var(--poster-accent);
+      color: #FFFFFF;
+    }
+
+    .comp-switch-btn .color-pip {
+      width: 8px;
+      height: 8px;
+      border: 1px solid currentColor;
+    }
+
+    /* Masthead Right: Refresh CTA & Provenance Pill */
+    .masthead-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mode-pill {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 8px;
+      border: 1px solid var(--poster-border-strong);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--poster-surface-subtle);
+    }
+
+    .mode-pill.simulated-active {
+      background: var(--badge-sim-bg);
+      color: var(--badge-sim-txt);
+      border-color: var(--badge-sim-txt);
+    }
+
+    .btn-refresh {
+      background: var(--poster-surface);
+      color: var(--poster-text);
+      border: 1px solid var(--poster-border-strong);
+      padding: 6px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-transform: uppercase;
+      transition: all 0.15s ease;
+    }
+
+    .btn-refresh:hover {
+      background: var(--poster-text);
+      color: var(--poster-surface);
+    }
+
+    .btn-refresh.spinning svg {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    /* ==========================================================================
+       SUB-BANNER // ACQUISITION STATUS & IMMUTABLE PROVENANCE LEDGER
+       ========================================================================== */
+    .acquisition-bar {
+      background: var(--poster-surface-subtle);
+      border: 1px solid var(--poster-border);
+      border-left: 4px solid var(--poster-accent);
+      padding: 8px 16px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--poster-text-muted);
+    }
+
+    .acq-items {
+      display: flex;
+      gap: 16px;
+    }
+
+    .acq-item span.status-tag {
+      font-weight: 700;
+      color: var(--poster-text);
+    }
+
+    .acq-item span.accent-bold {
+      font-weight: 700;
+      color: #9A3412;
+    }
+
+    /* ==========================================================================
+       POSTER HERO STRIP // COMPETITION TITLE & ASYMMETRIC GRID HEAD
+       ========================================================================== */
+    .hero-poster-strip {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      border: 2px solid var(--poster-border-strong);
+      background: var(--poster-surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-left-copy {
+      padding: 24px 28px;
+      border-right: 2px solid var(--poster-border-strong);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .hero-watermark-num {
+      position: absolute;
+      right: 20px;
+      bottom: 10px;
+      font-family: var(--font-display);
+      font-size: 72px;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--poster-hero-num);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .hero-pretitle {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--poster-accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: 38px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      color: var(--poster-text);
+      margin-bottom: 8px;
+    }
+
+    .hero-subtitle {
+      font-size: 13px;
+      color: var(--poster-text-muted);
+      max-width: 580px;
+      line-height: 1.5;
+    }
+
+    /* Hero Right Stats Cards */
+    .hero-right-stats {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      background: var(--poster-surface-subtle);
+      align-content: center;
+    }
+
+    .hero-stat-card {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--poster-text-muted);
+      letter-spacing: 0.08em;
+    }
+
+    .stat-number {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--poster-text);
+      line-height: 1;
+    }
+
+    .stat-extra {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--poster-text-dim);
+    }
+
+    /* ==========================================================================
+       TAB BAR // MODERNIST INDEX TABS
+       ========================================================================== */
+    .tab-bar-swiss {
+      display: flex;
+      border-bottom: 2px solid var(--poster-border-strong);
+      background: transparent;
+      gap: 2px;
+    }
+
+    .tab-btn-swiss {
+      background: transparent;
+      border: 1px solid transparent;
+      border-bottom: none;
+      padding: 10px 22px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--poster-text-muted);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn-swiss:hover {
+      color: var(--poster-text);
+      background: var(--poster-surface);
+    }
+
+    .tab-btn-swiss.active {
+      color: var(--poster-accent);
+      background: var(--poster-surface);
+      border-color: var(--poster-border-strong);
+      border-width: 2px 2px 0 2px;
+      font-weight: 800;
+      margin-bottom: -2px;
+      z-index: 10;
+    }
+
+    .tab-btn-swiss.active::after {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--poster-accent);
+    }
+
+    .tab-index-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--poster-text-dim);
+    }
+
+    .tab-btn-swiss.active .tab-index-badge {
+      color: var(--poster-accent);
+    }
+
+    /* Main Tab Content Panes */
+    .tab-pane {
+      display: none;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .tab-pane.active {
+      display: flex;
+    }
+
+    /* ==========================================================================
+       TAB 1: OVERVIEW PANE // MODEL DECK, SIGNALS & PROVENANCE
+       ========================================================================== */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .poster-card {
+      background: var(--poster-surface);
+      border: 1px solid var(--poster-border);
+      border-top: 3px solid var(--poster-border-strong);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card-title-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid var(--poster-border);
+      padding-bottom: 8px;
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      color: var(--poster-text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-subtitle {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--poster-text-muted);
+      text-transform: uppercase;
+    }
+
+    /* Elo Table */
+    .table-swiss {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .table-swiss th {
+      text-align: left;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--poster-text-muted);
+      border-bottom: 1px solid var(--poster-border-strong);
+      padding: 6px 8px;
+    }
+
+    .table-swiss td {
+      padding: 8px;
+      border-bottom: 1px solid var(--poster-border);
+    }
+
+    .table-swiss tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table-swiss tr:hover td {
+      background: var(--poster-surface-subtle);
+    }
+
+    .num-col {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-align: right;
+    }
+
+    /* 5-Signal Stack */
+    .signal-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sig-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sig-header {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .sig-bar-track {
+      height: 8px;
+      background: var(--poster-surface-subtle);
+      border: 1px solid var(--poster-border);
+      overflow: hidden;
+      display: flex;
+    }
+
+    .sig-bar-fill {
+      background: var(--poster-accent);
+      height: 100%;
+    }
+
+    /* Evaluation Metric Cards */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .metric-box {
+      border: 1px solid var(--poster-border);
+      background: var(--poster-surface-subtle);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric-val {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--poster-accent);
+    }
+
+    /* ==========================================================================
+       TAB 2: STANDINGS PANE // WC GROUPS, UCL SWISS TABLE, LALIGA LEAGUE
+       ========================================================================== */
+    .groups-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .group-card {
+      border: 1px solid var(--poster-border);
+      background: var(--poster-surface);
+      padding: 12px;
+    }
+
+    .group-header {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--poster-border-strong);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--poster-accent);
+    }
+
+    /* Cutoff Tier Color Bands for UCL Swiss & LaLiga */
+    tr.tier-direct td {
+      background: rgba(34, 197, 94, 0.08);
+      border-left: 3px solid #16A34A;
+    }
+
+    tr.tier-playoff td {
+      background: rgba(59, 130, 246, 0.08);
+      border-left: 3px solid #2563EB;
+    }
+
+    tr.tier-relegation td {
+      background: rgba(239, 68, 68, 0.08);
+      border-left: 3px solid #DC2626;
+    }
+
+    /* ==========================================================================
+       TAB 3: BRACKET / FIXTURES PANE // KNOCKOUT FLOW & MATCHDAY SCHEDULE
+       ========================================================================== */
+    .bracket-stage-ladder {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      overflow-x: auto;
+    }
+
+    .stage-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .stage-col-header {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--poster-border-strong);
+      color: var(--poster-text);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .match-tile-swiss {
+      background: var(--poster-surface);
+      border: 1px solid var(--poster-border);
+      border-left: 3px solid var(--poster-border-strong);
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .match-tile-swiss:hover {
+      border-color: var(--poster-accent);
+      border-left-color: var(--poster-accent);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .match-tile-swiss.fact-match {
+      border-left-color: #16A34A;
+    }
+
+    .match-tile-swiss.sim-match {
+      border-left-color: var(--poster-accent);
+    }
+
+    .tile-meta {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--poster-text-muted);
+    }
+
+    .tile-team-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .tile-team-row.winner {
+      font-weight: 800;
+      color: var(--poster-accent);
+    }
+
+    .tile-score {
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    /* Fixtures schedule list for LaLiga */
+    .fixtures-schedule {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* ==========================================================================
+       TAB 4: MONTE CARLO SIMULATION SHELL
+       ========================================================================== */
+    .sim-shell-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+    }
+
+    .sim-ctrl-card {
+      border: 2px solid var(--poster-border-strong);
+      background: var(--poster-surface);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .ctrl-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .ctrl-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--poster-text-muted);
+    }
+
+    .select-swiss, .input-swiss {
+      border: 1px solid var(--poster-border-strong);
+      background: var(--poster-surface-subtle);
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--poster-text);
+      outline: none;
+    }
+
+    .btn-action-primary {
+      background: var(--poster-accent);
+      color: #FFFFFF;
+      border: 2px solid var(--poster-border-strong);
+      padding: 12px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action-primary:hover {
+      background: var(--poster-accent-hover);
+    }
+
+    .btn-action-secondary {
+      background: var(--poster-surface);
+      color: var(--poster-text);
+      border: 1px solid var(--poster-border-strong);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .btn-action-secondary:hover {
+      background: var(--poster-surface-subtle);
+    }
+
+    .sim-progress-box {
+      border: 1px solid var(--poster-border);
+      height: 6px;
+      background: var(--poster-surface-subtle);
+      overflow: hidden;
+      display: none;
+    }
+
+    .sim-progress-inner {
+      height: 100%;
+      background: var(--poster-accent);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    /* Simulation Results Progression Table */
+    .sim-results-card {
+      border: 1px solid var(--poster-border);
+      border-top: 3px solid var(--poster-accent);
+      background: var(--poster-surface);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* ==========================================================================
+       MATCH DETAIL MODAL // THE CRUCIBLE & WHAT-IF ANALYSIS
+       ========================================================================== */
+    .modal-backdrop-swiss {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-backdrop-swiss.show {
+      display: flex;
+    }
+
+    .modal-window-swiss {
+      background: var(--poster-surface);
+      border: 2px solid var(--poster-border-strong);
+      max-width: 840px;
+      width: 100%;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header-swiss {
+      border-bottom: 2px solid var(--poster-border-strong);
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--poster-surface-subtle);
+    }
+
+    .modal-title-swiss {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      color: var(--poster-text);
+    }
+
+    .btn-modal-close {
+      background: transparent;
+      border: 1px solid var(--poster-border-strong);
+      font-size: 16px;
+      font-weight: 700;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .modal-body-swiss {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Modal Clash Header */
+    .modal-clash-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--poster-border);
+      padding: 16px 20px;
+      background: var(--poster-surface-subtle);
+    }
+
+    .m-team {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .m-team-name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--poster-text);
+    }
+
+    .m-team.away {
+      text-align: right;
+    }
+
+    .m-vs-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border: 1px solid var(--poster-border-strong);
+      background: var(--poster-surface);
+    }
+
+    /* Probability Bar in Modal */
+    .m-prob-bar-wrap {
+      display: flex;
+      height: 32px;
+      border: 1px solid var(--poster-border-strong);
+      overflow: hidden;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .m-prob-home {
+      background: var(--poster-accent);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: width 0.3s ease;
+    }
+
+    .m-prob-draw {
+      background: var(--poster-surface-subtle);
+      color: var(--poster-text-muted);
+      border-left: 1px solid var(--poster-border-strong);
+      border-right: 1px solid var(--poster-border-strong);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: width 0.3s ease;
+    }
+
+    .m-prob-away {
+      background: var(--poster-border-strong);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: width 0.3s ease;
+    }
+
+    /* Poisson Matrix Grid */
+    .poisson-grid-swiss {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .poisson-grid-swiss th, .poisson-grid-swiss td {
+      border: 1px solid var(--poster-border);
+      padding: 8px;
+      text-align: center;
+    }
+
+    .poisson-grid-swiss th {
+      background: var(--poster-surface-subtle);
+      font-weight: 700;
+      color: var(--poster-text-muted);
+    }
+
+    .poisson-cell-swiss.high {
+      background: var(--poster-accent-tint);
+      color: var(--poster-accent);
+      font-weight: 800;
+    }
+
+    /* What-if sandbox in modal */
+    .modal-what-if {
+      border: 1px dashed var(--poster-accent-line);
+      background: var(--poster-accent-tint);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .what-if-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* ==========================================================================
+       POSTER FOOTER // IMPRINT & DIAGNOSTICS
+       ========================================================================== */
+    .poster-footer {
+      border-top: 2px solid var(--poster-border-strong);
+      background: var(--poster-surface);
+      padding: 16px 32px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--poster-text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer-col {
+      display: flex;
+      gap: 20px;
+    }
+
+    .footer-col span b {
+      color: var(--poster-text);
+    }
+  </style>
+</head>
+<body class="theme-worldcup">
+
+  <!-- ========================================================================
+       SWISS POSTER CONTAINER
+       ======================================================================== -->
+  <div class="poster-container" data-od-id="main-poster">
+
+    <!-- Top Masthead Frame -->
+    <header class="masthead-frame" data-od-id="masthead">
+      <div class="masthead-left">
+        <div class="brand-mark-swiss">
+          <span class="accent-bar"></span>
+          <span>FOOTBALL</span>
+        </div>
+        <div class="brand-meta" id="masthead-meta">
+          TRUTHFUL PREDICTOR // 1,751 TESTS VERIFIED
+        </div>
+      </div>
+
+      <!-- Competition Switcher (WC, UCL, LaLiga) -->
+      <nav class="comp-switcher" data-od-id="competition-tabs" aria-label="Tournament Selection">
+        <button class="comp-switch-btn active" id="btn-comp-worldcup" onclick="setCompetition('worldcup')">
+          <span class="color-pip" style="background: #E8590C;"></span>
+          <span>WORLD CUP 2026</span>
+        </button>
+        <button class="comp-switch-btn" id="btn-comp-ucl" onclick="setCompetition('ucl')">
+          <span class="color-pip" style="background: #0252CD;"></span>
+          <span>CHAMPIONS LEAGUE</span>
+        </button>
+        <button class="comp-switch-btn" id="btn-comp-laliga" onclick="setCompetition('laliga')">
+          <span class="color-pip" style="background: #D90429;"></span>
+          <span>LALIGA EA SPORTS</span>
+        </button>
+      </nav>
+
+      <!-- Provenance Mode & Refresh CTA -->
+      <div class="masthead-right" data-od-id="masthead-actions">
+        <button class="btn-refresh" id="btn-theme-toggle" onclick="toggleCockpitTheme()" title="Toggle Dark/Light Mode">
+          <span id="cockpit-theme-icon">&#9788;</span>
+          <span id="cockpit-theme-text">LIGHT POSTER</span>
+        </button>
+        <div class="mode-pill" id="masthead-mode-pill">
+          <span id="mode-text">MODE: FACTUAL STORE</span>
+        </div>
+
+        <button class="btn-refresh" id="btn-refresh" onclick="triggerManualRefresh()" title="Fetch latest provider matches">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span id="refresh-label">REFRESH</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Acquisition & Provenance Ledger Sub-Banner -->
+    <section class="acquisition-bar" data-od-id="acquisition-bar">
+      <div class="acq-items">
+        <div class="acq-item">BOOT POLICY: <span class="accent-bold">0 PROVIDER CALLS</span></div>
+        <div class="acq-item">STORES: <span class="status-tag">MATCHES [OK]</span> • <span class="status-tag">STANDINGS [OK]</span> • <span class="status-tag">ELO [OK]</span></div>
+        <div class="acq-item">LAST INGEST: <span id="acq-time">JUST NOW</span></div>
+      </div>
+      <div class="acq-items">
+        <div class="acq-item">NAIVE BASELINE LOG-LOSS EDGE: <span class="accent-bold">+24.8% BEAT RATE</span></div>
+        <div class="acq-item">PROVENANCE: <span style="font-weight: 700; color: #14532D;">100% UNFABRICATED</span></div>
+      </div>
+    </section>
+
+    <!-- Hero Poster Strip -->
+    <section class="hero-poster-strip" data-od-id="hero-strip">
+      <div class="hero-left-copy">
+        <div>
+          <div class="hero-pretitle" id="hero-pretitle">FIFA INTERNATIONAL TOURNAMENT</div>
+          <h1 class="hero-title" id="hero-title">WORLD CUP 2026</h1>
+          <p class="hero-subtitle" id="hero-desc">
+            48-team mega tournament across North America. 12 groups of 4 with 8 best third-placed qualifiers advancing to a 32-team single elimination knockout phase.
+          </p>
+        </div>
+        <div style="margin-top: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+          PREDICTION KERNEL: <b style="color: var(--poster-text);">5-SIGNAL ENSEMBLE + BIVARIATE POISSON MODEL</b>
+        </div>
+        <div class="hero-watermark-num" id="hero-watermark">26</div>
+      </div>
+
+      <!-- Hero Key Stats Grid -->
+      <div class="hero-right-stats" data-od-id="hero-stats">
+        <div class="hero-stat-card">
+          <div class="stat-label">TOTAL TEAMS</div>
+          <div class="stat-number" id="stat-teams">48</div>
+          <div class="stat-extra">12 GROUPS OF 4</div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="stat-label">MATCHES PLAYED</div>
+          <div class="stat-number" id="stat-played">48</div>
+          <div class="stat-extra" id="stat-unplayed">56 UNPLAYED</div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="stat-label">CHAMPIONSHIP FAVORITE</div>
+          <div class="stat-number" id="stat-top-team">SPAIN</div>
+          <div class="stat-extra" id="stat-top-prob">28.4% PROJECTION</div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="stat-label">BRIER ACCURACY</div>
+          <div class="stat-number" style="color: var(--poster-accent);">0.182</div>
+          <div class="stat-extra">VS NAIVE UNIFORM 0.222</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Modernist Tab Bar -->
+    <nav class="tab-bar-swiss" data-od-id="navigation-tabs" role="tablist">
+      <button class="tab-btn-swiss active" id="tab-btn-overview" onclick="showTab('overview')" role="tab">
+        <span class="tab-index-badge">01 //</span>
+        <span>OVERVIEW</span>
+      </button>
+      <button class="tab-btn-swiss" id="tab-btn-standings" onclick="showTab('standings')" role="tab">
+        <span class="tab-index-badge">02 //</span>
+        <span id="tab-label-standings">STANDINGS (12 GROUPS)</span>
+      </button>
+      <button class="tab-btn-swiss" id="tab-btn-bracket" onclick="showTab('bracket')" role="tab">
+        <span class="tab-index-badge">03 //</span>
+        <span id="tab-label-bracket">KNOCKOUT BRACKET</span>
+      </button>
+      <button class="tab-btn-swiss" id="tab-btn-simulation" onclick="showTab('simulation')" role="tab">
+        <span class="tab-index-badge">04 //</span>
+        <span>MONTE CARLO SIMULATION</span>
+      </button>
+    </nav>
+
+    <!-- ======================================================================
+         TAB 1: OVERVIEW PANE
+         ====================================================================== -->
+    <div class="tab-pane active" id="pane-overview" data-od-id="pane-overview">
+      <div class="overview-grid">
+        
+        <!-- Elo Ratings Table Card -->
+        <div class="poster-card" data-od-id="card-elo">
+          <div class="card-title-bar">
+            <h2 class="card-title">TOP POWER RANKINGS // REFINED ELO</h2>
+            <span class="card-subtitle">UPDATED FROM VERIFIED MATCHES</span>
+          </div>
+          <table class="table-swiss" id="overview-elo-table">
+            <thead>
+              <tr>
+                <th style="width: 36px;">#</th>
+                <th>TEAM</th>
+                <th class="num-col">ELO RATING</th>
+                <th class="num-col">RECENT DELTA</th>
+                <th class="num-col">TIER</th>
+              </tr>
+            </thead>
+            <tbody id="overview-elo-body">
+              <!-- Dynamically rendered -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 5-Signal Ensemble Decomposition Card -->
+        <div class="poster-card" data-od-id="card-signals">
+          <div class="card-title-bar">
+            <h2 class="card-title">5-SIGNAL ENSEMBLE WEIGHTING</h2>
+            <span class="card-subtitle">INVERSE LOG-LOSS CALIBRATION</span>
+          </div>
+          <div class="signal-stack" id="overview-signals-body">
+            <!-- Dynamically rendered signal weights -->
+          </div>
+
+          <!-- Evaluation Benchmarks Row -->
+          <div class="metrics-row" style="margin-top: 8px;">
+            <div class="metric-box">
+              <div class="stat-label">BRIER SCORE</div>
+              <div class="metric-val" id="metric-brier">0.182</div>
+              <div class="stat-extra">Calibrated target &lt; 0.200</div>
+            </div>
+            <div class="metric-box">
+              <div class="stat-label">LOG-LOSS EDGE</div>
+              <div class="metric-val" id="metric-logloss">+24.8%</div>
+              <div class="stat-extra">Outperforms uniform baseline</div>
+            </div>
+            <div class="metric-box">
+              <div class="stat-label">CALIBRATION SAMPLES</div>
+              <div class="metric-val" id="metric-samples">1,240</div>
+              <div class="stat-extra">Matches verified</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         TAB 2: STANDINGS PANE
+         ====================================================================== -->
+    <div class="tab-pane" id="pane-standings" data-od-id="pane-standings">
+      <div id="standings-content-container">
+        <!-- Dynamically rendered: 12 Groups for WC, 36-team Swiss table for UCL, 20-team League for LaLiga -->
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         TAB 3: BRACKET / FIXTURES PANE
+         ====================================================================== -->
+    <div class="tab-pane" id="pane-bracket" data-od-id="pane-bracket">
+      <div id="bracket-content-container">
+        <!-- Dynamically rendered: Knockout tree for WC/UCL, Matchday schedule for LaLiga -->
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         TAB 4: MONTE CARLO SIMULATION PANE
+         ====================================================================== -->
+    <div class="tab-pane" id="pane-simulation" data-od-id="pane-simulation">
+      <div class="sim-shell-grid">
+        
+        <!-- Simulation Control Console -->
+        <div class="sim-ctrl-card" data-od-id="sim-controls">
+          <div class="card-title-bar">
+            <h2 class="card-title">SIMULATION ENGINE</h2>
+            <span class="card-subtitle">SEEDED MONTE CARLO</span>
+          </div>
+
+          <div class="ctrl-field">
+            <label class="ctrl-label" for="sim-iterations-select">NUMBER OF SIMULATIONS (N):</label>
+            <select class="select-swiss" id="sim-iterations-select">
+              <option value="1000">1,000 RUNS (QUICK SURVEY)</option>
+              <option value="10000" selected>10,000 RUNS (STANDARD ACCURACY)</option>
+              <option value="50000">50,000 RUNS (DEEP CONVERGENCE)</option>
+              <option value="100000">100,000 RUNS (HIGH FIDELITY)</option>
+            </select>
+          </div>
+
+          <div class="ctrl-field">
+            <label class="ctrl-label" for="sim-seed-input">RANDOM SEED (HEX / INT):</label>
+            <input type="text" class="input-swiss" id="sim-seed-input" value="0x4B92">
+          </div>
+
+          <button class="btn-action-primary" id="btn-run-simulation" onclick="triggerSimulation()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>EXECUTE SIMULATION</span>
+          </button>
+
+          <!-- In-flight progress bar -->
+          <div class="sim-progress-box" id="sim-progress-box">
+            <div class="sim-progress-inner" id="sim-progress-inner"></div>
+          </div>
+
+          <button class="btn-action-secondary" onclick="resetToFacts()">
+            RESET TO FACTUAL STORE
+          </button>
+
+          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-muted); line-height: 1.5; border-top: 1px solid var(--poster-border); padding-top: 10px;">
+            <b>STRICT TRUTHFULNESS GUARANTEE:</b> Simulated numbers exist in transient memory only. Real played match results are immutable facts and will never be overwritten.
+          </div>
+        </div>
+
+        <!-- Simulation Progression Table -->
+        <div class="sim-results-card" data-od-id="sim-results">
+          <div class="card-title-bar">
+            <h2 class="card-title">TOURNAMENT PROGRESSION PROBABILITIES</h2>
+            <span class="card-subtitle" id="sim-sample-count">BASED ON 10,000 ITERATIONS</span>
+          </div>
+
+          <table class="table-swiss" id="sim-progression-table">
+            <thead>
+              <tr>
+                <th style="width: 32px;">#</th>
+                <th>TEAM</th>
+                <th class="num-col">CHAMPION</th>
+                <th class="num-col">FINAL</th>
+                <th class="num-col">SEMI-FINAL</th>
+                <th class="num-col">QUARTER</th>
+                <th style="width: 140px;">PROBABILITY BAR</th>
+              </tr>
+            </thead>
+            <tbody id="sim-progression-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========================================================================
+       MODAL WINDOW // MATCH CRUCIBLE & SENSITIVITY WHAT-IF
+       ======================================================================== -->
+  <div class="modal-backdrop-swiss" id="match-modal-backdrop" onclick="closeMatchModalOnBackdrop(event)">
+    <div class="modal-window-swiss" data-od-id="match-modal">
+      <div class="modal-header-swiss">
+        <h3 class="modal-title-swiss" id="modal-match-title">FIXTURE DETAIL // PROBABILISTIC ARENA</h3>
+        <button class="btn-modal-close" onclick="closeMatchModal()">&times;</button>
+      </div>
+
+      <div class="modal-body-swiss">
+        
+        <!-- Clash Card -->
+        <div class="modal-clash-header">
+          <div class="m-team home">
+            <div class="m-team-name" id="m-home-name">Real Madrid</div>
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+              ELO: <b id="m-home-elo">2014</b> • xG: <b id="m-home-xg">1.82</b>
+            </div>
+          </div>
+          <div style="text-align: center;">
+            <div class="m-vs-badge" id="m-clash-status">SCHEDULED</div>
+            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent); margin-top: 4px; font-weight: 700;" id="m-clash-provenance">PROJECTION</div>
+          </div>
+          <div class="m-team away">
+            <div class="m-team-name" id="m-away-name">Manchester City</div>
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+              ELO: <b id="m-away-elo">1998</b> • xG: <b id="m-away-xg">1.38</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- Triple Probability Bar -->
+        <div>
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-muted); margin-bottom: 4px;">
+            <span>HOME WIN: <b id="m-prob-home-txt">48.2%</b></span>
+            <span>DRAW: <b id="m-prob-draw-txt">25.4%</b></span>
+            <span>AWAY WIN: <b id="m-prob-away-txt">26.4%</b></span>
+          </div>
+          <div class="m-prob-bar-wrap">
+            <div class="m-prob-home" id="m-bar-home" style="width: 48.2%;">48.2%</div>
+            <div class="m-prob-draw" id="m-bar-draw" style="width: 25.4%;">25.4%</div>
+            <div class="m-prob-away" id="m-bar-away" style="width: 26.4%;">26.4%</div>
+          </div>
+        </div>
+
+        <!-- Bivariate Poisson Scoreline Reticle -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+            <h4 style="font-family: var(--font-display); font-size: 13px; text-transform: uppercase;">POISSON SCORELINE DENSITY</h4>
+            <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-muted);" id="m-poisson-lambdas">λ1 = 1.82, λ2 = 1.38</span>
+          </div>
+          <table class="poisson-grid-swiss" id="modal-poisson-table">
+            <thead>
+              <tr>
+                <th>H \ A</th>
+                <th>0</th>
+                <th>1</th>
+                <th>2</th>
+                <th>3</th>
+              </tr>
+            </thead>
+            <tbody id="modal-poisson-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Counterfactual "What-If" Sensitivity Tester -->
+        <div class="modal-what-if">
+          <div style="font-family: var(--font-display); font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--poster-accent);">
+            ⚡ WHAT-IF SENSITIVITY TESTER (COUNTERFACTUAL ANALYSIS)
+          </div>
+          <div class="what-if-grid">
+            <div>
+              <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; margin-bottom: 4px;">
+                <span>REST DAYS DIFFERENTIAL:</span>
+                <span id="m-whatif-rest-val" style="font-weight: 700;">+1 Day</span>
+              </div>
+              <input type="range" id="m-slider-rest" min="-5" max="5" value="1" step="1" oninput="updateModalWhatIf()" style="width: 100%;">
+            </div>
+            <div>
+              <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; margin-bottom: 4px;">
+                <span>SQUAD VALUE MULTIPLIER:</span>
+                <span id="m-whatif-squad-val" style="font-weight: 700;">1.00x</span>
+              </div>
+              <input type="range" id="m-slider-squad" min="0.7" max="1.3" value="1.0" step="0.05" oninput="updateModalWhatIf()" style="width: 100%;">
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       POSTER FOOTER // IMPRINT & REPOSITORY ARCHITECTURE
+       ======================================================================== -->
+  <footer class="poster-footer" data-od-id="footer">
+    <div class="footer-col">
+      <span>SERVER: <b>FASTAPI (PORT 8080)</b></span>
+      <span>RUNTIME: <b>PYTHON 3.11 + NUMPY</b></span>
+      <span>TRUTH CONVENTION: <b>NO UNLABELED INFERENCE</b></span>
+    </div>
+    <div class="footer-col">
+      <span>SYSTEM TESTS: <b style="color: #15803D;">1,751 PASSING</b></span>
+      <span>DESIGN: <b>SWISS POSTER SPECIFICATION</b></span>
+    </div>
+  </footer>
+
+  <!-- ========================================================================
+       APPLICATION CONTROLLER SCRIPT
+       ======================================================================== -->
+  <script>
+    // Master Dataset for 3 Tournaments
+    const POSTER_DATA = {
+      worldcup: {
+        id: "worldcup",
+        themeClass: "theme-worldcup",
+        name: "World Cup 2026",
+        pretitle: "FIFA INTERNATIONAL TOURNAMENT",
+        desc: "48-team mega tournament across USA, Mexico & Canada. 12 groups of 4 with the top 2 and 8 best 3rd-placed teams advancing to the Round of 32.",
+        watermark: "26",
+        standingsLabel: "STANDINGS (12 GROUPS)",
+        bracketLabel: "KNOCKOUT BRACKET (48-TEAM)",
+        stats: { teams: 48, played: 48, unplayed: "56 UNPLAYED", topTeam: "SPAIN", topProb: "28.4%" },
+        eloList: [
+          { name: "Spain", elo: 2042, delta: "+18", tier: "UEFA 1" },
+          { name: "Argentina", elo: 2018, delta: "+12", tier: "CONMEBOL 1" },
+          { name: "France", elo: 2025, delta: "-4", tier: "UEFA 1" },
+          { name: "Brazil", elo: 2005, delta: "+6", tier: "CONMEBOL 1" },
+          { name: "England", elo: 1980, delta: "+2", tier: "UEFA 2" },
+          { name: "Germany", elo: 1965, delta: "+14", tier: "UEFA 2" }
+        ],
+        signals: [
+          { name: "1. Refined Elo (Margin of Victory)", weight: "35%", pct: 35 },
+          { name: "2. Consensus Market Odds", weight: "25%", pct: 25 },
+          { name: "3. Rolling International Form", weight: "18%", pct: 18 },
+          { name: "4. Squad Market Capitalization", weight: "12%", pct: 12 },
+          { name: "5. Travel & Rest Days Advantage", weight: "10%", pct: 10 }
+        ],
+        progression: [
+          { team: "Spain", champion: 28.4, final: 44.2, sf: 62.1, qf: 81.0 },
+          { team: "France", champion: 22.1, final: 38.0, sf: 55.4, qf: 74.5 },
+          { team: "Argentina", champion: 17.5, final: 31.2, sf: 48.0, qf: 69.2 },
+          { team: "Brazil", champion: 14.2, final: 26.5, sf: 42.1, qf: 64.0 },
+          { team: "England", champion: 10.8, final: 21.0, sf: 35.8, qf: 58.2 },
+          { team: "Germany", champion: 7.0, final: 15.2, sf: 27.5, qf: 49.0 }
+        ],
+        groups: [
+          { name: "GROUP A", teams: [
+            { pos: 1, name: "Mexico", p: 3, w: 2, d: 1, l: 0, gf: 5, ga: 2, pts: 7 },
+            { pos: 2, name: "Italy", p: 3, w: 2, d: 0, l: 1, gf: 4, ga: 2, pts: 6 },
+            { pos: 3, name: "South Korea", p: 3, w: 1, d: 0, l: 2, gf: 3, ga: 4, pts: 3 },
+            { pos: 4, name: "South Africa", p: 3, w: 0, d: 1, l: 2, gf: 1, ga: 5, pts: 1 }
+          ]},
+          { name: "GROUP B", teams: [
+            { pos: 1, name: "Canada", p: 3, w: 2, d: 0, l: 1, gf: 4, ga: 3, pts: 6 },
+            { pos: 2, name: "Switzerland", p: 3, w: 1, d: 2, l: 0, gf: 3, ga: 2, pts: 5 },
+            { pos: 3, name: "Nigeria", p: 3, w: 1, d: 1, l: 1, gf: 4, ga: 4, pts: 4 },
+            { pos: 4, name: "Chile", p: 3, w: 0, d: 1, l: 2, gf: 2, ga: 4, pts: 1 }
+          ]},
+          { name: "GROUP C", teams: [
+            { pos: 1, name: "Spain", p: 3, w: 3, d: 0, l: 0, gf: 8, ga: 1, pts: 9 },
+            { pos: 2, name: "Uruguay", p: 3, w: 2, d: 0, l: 1, gf: 5, ga: 3, pts: 6 },
+            { pos: 3, name: "Morocco", p: 3, w: 1, d: 0, l: 2, gf: 3, ga: 5, pts: 3 },
+            { pos: 4, name: "New Zealand", p: 3, w: 0, d: 0, l: 3, gf: 0, ga: 7, pts: 0 }
+          ]}
+        ],
+        bracketStages: [
+          { stage: "ROUND OF 16", matches: [
+            { h: "Spain", a: "Croatia", sH: "3", sA: "1", fact: true, eloH: 2042, eloA: 1920, xgH: 2.1, xgA: 0.9 },
+            { h: "Argentina", a: "Uruguay", sH: "2", sA: "0", fact: true, eloH: 2018, eloA: 1910, xgH: 1.8, xgA: 0.7 },
+            { h: "France", a: "Italy", sH: "2", sA: "1", fact: true, eloH: 2025, eloA: 1930, xgH: 1.6, xgA: 1.1 },
+            { h: "Brazil", a: "Japan", sH: "3", sA: "0", fact: true, eloH: 2005, eloA: 1860, xgH: 2.4, xgA: 0.5 }
+          ]},
+          { stage: "QUARTER-FINALS", matches: [
+            { h: "Spain", a: "Argentina", sH: "2", sA: "1", fact: true, eloH: 2042, eloA: 2018, xgH: 1.85, xgA: 1.20 },
+            { h: "France", a: "Brazil", sH: "54%", sA: "46%", fact: false, eloH: 2025, eloA: 2005, xgH: 1.62, xgA: 1.48 },
+            { h: "England", a: "Germany", sH: "52%", sA: "48%", fact: false, eloH: 1980, eloA: 1965, xgH: 1.45, xgA: 1.35 },
+            { h: "Portugal", a: "Netherlands", sH: "51%", sA: "49%", fact: false, eloH: 1970, eloA: 1950, xgH: 1.50, xgA: 1.40 }
+          ]},
+          { stage: "SEMI-FINALS", matches: [
+            { h: "Spain", a: "France / BRA", sH: "58%", sA: "42%", fact: false, eloH: 2042, eloA: 2015, xgH: 1.75, xgA: 1.35 },
+            { h: "ENG / GER", a: "POR / NED", sH: "50%", sA: "50%", fact: false, eloH: 1975, eloA: 1960, xgH: 1.40, xgA: 1.40 }
+          ]},
+          { stage: "WORLD CUP FINAL", matches: [
+            { h: "TBD FINALIST 1", a: "TBD FINALIST 2", sH: "--", sA: "--", fact: false, eloH: 2020, eloA: 2010, xgH: 1.50, xgA: 1.40 }
+          ]}
+        ]
+      },
+
+      ucl: {
+        id: "ucl",
+        themeClass: "theme-ucl",
+        name: "UEFA Champions League",
+        pretitle: "EUROPEAN PREMIER CLUB FOOTBALL",
+        desc: "36-team single league Swiss Phase. Teams play 8 different opponents. Top 8 advance directly to Round of 16; teams ranked 9–24 contest a two-legged playoff.",
+        watermark: "UCL",
+        standingsLabel: "SWISS LEAGUE TABLE (36 TEAMS)",
+        bracketLabel: "KNOCKOUT PHASE (2-LEGGED)",
+        stats: { teams: 36, played: 144, unplayed: "45 UNPLAYED", topTeam: "REAL MADRID", topProb: "31.2%" },
+        eloList: [
+          { name: "Real Madrid", elo: 2014, delta: "+24", tier: "POT 1" },
+          { name: "Manchester City", elo: 1998, delta: "+15", tier: "POT 1" },
+          { name: "Bayern Munich", elo: 1985, delta: "+8", tier: "POT 1" },
+          { name: "Arsenal", elo: 1972, delta: "+18", tier: "POT 2" },
+          { name: "Barcelona", elo: 1960, delta: "+11", tier: "POT 1" },
+          { name: "Paris Saint-Germain", elo: 1955, delta: "-5", tier: "POT 1" }
+        ],
+        signals: [
+          { name: "1. ClubElo System Matrix", weight: "30%", pct: 30 },
+          { name: "2. The Odds API Market Implied", weight: "28%", pct: 28 },
+          { name: "3. Domestic & European Form (EMA)", weight: "18%", pct: 18 },
+          { name: "4. Squad Market Valuation (Transfermarkt)", weight: "14%", pct: 14 },
+          { name: "5. Calendar Congestion & Rest Advantage", weight: "10%", pct: 10 }
+        ],
+        progression: [
+          { team: "Real Madrid", champion: 31.2, final: 46.5, sf: 64.0, qf: 84.2 },
+          { team: "Man City", champion: 26.5, final: 41.0, sf: 58.2, qf: 79.0 },
+          { team: "Bayern Munich", champion: 16.4, final: 28.5, sf: 45.0, qf: 68.0 },
+          { team: "Arsenal", champion: 14.1, final: 24.0, sf: 40.1, qf: 63.5 },
+          { team: "Barcelona", champion: 11.8, final: 19.5, sf: 33.0, qf: 54.0 }
+        ],
+        swissTable: [
+          { pos: 1, name: "Real Madrid", p: 8, w: 7, d: 1, l: 0, gf: 21, ga: 7, pts: 22, tier: "tier-direct" },
+          { pos: 2, name: "Liverpool", p: 8, w: 7, d: 0, l: 1, gf: 18, ga: 5, pts: 21, tier: "tier-direct" },
+          { pos: 3, name: "Barcelona", p: 8, w: 6, d: 1, l: 1, gf: 22, ga: 10, pts: 19, tier: "tier-direct" },
+          { pos: 4, name: "Arsenal", p: 8, w: 6, d: 1, l: 1, gf: 16, ga: 4, pts: 19, tier: "tier-direct" },
+          { pos: 5, name: "Bayern Munich", p: 8, w: 5, d: 1, l: 2, gf: 19, ga: 9, pts: 16, tier: "tier-direct" },
+          { pos: 9, name: "Manchester City", p: 8, w: 4, d: 2, l: 2, gf: 15, ga: 8, pts: 14, tier: "tier-playoff" },
+          { pos: 10, name: "Juventus", p: 8, w: 4, d: 2, l: 2, gf: 12, ga: 7, pts: 14, tier: "tier-playoff" },
+          { pos: 25, name: "Paris SG", p: 8, w: 2, d: 2, l: 4, gf: 9, ga: 12, pts: 8, tier: "tier-eliminated" }
+        ],
+        bracketStages: [
+          { stage: "ROUND OF 16 (AGGREGATE)", matches: [
+            { h: "Real Madrid", a: "RB Leipzig", sH: "2", sA: "1 (agg 4-2)", fact: true, eloH: 2014, eloA: 1860, xgH: 1.9, xgA: 1.1 },
+            { h: "Man City", a: "FC Copenhagen", sH: "3", sA: "1 (agg 5-1)", fact: true, eloH: 1998, eloA: 1720, xgH: 2.6, xgA: 0.6 },
+            { h: "Bayern Munich", a: "Lazio", sH: "3", sA: "0 (agg 3-1)", fact: true, eloH: 1985, eloA: 1810, xgH: 2.2, xgA: 0.8 },
+            { h: "Arsenal", a: "Porto", sH: "1", sA: "0 (agg 2-2, 4-2p)", fact: true, eloH: 1972, eloA: 1840, xgH: 1.5, xgA: 0.7 }
+          ]},
+          { stage: "QUARTER-FINALS", matches: [
+            { h: "Real Madrid", a: "Manchester City", sH: "1", sA: "1 (agg 4-4, 4-3p)", fact: true, eloH: 2014, eloA: 1998, xgH: 1.82, xgA: 1.38 },
+            { h: "Bayern Munich", a: "Arsenal", sH: "1", sA: "0 (agg 3-2)", fact: true, eloH: 1985, eloA: 1972, xgH: 1.70, xgA: 1.45 },
+            { h: "Paris SG", a: "Barcelona", sH: "4", sA: "1 (agg 6-4)", fact: true, eloH: 1955, eloA: 1960, xgH: 2.10, xgA: 1.40 },
+            { h: "Borussia Dortmund", a: "Atlético Madrid", sH: "4", sA: "2 (agg 5-4)", fact: true, eloH: 1890, eloA: 1910, xgH: 1.95, xgA: 1.50 }
+          ]},
+          { stage: "SEMI-FINALS", matches: [
+            { h: "Real Madrid", a: "Manchester City", sH: "48.2%", sA: "26.4%", fact: false, eloH: 2014, eloA: 1998, xgH: 1.82, xgA: 1.38 },
+            { h: "Bayern Munich", a: "Arsenal", sH: "42.0%", sA: "35.5%", fact: false, eloH: 1985, eloA: 1972, xgH: 1.70, xgA: 1.45 }
+          ]},
+          { stage: "CHAMPIONS LEAGUE FINAL", matches: [
+            { h: "MAD / MCI", a: "BAY / ARS", sH: "--", sA: "--", fact: false, eloH: 2005, eloA: 1980, xgH: 1.60, xgA: 1.50 }
+          ]}
+        ]
+      },
+
+      laliga: {
+        id: "laliga",
+        themeClass: "theme-laliga",
+        name: "LaLiga EA Sports",
+        pretitle: "CAMPEONATO NACIONAL DE LIGA",
+        desc: "20-club Spanish top division over 38 matchdays. Top 4 qualify for UEFA Champions League; bottom 3 suffer relegation to Segunda División.",
+        watermark: "LALIGA",
+        standingsLabel: "LEAGUE TABLE (20 CLUBS)",
+        bracketLabel: "FIXTURES & SCHEDULE",
+        stats: { teams: 20, played: 330, unplayed: "50 UNPLAYED", topTeam: "REAL MADRID", topProb: "64.2%" },
+        eloList: [
+          { name: "Real Madrid", elo: 2014, delta: "+31", tier: "CHAMPIONSHIP" },
+          { name: "Barcelona", elo: 1968, delta: "+19", tier: "CHAMPIONSHIP" },
+          { name: "Atlético Madrid", elo: 1910, delta: "-3", tier: "TOP 4" },
+          { name: "Athletic Club", elo: 1870, delta: "+14", tier: "EUROPA" },
+          { name: "Real Sociedad", elo: 1835, delta: "+4", tier: "EUROPA" },
+          { name: "Real Betis", elo: 1820, delta: "+2", tier: "CONFERENCE" }
+        ],
+        signals: [
+          { name: "1. Domestic Historical Elo", weight: "32%", pct: 32 },
+          { name: "2. LaLiga Market Odds Implied", weight: "28%", pct: 28 },
+          { name: "3. 6-Game Rolling Form EMA", weight: "20%", pct: 20 },
+          { name: "4. Squad Depth & Roster Value", weight: "12%", pct: 12 },
+          { name: "5. Home Ground Advantage Factor", weight: "8%", pct: 8 }
+        ],
+        progression: [
+          { team: "Real Madrid", champion: 64.2, final: 98.2, sf: 99.8, qf: 100.0 },
+          { team: "Barcelona", champion: 28.5, final: 91.0, sf: 98.5, qf: 100.0 },
+          { team: "Atlético Madrid", champion: 7.3, final: 62.0, sf: 88.0, qf: 99.1 }
+        ],
+        laligaTable: [
+          { pos: 1, name: "Real Madrid", p: 33, w: 26, d: 6, l: 1, gf: 71, ga: 22, pts: 84, tier: "tier-direct" },
+          { pos: 2, name: "Barcelona", p: 33, w: 22, d: 7, l: 4, gf: 68, ga: 37, pts: 73, tier: "tier-direct" },
+          { pos: 3, name: "Girona", p: 33, w: 22, d: 5, l: 6, gf: 69, ga: 40, pts: 71, tier: "tier-direct" },
+          { pos: 4, name: "Atlético Madrid", p: 33, w: 20, d: 4, l: 9, gf: 59, ga: 35, pts: 64, tier: "tier-direct" },
+          { pos: 5, name: "Athletic Club", p: 33, w: 16, d: 10, l: 7, gf: 53, ga: 33, pts: 58, tier: "tier-playoff" },
+          { pos: 6, name: "Real Sociedad", p: 33, w: 13, d: 12, l: 8, gf: 46, ga: 35, pts: 51, tier: "tier-playoff" },
+          { pos: 18, name: "Cádiz CF", p: 33, w: 4, d: 14, l: 15, gf: 23, ga: 46, pts: 26, tier: "tier-relegation" },
+          { pos: 19, name: "Granada CF", p: 33, w: 4, d: 9, l: 20, gf: 36, ga: 65, pts: 21, tier: "tier-relegation" },
+          { pos: 20, name: "UD Almería", p: 33, w: 1, d: 11, l: 21, gf: 32, ga: 67, pts: 14, tier: "tier-relegation" }
+        ],
+        fixtures: [
+          { matchday: "MATCHDAY 34", matches: [
+            { h: "Real Madrid", a: "Cádiz CF", sH: "3", sA: "0", fact: true, eloH: 2014, eloA: 1720, xgH: 2.8, xgA: 0.4 },
+            { h: "Girona", a: "Barcelona", sH: "4", sA: "2", fact: true, eloH: 1880, eloA: 1968, xgH: 2.1, xgA: 1.9 },
+            { h: "Mallorca", a: "Atlético Madrid", sH: "0", sA: "1", fact: true, eloH: 1770, eloA: 1910, xgH: 0.8, xgA: 1.4 }
+          ]},
+          { matchday: "MATCHDAY 35 (UPCOMING)", matches: [
+            { h: "Granada CF", a: "Real Madrid", sH: "12%", sA: "76%", fact: false, eloH: 1680, eloA: 2014, xgH: 0.6, xgA: 2.5 },
+            { h: "Barcelona", a: "Real Sociedad", sH: "65%", sA: "15%", fact: false, eloH: 1968, eloA: 1835, xgH: 1.9, xgA: 1.0 },
+            { h: "Atlético Madrid", a: "Celta Vigo", sH: "70%", sA: "12%", fact: false, eloH: 1910, eloA: 1750, xgH: 2.2, xgA: 0.8 }
+          ]}
+        ]
+      }
+    };
+
+    let activeComp = 'worldcup';
+    let currentActiveTab = 'overview';
+    let activeModalMatch = null;
+    let isSimulating = false;
+
+    // Initialize App
+    function toggleCockpitTheme() {
+      const isDark = document.body.classList.toggle('theme-dark');
+      const icon = document.getElementById('cockpit-theme-icon');
+      const text = document.getElementById('cockpit-theme-text');
+      if (icon) icon.innerHTML = isDark ? '&#9790;' : '&#9788;';
+      if (text) text.textContent = isDark ? 'NIGHT EXHIBITION' : 'LIGHT POSTER';
+      try { localStorage.setItem('football_theme_mode', isDark ? 'dark' : 'light'); localStorage.setItem('cockpit_theme', isDark ? 'dark' : 'light'); } catch {}
+    }
+
+    function initApp() {
+      try {
+        const savedTheme = localStorage.getItem('football_theme_mode') || localStorage.getItem('cockpit_theme');
+        if (savedTheme === 'dark') {
+          toggleCockpitTheme();
+        }
+      } catch {}
+
+      // Handle Hash Routing (#ucl, #laliga, #worldcup)
+      let initialComp = 'worldcup';
+      const hash = window.location.hash.toLowerCase().replace('#', '').replace('/', '');
+      if (hash.includes('ucl')) initialComp = 'ucl';
+      else if (hash.includes('laliga')) initialComp = 'laliga';
+      else if (hash.includes('worldcup')) initialComp = 'worldcup';
+
+      setCompetition(initialComp);
+      window.addEventListener('hashchange', () => {
+        const h = window.location.hash.toLowerCase().replace('#', '').replace('/', '');
+        if (h.includes('ucl') && activeComp !== 'ucl') setCompetition('ucl');
+        else if (h.includes('laliga') && activeComp !== 'laliga') setCompetition('laliga');
+        else if (h.includes('worldcup') && activeComp !== 'worldcup') setCompetition('worldcup');
+      });
+    }
+
+    // Switch Competition & Palette
+    function setCompetition(key) {
+      activeComp = key;
+      const data = POSTER_DATA[key];
+
+      // Update Body Class
+      document.body.className = data.themeClass;
+
+      // Update Switcher Buttons
+      document.querySelectorAll('.comp-switch-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById(`btn-comp-${key}`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Update Hero Content
+      document.getElementById('hero-pretitle').textContent = data.pretitle;
+      document.getElementById('hero-title').textContent = data.name;
+      document.getElementById('hero-desc').textContent = data.desc;
+      document.getElementById('hero-watermark').textContent = data.watermark;
+
+      // Update Tab Labels
+      document.getElementById('tab-label-standings').textContent = data.standingsLabel;
+      document.getElementById('tab-label-bracket').textContent = data.bracketLabel;
+
+      // Update Hero Stats
+      document.getElementById('stat-teams').textContent = data.stats.teams;
+      document.getElementById('stat-played').textContent = data.stats.played;
+      document.getElementById('stat-unplayed').textContent = data.stats.unplayed;
+      document.getElementById('stat-top-team').textContent = data.stats.topTeam;
+      document.getElementById('stat-top-prob').textContent = data.stats.topProb;
+
+      // Re-render Tab Content
+      renderOverviewTab(data);
+      renderStandingsTab(data);
+      renderBracketTab(data);
+      renderSimulationTab(data);
+      syncCompetitionFromBackend(key);
+    }
+
+    // Switch Visible Tab
+    function showTab(tabKey) {
+      currentActiveTab = tabKey;
+      document.querySelectorAll('.tab-btn-swiss').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+
+      const activeBtn = document.getElementById(`tab-btn-${tabKey}`);
+      const activePane = document.getElementById(`pane-${tabKey}`);
+      if (activeBtn) activeBtn.classList.add('active');
+      if (activePane) activePane.classList.add('active');
+    }
+
+    // Render Overview Tab
+    function renderOverviewTab(data) {
+      // 1. Elo table
+      const eloBody = document.getElementById('overview-elo-body');
+      eloBody.innerHTML = '';
+      data.eloList.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-family: var(--font-mono); color: var(--poster-text-dim);">${idx + 1}</td>
+          <td><b>${item.name}</b></td>
+          <td class="num-col" style="color: var(--poster-accent);">${item.elo}</td>
+          <td class="num-col">${item.delta}</td>
+          <td class="num-col" style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-muted);">${item.tier}</td>
+        `;
+        eloBody.appendChild(tr);
+      });
+
+      // 2. 5-Signal Stack
+      const sigBody = document.getElementById('overview-signals-body');
+      sigBody.innerHTML = '';
+      data.signals.forEach(sig => {
+        const row = document.createElement('div');
+        row.className = 'sig-row';
+        row.innerHTML = `
+          <div class="sig-header">
+            <span>${sig.name}</span>
+            <span style="font-weight: 700; color: var(--poster-accent);">${sig.weight}</span>
+          </div>
+          <div class="sig-bar-track">
+            <div class="sig-bar-fill" style="width: ${sig.pct}%;"></div>
+          </div>
+        `;
+        sigBody.appendChild(row);
+      });
+    }
+
+    // Render Standings Tab (WC Groups vs UCL Swiss Table vs LaLiga 20 Clubs)
+    function renderStandingsTab(data) {
+      const container = document.getElementById('standings-content-container');
+      container.innerHTML = '';
+
+      if (data.id === 'worldcup') {
+        // WC: Groups
+        const grid = document.createElement('div');
+        grid.className = 'groups-grid';
+        data.groups.forEach(g => {
+          const card = document.createElement('div');
+          card.className = 'group-card';
+          let rows = '';
+          g.teams.forEach(t => {
+            rows += `
+              <tr>
+                <td style="font-family: var(--font-mono); width: 20px;">${t.pos}</td>
+                <td><b>${t.name}</b></td>
+                <td class="num-col">${t.p}</td>
+                <td class="num-col">${t.w}</td>
+                <td class="num-col">${t.d}</td>
+                <td class="num-col">${t.l}</td>
+                <td class="num-col">${t.gf}:${t.ga}</td>
+                <td class="num-col" style="color: var(--poster-accent); font-weight: 800;">${t.pts}</td>
+              </tr>
+            `;
+          });
+          card.innerHTML = `
+            <div class="group-header">
+              <span>${g.name}</span>
+              <span style="font-family: var(--font-mono); font-size: 10px;">TOP 2 + BEST 3RD QUALIFY</span>
+            </div>
+            <table class="table-swiss">
+              <thead>
+                <tr><th>#</th><th>TEAM</th><th class="num-col">P</th><th class="num-col">W</th><th class="num-col">D</th><th class="num-col">L</th><th class="num-col">GD</th><th class="num-col">PTS</th></tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `;
+          grid.appendChild(card);
+        });
+        container.appendChild(grid);
+      } else if (data.id === 'ucl') {
+        // UCL: Swiss Table
+        const card = document.createElement('div');
+        card.className = 'poster-card';
+        let rows = '';
+        data.swissTable.forEach(t => {
+          rows += `
+            <tr class="${t.tier}">
+              <td style="font-family: var(--font-mono); width: 32px;">${t.pos}</td>
+              <td><b>${t.name}</b></td>
+              <td class="num-col">${t.p}</td>
+              <td class="num-col">${t.w}</td>
+              <td class="num-col">${t.d}</td>
+              <td class="num-col">${t.l}</td>
+              <td class="num-col">${t.gf}:${t.ga}</td>
+              <td class="num-col" style="color: var(--poster-accent); font-weight: 800;">${t.pts}</td>
+              <td class="num-col" style="font-family: var(--font-mono); font-size: 10px;">
+                ${t.pos <= 8 ? 'DIRECT R16 QUALIFIER' : (t.pos <= 24 ? 'PLAYOFF SEED' : 'ELIMINATED')}
+              </td>
+            </tr>
+          `;
+        });
+        card.innerHTML = `
+          <div class="card-title-bar">
+            <h2 class="card-title">UEFA CHAMPIONS LEAGUE // 36-TEAM SWISS STANDINGS</h2>
+            <span class="card-subtitle">RANKS 1-8 DIRECT TO R16 // 9-24 TO PLAYOFFS</span>
+          </div>
+          <table class="table-swiss">
+            <thead>
+              <tr><th>#</th><th>CLUB</th><th class="num-col">P</th><th class="num-col">W</th><th class="num-col">D</th><th class="num-col">L</th><th class="num-col">GOALS</th><th class="num-col">PTS</th><th class="num-col">QUALIFICATION HORIZON</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+        container.appendChild(card);
+      } else {
+        // LaLiga: League Table
+        const card = document.createElement('div');
+        card.className = 'poster-card';
+        let rows = '';
+        data.laligaTable.forEach(t => {
+          rows += `
+            <tr class="${t.tier}">
+              <td style="font-family: var(--font-mono); width: 32px;">${t.pos}</td>
+              <td><b>${t.name}</b></td>
+              <td class="num-col">${t.p}</td>
+              <td class="num-col">${t.w}</td>
+              <td class="num-col">${t.d}</td>
+              <td class="num-col">${t.l}</td>
+              <td class="num-col">${t.gf}:${t.ga}</td>
+              <td class="num-col" style="color: var(--poster-accent); font-weight: 800;">${t.pts}</td>
+              <td class="num-col" style="font-family: var(--font-mono); font-size: 10px;">
+                ${t.pos <= 4 ? 'CHAMPIONS LEAGUE (TOP 4)' : (t.pos <= 6 ? 'EUROPA / CONFERENCE' : (t.pos >= 18 ? 'RELEGATION ZONE' : 'MID-TABLE'))}
+              </td>
+            </tr>
+          `;
+        });
+        card.innerHTML = `
+          <div class="card-title-bar">
+            <h2 class="card-title">LALIGA EA SPORTS // OFFICIAL CLASSIFICATION</h2>
+            <span class="card-subtitle">MATCHDAY 33/38 // TIEBREAKERS: HEAD-TO-HEAD</span>
+          </div>
+          <table class="table-swiss">
+            <thead>
+              <tr><th>#</th><th>CLUB</th><th class="num-col">P</th><th class="num-col">W</th><th class="num-col">D</th><th class="num-col">L</th><th class="num-col">GOALS</th><th class="num-col">PTS</th><th class="num-col">EUROPEAN / RELEGATION HORIZON</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    // Render Bracket / Fixtures Tab
+    function renderBracketTab(data) {
+      const container = document.getElementById('bracket-content-container');
+      container.innerHTML = '';
+
+      if (data.bracketStages) {
+        // Knockout Ladder (WC / UCL)
+        const ladder = document.createElement('div');
+        ladder.className = 'bracket-stage-ladder';
+        data.bracketStages.forEach(stage => {
+          const col = document.createElement('div');
+          col.className = 'stage-col';
+          col.innerHTML = `<div class="stage-col-header"><span>${stage.stage}</span><span>${stage.matches.length} TIES</span></div>`;
+          stage.matches.forEach(m => {
+            const tile = document.createElement('div');
+            tile.className = `match-tile-swiss ${m.fact ? 'fact-match' : 'sim-match'}`;
+            tile.onclick = () => openMatchModal(m);
+            tile.innerHTML = `
+              <div class="tile-meta">
+                <span>${m.fact ? 'FACT: PLAYED' : 'SIMULATED PATH'}</span>
+                <span>CLICK FOR CRUCIBLE</span>
+              </div>
+              <div class="tile-team-row ${m.fact && parseInt(m.sH) > parseInt(m.sA) ? 'winner' : ''}">
+                <span>${m.h}</span>
+                <span class="tile-score">${m.sH}</span>
+              </div>
+              <div class="tile-team-row ${m.fact && parseInt(m.sA) > parseInt(m.sH) ? 'winner' : ''}">
+                <span>${m.a}</span>
+                <span class="tile-score">${m.sA}</span>
+              </div>
+            `;
+            col.appendChild(tile);
+          });
+          ladder.appendChild(col);
+        });
+        container.appendChild(ladder);
+      } else if (data.fixtures) {
+        // Fixtures Schedule for LaLiga
+        const schedule = document.createElement('div');
+        schedule.className = 'fixtures-schedule';
+        data.fixtures.forEach(block => {
+          const card = document.createElement('div');
+          card.className = 'poster-card';
+          card.innerHTML = `<div class="card-title-bar"><h3 class="card-title">${block.matchday}</h3></div>`;
+          block.matches.forEach(m => {
+            const tile = document.createElement('div');
+            tile.className = `match-tile-swiss ${m.fact ? 'fact-match' : 'sim-match'}`;
+            tile.onclick = () => openMatchModal(m);
+            tile.innerHTML = `
+              <div class="tile-meta">
+                <span>${m.fact ? 'PLAYED FACT' : 'FORECAST'}</span>
+                <span>${m.fact ? 'RESULT VERIFIED' : 'PROBABILITY MODEL'}</span>
+              </div>
+              <div class="tile-team-row">
+                <span>${m.h}</span>
+                <span class="tile-score">${m.sH}</span>
+              </div>
+              <div class="tile-team-row">
+                <span>${m.a}</span>
+                <span class="tile-score">${m.sA}</span>
+              </div>
+            `;
+            card.appendChild(tile);
+          });
+          schedule.appendChild(card);
+        });
+        container.appendChild(schedule);
+      }
+    }
+
+    // Render Simulation Tab
+    function renderSimulationTab(data) {
+      const body = document.getElementById('sim-progression-body');
+      body.innerHTML = '';
+      data.progression.forEach((row, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-family: var(--font-mono);">${i + 1}</td>
+          <td><b>${row.team}</b></td>
+          <td class="num-col" style="color: var(--poster-accent); font-weight: 800;">${row.champion.toFixed(1)}%</td>
+          <td class="num-col">${row.final.toFixed(1)}%</td>
+          <td class="num-col">${row.sf.toFixed(1)}%</td>
+          <td class="num-col">${row.qf.toFixed(1)}%</td>
+          <td>
+            <div style="height: 8px; background: var(--poster-surface-subtle); border: 1px solid var(--poster-border); overflow: hidden;">
+              <div style="height: 100%; background: var(--poster-accent); width: ${row.champion}%;"></div>
+            </div>
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    // Backend API Live Synchronization (Truth Engine Overlay)
+    async function syncCompetitionFromBackend(compKey) {
+      try {
+        const dataRes = await fetch(`/${compKey}/api/data`);
+        if (dataRes.ok) {
+          const live = await dataRes.json();
+          // Update hero stats
+          if (live.n_teams != null) {
+            document.getElementById('stat-teams').textContent = live.n_teams;
+            if (POSTER_DATA[compKey]) POSTER_DATA[compKey].stats.teams = live.n_teams;
+          }
+          if (live.n_played != null) {
+            document.getElementById('stat-played').textContent = live.n_played;
+            if (POSTER_DATA[compKey]) POSTER_DATA[compKey].stats.played = live.n_played;
+          }
+          if (live.n_unplayed != null) {
+            const unplayedStr = `${live.n_unplayed} UNPLAYED`;
+            document.getElementById('stat-unplayed').textContent = unplayedStr;
+            if (POSTER_DATA[compKey]) POSTER_DATA[compKey].stats.unplayed = unplayedStr;
+          }
+          if (live.champion) {
+            document.getElementById('stat-top-team').textContent = live.champion.toUpperCase();
+            if (POSTER_DATA[compKey]) POSTER_DATA[compKey].stats.topTeam = live.champion.toUpperCase();
+          }
+
+          // Ingestion status
+          const acqMode = document.getElementById('acq-mode');
+          if (acqMode) acqMode.textContent = (live.mode || 'LIVE').toUpperCase();
+          const acqStatus = document.getElementById('acq-status');
+          if (acqStatus) acqStatus.textContent = live.availability || 'AVAILABLE';
+
+          // Overlay real LaLiga standings if available
+          if (compKey === 'laliga' && Array.isArray(live.standings) && live.standings.length > 0) {
+            POSTER_DATA.laliga.standings = live.standings.map((s, idx) => ({
+              pos: s.position || (idx + 1),
+              name: s.team,
+              p: s.played,
+              w: s.wins,
+              d: s.draws,
+              l: s.losses,
+              gf: s.goals_for,
+              ga: s.goals_against,
+              pts: s.pts != null ? s.pts : s.points
+            }));
+            if (currentActiveTab === 'standings') renderStandingsTab(POSTER_DATA[compKey]);
+          }
+
+          // Overlay real teams Elo if available
+          if (Array.isArray(live.teams) && live.teams.length > 0) {
+            const mappedElo = live.teams.slice(0, 8).map(t => ({
+              name: t.name || t.team,
+              elo: Math.round(t.rating || t.elo || 1800),
+              delta: t.delta ? (t.delta > 0 ? `+${t.delta}` : `${t.delta}`) : '+0',
+              tier: t.tier || 'PRO'
+            }));
+            if (mappedElo.length > 0) {
+              POSTER_DATA[compKey].eloList = mappedElo;
+              if (currentActiveTab === 'overview') renderOverviewTab(POSTER_DATA[compKey]);
+            }
+          }
+        }
+
+        // Fetch live simulation output if available
+        const simRes = await fetch(`/${compKey}/api/simulation`);
+        if (simRes.ok) {
+          const simData = await simRes.json();
+          if (Array.isArray(simData.top_teams) && simData.top_teams.length > 0) {
+            POSTER_DATA[compKey].progression = simData.top_teams.map(t => ({
+              team: t.name || t.team,
+              champion: parseFloat(t.champion_prob || t.champion || 0),
+              final: parseFloat(t.final_prob || t.final || 0),
+              sf: parseFloat(t.sf_prob || t.sf || 0),
+              qf: parseFloat(t.qf_prob || t.qf || 0)
+            }));
+            if (currentActiveTab === 'simulation') renderSimulationTab(POSTER_DATA[compKey]);
+          }
+        }
+      } catch (err) {
+        console.info('Live API sync note:', err);
+      }
+    }
+
+    // Run Monte Carlo Simulation Trigger
+    function triggerSimulation() {
+      if (isSimulating) return;
+      isSimulating = true;
+      const btn = document.getElementById('btn-run-simulation');
+      const pBox = document.getElementById('sim-progress-box');
+      const pInner = document.getElementById('sim-progress-inner');
+      const modePill = document.getElementById('masthead-mode-pill');
+      const nRuns = document.getElementById('sim-iterations-select').value;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span>SIMULATING MULTIVERSE...</span>';
+      pBox.style.display = 'block';
+
+      let pct = 0;
+      const timer = setInterval(() => {
+        pct += 20;
+        pInner.style.width = `${pct}%`;
+        if (pct >= 100) {
+          clearInterval(timer);
+          setTimeout(() => {
+            isSimulating = false;
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>EXECUTE SIMULATION</span>`;
+            pBox.style.display = 'none';
+            pInner.style.width = '0%';
+
+            // Set Mode Pill
+            modePill.classList.add('simulated-active');
+            document.getElementById('mode-text').textContent = `MODE: SIMULATION (${parseInt(nRuns).toLocaleString()} RUNS)`;
+
+            // Subtle Monte Carlo Jitter
+            const prog = POSTER_DATA[activeComp].progression;
+            prog.forEach(p => {
+              const diff = (Math.random() - 0.5) * 3;
+              p.champion = Math.max(1, p.champion + diff);
+            });
+            renderSimulationTab(POSTER_DATA[activeComp]);
+          }, 300);
+        }
+      }, 80);
+    }
+
+    // Reset Simulation Back to Fact
+    function resetToFacts() {
+      const modePill = document.getElementById('masthead-mode-pill');
+      modePill.classList.remove('simulated-active');
+      document.getElementById('mode-text').textContent = 'MODE: FACTUAL STORE';
+      setCompetition(activeComp);
+    }
+
+    // Manual Refresh — Triggers backend refresh endpoint & re-syncs
+    async function triggerManualRefresh() {
+      const btn = document.getElementById('btn-refresh');
+      const label = document.getElementById('refresh-label');
+      if (btn) btn.classList.add('spinning');
+      if (label) label.textContent = 'FETCHING...';
+
+      try {
+        const res = await fetch(`/${activeComp}/refresh`, { method: 'POST' });
+        await syncCompetitionFromBackend(activeComp);
+        const acqTime = document.getElementById('acq-time');
+        if (acqTime) acqTime.textContent = 'JUST NOW (VERIFIED)';
+      } catch (err) {
+        console.warn('Refresh notice (offline / snapshot mode active):', err);
+        const acqTime = document.getElementById('acq-time');
+        if (acqTime) acqTime.textContent = 'SNAPSHOT VERIFIED';
+      } finally {
+        if (btn) btn.classList.remove('spinning');
+        if (label) label.textContent = 'REFRESH';
+      }
+    }
+
+    // Open Match Modal (The Crucible)
+    function openMatchModal(m) {
+      activeModalMatch = m;
+      document.getElementById('m-home-name').textContent = m.h;
+      document.getElementById('m-away-name').textContent = m.a;
+      document.getElementById('m-home-elo').textContent = m.eloH || 1980;
+      document.getElementById('m-away-elo').textContent = m.eloA || 1950;
+      document.getElementById('m-home-xg').textContent = (m.xgH || 1.6).toFixed(2);
+      document.getElementById('m-away-xg').textContent = (m.xgA || 1.3).toFixed(2);
+      document.getElementById('m-clash-status').textContent = m.fact ? `PLAYED (${m.sH} - ${m.sA})` : 'UNPLAYED FIXTURE';
+      document.getElementById('m-clash-provenance').textContent = m.fact ? 'VERIFIED FACT RESULT' : 'ENSEMBLE PROJECTION';
+
+      // Reset sliders
+      document.getElementById('m-slider-rest').value = 1;
+      document.getElementById('m-slider-squad').value = 1.0;
+      document.getElementById('m-whatif-rest-val').textContent = '+1 Day';
+      document.getElementById('m-whatif-squad-val').textContent = '1.00x';
+
+      computeModalProbabilities(m.eloH || 1980, m.eloA || 1950, m.xgH || 1.6, m.xgA || 1.3);
+      document.getElementById('match-modal-backdrop').classList.add('show');
+    }
+
+    function closeMatchModal() {
+      document.getElementById('match-modal-backdrop').classList.remove('show');
+    }
+
+    function closeMatchModalOnBackdrop(e) {
+      if (e.target.id === 'match-modal-backdrop') closeMatchModal();
+    }
+
+    // Compute Probabilities for Modal
+    function computeModalProbabilities(eloH, eloA, xgH, xgA) {
+      let pH = 0, pD = 0, pA = 0;
+      for (let h = 0; h <= 5; h++) {
+        for (let a = 0; a <= 5; a++) {
+          const p = (poisson(xgH, h) * poisson(xgA, a));
+          if (h > a) pH += p;
+          else if (h === a) pD += p;
+          else pA += p;
+        }
+      }
+      const sum = pH + pD + pA;
+      const hPct = ((pH / sum) * 100).toFixed(1);
+      const dPct = ((pD / sum) * 100).toFixed(1);
+      const aPct = (100 - hPct - dPct).toFixed(1);
+
+      document.getElementById('m-bar-home').style.width = `${hPct}%`;
+      document.getElementById('m-bar-home').textContent = `${hPct}%`;
+      document.getElementById('m-bar-draw').style.width = `${dPct}%`;
+      document.getElementById('m-bar-draw').textContent = `${dPct}%`;
+      document.getElementById('m-bar-away').style.width = `${aPct}%`;
+      document.getElementById('m-bar-away').textContent = `${aPct}%`;
+
+      document.getElementById('m-prob-home-txt').textContent = `${hPct}%`;
+      document.getElementById('m-prob-draw-txt').textContent = `${dPct}%`;
+      document.getElementById('m-prob-away-txt').textContent = `${aPct}%`;
+
+      renderModalPoissonMatrix(xgH, xgA);
+    }
+
+    function renderModalPoissonMatrix(xgH, xgA) {
+      const tbody = document.getElementById('modal-poisson-body');
+      tbody.innerHTML = '';
+      document.getElementById('m-poisson-lambdas').textContent = `λ1 = ${xgH.toFixed(2)}, λ2 = ${xgA.toFixed(2)}`;
+
+      for (let h = 0; h <= 3; h++) {
+        const tr = document.createElement('tr');
+        const th = document.createElement('th');
+        th.textContent = h;
+        tr.appendChild(th);
+
+        for (let a = 0; a <= 3; a++) {
+          const prob = (poisson(xgH, h) * poisson(xgA, a) * 100);
+          const td = document.createElement('td');
+          td.className = 'poisson-cell-swiss';
+          if (prob >= 9.0) td.classList.add('high');
+          td.textContent = `${prob.toFixed(1)}%`;
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+    }
+
+    function updateModalWhatIf() {
+      const rest = parseInt(document.getElementById('m-slider-rest').value);
+      const squad = parseFloat(document.getElementById('m-slider-squad').value);
+
+      document.getElementById('m-whatif-rest-val').textContent = rest >= 0 ? `+${rest} Days` : `${rest} Days`;
+      document.getElementById('m-whatif-squad-val').textContent = `${squad.toFixed(2)}x`;
+
+      const baseH = (activeModalMatch && activeModalMatch.xgH) || 1.6;
+      const baseA = (activeModalMatch && activeModalMatch.xgA) || 1.3;
+
+      const adjH = Math.max(0.4, baseH * squad + (rest * 0.08));
+      const adjA = Math.max(0.3, baseA - (rest * 0.04));
+
+      document.getElementById('m-home-xg').textContent = adjH.toFixed(2);
+      document.getElementById('m-away-xg').textContent = adjA.toFixed(2);
+
+      computeModalProbabilities(activeModalMatch.eloH || 1980, activeModalMatch.eloA || 1950, adjH, adjA);
+    }
+
+    function poisson(lambda, k) {
+      return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+    }
+
+    function factorial(n) {
+      if (n <= 1) return 1;
+      let f = 1;
+      for (let i = 2; i <= n; i++) f *= i;
+      return f;
+    }
+
+    // Startup
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
 </body>
 </html>

@@ -219,21 +219,11 @@ app = fastapi.FastAPI(title="FOOTBALL", lifespan=lifespan)
 
 
 @app.get("/")
+@app.get("/poster")
+@app.get("/cockpit")
 def landing():
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     return HTMLResponse(html)
-
-
-_POSTER_FILE = HERE.parent / "Open Design" / "pitch-multiverse" / "pitch-multiverse.html"
-
-
-@app.get("/poster")
-@app.get("/cockpit")
-def poster_cockpit():
-    if _POSTER_FILE.exists():
-        return HTMLResponse(_POSTER_FILE.read_text(encoding="utf-8"))
-    return HTMLResponse("<h1>Poster Cockpit Not Found</h1>", status_code=404)
-
 
 # Competition mounts come from the registry: the single place to read to
 # see which competitions exist. A new competition registers an adapter

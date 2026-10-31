@@ -216,6 +216,7 @@ function initThemeMode() {
 }
 
 function applyThemeMode(mode) {
+  if (typeof document === "undefined" || !document.body || !document.body.classList) return;
   const isLight = mode === "light";
   document.body.classList.toggle("theme-light", isLight);
   const btn = document.getElementById("themeToggleBtn");
