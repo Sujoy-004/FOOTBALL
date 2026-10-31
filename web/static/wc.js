@@ -547,17 +547,16 @@ function renderBracket() {
     html += '<div class="dim" style="padding:2px 4px;font-size:11px;margin-bottom:6px">Unplayed matches are shown as scheduled. Run a simulation to project their outcomes.</div>';
   }
 
-  // Section 1: Group Stage Accordion
+  // Section 1: Group Stage Accordion (matching UCL / LaLiga matchdays architecture)
   html += '<div class="chart-section"><div class="title">Group Stage</div><div class="md-accordion">';
   groupRounds.forEach((r, ri) => {
-    const isFirst = ri === 0;
-    const nPlayed = r.matches.filter(m => m.played).length;
-    const nTotal = r.matches.length;
-    html += '<div class="md-card"><div class="md-header" onclick="this.nextElementSibling.classList.toggle(\'open\')">' +
-      '<span class="md-label">' + r.round_name + '</span><span class="md-count">' + nPlayed + '/' + nTotal + ' played</span>' +
-      '<span class="md-arrow">' + (isFirst ? '\u25BC' : '\u25B6') + '</span></div>' +
-      '<div class="md-body ' + (isFirst ? 'open' : '') + '">' +
-      r.matches.map(m => renderMatchRow(m)).join('') +
+    const ms = r.matches || [];
+    const open = ri === 0;
+    html += '<div class="md-card"><div class="md-header" onclick="this.nextElementSibling.classList.toggle(\'open\'); const a = this.querySelector(\'.md-arrow\'); if (a) a.textContent = this.nextElementSibling.classList.contains(\'open\') ? \'-\' : \'+\';">' +
+      '<span class="md-label">' + _esc(r.round_name) + '</span><span class="md-count">' + ms.length + ' matches</span>' +
+      '<span class="md-arrow">' + (open ? '-' : '+') + '</span></div>' +
+      '<div class="md-body' + (open ? ' open' : '') + '">' +
+      ms.map(m => renderMatchRow(m)).join('') +
       '</div></div>';
   });
   html += '</div></div>';
@@ -625,11 +624,18 @@ function renderBracket() {
 }
 
 function renderMatchRow(m) {
-  const scoreStr = (m.home_score != null && m.away_score != null) ? (m.home_score + '-' + m.away_score) : (m.played ? '?' : '—');
-  const status = m.played
-    ? '<span class="dot-green">&#9679;</span> <span class="dim">Played</span>'
-    : '<span class="dot-orange">&#9679;</span> TBD';
-  return '<div class="md-row"><span class="md-team">' + m.team_a + '</span><span class="md-score">' + scoreStr + '</span><span class="md-team">' + m.team_b + '</span><span class="md-date">' + status + '</span></div>';
+  const hs = (m.home_score !== undefined && m.home_score !== null) ? m.home_score : null;
+  const as_ = (m.away_score !== undefined && m.away_score !== null) ? m.away_score : null;
+  const played = m.status ? m.status === "played" : (hs !== null && as_ !== null);
+  const dot = played ? '<span class="dot-green">\u25CF</span>' : '<span class="dot-orange">\u25CF</span>';
+  const scoreStr = played ? hs + ' \u2013 ' + as_ : 'vs';
+  return '<div class="md-row"'
+    + (m.match_id ? ' data-match-id="' + _esc(m.match_id) + '"' : '')
+    + ' style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.06)"'
+    + '><span class="md-team" style="flex:1;text-align:right">' + _esc(m.team_a) + '</span>'
+    + '<span class="md-score" style="margin:0 12px;font-weight:bold;min-width:46px;text-align:center">' + scoreStr + '</span>'
+    + '<span class="md-team" style="flex:1">' + _esc(m.team_b) + '</span>'
+    + '<span style="font-size:10px;margin-left:8px">' + dot + '</span></div>';
 }
 
 // ── Bracket controls ──

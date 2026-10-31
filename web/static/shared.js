@@ -208,6 +208,43 @@ document.addEventListener("click", e => {
   toggle.setAttribute("aria-expanded", open ? "true" : "false");
 });
 
+// ── Swiss Minimalist Poster Theme Toggle (Light / Dark) ──
+function initThemeMode() {
+  let saved = "dark";
+  try { saved = localStorage.getItem("football_theme_mode") || "dark"; } catch {}
+  applyThemeMode(saved);
+}
+
+function applyThemeMode(mode) {
+  const isLight = mode === "light";
+  document.body.classList.toggle("theme-light", isLight);
+  const btn = document.getElementById("themeToggleBtn");
+  if (btn) {
+    const icon = btn.querySelector(".tt-icon");
+    const text = btn.querySelector(".tt-text");
+    if (icon) icon.innerHTML = isLight ? "&#9790;" : "&#9788;";
+    if (text) text.textContent = isLight ? "NIGHT EXHIBITION" : "LIGHT POSTER";
+    btn.setAttribute("aria-label", isLight ? "Switch to Night Exhibition Mode" : "Switch to Light Poster Mode");
+  }
+}
+
+document.addEventListener("click", e => {
+  const btn = e.target && e.target.closest ? e.target.closest("#themeToggleBtn") : null;
+  if (!btn) return;
+  const isLight = document.body.classList.contains("theme-light");
+  const next = isLight ? "dark" : "light";
+  applyThemeMode(next);
+  try { localStorage.setItem("football_theme_mode", next); } catch {}
+});
+
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initThemeMode);
+  } else {
+    initThemeMode();
+  }
+}
+
 // ── Landing Page ──
 function renderLanding() {
   currentCompetition = null;
@@ -356,6 +393,11 @@ function renderNavBar(activeSlug) {
         <span class="nb-label">${c.label}</span>
       </button>
     `).join("")}
+    <div style="flex:1"></div>
+    <button class="nav-home-btn" data-route="/" aria-label="Return to Overview Hub" title="Overview Hub">
+      <span>&larr;</span>
+      <span>Overview Hub</span>
+    </button>
   `;
 }
 
