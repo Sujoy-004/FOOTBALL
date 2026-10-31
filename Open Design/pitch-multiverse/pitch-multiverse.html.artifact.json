@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "PITCH MULTIVERSE // Apex Football Intelligence & Truth Cockpit",
+  "entry": "Open Design/pitch-multiverse/pitch-multiverse.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "standalone",
+    "site",
+    "png",
+    "jpeg",
+    "pdf"
+  ],
+  "createdAt": "2026-10-31T17:29:06.735Z",
+  "updatedAt": "2026-10-31T18:02:17.742Z",
+  "sourceSkillId": "od:prototype:dashboard",
+  "designSystemId": "hud",
+  "metadata": {
+    "exports": [
+      {
+        "path": "Open Design/pitch-multiverse/pitch-multiverse.png",
+        "width": 1600,
+        "height": 950,
+        "scale": 1,
+        "format": "png",
+        "exportedAt": "2026-10-31T18:02:17.605Z"
+      }
+    ]
+  }
+}
