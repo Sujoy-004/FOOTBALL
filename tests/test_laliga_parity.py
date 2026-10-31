@@ -144,8 +144,8 @@ class TestSimulation:
         out = run_mc_simulation(DATA_DIR, n_iterations=200, seed=1)
         assert out["n_iterations"] == 200
         prov = out["_meta"]["provenance"]
-        assert prov["n_played_facts"] == 69
-        assert prov["n_unplayed_sampled"] == 311
+        assert prov["n_played_facts"] == 99
+        assert prov["n_unplayed_sampled"] == 281
         assert out["champion"] in {o["team"] for o in out["odds"]}
 
     def test_mc_odds_are_probabilities(self):
@@ -179,7 +179,7 @@ class TestSeasonsStore:
         fx = read_fixtures(DATA_DIR)
         rs = read_results(DATA_DIR)
         assert len(fx.get("fixtures", [])) == 380
-        assert len(rs.get("matches", [])) == 69
+        assert len(rs.get("matches", [])) == 99
 
     def test_active_season_defaults_to_shipped(self):
         from competitions.laliga.src.seasons import active_season
@@ -206,7 +206,7 @@ class TestWebParity:
         assert d["season"] == SHIPPED_SEASON
         assert d["mode"] == "results"
         assert d["n_teams"] == 20
-        assert d["n_played"] == 69
+        assert d["n_played"] == 99
         assert d["n_total_fixtures"] == 380
         assert d["phase"]["progress"]["current_matchday"] >= 1
         assert len(d["standings"]) == 20
@@ -214,7 +214,7 @@ class TestWebParity:
     def test_standings_endpoint(self, served):
         s = served.get("/laliga/api/standings").json()
         assert s["standings"][0]["team"] == "FC Barcelona"
-        assert s["standings"][0]["points"] == 21
+        assert s["standings"][0]["points"] == 27
 
     def test_fixtures_endpoint_matchday_rows(self, served):
         mds = served.get("/laliga/api/fixtures").json()["matchdays"]
@@ -228,7 +228,7 @@ class TestWebParity:
         assert o["odds_semantics"] == "achieved_outcome_indicators"
         assert len(o["odds"]) == 380
         played = [x for x in o["odds"] if x["home_prob"] is not None]
-        assert len(played) == 69
+        assert len(played) == 99
 
     def test_signals_endpoint(self, served):
         s = served.get("/laliga/api/signals").json()
@@ -237,7 +237,7 @@ class TestWebParity:
 
     def test_validation_endpoint(self, served):
         v = served.get("/laliga/api/validation").json()["validation"]
-        assert v["n_matches_matched"] == 69
+        assert v["n_matches_matched"] == 99
         assert 0.0 <= v["prediction_metrics"]["accuracy"] <= 1.0
 
     def test_state_endpoint(self, served):

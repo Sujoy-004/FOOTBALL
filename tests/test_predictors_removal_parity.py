@@ -313,7 +313,7 @@ def _odds_cache(state: dict) -> dict:
     """Kernel odds layer the deleted adapter was a pure pass-through for.
 
     ``fetch_and_cache_odds`` parses events it is handed; it never fetches.
-    Handing it the empty event list reproduces the offline / no-BSD condition
+    Handing it the empty event list reproduces the offline / no-provider condition
     the stage actually ran under, so this makes no network call of any kind.
     """
     return fetch_and_cache_odds(

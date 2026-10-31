@@ -1,8 +1,8 @@
-"""Match result providers for UCL — replay JSON file and BSD live fetch.
+"""Match result providers for UCL — replay JSON file and live fetch.
 
 Both conform to the core MatchResultProvider Protocol (load()-based).
 ReplayMatchResultProvider loads from a local JSON file.
-BSDMatchResultProvider fetches from the BSD API (live mode).
+LiveMatchResultProvider fetches from the live API (live mode).
 """
 
 from __future__ import annotations
@@ -50,8 +50,8 @@ class ReplayMatchResultProvider:
         return played
 
 
-class BSDMatchResultProvider:
-    """Fetch completed UCL match results from BSD API for live conditioning mode.
+class LiveMatchResultProvider:
+    """Fetch completed UCL match results from provider API for live conditioning mode.
 
     Wraps the existing fetch_ucl_matches() from fetcher.py in the
     MatchResultProvider Protocol interface.
@@ -68,47 +68,47 @@ class BSDMatchResultProvider:
         self._fixtures_schedule = fixtures_schedule
 
     def load(self) -> dict[tuple[str, str], tuple[int, int]]:
-        """Fetch completed BSD matches and convert to played_matches format.
+        """Fetch completed matches and convert to played_matches format.
 
         Uses fetch_ucl_matches() from fetcher.py (reuses Phase 4 code).
         Filters to completed matches only (winner is not None or is_draw).
         """
         from competitions.ucl.src.fetcher import fetch_ucl_matches
 
-        bsd_results = fetch_ucl_matches(
+        results = fetch_ucl_matches(
             self._api_key, self._team_aliases, self._fixtures_schedule,
         )
 
         played: dict[tuple[str, str], tuple[int, int]] = {}
-        for match in bsd_results:
+        for match in results:
             ta, tb = match["team_a"], match["team_b"]
             score = (match["home_score"], match["away_score"])
             played[(ta, tb)] = score
             played[(tb, ta)] = score
 
-        logger.info("Converted %d BSD matches to played_matches", len(played) // 2)
+        logger.info("Converted %d matches to played_matches", len(played) // 2)
         return played
 
 
-def convert_bsd_matches(
-    bsd_results: list[dict[str, Any]],
+def convert_live_matches(
+    results: list[dict[str, Any]],
 ) -> dict[tuple[str, str], tuple[int, int]]:
-    """Convert BSD fetch_ucl_matches() output to played_matches format.
+    """Convert fetch_ucl_matches() output to played_matches format.
 
     Standalone utility (not Protocol-implementing) — same conversion
-    logic as BSDMatchResultProvider.load() but operates on pre-fetched data.
+    logic as LiveMatchResultProvider.load() but operates on pre-fetched data.
 
-    BSD format (from fetcher.py):
+    Format (from fetcher.py):
         {"team_a": str, "team_b": str,
          "home_score": int, "away_score": int,
          "winner": str|None, "is_draw": bool, ...}
     """
     played: dict[tuple[str, str], tuple[int, int]] = {}
-    for match in bsd_results:
+    for match in results:
         ta, tb = match["team_a"], match["team_b"]
         score = (match["home_score"], match["away_score"])
         played[(ta, tb)] = score
         played[(tb, ta)] = score
 
-    logger.info("Converted %d BSD matches to played_matches", len(played) // 2)
+    logger.info("Converted %d matches to played_matches", len(played) // 2)
     return played

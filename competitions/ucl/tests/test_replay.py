@@ -143,6 +143,6 @@ class TestReplayDataLoading:
 
     def test_protocol_runtime_checkable(self):
         from football_core.provider import MatchResultProvider
-        from competitions.ucl.src.result_provider import ReplayMatchResultProvider, BSDMatchResultProvider
+        from competitions.ucl.src.result_provider import ReplayMatchResultProvider, LiveMatchResultProvider
         assert isinstance(ReplayMatchResultProvider("dummy"), MatchResultProvider)
-        assert isinstance(BSDMatchResultProvider("key", {}, {}), MatchResultProvider)
+        assert isinstance(LiveMatchResultProvider("key", {}, {}), MatchResultProvider)

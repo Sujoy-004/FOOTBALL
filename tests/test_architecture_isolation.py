@@ -78,7 +78,6 @@ def test_web_refresh_boundaries_are_per_competition(tmp_path, monkeypatch):
         monkeypatch.setattr(wc_app, "DATA_DIR", wc_dir)
         # Credentials are read at CALL time: clear the env so no real key
         # can leak into the isolated fetch.
-        monkeypatch.delenv("BSD_API_KEY", raising=False)
         monkeypatch.delenv("FOOTBALL_DATA_ORG_KEY", raising=False)
 
         wc_report = wc_app._fetch_live_data()

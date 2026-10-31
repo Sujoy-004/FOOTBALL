@@ -13,11 +13,10 @@ pip install -r requirements.txt
 Copy `.env.example` to `.env` and fill in:
 
 - `FOOTBALL_DATA_ORG_KEY` — free key from football-data.org (recommended)
-- `BSD_API_KEY` — optional alternative provider
-- `DATA_PROVIDER` — `bsd` or `football-data` to pin the provider (auto-detects when unset)
-- `ODDS_PROVIDER` — `the-odds-api`, `bsd`, `auto` (default), or `none` for
+- `DATA_PROVIDER` — `football-data` to pin the provider (auto-detects when unset)
+- `ODDS_PROVIDER` — `the-odds-api`, `auto` (default), or `none` for
   bookmaker market odds (separate from `DATA_PROVIDER`; `auto` precedence is
-  the-odds-api → bsd → none)
+  the-odds-api → none)
 - `THE_ODDS_API_KEY` — free key from the-odds-api.com; enables live LaLiga
   market odds when `ODDS_PROVIDER=the-odds-api|auto`
 

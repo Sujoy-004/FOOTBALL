@@ -45,8 +45,8 @@ CompetitionRegistry ── FastAPI shell ── dashboard
 | `knockout.py` | Knockout primitives: single match (+ET/pens), two-legged ties, blended-prob resolution with matchup-aware Elo fallback |
 | `elo.py` / `elo_fetcher.py` / `elo_sync.py` | Elo math; ClubElo fetch; eloratings.net TSV sync with graduated correction |
 | `predictors/odds.py` | Single-book devig (`remove_vig`) — the canonical vig-removal math |
-| `odds.py` | Generic live market-odds layer: `OddsProvider` contract, `TheOddsApiOddsProvider`, `BSDOddsProvider`, `ODDS_PROVIDER` resolution (the-odds-api/bsd/auto/none), deterministic primary-book selection, canonical acquisition core (fixture mapping, validation, freshness, state, store), observability. Data provider (`DATA_PROVIDER`) stays fixtures/results-only |
-| `data_providers/` | BSD + football-data.org result/event providers (`fetch_matches` only) |
+| `odds.py` | Generic live market-odds layer: `OddsProvider` contract, `TheOddsApiOddsProvider`, `ODDS_PROVIDER` resolution (the-odds-api/auto/none), deterministic primary-book selection, canonical acquisition core (fixture mapping, validation, freshness, state, store), observability. Data provider (`DATA_PROVIDER`) stays fixtures/results-only |
+| `data_providers/` | football-data.org result/event provider (`fetch_matches` only) |
 | `evaluation.py` | Brier, log-loss, ECE, calibration curve, TRPS (numpy only here) |
 | `state.py` | Atomic JSON persistence helpers; bracket DAG validation (`validate_bracket`) |
 | `provider.py` | Protocols: `DataProvider`, `FixtureProvider`, `MatchResultProvider`, `ResultHistoryProvider` |
@@ -63,8 +63,7 @@ reports FALLBACK/stale state with the error. Explicit offline execution
 network calls. Placeholder credentials select no provider. A failed scrape
 never mutates factual stores.
 
-Transport selection is shared (`web/common.get_data_provider`: BSD or
-football-data.org, chosen by keys/`DATA_PROVIDER`); everything after raw
+Transport selection is shared (`web/common.get_data_provider`: football-data.org, chosen by keys/`DATA_PROVIDER`); everything after raw
 events is competition-owned. Each brain exposes its own authoritative ingest
 path — World Cup: `competitions/worldcup/src/pipeline.fetch_live_data`; UCL:
 `competitions/ucl/src/pipeline.fetch_live_data`, which routes new-season
@@ -113,12 +112,9 @@ selects the fixture/result feed; `ODDS_PROVIDER` selects the odds source:
 - `the-odds-api` — live market odds through
   `football_core.odds.TheOddsApiOddsProvider` (official v4 `/v4/sports/{sport}/odds/`,
   h2h, decimal, EU books; sport keys per competition in `SPORT_KEYS`).
-- `bsd` — the pre-existing BSD event feed re-shaped through
-  `BSDOddsProvider` (league ids per competition in `LEAGUE_IDS`).
-- `auto` — **the-odds-api → bsd → none** (deterministic). The acting
+- `auto` — **the-odds-api → none** (deterministic). The acting
   provider is reported in the odds summary, never inferred later.
-- `none` — explicit disable. Unset keeps legacy behavior (LaLiga falls back
-  to BSD).
+- `none` — explicit disable.
 
 Book selection is deterministic and documented: primary book (`pinnacle`
 by default) when it carries a complete h2h set, else the most-recently
@@ -226,7 +222,7 @@ World Cup has none. See `docs/FIXTURE-IDENTITY.md`.
 | Signal | Data source | Degradation |
 |---|---|---|
 | `refined_elo` | context Elo ratings (ClubElo) | defaults to 1500 |
-| `market_odds` | devigged bookmaker odds from the live odds provider (`ODDS_PROVIDER`: The Odds API or BSD) | uniform thirds |
+| `market_odds` | devigged bookmaker odds from the live odds provider (`ODDS_PROVIDER`: The Odds API) | uniform thirds |
 | `rolling_form` | recent results via a result-history provider | neutral form |
 | `squad_value` | committed squad-value JSON (log-ratio sigmoid); path injected by the owning competition | uniform thirds |
 | `rest_days` | fixture schedule gaps | assumes 7 days rest |

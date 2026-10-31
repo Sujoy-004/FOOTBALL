@@ -777,7 +777,7 @@ def test_gate_invariance_contract_rejects_stub_class() -> None:
 # ---------------------------------------------------------------------------
 
 _SECRET_KEY_PATTERN = re.compile(
-    r"(BSD_API_KEY|FOOTBALL_DATA_ORG_KEY|THE_ODDS_API_KEY)"
+    r"(FOOTBALL_DATA_ORG_KEY|THE_ODDS_API_KEY)"
     r"\s*[\"']?\s*[=:]\s*[\"']([A-Za-z0-9\-_]{16,})[\"']"
 )
 
@@ -805,7 +805,7 @@ def _find_committed_keys(content: str) -> list[str]:
 
 
 def test_zero_committed_api_keys() -> None:
-    """No committed BSD / football-data.org / Odds API credentials."""
+    """No committed football-data.org / Odds API credentials."""
     tracked = _tracked_source_files()
     py_files = [rel for rel in tracked if rel.endswith(".py")]
     json_files = [rel for rel in tracked if rel.endswith(".json")]
@@ -832,8 +832,8 @@ def test_gate_secret_scanner_flags_synthetic_keys() -> None:
     tracked source file never itself contains a matching literal.
     """
     # env-style single-quote name + double-quoted value.
-    committed_key = "BSD_API" + '_KEY = "aBcDeFgH1234567890Zx"'
-    assert _find_committed_keys(committed_key) == ["BSD_API_KEY"]
+    committed_key = "THE_ODDS" + '_API_KEY = "aBcDeFgH1234567890Zx"'
+    assert _find_committed_keys(committed_key) == ["THE_ODDS_API_KEY"]
 
     # JSON-style: quoted name, colon, quoted value.
     json_style = (
@@ -846,9 +846,5 @@ def test_gate_secret_scanner_flags_synthetic_keys() -> None:
     assert _find_committed_keys(colons_kv) == ["THE_ODDS_API_KEY"]
 
     # Negative controls: env reads and short/dashed values are not keys.
-    env_read = 'os.environ.get("BSD_API_KEY", "")'
-    assert _find_committed_keys(env_read) == []
-    short_value = "BSD_API_KEY = \"short\""
-    assert _find_committed_keys(short_value) == []
     empty_env = 'THE_ODDS_API_KEY = ""'
     assert _find_committed_keys(empty_env) == []

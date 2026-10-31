@@ -50,7 +50,7 @@ Scores can only enter the data stores when a caller pushes finished events into
 | `data/snapshot.json` | `mode: simulation`, `provenance: simulated`, champion Bayern Munich — **no `2026-09-0[89]` events** |
 | `data/results.json` / `data/fixtures.json` (legacy root) | `MD01_11` "Liverpool vs Atletico Madrid" 3-2 exists, but is the **2025/26 legacy simulation store** (root fixtures has no `season`, no event dates, `MD01_11` is a different `match_id` from a different draw cycle). It is not keyed to the 2026/27 canonical `gen-*` id and never flows into the shadow stores (`shadow_eval` reads `data/seasons/<season>/results.json`) |
 | Local/legacy historical (`bootstrap/`, `historical/`) | All 2025/26 and earlier — no 2026-09-08/09 UCL events |
-| Environment | `BSD_API_KEY` and `FOOTBALL_DATA_ORG_API_KEY` are **not set**; the only live source (`fetcher.py:fetch_ucl_matches`, BSD API at `sports.bzzoiro.com`) is unreachable without credentials |
+| Environment | `FOOTBALL_DATA_ORG_KEY` is **not set**; the only live source (`football-data.org`) is unreachable without credentials |
 
 ### 2.3 Root cause (unchanged from Phase 7A finding)
 
@@ -83,9 +83,9 @@ outside the shadow subsystem.
 If a trustworthy score is ever needed, the following paths exist — **none should
 be applied unilaterally without the data-pipeline owner's sign-off**:
 
-1. **Live BSD fetch** (`competitions/ucl/src/fetcher.py::fetch_ucl_matches`) —
+1. **Live provider fetch** (`competitions/ucl/src/fetcher.py::fetch_ucl_matches`) —
    would pull finished events for `league_id=7` from `sports.bzzoiro.com` when a
-   valid `BSD_API_KEY` is configured, then feed them into `ingest_ucl_events`.
+   valid `FOOTBALL_DATA_ORG_KEY` is configured, then feed them into `ingest_ucl_events`.
    Requires credentials not present in this environment.
 2. **Manual authoritative result** from an official/UEFA source for the exact
    pairing (Liverpool vs Atlético Madrid, 2026-09-09) as a pushed event with a

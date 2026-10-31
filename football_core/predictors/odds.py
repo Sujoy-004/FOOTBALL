@@ -1,4 +1,4 @@
-"""Market odds ingestion from BSD events endpoint — generic."""
+"""Market odds ingestion from match events — generic."""
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -44,7 +44,7 @@ def _extract_group_letter_from_event(event: dict) -> str | None:
 
 
 def parse_odds_response(
-    bsd_events: list[dict],
+    events: list[dict],
     alias_lookup: dict[str, str],
     groups: dict,
     bracket: list[dict] | None = None,
@@ -52,7 +52,7 @@ def parse_odds_response(
     now = datetime.now(timezone.utc)
     result: dict[str, dict] = {}
 
-    for event in bsd_events:
+    for event in events:
         if event.get("status") == "finished":
             continue
 
@@ -111,14 +111,14 @@ def parse_odds_response(
 
 def fetch_and_cache_odds(
     api_key: str,
-    bsd_events: list[dict],
+    events: list[dict],
     alias_lookup: dict[str, str],
     groups: dict,
     cache_ttl_hours: int = 12,
     bracket: list[dict] | None = None,
 ) -> dict:
     now = datetime.now(timezone.utc)
-    parsed = parse_odds_response(bsd_events, alias_lookup, groups, bracket=bracket)
+    parsed = parse_odds_response(events, alias_lookup, groups, bracket=bracket)
     return {
         "fetched_at": now.isoformat(),
         "expires_at": (now + timedelta(hours=cache_ttl_hours)).isoformat(),

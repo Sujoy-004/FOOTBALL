@@ -1,9 +1,9 @@
-"""football-data.org API data provider — replaces BSD for match results.
+"""football-data.org API data provider — external provider for match results.
 
-Field mapping (football-data.org → BSD-compatible flat dict):
+Field mapping (football-data.org → canonical flat dict):
 
 +---------------------------+------------------------------------------+
-| BSD field                 | football-data.org source                 |
+| Canonical field           | football-data.org source                 |
 +---------------------------+------------------------------------------+
 | home_team                 | homeTeam.name                            |
 | away_team                 | awayTeam.name                            |
@@ -109,7 +109,7 @@ class FootballDataOrgProvider:
 
     @staticmethod
     def _map_group(raw_group: str | None) -> str:
-        """Convert ``"GROUP_A"`` → ``"Group A"`` (BSD convention)."""
+        """Convert ``"GROUP_A"`` → ``"Group A"`` (canonical convention)."""
         if not raw_group:
             return ""
         m = _GROUP_PATTERN.match(raw_group)
@@ -119,7 +119,7 @@ class FootballDataOrgProvider:
 
     @staticmethod
     def _map_match(raw: dict[str, Any]) -> dict[str, Any]:
-        """Map football-data.org match schema to BSD-compatible flat dict."""
+        """Map football-data.org match schema to canonical flat dict."""
         ht = raw.get("homeTeam") or {}
         at = raw.get("awayTeam") or {}
         home_team = (
@@ -192,7 +192,7 @@ class FootballDataOrgProvider:
     ) -> list[dict[str, Any]]:
         """Fetch matches for *competition_id* from football-data.org.
 
-        Returns flattened dicts matching the BSD event schema expected by
+        Returns flattened dicts matching the canonical event schema expected by
         the existing processing pipeline (``process_matches``, etc.).
 
         Parameters

@@ -33,13 +33,9 @@ def boot_step(
     return runtime_support.boot_step(step_name, action, boot_log)
 
 
-def get_data_provider(
-    bsd_api_key: str, football_data_org_key: str, bsd_league_id: int
-) -> Any:
+def get_data_provider(*args, **kwargs) -> Any:
     """Compatibility shim; the implementation lives in football_core.runtime_support."""
-    return runtime_support.get_data_provider(
-        bsd_api_key, football_data_org_key, bsd_league_id
-    )
+    return runtime_support.get_data_provider(*args, **kwargs)
 
 
 def load_json(data_dir, name: str) -> dict:

@@ -2,7 +2,7 @@
 
 Phase 13B turned the Phase-13A odds contract into a competition-agnostic layer
 (``football_core.odds``): ``OddsProvider`` base + ``TheOddsApiOddsProvider``
-(h2h / decimal / EU books) + ``BSDOddsProvider``, one provider-selection
+(h2h / decimal / EU books) one provider-selection
 mechanism (``ODDS_PROVIDER``), and one acquisition/mapping/de-vig/freshness/
 store core reused by every competition.
 
@@ -10,9 +10,8 @@ This module is the LaLiga entry point. It keeps the original public API (so
 the pipeline, simulation and existing tests are untouched) and multiplexes
 three ingestion modes:
 
-- ``ODDS_PROVIDER`` unset  -> legacy BSD-only path (unchanged behavior).
-- ``ODDS_PROVIDER=the-odds-api|bsd`` -> exactly the named provider.
-- ``ODDS_PROVIDER=auto`` -> the-odds-api when a key exists, else BSD.
+- ``ODDS_PROVIDER=the-odds-api`` -> exactly the named provider.
+- ``ODDS_PROVIDER=auto`` -> the-odds-api when a key exists, else none.
 - ``ODDS_PROVIDER=none``  -> odds ingestion disabled (NOT_CONFIGURED).
 
 ``DATA_PROVIDER`` is untouched and keeps its meaning (fixtures/results only).
@@ -24,8 +23,7 @@ Contract notes (inherited from ``football_core.odds``):
   match dicts, so ``MarketOddsSignal`` / ``market_only`` work unchanged.
 - Freshness: record valid only when captured *before* the target kickoff and
   within ``ODDS_MAX_AGE_HOURS``. The provider's own market timestamp is kept
-  separately as ``provider_last_update`` (BSD exposes none; The Odds API
-  exposes it per selected book) and must also precede kickoff.
+  separately as ``provider_last_update`` (The Odds API exposes it per selected book) and must also precede kickoff.
 - Storage: competition-scoped, atomic store
   ``<data_dir>/seasons/<season>/odds.json`` (gitignored runtime data).
 
@@ -42,18 +40,17 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-from football_core.data_providers.bsd_provider import BSDDataProvider
 from football_core.fetcher import fold_team_key
 from football_core.predictors.odds import remove_vig
 from football_core import odds as core
 
 from competitions.laliga.src import seasons as _season_store
-from competitions.laliga.src.constants import DATA_DIR, LALIGA_BSD_LEAGUE_ID, SHIPPED_SEASON
+from competitions.laliga.src.constants import DATA_DIR, SHIPPED_SEASON
 
 MARKET = core.MARKET
-PROVIDER_NAME = "BSD"
-BOOKMAKER = "BSD"
-ODDS_ENDPOINT = f"https://sports.bzzoiro.com/api/events/?league_id={LALIGA_BSD_LEAGUE_ID}"
+PROVIDER_NAME = "the-odds-api"
+BOOKMAKER = "pinnacle"
+ODDS_ENDPOINT = "https://api.the-odds-api.com/v4/sports/soccer_spain_la_liga/odds/"
 
 ODDS_MAX_AGE_HOURS = core.ODDS_MAX_AGE_HOURS
 MIN_DECIMAL_ODDS = core.MIN_DECIMAL_ODDS
@@ -138,17 +135,17 @@ def _parser_error(base: dict, exc: Exception, now: datetime) -> dict:
 def acquire_laliga_odds(
     data_dir=DATA_DIR,
     season_token: str | None = None,
-    bsd_api_key: str = "",
-    *,
-    provider: BSDDataProvider | None = None,
+    *args,
+    provider = None,
     fetch_fn=None,
     now: datetime | None = None,
     odds_mode: str | None = None,
+    **kwargs,
 ) -> dict:
     """Pull live market odds for the LaLiga season and persist the store.
 
-    ``fetch_fn`` injects a legacy BSD-style event stub (used by tests);
-    ``provider`` injects an existing BSD transport; ``odds_mode`` overrides
+    ``fetch_fn`` injects an event stub (used by tests);
+     ``odds_mode`` overrides
     ``ODDS_PROVIDER`` (used by callers who must not touch the environment).
 
     Never raises: every failure mode is folded into the returned summary's
@@ -156,6 +153,11 @@ def acquire_laliga_odds(
     """
     now = now or datetime.now(timezone.utc)
     season_token = season_token or _season_store.active_season(data_dir)
+    api_key = args[0] if args else kwargs.get('api_key')
+    if api_key is not None and not _odds_key_usable(str(api_key)):
+        base = {"market": MARKET, "provider": "none", "season": season_token,
+                "competition": "laliga", "schema": 1, "_runtime": True}
+        return _not_configured(base, "no_odds_credential", now)
     mode = (odds_mode if odds_mode is not None
             else (os.getenv("ODDS_PROVIDER") or "")).strip().lower()
 
@@ -176,8 +178,8 @@ def acquire_laliga_odds(
                           market=MARKET, competition="laliga")
 
     # ── ODDS_PROVIDER modes ──────────────────────────────────────────────
-    if mode in (core.THE_ODDS_API, core.BSD, "auto"):
-        name, odds_provider = core.resolve_odds_provider(mode=mode)
+    if mode in (core.THE_ODDS_API, "auto", ""):
+        name, odds_provider = core.resolve_odds_provider(mode=mode or "auto")
         base = {"market": MARKET, "provider": name if name else "none",
                 "season": season_token, "competition": "laliga",
                 "schema": 1, "_runtime": True}
@@ -192,7 +194,7 @@ def acquire_laliga_odds(
         except Exception as exc:
             return _unavailable(base, exc, now)
         bookmaker = (odds_provider.primary_book
-                     if isinstance(odds_provider, core.TheOddsApiOddsProvider) else "BSD")
+                     if isinstance(odds_provider, core.TheOddsApiOddsProvider) else "pinnacle")
         iso_note = ("provider_last_update kept per record (selected book); "
                     "fetched_at is capture time")
         return _run_store(events, fixtures, alias, data_dir, season_token, now,
@@ -203,28 +205,9 @@ def acquire_laliga_odds(
                           if isinstance(odds_provider, core.TheOddsApiOddsProvider)
                           else "latest_event_wins_single_book")
 
-    if mode == "none":
-        base = {"market": MARKET, "provider": "none", "season": season_token,
-                "competition": "laliga", "schema": 1, "_runtime": True}
-        return _not_configured(base, "odds_provider_none", now)
-
-    # ── legacy default: BSD (mode unset) ─────────────────────────────────
-    base = {"market": MARKET, "provider": PROVIDER_NAME, "season": season_token,
+    base = {"market": MARKET, "provider": "none", "season": season_token,
             "competition": "laliga", "schema": 1, "_runtime": True}
-    key = _odds_key_usable(bsd_api_key)
-    if key is None and provider is None:
-        return _not_configured(base, "no_odds_credential", now)
-    try:
-        if provider is None:
-            if key is None:  # unreachable: caught by the no-credential gate above
-                return _not_configured(base, "no_odds_credential", now)
-            provider = BSDDataProvider(key, league_id=LALIGA_BSD_LEAGUE_ID)
-        events = list(provider.fetch_matches() or [])
-    except Exception as exc:
-        return _unavailable(base, exc, now)
-    return _run_store(events, fixtures, alias, data_dir, season_token, now,
-                      provider=PROVIDER_NAME, bookmaker=BOOKMAKER,
-                      market=MARKET, competition="laliga")
+    return _not_configured(base, "odds_provider_none" if mode == "none" else "no_odds_credential", now)
 
 
 def _run_store(events, fixtures, alias, data_dir, season_token, now, *,
@@ -236,5 +219,5 @@ def _run_store(events, fixtures, alias, data_dir, season_token, now, *,
         now=now, provider=provider, bookmaker=bookmaker, market=market,
         competition=competition, store_path=store_path, endpoint=endpoint,
         iso_note=iso_note or (
-            "BSD exposes no separate odds timestamp; fetched_at is odds capture time"),
+            "fetched_at is odds capture time"),
         aggregation=aggregation or "latest_event_wins_single_book")

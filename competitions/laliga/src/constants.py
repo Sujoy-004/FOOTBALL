@@ -1,9 +1,7 @@
 """LaLiga EA Sports — brain constants and composition-root paths.
 
 20-team double round-robin (38 matchdays). Data source of record is
-football-data.org (competition id ``PD``); BSD league id 3 exists but
-returned an empty catalog when probed (Oct 2026), so live refresh uses
-the FDO provider path unless the deployment forces BSD.
+football-data.org (competition id ``PD``).
 """
 
 from pathlib import Path
@@ -23,7 +21,6 @@ BLEND_CALIBRATION_PATH = CONFIG_DIR / "blend_calibration.json"
 # (single source of truth for the D-01 window) — never hardcode it here.
 HISTORICAL_REPLAY_PATH = DATA_DIR / "historical" / REPLAY_NAME
 
-LALIGA_BSD_LEAGUE_ID = 3
 LALIGA_FDO_COMPETITION_ID = "PD"
 
 SHIPPED_SEASON = "2026/27"

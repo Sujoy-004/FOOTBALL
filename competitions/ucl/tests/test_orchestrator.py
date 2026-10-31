@@ -40,7 +40,7 @@ class TestResolvePlayedMatches:
 
     def test_live_mode_without_key_exits(self, monkeypatch):
         """Live mode without API key exits with error."""
-        monkeypatch.delenv("BSD_API_KEY", raising=False)
+        monkeypatch.delenv("FOOTBALL_DATA_ORG_KEY", raising=False)
         from competitions.ucl.src.orchestrator import resolve_played_matches
 
         class FakeArgs:
@@ -115,7 +115,7 @@ class TestShellRefinedEloCoverage:
         elo_ratings.update({t: float(DEFAULT_ELO) for t in names[22:]})
         monkeypatch.setattr(orch, "_resolve_elo_ratings", lambda _n: elo_ratings)
 
-        result = orch.run_deterministic_compute(str(dp), bsd_api_key="")
+        result = orch.run_deterministic_compute(str(dp))
         re = result["signals"]["refined_elo"]
 
         # Existing per-match availability semantics are untouched.
@@ -141,7 +141,7 @@ class TestShellRefinedEloCoverage:
         dp = _shell_data_dir(tmp_path)
         monkeypatch.setattr(orch, "_resolve_elo_ratings", lambda _n: {})
 
-        result = orch.run_deterministic_compute(str(dp), bsd_api_key="")
+        result = orch.run_deterministic_compute(str(dp))
         re = result["signals"]["refined_elo"]
 
         assert re["n_matches"] == 144

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class RollingFormSignal(Signal):
     """Recent form signal using configurable windows and exponential decay.
-    Uses MatchResultProvider for data (D-09 — agnostic to BSD vs replay)."""
+    Uses MatchResultProvider for data (D-09 — agnostic to live vs replay)."""
 
     name: str = "rolling_form"
 

@@ -1,17 +1,17 @@
-"""Tests for UCL BSD fetcher."""
+"""Tests for UCL fetcher."""
 
-from competitions.ucl.src.fetcher import fetch_ucl_matches, build_ucl_url, UCL_LEAGUE_ID
+from competitions.ucl.src.fetcher import fetch_ucl_matches, build_ucl_url
 
 
 class TestBuildUclUrl:
     """Tests for build_ucl_url()."""
 
-    def test_returns_string_with_league_id(self):
-        """build_ucl_url() must contain league_id=7 for UCL."""
+    def test_returns_string_with_competition_code(self):
+        """build_ucl_url() must contain CL for UCL."""
         url = build_ucl_url()
         assert isinstance(url, str)
-        assert "league_id=7" in url
-        assert url.startswith("https://sports.bzzoiro.com/api/events/")
+        assert "CL" in url
+        assert "football-data.org" in url
 
 
 class TestFetchUclMatches:
@@ -67,7 +67,7 @@ class TestFetchUclMatches:
         odds_draw=None,
         odds_away=None,
     ) -> dict:
-        """Build a minimal BSD event dict matching fetch_raw_matches output."""
+        """Build a minimal event dict matching fetch_raw_matches output."""
         event: dict = {
             "id": event_id,
             "status": status,
@@ -89,7 +89,7 @@ class TestFetchUclMatches:
     # ── Tests ────────────────────────────────────────────────────────────
 
     def test_empty_events_return_empty_list(self, monkeypatch):
-        """No BSD events should produce an empty result list."""
+        """No events should produce an empty result list."""
         monkeypatch.setattr(
             "competitions.ucl.src.fetcher.fetch_raw_matches",
             lambda api_key, api_url, league_id, timeout=10: [],
@@ -112,7 +112,7 @@ class TestFetchUclMatches:
         assert result == []
 
     def test_normalizes_matching_teams(self, monkeypatch):
-        """BSD team names should resolve through alias lookup and fixture matching."""
+        """Team names should resolve through alias lookup and fixture matching."""
         events = [
             self._make_raw_event("Man City", "Bayern", home_score=2, away_score=1),
         ]
@@ -131,7 +131,7 @@ class TestFetchUclMatches:
         assert entry["away_score"] == 1
 
     def test_normalizes_psg_through_alias(self, monkeypatch):
-        """BSD returns 'Paris SG' — alias lookup should resolve to canonical 'PSG'."""
+        """Provider returns 'Paris SG' — alias lookup should resolve to canonical 'PSG'."""
         events = [
             self._make_raw_event("Slovan Bratislava", "Paris SG", home_score=0, away_score=3),
         ]
@@ -143,7 +143,7 @@ class TestFetchUclMatches:
         result = fetch_ucl_matches("test_key", self._MINIMAL_ALIASES, self._MINIMAL_FIXTURES)
         assert len(result) == 1
         entry = result[0]
-        # Though BSD says "Paris SG", canonical should be "PSG"
+        # Though provider says "Paris SG", canonical should be "PSG"
         assert entry["team_b"] == "PSG"
         assert entry["team_a"] == "Slovan Bratislava"
         assert entry["match_id"] == "MD01_02"
@@ -226,8 +226,8 @@ class TestFetchUclMatches:
         assert result == []
 
     def test_builds_fixture_lookup_bidirectionally(self, monkeypatch):
-        """Fixture lookup should work with BSD events where home/away are reversed."""
-        # BSD event has Bayern as home, Man City as away (reversed from fixture)
+        """Fixture lookup should work with events where home/away are reversed."""
+        # Event has Bayern as home, Man City as away (reversed from fixture)
         events = [
             self._make_raw_event("Bayern", "Man City", home_score=2, away_score=2),
         ]
@@ -247,7 +247,7 @@ class TestFetchUclMatches:
         assert entry["is_draw"] is True
 
     def test_extracts_odds_with_vig_removal(self, monkeypatch):
-        """BSD events with odds should have vig-removed fair probabilities."""
+        """Events with odds should have vig-removed fair probabilities."""
         events = [
             self._make_raw_event(
                 "Man City", "Bayern", home_score=2, away_score=0,
@@ -276,7 +276,7 @@ class TestFetchUclMatches:
         assert odds["home"] > odds["away"]
 
     def test_skips_events_without_odds(self, monkeypatch):
-        """BSD events without odds fields should not have an 'odds' key."""
+        """Events without odds fields should not have an 'odds' key."""
         events = [
             self._make_raw_event("Man City", "Bayern", home_score=1, away_score=0),
             # No odds_home/odds_draw/odds_away set

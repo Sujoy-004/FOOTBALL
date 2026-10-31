@@ -4,7 +4,7 @@ Provides the core two-legged aggregate scoring primitive with
 extra time (reduced Poisson lambda) and penalty shootouts, plus
 the playoff round orchestrator (positions 9-24).
 
-Per D-01: ET simulated locally — BSD API does not expose ET scores.
+Per D-01: ET simulated locally — external provider API does not expose ET scores.
 Per D-02: Penalties simulated locally — calibration in config constant.
 Per D-03: ET home advantage belongs to second-leg home team.
 Per D-04: Playoff pairings from dedicated data file.

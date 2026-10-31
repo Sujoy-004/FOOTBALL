@@ -101,7 +101,7 @@ def apply_session_overrides(fdo_key: str) -> None:
     """Propagate a session key into this process without persisting it.
 
     The competition apps read their credentials at CALL time (via
-    ``_bsd_key()`` / ``_football_data_org_key()``), so setting the env var
+    ``_football_data_org_key()``), so setting the env var
     is enough — no ``sys.modules`` write-back patching of already-imported
     app modules is needed (and none is correct: it would diverge from every
     module that never got patched).

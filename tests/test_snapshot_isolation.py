@@ -94,7 +94,7 @@ def test_ucl_deterministic_compute_no_knockout_results(tmp_path):
     from competitions.ucl.src.orchestrator import run_deterministic_compute
     data_dir = _historical_ucl_data(tmp_path)
     (data_dir / "knockout_results.json").unlink(missing_ok=True)
-    result = run_deterministic_compute(str(data_dir), bsd_api_key="")
+    result = run_deterministic_compute(str(data_dir))
     assert "error" not in result, f"deterministic_compute errored: {result.get('error')}"
     standings = result.get("standings", [])
     assert len(standings) == 36, f"expected 36 teams, got {len(standings)}"
@@ -238,7 +238,7 @@ def test_ucl_snapshot_boot_makes_zero_clubelo_requests(monkeypatch, tmp_path):
 
         from competitions.ucl.src.orchestrator import run_deterministic_compute
         data_dir = _historical_ucl_data(tmp_path)
-        result = run_deterministic_compute(str(data_dir), bsd_api_key="")
+        result = run_deterministic_compute(str(data_dir))
         assert "error" not in result, result.get("error")
         assert len(result.get("standings", [])) == 36
         assert calls == {"clubelo": 0, "urlopen": 0}, calls

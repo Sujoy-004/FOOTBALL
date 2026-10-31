@@ -10,9 +10,9 @@ simulated.
 ## What it does
 
 - **Ingests real football data** from external providers (football-data.org
-  or BSD) into per-competition result stores, or runs entirely offline on a
+  via Football-Data.org) into per-competition result stores, or runs entirely offline on a
   committed snapshot. Bookmaker market odds are enriched separately via
-  the optional `ODDS_PROVIDER` (The Odds API or BSD) — see
+  the optional `ODDS_PROVIDER` (The Odds API) — see
   "Bookmaker odds" below.
 - **Produces match probabilities** from a five-signal ensemble
   (`refined_elo · market_odds · rolling_form · squad_value · rest_days`)
@@ -131,7 +131,7 @@ Simulation is always user-triggered. Nothing runs automatically.
 
 Normal startup is fresh-first: the server attempts acquisition lazily per competition and falls back to the last validated stores on failure.
 Fallback is reserved for real failures: if the provider answers HTTP 200 but has published zero matches for the active future season (UCL 2026/27), refresh reports `deferred/provider-empty` — not stale — and the committed draw-derived fixtures keep serving.
-`FOOTBALL_DATA_ORG_KEY` is the recommended provider credential; optional `BSD_API_KEY` and `DATA_PROVIDER=bsd|football-data` remain supported. Bookmaker odds are governed separately by `ODDS_PROVIDER`/`THE_ODDS_API_KEY` (see "Bookmaker odds"). Explicit snapshot/offline mode performs **zero** live requests — including
+`FOOTBALL_DATA_ORG_KEY` is the match data provider credential (`DATA_PROVIDER=football-data`). Bookmaker odds are governed separately by `ODDS_PROVIDER`/`THE_ODDS_API_KEY` (see "Bookmaker odds"). Explicit snapshot/offline mode performs **zero** live requests — including
 Elo lookups, which fall back to UEFA-coefficient-derived ratings for UCL —
 and both dashboards disclose that stored data is being shown. A refresh
 endpoint re-ingests live results into the canonical stores without touching
@@ -142,12 +142,12 @@ simulation state.
 Market odds are a separate, optional enrichment layer — distinct from the
 fixture/result feed:
 
-- `DATA_PROVIDER` (football-data | bsd) → **fixtures and results**.
-- `ODDS_PROVIDER` (the-odds-api | bsd | auto | none) → **bookmaker market
+- `DATA_PROVIDER` (football-data) → **fixtures and results**.
+- `ODDS_PROVIDER` (the-odds-api | auto | none) → **bookmaker market
   odds** (1X2, decimal, vig-removed). Unset keeps each competition's legacy
-  odds behavior (e.g. LaLiga falls back to BSD); `none` disables odds
+  odds behavior; `none` disables odds
   enrichment explicitly. `auto` precedence is deterministic:
-  **the-odds-api → bsd → none**, and the provider that actually supplied
+  **the-odds-api → none**, and the provider that actually supplied
   odds is reported in every odds summary.
 
 Supported odds providers:
@@ -155,13 +155,12 @@ Supported odds providers:
 - **The Odds API** (`THE_ODDS_API_KEY`) — live market odds. Sport keys are
   mapped per competition (LaLiga `soccer_spain_la_liga`, UCL
   `soccer_uefa_champs_league`, World Cup `soccer_fifa_world_cup`).
-- **BSD** (`BSD_API_KEY`) — the pre-existing event feed, reused for odds.
 
 Current provider capabilities (verified live):
 
 | Competition | The Odds API odds | Consumption |
 |---|---|---|
-| LaLiga 2026/27 | **available** (real live fixtures mapped 20/20) | wired: The Odds API or BSD → canonical mapping → validation → de-vig → runtime odds store → `MarketOddsSignal` → `market_only` strategy |
+| LaLiga 2026/27 | **available** (real live fixtures mapped 20/20) | wired: The Odds API → canonical mapping → validation → de-vig → runtime odds store → `MarketOddsSignal` → `market_only` strategy |
 | UCL 2026/27 | available in the live feed | **intentionally unchanged** — UCL still uses its existing odds path |
 | World Cup 2026 | returns no usable events | unchanged — remains an odds-free competition |
 
@@ -287,7 +286,7 @@ python -m pytest -q --tb=no -p no:cacheprovider 2>&1 | Select-String "^(FAILED|E
 football_core/            shared kernel: domain truth model, signals +
                           ensemble, Poisson model, MonteCarloEngine,
                           shared insight, Elo infra, generic odds-provider
-                          layer (contract, The Odds API + BSD adapters,
+                          layer (contract, The Odds API adapter,
                           acquisition core), providers, persistence
 competitions/worldcup/    WC brain: groups/Annex-C/knockout rules,
                           SimulationRules adapter, engine/pipeline,

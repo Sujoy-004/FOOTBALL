@@ -95,6 +95,7 @@ class TestUCLTruthPayloads:
         from web.wc_app import compute_overview, wc_app
         from web.derived import holder
         # The parent server publishes the wc snapshot at boot; mirror that here.
+        holder.clear_sim("worldcup")
         holder.publish_data("worldcup", compute_overview(), "results",
                             wc_mod._observed_stamp())
         with TestClient(wc_app) as client:
@@ -190,6 +191,7 @@ class TestWCInsightTruth:
         from web.wc_app import compute_overview
         from web.derived import holder
         from competitions.worldcup.src.insight import compute_match_insight
+        holder.clear_sim("worldcup")
         holder.publish_data("worldcup", compute_overview(), "results",
                             wc_mod._observed_stamp())
         fb = holder.read_data("worldcup")["full_bracket"]

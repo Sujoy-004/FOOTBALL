@@ -320,8 +320,8 @@ class TestLedgerSeeding:
                 "error": None, "stale": False, "deferred": True,
                 "reason": "provider_empty", "status": "deferred",
                 "last_refresh": "2026-01-01T00:00:00+00:00",
-                "mode": "ucl.data_providers.bsd_provider",
-                "n_matches": 0, "n_updated": 0, "provider": "BSDProvider",
+                "mode": "football_core.data_providers.football_data_org_provider",
+                "n_matches": 0, "n_updated": 0, "provider": "FootballDataOrgProvider",
             },
         }), encoding="utf-8")
 

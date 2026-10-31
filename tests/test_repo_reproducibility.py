@@ -64,7 +64,7 @@ def _backfill_runtime_stores(data_dir: Path) -> None:
 def _run_ucl_deterministic_compute(data_dir: Path) -> dict:
     """Run the UCL deterministic compute on the given data dir."""
     from competitions.ucl.src.orchestrator import run_deterministic_compute
-    return run_deterministic_compute(str(data_dir), bsd_api_key="")
+    return run_deterministic_compute(str(data_dir))
 
 
 def _verify_gitignore_excludes_runtime() -> bool:

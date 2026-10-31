@@ -71,7 +71,7 @@ class MatchResultProvider(Protocol):
     """Protocol that all match result providers implement.
 
     Follows the same pattern as FixtureProvider.
-    Implementations load match results from their source (JSON, BSD API, etc.)
+    Implementations load match results from their source (JSON, external API, etc.)
     and return a played_matches dict for injection into the simulation engine.
     """
 
@@ -95,7 +95,7 @@ class ResultHistoryProvider(Protocol):
     """Provide completed match results for a team before a given date.
 
     Used by RollingFormSignal for form computation (D-09).
-    Implementations: BSDMatchResultProvider (BSD API) and
+    Implementations: LiveMatchResultProvider (live API) and
     ReplayMatchResultProvider (replay JSON files).
     """
 
@@ -127,7 +127,7 @@ class DataProvider(Protocol):
     Returns raw list-of-dict data from the provider. Processing, caching,
     and persistence are handled by the caller. Competition identifiers are
     provider-specific (e.g. ``"WC"``, ``"CL"`` for football-data.org;
-    ``"27"``, ``"7"`` for BSD league IDs).
+    ``"27"``, ``"7"`` for competition identifiers).
     """
 
     def fetch_matches(self, competition_id: str, **kwargs) -> list[dict]:

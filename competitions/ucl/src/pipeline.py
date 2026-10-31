@@ -265,20 +265,18 @@ def compute_elo_coverage(
 # ── 5 ─────────────────────────────────────────────────────────────────────
 
 
-def _select_provider(bsd_api_key: str, football_data_org_key: str, ucl_league_id: int):
+def _select_provider(football_data_org_key: str = "", *args, **kwargs):
     """Select a data provider based on available keys and env override."""
-    from football_core.data_providers.bsd_provider import BSDDataProvider
     from football_core.data_providers.football_data_org_provider import FootballDataOrgProvider
 
-    mode = os.environ.get("DATA_PROVIDER", "").lower()
-    if mode == "bsd" and bsd_api_key:
-        return BSDDataProvider(bsd_api_key, league_id=ucl_league_id)
-    if mode == "football-data" and football_data_org_key:
-        return FootballDataOrgProvider(football_data_org_key)
-    if bsd_api_key:
-        return BSDDataProvider(bsd_api_key, league_id=ucl_league_id)
-    if football_data_org_key:
-        return FootballDataOrgProvider(football_data_org_key)
+    fdo_key = (
+        football_data_org_key
+        or (args[1] if len(args) > 1 and args[1] else (args[0] if args else ""))
+        or kwargs.get("football_data_org_key")
+        or kwargs.get("api_key", "")
+    )
+    if fdo_key:
+        return FootballDataOrgProvider(fdo_key)
     return None
 
 
@@ -342,11 +340,12 @@ def build_active_season_lookup(data_dir: str | Path, aliases: dict) -> dict:
 
 def fetch_live_data(
     data_dir: str | Path,
-    bsd_api_key: str,
+    *args,
     football_data_org_key: str = "",
-    ucl_league_id: int = 7,
+    ucl_league_id: int = 0,
     team_aliases_data: dict | None = None,
     provider=None,
+    **kwargs,
 ) -> dict:
     """Fetch live match data from the configured provider and ingest it.
 
@@ -392,7 +391,7 @@ def fetch_live_data(
     # and may pass a pre-selected provider; offline/backfill callers fall
     # back to the local key-based selection.
     if provider is None:
-        provider = _select_provider(bsd_api_key, football_data_org_key, ucl_league_id)
+        provider = _select_provider(football_data_org_key, *args, **kwargs)
     if provider is None:
         logger.warning("[UCL] No data provider — skipping live fetch")
         # D-13: attempted=False derives to (False, "deferred") — never True.
@@ -408,7 +407,7 @@ def fetch_live_data(
     # When a non-historical season is explicitly active, request that season
     # from providers that support a season filter (for example FDO). Without
     # this, the provider may silently return its own default/current season,
-    # defeating the active-season boundary during transitions. BSD-compatible
+    # defeating the active-season boundary during transitions. Generic
     # providers accept and ignore the keyword for protocol compatibility.
     current = get_current_season(data_dir)
     requested_season = None
@@ -527,7 +526,7 @@ def fetch_live_data(
 
         # Exchange 5: preserve season identity for multi-season routing.
         # Events without provider season info default to the local historical
-        # season — BSD and other non-FDO providers never emit season.
+        # season — non-FDO providers never emit season.
         season_raw = event.get("season", "")
         ev_season = season_raw if season_raw else LOCAL_HISTORICAL_SEASON
 
@@ -914,11 +913,12 @@ def run_mc_simulation(
     seed: int | None = None,
     weights: dict[str, float] | None = None,
     show_ci: str = "auto",
-    bsd_api_key: str = "",
+    football_data_org_key: str = "",
     team_aliases: dict[str, str] | None = None,
     progress_cb=None,
     elo_ratings_override: dict[str, float] | None = None,
     played_matches: dict[tuple[str, str], tuple[int, int]] | None = None,
+    **kwargs,
 ) -> dict:
     """Run a full Monte Carlo simulation pipeline.
 

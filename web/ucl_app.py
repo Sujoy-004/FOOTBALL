@@ -66,14 +66,10 @@ logger = logging.getLogger(__name__)
 # Credentials are read at CALL time, never frozen at import: os.environ can
 # be populated (or overridden) long after this module was imported, and a
 # frozen constant would keep resolving to the empty pre-import value.
-def _bsd_key() -> str:
-    return os.environ.get("BSD_API_KEY", "")
-
-
 def _football_data_org_key() -> str:
     return os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
 
-_BSD_TEAM_ALIASES: dict[str, str] = {
+_UCL_TEAM_ALIASES: dict[str, str] = {
     "Real Madrid": "Real Madrid",
     "FC Bayern M\u00fcnchen": "Bayern",
     "Liverpool FC": "Liverpool",
@@ -587,14 +583,13 @@ def _fetch_live_data() -> None:
     from web.common import get_data_provider
     from competitions.ucl.src.pipeline import fetch_live_data as _brain_fetch
 
-    provider = get_data_provider(
-        _bsd_key(), _football_data_org_key(), UCL_LEAGUE_ID)
+    provider = get_data_provider("", _football_data_org_key(), UCL_LEAGUE_ID)
     if provider is None:
         logger.warning(
             "[UCL] NOT_CONFIGURED - no data provider available "
-            "(BSD key configured: %s, football-data key configured: %s, "
+            "(football-data key configured: %s, "
             "DATA_PROVIDER=%s); skipping live fetch",
-            bool(_bsd_key()), bool(_football_data_org_key()),
+            bool(_football_data_org_key()),
             os.environ.get("DATA_PROVIDER", "") or "(unset)",
         )
         holder.append_boot("ucl", {"step": "UCL live fetch", "status": "skip", "elapsed": 0.0, "output": f"[{ts()}] No data provider configured"})
@@ -607,9 +602,8 @@ def _fetch_live_data() -> None:
         # can tell whether the canonical stores actually changed.
         stamp_before = _observed_stamp()
         summary = _brain_fetch(
-            str(DATA_DIR), _bsd_key(),
+            str(DATA_DIR),
             football_data_org_key=_football_data_org_key(),
-            ucl_league_id=UCL_LEAGUE_ID,
             provider=provider,
         )
     except Exception as exc:  # never let a refresh crash the request path
@@ -760,7 +754,7 @@ def _match_counts() -> tuple[int, int]:
 
 def deterministic_compute() -> dict:
     from competitions.ucl.src.orchestrator import run_deterministic_compute as _f
-    result = _f(str(DATA_DIR), bsd_api_key=_bsd_key())
+    result = _f(str(DATA_DIR), football_data_org_key=_football_data_org_key())
     result["mode"] = "results"
     result["boot"] = result.get("boot", [])
     return result
@@ -781,7 +775,7 @@ def compute_all() -> dict:
                       "output": f"[error] {mode_reason}"}],
         }
     from competitions.ucl.src.orchestrator import run_compute_all as _f
-    result = _f(str(DATA_DIR), bsd_api_key=_bsd_key(), team_aliases=_BSD_TEAM_ALIASES)
+    result = _f(str(DATA_DIR), football_data_org_key=_football_data_org_key(), team_aliases=_UCL_TEAM_ALIASES)
     result["mode"] = "simulation"
     result["boot"] = result.get("boot", [])
     return result
@@ -1270,8 +1264,8 @@ def _ucl_sim_runner(progress_cb, count: int, seed):
     facts = _ucl_known_fact_ids()
     result = _run_mc_simulation_pipeline(
         str(DATA_DIR), n_iterations=count, seed=seed,
-        weights=None, show_ci="auto", bsd_api_key=_bsd_key(),
-        team_aliases=_BSD_TEAM_ALIASES, progress_cb=_normalized_progress,
+        weights=None, show_ci="auto", football_data_org_key=_football_data_org_key(),
+        team_aliases=_UCL_TEAM_ALIASES, progress_cb=_normalized_progress,
         elo_ratings_override=cached_elo,
     )
     result["sim_results_stamp"] = stamp

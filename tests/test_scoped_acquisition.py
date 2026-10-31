@@ -27,8 +27,6 @@ from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parent.parent
 
-UCL_LEAGUE_ID = 7      # web.ucl_app.UCL_LEAGUE_ID
-WC_LEAGUE_ID = 27      # competitions.worldcup.src.constants.DEFAULT_LEAGUE_ID
 
 
 class _CountingProvider:
@@ -104,13 +102,17 @@ def isolated_environment(tmp_path, monkeypatch):
 
 
 def _install_split_fakes(monkeypatch, ucl_prov, wc_prov):
-    """Route provider selection by league id so each competition gets its
+    """Route provider selection so each competition gets its
     own counting fake through the single shared factory."""
 
-    def _factory(bsd_key, fdo_key, league_id=None):
-        return ucl_prov if league_id == UCL_LEAGUE_ID else wc_prov
+    class SplitProvider:
+        last_error = None
+        def fetch_matches(self, competition_id="WC", *a, **k):
+            if competition_id in ("CL", "ucl"):
+                return ucl_prov.fetch_matches(competition_id, *a, **k)
+            return wc_prov.fetch_matches(competition_id, *a, **k)
 
-    monkeypatch.setattr("football_core.runtime_support.get_data_provider", _factory)
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider", lambda *a, **k: SplitProvider())
 
 
 # ── 1. registry scoping: no cross-talk ───────────────────────────────────

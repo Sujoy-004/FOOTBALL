@@ -76,8 +76,8 @@ def _group_event(wc_dir: Path) -> dict:
     groups = json.loads((wc_dir / "groups.json").read_text(encoding="utf-8"))
     match = groups["groups"]["A"]["matches"][0]
     return {
-        "id": "BSD_G1",
-        "match_id": "BSD_G1",
+        "id": "EVT_G1",
+        "match_id": "EVT_G1",
         "status": "finished",
         "group_name": "Group A",
         "home_team": match["team_a"],
@@ -138,8 +138,8 @@ def test_unmatchable_event_lands_in_exactly_one_bucket(
 ):
     good = bracket_events(wc_dir, ("R16",), seed_r32_winners=True)[0]
     bad = {
-        "id": "BSD_BAD",
-        "match_id": "BSD_BAD",
+        "id": "EVT_BAD",
+        "match_id": "EVT_BAD",
         "status": "finished",
         "home_team": "FC Nowhere United",
         "away_team": "Atlantis Olympic",

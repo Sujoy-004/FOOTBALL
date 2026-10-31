@@ -48,7 +48,7 @@ class _DeadProvider:
 def dead_provider(monkeypatch):
     prov = _DeadProvider()
 
-    def _factory(bsd_key, fdo_key, league_id=None):
+    def _factory(*args, **kwargs):
         return prov
 
     monkeypatch.setattr("football_core.runtime_support.get_data_provider", _factory)
@@ -62,7 +62,7 @@ def test_wc_failed_refresh_is_visible_and_marked_stale(monkeypatch, caplog):
 
     monkeypatch.setattr(
         "football_core.runtime_support.get_data_provider",
-        lambda b, f, l: type("P", (), {"last_error": "HTTP 400: invalid",
+        lambda *a, **k: type("P", (), {"last_error": "HTTP 400: invalid",
                                        "fetch_matches": lambda s, **k: []})())
     report = wc_pipeline.fetch_live_data("", "", WC_DATA)
     assert report["attempted"] is True
@@ -93,7 +93,7 @@ def test_ucl_empty_fetch_marks_stale(monkeypatch, caplog):
     import logging
 
     dead = _DeadProvider()
-    monkeypatch.setattr("football_core.runtime_support.get_data_provider", lambda b, f, l=None: dead)
+    monkeypatch.setattr("football_core.runtime_support.get_data_provider", lambda *a, **k: dead)
 
     import web.ucl_app as ucl_app
     with caplog.at_level(logging.WARNING):

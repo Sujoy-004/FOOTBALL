@@ -71,13 +71,13 @@ def _build_match_entry(
                 winner = home_norm if pen_home > pen_away else away_norm
                 is_draw = False
         if winner is None:
-            bsd_winner = raw.get("winner") or raw.get("result")
-            if bsd_winner:
+            raw_winner = raw.get("winner") or raw.get("result")
+            if raw_winner:
                 w_name = None
-                if isinstance(bsd_winner, str):
-                    w_name = bsd_winner
-                elif isinstance(bsd_winner, dict):
-                    w_name = bsd_winner.get("name") or bsd_winner.get("full_name")
+                if isinstance(raw_winner, str):
+                    w_name = raw_winner
+                elif isinstance(raw_winner, dict):
+                    w_name = raw_winner.get("name") or raw_winner.get("full_name")
                 if w_name:
                     w_norm = normalize_team(
                         w_name, alias_lookup or {}
@@ -149,10 +149,6 @@ def _should_apply_wc_update(existing: dict, proposed: dict) -> bool:
     return True
 
 
-def build_historic_url(league_id: int = 27) -> str:
-    today = datetime.now().strftime("%Y-%m-%d")
-    base = "https://sports.bzzoiro.com/api/events/"
-    return f"{base}?league_id={league_id}&date_from={constants.WC_START_DATE}&date_to={today}&limit=200"
 
 
 def _extract_ai_preview(raw_event: dict) -> str | None:
@@ -228,7 +224,7 @@ def process_matches(
         played_store = {}
         legacy_ids = set(played or ())
     # NOTE: played_event_ids mutates the caller's set when one is supplied
-    # (the historical contract of the group processor's played_bsd_event_ids),
+    # (the historical contract of the group processor's played_provider_event_ids),
     # matching legacy in-call event deduplication.
     played_event_ids_local = (
         played_event_ids if played_event_ids is not None else set()
@@ -325,7 +321,7 @@ def process_group_matches(
     groups: dict,
     aliases: dict[str, list[str]],
     played_groups: dict[str, dict] | set[str],
-    played_bsd_event_ids: set[str] | None = None,
+    played_provider_event_ids: set[str] | None = None,
     ingestion_stats: dict | None = None,
     changed_ids: list | None = None,
 ) -> list[dict]:
@@ -337,7 +333,7 @@ def process_group_matches(
         groups: Tournament groups dictionary.
         aliases: Team spelling alias lookup dictionary.
         played_groups: Already-ingested played group matches store or set.
-        played_bsd_event_ids: Mutable set tracking provider event IDs.
+        played_provider_event_ids: Mutable set tracking provider event IDs.
         ingestion_stats: Tracking counters dictionary.
         changed_ids: Optional list to collect match_ids whose stored content
             changed (appended at the mutation site).
@@ -361,11 +357,11 @@ def process_group_matches(
         # Preserve the old "skip entirely" semantics for those ids.
         played_store = {}
         legacy_ids = set(played_groups or ())
-    # NOTE: played_bsd_event_ids mutates the caller's set when one is
+    # NOTE: played_provider_event_ids mutates the caller's set when one is
     # supplied, matching the historical in-call/cross-call event
     # deduplication contract relied on by callers.
-    played_bsd_event_ids = (
-        played_bsd_event_ids if played_bsd_event_ids is not None else set()
+    played_provider_event_ids = (
+        played_provider_event_ids if played_provider_event_ids is not None else set()
     )
 
     results: list[dict] = []
@@ -386,14 +382,14 @@ def process_group_matches(
             istats["skipped_no_target"] += 1
             continue
 
-        bsd_id = str(match.get("id", ""))
-        if bsd_id in played_bsd_event_ids:
+        ev_id = str(match.get("id", ""))
+        if ev_id in played_provider_event_ids:
             # Re-offered receipt: already counted this run; the earlier
             # receipt drove the store change, so landing here is a true
             # no-op for the store.
             istats["skipped_no_change"] = istats.get("skipped_no_change", 0) + 1
             continue
-        played_bsd_event_ids.add(bsd_id)
+        played_provider_event_ids.add(ev_id)
 
         group_letter = _extract_group_letter(group_name)
         if group_letter is None:

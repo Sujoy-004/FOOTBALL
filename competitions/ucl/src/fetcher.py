@@ -1,35 +1,36 @@
-"""Fetch and normalize live UCL match results from BSD API."""
+"""Fetch and normalize live UCL match results from provider API."""
 
 import logging
 from football_core.fetcher import fetch_raw_matches, _build_alias_lookup, normalize_team
 
 logger = logging.getLogger(__name__)
 
-UCL_LEAGUE_ID = 7
-
 
 def build_ucl_url() -> str:
-    """Build BSD API URL for UCL events, filtered by league_id."""
-    return f"https://sports.bzzoiro.com/api/events/?league_id={UCL_LEAGUE_ID}&limit=200"
+    """Build API URL for UCL events."""
+    return "https://api.football-data.org/v4/competitions/CL/matches"
 
 
 def fetch_ucl_matches(
     api_key: str,
     aliases: dict[str, list[str]],
     fixtures_schedule: dict,
+    api_url: str | None = None,
 ) -> list[dict]:
-    """Fetch completed UCL matches from BSD API and normalize to internal format.
+    """Fetch completed UCL matches from provider API and normalize to internal format.
 
     Parameters
     ----------
     api_key : str
-        BSD API authentication token.
+        API authentication token.
     aliases : dict[str, list[str]]
         Team alias mapping: {canonical_name: [variant_names]}.
         See ``team_aliases.json`` for format.
     fixtures_schedule : dict
         UCL fixture schedule with ``teams`` and ``matchdays`` keys.
         Structure matches ``fixtures.json`` schema.
+    api_url : str, optional
+        API URL override.
 
     Returns
     -------
@@ -42,21 +43,22 @@ def fetch_ucl_matches(
         - is_draw: bool — whether match ended in a draw
         - home_score: int — home team goals
         - away_score: int — away team goals
-        - completed_at: str — ISO event date from BSD API
-        - odds: dict (optional) — vig-removed fair probabilities
+        - completed_at: str — ISO event date from API
+        - odds: dict (optional) — fair probabilities
             with keys "home", "draw", "away" (sum ~= 1.0)
     """
     alias_lookup = _build_alias_lookup(aliases, bracket=[])
 
-    # Register fixture teams into alias lookup so teams missing from BSD aliases
+    # Register fixture teams into alias lookup so teams missing from aliases
     # still resolve through their canonical fixture name.
     for team in fixtures_schedule.get("teams", []):
         alias_lookup[team["name"].strip().lower()] = team["name"]
 
-    raw = fetch_raw_matches(api_key, build_ucl_url(), league_id=UCL_LEAGUE_ID)
+    url = api_url or build_ucl_url()
+    raw = fetch_raw_matches(api_key, url, 0)
 
     # Build bidirectional fixture lookup: (team_a, team_b) -> match_id
-    # Both orientations are stored so BSD events with swapped home/away
+    # Both orientations are stored so events with swapped home/away
     # still match their fixture entry.
     fixture_lookup: dict[tuple[str, str], str] = {}
     for md in fixtures_schedule.get("matchdays", []):

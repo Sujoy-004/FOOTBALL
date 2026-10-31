@@ -1,7 +1,6 @@
-"""Tests for live mode — BSD fetch + played_matches injection."""
+"""Tests for live mode — provider fetch + played_matches injection."""
 
 from __future__ import annotations
-
 
 from competitions.ucl.src.simulation import run_monte_carlo
 
@@ -9,9 +8,9 @@ from competitions.ucl.src.simulation import run_monte_carlo
 class TestLiveMode:
     """Tests for live mode data conversion and injection."""
 
-    def test_bsd_provider_load(self, monkeypatch):
-        """BSDMatchResultProvider.load() fetches BSD and converts to played_matches."""
-        from competitions.ucl.src.result_provider import BSDMatchResultProvider
+    def test_live_provider_load(self, monkeypatch):
+        """LiveMatchResultProvider.load() fetches matches and converts to played_matches."""
+        from competitions.ucl.src.result_provider import LiveMatchResultProvider
 
         mock_results = [
             {"team_a": "Barcelona", "team_b": "Man City",
@@ -32,7 +31,7 @@ class TestLiveMode:
             mock_fetch,
         )
 
-        provider = BSDMatchResultProvider("dummy_key", {}, {})
+        provider = LiveMatchResultProvider("dummy_key", {}, {})
         result = provider.load()
         assert ("Barcelona", "Man City") in result
         assert result[("Barcelona", "Man City")] == (4, 0)
@@ -42,10 +41,10 @@ class TestLiveMode:
     def test_live_mode_integration(
         self, monkeypatch, sample_fixture_schedule, sample_elo_dict,
     ):
-        """Live mode fetching BSD + injecting into MC produces valid results."""
-        from competitions.ucl.src.result_provider import convert_bsd_matches
+        """Live mode fetching + injecting into MC produces valid results."""
+        from competitions.ucl.src.result_provider import convert_live_matches
 
-        mock_bsd_results = [
+        mock_live_results = [
             {"team_a": "Barcelona", "team_b": "Man City",
              "home_score": 3, "away_score": 0,
              "winner": "Barcelona", "is_draw": False,
@@ -53,14 +52,14 @@ class TestLiveMode:
         ]
 
         def mock_fetch(*args, **kwargs):
-            return mock_bsd_results
+            return mock_live_results
 
         monkeypatch.setattr(
             "competitions.ucl.src.fetcher.fetch_ucl_matches",
             mock_fetch,
         )
 
-        played_matches = convert_bsd_matches(mock_bsd_results)
+        played_matches = convert_live_matches(mock_live_results)
         result = run_monte_carlo(
             sample_fixture_schedule, sample_elo_dict,
             n_iterations=5, seed=42,

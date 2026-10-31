@@ -26,26 +26,16 @@ from football_core.constants import (
 # ─── Multi-League Framework (Phase 19) ─────────────────────────────────────
 
 DEFAULT_LEAGUE_ID: int = 27
-"""Default BSD league ID (World Cup 2026)."""
+WC_COMPETITION_CODE: str = "WC"
 
 LEAGUES: dict[int, str] = {
     27: "World Cup 2026",
 }
-"""Static catalog of BSD league IDs to league names (World Cup only)."""
-
-
-def api_url_for_league(league_id: int) -> str:
-    """Build BSD events API URL for a given league ID."""
-    return f"https://sports.bzzoiro.com/api/events/?league_id={league_id}&limit=200"
-
 
 # ─── World-Cup-specific Constants ───────────────────────────────────────────
 
 DATA_DIR: Path = Path(__file__).resolve().parent.parent / "data"
 """Directory containing JSON state files (teams.json, bracket.json, played.json)."""
-
-API_URL: str = "https://sports.bzzoiro.com/api/events/?league_id=27&limit=200"
-"""BSD API endpoint for World Cup matches."""
 
 WC_START_DATE: str = "2026-06-11"
 """Tournament start date for historical catch-up URL construction."""
@@ -176,8 +166,8 @@ If a team has fewer than this, use whatever is available. If 0, signal unavailab
 
 TEAM_VALUES_FILE: str = "team_values.json"
 """Filename for squad market values data file in data/ directory (Phase 15).
-Static file with per-team aggregate squad market values in EUR. NOT from BSD API
-per user decision (BSD API key expired, 832 API calls, live dependency ruled out)."""
+Static file with per-team aggregate squad market values in EUR.
+per user decision (live dependency ruled out)."""
 
 DEFAULT_FORM_K: float = 1.0
 """Default sigmoid steepness for form signal — TUNING PARAMETER (D-05).

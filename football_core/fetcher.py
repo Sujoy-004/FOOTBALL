@@ -1,10 +1,9 @@
-"""Fetch and process live match results from BSD API — generic pipeline."""
+"""Fetch and process live match results — generic pipeline."""
 
 import logging
 import unicodedata
 from dataclasses import dataclass, field
 
-from football_core.data_providers.bsd_provider import BSDDataProvider
 
 logger = logging.getLogger(__name__)
 
@@ -188,10 +187,34 @@ def derive_success(provider: str | None, attempted: bool,
     return True, None
 
 
-def fetch_raw_matches(api_key: str, api_url: str, league_id: int, timeout: int = 10) -> list[dict]:
-    """Thin wrapper — delegates to :class:`BSDDataProvider.fetch_matches`."""
-    provider = BSDDataProvider(api_key, league_id=league_id)
-    return provider.fetch_matches(url=api_url, league_id=league_id, timeout=timeout)
+def fetch_raw_matches(api_key: str, api_url: str, league_id: int = 0, timeout: int = 10) -> list[dict]:
+    """Fetch raw match events from external API endpoint."""
+    import time
+    import requests
+    headers = {"X-Auth-Token": api_key, "Authorization": f"Token {api_key}"}
+    session = requests.Session()
+    for attempt in range(3):
+        try:
+            resp = session.get(api_url, headers=headers, timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list):
+                    return data
+                if isinstance(data, dict):
+                    return data.get("matches", data.get("events", data.get("results", [])))
+                return []
+            if resp.status_code == 401:
+                return []
+            if attempt < 2:
+                time.sleep(1)
+        except Exception as exc:
+            if isinstance(exc, (requests.exceptions.Timeout, requests.exceptions.RequestException)):
+                if attempt < 2:
+                    time.sleep(1)
+                    continue
+            logger.debug("fetch_raw_matches error: %s", exc)
+            return []
+    return []
 
 
 

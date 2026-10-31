@@ -65,8 +65,8 @@ def teams_dict(elo_ratings):
 
 
 @pytest.fixture
-def group_a_match_bsd_events():
-    """Mock BSD API events for 2 finished group A matches.
+def group_a_match_provider_events():
+    """Mock provider API events for 2 finished group A matches.
 
     Mexico 2-1 South Africa (GS_A_01)
     South Korea 2-0 Czech Republic (GS_A_06)
@@ -101,12 +101,12 @@ def group_a_match_bsd_events():
 
 
 class TestProcessGroupMatches:
-    """Tests for process_group_matches() — BSD API group match ingestion."""
+    """Tests for process_group_matches() — provider API group match ingestion."""
 
-    def test_process_group_matches_basic(self, group_a_fixture, group_a_match_bsd_events):
-        """Basic ingestion: mock BSD event returns 1 entry with correct match_id, winner, scores."""
+    def test_process_group_matches_basic(self, group_a_fixture, group_a_match_provider_events):
+        """Basic ingestion: mock provider event returns 1 entry with correct match_id, winner, scores."""
         result = process_group_matches(
-            group_a_match_bsd_events[:1],  # First event only: Mexico vs South Africa
+            group_a_match_provider_events[:1],  # First event only: Mexico vs South Africa
             {}, group_a_fixture, {},
             set(), set(),
         )
@@ -123,10 +123,10 @@ class TestProcessGroupMatches:
         assert entry["team_a"] == "Mexico"
         assert entry["team_b"] == "South Africa"
 
-    def test_process_group_matches_basic_two_events(self, group_a_fixture, group_a_match_bsd_events):
-        """Two mock BSD events produce 2 entries with distinct match_ids."""
+    def test_process_group_matches_basic_two_events(self, group_a_fixture, group_a_match_provider_events):
+        """Two mock provider events produce 2 entries with distinct match_ids."""
         result = process_group_matches(
-            group_a_match_bsd_events, {}, group_a_fixture, {},
+            group_a_match_provider_events, {}, group_a_fixture, {},
             set(), set(),
         )
         assert len(result) == 2, f"Expected 2 results, got {len(result)}"
@@ -135,28 +135,28 @@ class TestProcessGroupMatches:
             f"Expected GS_A_01 and GS_A_06, got {match_ids}"
         )
 
-    def test_process_group_matches_dedup_bsd_event(self, group_a_fixture, group_a_match_bsd_events):
-        """BSD event id dedup: same event second time returns empty list."""
-        played_bsd_ids: set[str] = set()
+    def test_process_group_matches_dedup_provider_event(self, group_a_fixture, group_a_match_provider_events):
+        """provider event id dedup: same event second time returns empty list."""
+        played_provider_ids: set[str] = set()
         first = process_group_matches(
-            group_a_match_bsd_events[:1], {}, group_a_fixture, {},
-            set(), played_bsd_ids,
+            group_a_match_provider_events[:1], {}, group_a_fixture, {},
+            set(), played_provider_ids,
         )
         assert len(first) == 1, "First call should return 1 entry"
 
         second = process_group_matches(
-            group_a_match_bsd_events[:1], {}, group_a_fixture, {},
-            set(), played_bsd_ids,
+            group_a_match_provider_events[:1], {}, group_a_fixture, {},
+            set(), played_provider_ids,
         )
         assert len(second) == 0, (
-            f"Second call with same bsd_id should be empty, got {len(second)}"
+            f"Second call with same provider_id should be empty, got {len(second)}"
         )
 
-    def test_process_group_matches_dedup_match_id(self, group_a_fixture, group_a_match_bsd_events):
-        """Match_id dedup: fresh BSD event but played_group_ids prevents re-processing."""
+    def test_process_group_matches_dedup_match_id(self, group_a_fixture, group_a_match_provider_events):
+        """Match_id dedup: fresh provider event but played_group_ids prevents re-processing."""
         played_group_ids = {"GS_A_01"}
         result = process_group_matches(
-            group_a_match_bsd_events[:1], {}, group_a_fixture, {},
+            group_a_match_provider_events[:1], {}, group_a_fixture, {},
             played_group_ids, set(),
         )
         assert len(result) == 0, (
@@ -233,7 +233,7 @@ class TestProcessGroupMatches:
         )
         assert result == [], f"Expected empty for bad group_name, got {result}"
 
-    def test_process_group_matches_null_group_name_skipped(self, group_a_fixture, group_a_match_bsd_events):
+    def test_process_group_matches_null_group_name_skipped(self, group_a_fixture, group_a_match_provider_events):
         """Event with null group_name is skipped (knockout match, handled elsewhere)."""
         knockout_event = [
             {
@@ -394,14 +394,14 @@ class TestStandingsWithPlayedGroups:
 
 
 class TestFullPipeline:
-    """End-to-end test: mock BSD → process → persist → simulate → standings."""
+    """End-to-end test: mock provider → process → persist → simulate → standings."""
 
     def test_full_pipeline_with_group_matches(
         self, group_a_fixture, teams_dict, elo_ratings, tmp_path
     ):
-        """Full pipeline: 2 processed BSD events → save → load → sim → standings."""
-        # Step 1: Build mock BSD response with 2 group matches
-        bsd_events = [
+        """Full pipeline: 2 processed provider events → save → load → sim → standings."""
+        # Step 1: Build mock provider response with 2 group matches
+        provider_events = [
             {
                 "id": 1001,
                 "status": "finished",
@@ -426,9 +426,9 @@ class TestFullPipeline:
             },
         ]
 
-        # Step 2: Process group matches (mock BSD → results)
+        # Step 2: Process group matches (mock provider → results)
         processed = process_group_matches(
-            bsd_events, {}, group_a_fixture, {},
+            provider_events, {}, group_a_fixture, {},
             set(), set(),
         )
         assert len(processed) == 2, f"Expected 2 processed matches, got {len(processed)}"

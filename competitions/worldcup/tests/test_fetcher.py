@@ -6,7 +6,6 @@ import requests
 
 from src.fetcher import (
     _extract_ai_preview,
-    build_historic_url,
     fetch_raw_matches,
     process_group_matches,
     process_matches,
@@ -34,7 +33,7 @@ class MockResponse:
 
 
 class FakeSession:
-    """Stands in for requests.Session so BSDDataProvider's self._session.get
+    """Stands in for requests.Session so Provider's self._session.get
     hits the mocked HTTP seam."""
 
     def __init__(self, mock_get):
@@ -56,31 +55,6 @@ SAMPLE_MATCHES = [
 ]
 
 SAMPLE_ALIASES = {"Iran": ["IR Iran"]}
-
-
-def test_build_historic_url_format(monkeypatch):
-    """build_historic_url returns a valid URL with WC_START_DATE and today's date."""
-    from datetime import datetime
-    import src.constants as c
-    url = build_historic_url()
-    assert url.startswith("https://sports.bzzoiro.com/api/events/")
-    assert f"date_from={c.WC_START_DATE}" in url
-    assert f"date_to={datetime.now().strftime('%Y-%m-%d')}" in url
-    assert "league_id=27" in url
-    assert "limit=200" in url
-
-
-def test_build_historic_url_custom_league(monkeypatch):
-    """build_historic_url(league_id=65) returns URL with league_id=65 instead of default 27."""
-    from datetime import datetime
-    import src.constants as c
-    url = build_historic_url(league_id=65)
-    assert url.startswith("https://sports.bzzoiro.com/api/events/")
-    assert f"date_from={c.WC_START_DATE}" in url
-    assert f"date_to={datetime.now().strftime('%Y-%m-%d')}" in url
-    assert "league_id=65" in url
-    assert "league_id=27" not in url
-    assert "limit=200" in url
 
 
 def test_fetch_success(monkeypatch):
@@ -198,7 +172,7 @@ def test_process_matches_filters_played():
 
 
 def test_process_matches_draw():
-    """Draw match (equal scores, no BSD winner) produces entry with winner=None, is_draw=True."""
+    """Draw match (equal scores, no provider winner) produces entry with winner=None, is_draw=True."""
     bracket = [
         {"match_id": "R16_X", "team_a": "Argentina", "team_b": "Iran", "source_matches": None, "winner": None},
     ]
@@ -218,7 +192,7 @@ def test_process_matches_draw():
 
 
 def test_process_matches_pk():
-    """PK shootout (equal scores + BSD winner) produces entry with winner set, is_draw=False."""
+    """PK shootout (equal scores + provider winner) produces entry with winner set, is_draw=False."""
     bracket = [
         {"match_id": "R16_X", "team_a": "Argentina", "team_b": "Iran", "source_matches": None, "winner": None},
     ]
@@ -250,7 +224,7 @@ ENRICHED_MATCH = {
 
 
 def test_process_matches_with_enrichment():
-    """process_matches() attaches stats and context keys when BSD provides them."""
+    """process_matches() attaches stats and context keys when provider provides them."""
     bracket = [
         {"match_id": "R16_X", "team_a": "Argentina", "team_b": "Iran", "source_matches": None, "winner": None},
     ]
@@ -297,7 +271,7 @@ def test_extract_ai_preview_not_dict():
 
 
 def test_process_matches_no_stats():
-    """process_matches() omits stats key when BSD live_stats is None."""
+    """process_matches() omits stats key when provider live_stats is None."""
     bracket = [
         {"match_id": "R16_X", "team_a": "Argentina", "team_b": "Iran", "source_matches": None, "winner": None},
     ]
@@ -355,7 +329,7 @@ def test_process_group_matches_skips_empty_group_name():
 
 
 def test_process_group_matches_skips_none_group_name():
-    """Events with group_name=None (BSD-style knockout) must be skipped."""
+    """Events with group_name=None (provider-style knockout) must be skipped."""
     from football_core.fetcher import new_ingestion_stats
 
     knockout_match = {

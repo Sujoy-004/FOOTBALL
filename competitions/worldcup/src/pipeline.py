@@ -257,10 +257,27 @@ def build_blend_params(engine_predictions: list, all_matches: list[dict], engine
 
 
 def fetch_live_data(
-    bsd_api_key: str,
-    football_data_org_key: str,
-    data_dir: Path,
+    *args,
+    football_data_org_key: str = "",
+    data_dir: Path | None = None,
 ) -> dict:
+    if len(args) == 3:
+        football_data_org_key = str(args[1] or "")
+        data_dir = Path(args[2])
+    elif len(args) == 2:
+        if isinstance(args[0], Path) or (isinstance(args[0], str) and ("/" in str(args[0]) or "\\" in str(args[0]))):
+            data_dir = Path(args[0])
+            football_data_org_key = str(args[1] or "")
+        else:
+            football_data_org_key = str(args[0] or "")
+            data_dir = Path(args[1])
+    elif len(args) == 1:
+        if isinstance(args[0], Path) or ("/" in str(args[0]) or "\\" in str(args[0])):
+            data_dir = Path(args[0])
+        else:
+            football_data_org_key = str(args[0] or "")
+    if data_dir is None:
+        data_dir = constants.DATA_DIR
     """Fetch live match data + signal caches from the configured provider.
 
     Returns a refresh report {provider, attempted, success, error, stale,
@@ -312,7 +329,7 @@ def fetch_live_data(
             ),
         )
     from football_core.runtime_support import get_data_provider
-    provider = get_data_provider(bsd_api_key, football_data_org_key, constants.DEFAULT_LEAGUE_ID)
+    provider = get_data_provider("", football_data_org_key, constants.DEFAULT_LEAGUE_ID)
     if provider is None:
         return _fail("no data provider configured")
 
@@ -864,7 +881,6 @@ def run_simulation_compute(
     iterations: int = 50000,
     seed: int | None = None,
     weights: dict[str, float] | None = None,
-    bsd_api_key: str = "",
     football_data_org_key: str = "",
     progress_cb: callable | None = None,  # noqa: UP035
 ) -> dict:
@@ -1042,7 +1058,6 @@ def run_simulation_compute(
 
 def run_calibration_compute(
     data_dir: Path,
-    bsd_api_key: str = "",
     football_data_org_key: str = "",
     progress_cb: callable | None = None,  # noqa: UP035
 ) -> dict:

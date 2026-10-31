@@ -191,7 +191,7 @@ def test_results_upsert_folds_unaccented_spellings_onto_canonical_fixture(
     from competitions.ucl.src.ingest import _upsert_season_results
 
     data_dir = _seeded_runtime(tmp_path)
-    added, updated, no_target, missing = _upsert_season_results(
+    added, updated, no_target, missing, _ = _upsert_season_results(
         data_dir,
         "2026/27",
         [

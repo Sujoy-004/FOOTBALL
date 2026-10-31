@@ -1,4 +1,4 @@
-"""Market odds signal — BSD odds with vig removal as match probabilities."""
+"""Market odds signal — Market odds with vig removal as match probabilities."""
 
 import logging
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class MarketOddsSignal(Signal):
-    """Market-implied probabilities from BSD odds with vig removal.
+    """Market-implied probabilities from Market odds with vig removal.
     Provides a calibration baseline and independent signal."""
 
     name: str = "market_odds"

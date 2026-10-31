@@ -358,7 +358,7 @@ class TestFetchAndCacheOdds:
         return alias_lookup, groups
 
     def test_fetch_and_cache_with_valid_events(self):
-        """Minimal BSD event dicts → matches contain probability values."""
+        """Minimal provider event dicts → matches contain probability values."""
         alias_lookup, groups = self._make_event_fixtures()
         events = [
             {

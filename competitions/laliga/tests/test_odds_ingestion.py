@@ -1,6 +1,6 @@
 """Phase 13J — LaLiga live market-odds ingestion tests.
 
-Covers the odds contract, BSD acquisition + canonical fixture mapping,
+Covers the odds contract, market odds acquisition + canonical fixture mapping,
 validation/de-vig, freshness (pre-kickoff, max-age), the competition-scoped
 store, ``MarketOddsSignal`` enrichment (market_only non-uniform), observability
 states, UCL/WC isolation, and the pipeline refresh wiring. Network-free: a
@@ -110,7 +110,7 @@ class TestCredentialsAndFailures:
 
     def test_placeholder_key_is_not_configured(self, tmp_path):
         data_dir = _seed_data_dir(tmp_path)
-        out = acquire_laliga_odds(data_dir, "2026/27", "your_bsd_key_here", now=NOW)
+        out = acquire_laliga_odds(data_dir, "2026/27", "your_key_here", now=NOW)
         assert out["state"] == STATE_NOT_CONFIGURED
 
     def test_transport_raise_is_unavailable(self, tmp_path):
@@ -297,7 +297,7 @@ class TestSignalEnrichment:
 
 class TestObservability:
     def test_summary_available(self):
-        store = {"provider": "BSD", "state": STATE_ODDS_AVAILABLE,
+        store = {"provider": "the-odds-api", "state": STATE_ODDS_AVAILABLE,
                  "matches": {"1": {"status": STATUS_AVAILABLE,
                                    "fetched_at": "2026-09-22T10:00:00Z",
                                    "event_kickoff": "2026-09-30T19:00:00Z"}}}
@@ -306,7 +306,7 @@ class TestObservability:
         assert s["counts"]["available"] == 1
 
     def test_summary_partial_when_mixed(self):
-        store = {"provider": "BSD", "state": STATE_ODDS_AVAILABLE, "matches": {
+        store = {"provider": "the-odds-api", "state": STATE_ODDS_AVAILABLE, "matches": {
             "1": {"status": STATUS_AVAILABLE, "fetched_at": "2026-09-22T10:00:00Z",
                   "event_kickoff": "2026-09-30T19:00:00Z"},
             "2": {"status": STATUS_MISSING, "fetched_at": "2026-09-22T10:00:00Z"},
@@ -314,7 +314,7 @@ class TestObservability:
         assert odds_status_summary(store, now=NOW)["state"] == STATE_ODDS_PARTIAL
 
     def test_summary_parser_error_from_invalid(self):
-        store = {"provider": "BSD", "state": STATE_PARSER_ERROR, "matches": {
+        store = {"provider": "the-odds-api", "state": STATE_PARSER_ERROR, "matches": {
             "1": {"status": STATUS_INVALID, "fetched_at": "2026-09-22T10:00:00Z"}}}
         assert odds_status_summary(store, now=NOW)["state"] == STATE_PARSER_ERROR
 
@@ -322,7 +322,7 @@ class TestObservability:
         assert odds_status_summary({}, now=NOW)["state"] == STATE_ODDS_MISSING
 
     def test_summary_legacy_blocking_state_preserved(self):
-        store = {"state": STATE_CONFIGURED_BUT_UNAVAILABLE, "provider": "BSD"}
+        store = {"state": STATE_CONFIGURED_BUT_UNAVAILABLE, "provider": "the-odds-api"}
         assert odds_status_summary(store, now=NOW)["state"] == STATE_CONFIGURED_BUT_UNAVAILABLE
 
 
@@ -345,14 +345,14 @@ class TestPipelineWiring:
         from competitions.laliga.src import pipeline as _pipeline
         real_acquire = _pipeline.acquire_laliga_odds
 
-        def injected_acquire(data_dir_, season_token_, bsd_key_):
-            return real_acquire(data_dir_, season_token_, bsd_key_,
+        def injected_acquire(data_dir_, season_token_, *args):
+            return real_acquire(data_dir_, season_token_, *args,
                                 fetch_fn=lambda: [_event("E1", "Barcelona", "Real Madrid",
                                                     odds=(1.6, 4.2, 5.0), eid="E1")],
                                 now=NOW)
 
         monkeypatch.setattr(_pipeline, "acquire_laliga_odds", injected_acquire)
-        summary = _pipeline.fetch_live_data(str(data_dir), bsd_api_key="deadbeef",
+        summary = _pipeline.fetch_live_data(str(data_dir), api_key="deadbeef",
                                             provider=FakeProvider())
         assert summary["status"] == "ok"
         odds_status = summary.get("odds")

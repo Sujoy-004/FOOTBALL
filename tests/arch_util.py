@@ -233,8 +233,9 @@ class StubProvider:
 def recording_provider(stub):
     calls = []
 
-    def _get_data_provider(bsd_api_key, football_data_org_key, bsd_league_id=None):
-        calls.append(bsd_league_id)
+    def _get_data_provider(*args, **kwargs):
+        league_id = kwargs.get("league_id") or (args[2] if len(args) > 2 else None)
+        calls.append(league_id)
         return stub
 
     return calls, _get_data_provider

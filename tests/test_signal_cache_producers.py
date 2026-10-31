@@ -8,7 +8,7 @@ module proves, entirely offline:
 * a fresh cache inside its TTL is not recomputed (with ``count: None``);
 * the odds producer degrades truthfully with no provider and never clobbers a
   good cache with an empty result;
-* injected BSD-style events map onto canonical fixtures (finished skipped);
+* injected provider events map onto canonical fixtures (finished skipped);
 * snapshot mode returns four truthful not-attempted rows and writes nothing;
 * importing the module performs no credential read or network call.
 """
@@ -180,7 +180,6 @@ def test_odds_producer_without_provider_writes_nothing(tmp_path, monkeypatch):
     dst = _seed(tmp_path)
     monkeypatch.delenv("ODDS_PROVIDER", raising=False)
     monkeypatch.delenv("THE_ODDS_API_KEY", raising=False)
-    monkeypatch.delenv("BSD_API_KEY", raising=False)
 
     odds_path = dst / constants.ODDS_CACHE_FILE
     assert not odds_path.exists()
@@ -274,7 +273,6 @@ def _seed_and_run_wc(tmp_path, monkeypatch, *, with_team_values=True):
     )
     monkeypatch.delenv("ODDS_PROVIDER", raising=False)
     monkeypatch.delenv("THE_ODDS_API_KEY", raising=False)
-    monkeypatch.delenv("BSD_API_KEY", raising=False)
 
     from competitions.worldcup.src.pipeline import fetch_live_data
 

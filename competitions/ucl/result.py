@@ -2,10 +2,10 @@
 
 This is the architectural spine of Phase 3 (D-15, D-16, D-17):
 - Phase 3 CLI creates this from run_monte_carlo() output + one extra bracket iteration.
-- Phase 4 creates this from BSD-enriched data.
+- Phase 4 creates this from provider-enriched data.
 - Display functions never import simulation.py or knockout.py — only result.py.
 
-Owned by orchestration (Phase 3), not by simulation engine or BSD (D-16).
+Owned by orchestration (Phase 3), not by simulation engine or external provider (D-16).
 """
 
 from __future__ import annotations

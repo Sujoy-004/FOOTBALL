@@ -1,7 +1,7 @@
-"""Fixture providers for UCL — BSD API primary and repo JSON fallback.
+"""Fixture providers for UCL — live API primary and repo JSON fallback.
 
 Both providers implement the FixtureProvider Protocol from football_core.
-BSDFixtureProvider fetches from the BSD API with TTL caching.
+LiveFixtureProvider fetches from live API with TTL caching.
 RepoFixtureProvider loads from the repo fixtures.json file.
 """
 
@@ -22,8 +22,6 @@ from football_core.provider import (
 from football_core.state import is_cache_valid, _atomic_write_json
 from competitions.ucl.src.validation import validate_ucl_fixtures
 from competitions.ucl.src.constants import (
-    UCL_LEAGUE_ID,
-    BSD_API_URL,
     CACHE_TTL_HOURS,
     CACHE_FILENAME,
 )
@@ -65,12 +63,12 @@ class RepoFixtureProvider:
         return FixtureSchedule.from_dict(schedule_dict)
 
 
-class BSDFixtureProvider:
-    """Fetch UCL fixture schedule from BSD API with TTL caching.
+class LiveFixtureProvider:
+    """Fetch UCL fixture schedule from live API with TTL caching.
 
     Load flow:
         1. Check local TTL cache — return cached FixtureSchedule if valid
-        2. Fetch raw events from BSD API via ``fetch_raw_matches()``
+        2. Fetch raw events from API via ``fetch_raw_matches()``
         3. Filter to future-dated / upcoming events only
         4. Resolve team names via alias lookup
         5. Group events by round_number into matchdays
@@ -96,13 +94,13 @@ class BSDFixtureProvider:
     def load(self) -> FixtureSchedule:
         """Load and return a validated FixtureSchedule.
 
-        Uses cache-first strategy. Falls back to BSD API fetch on cache miss.
+        Uses cache-first strategy. Falls back to API fetch on cache miss.
         Validates the schedule before returning.
 
         Raises
         ------
         FixtureProviderError
-            If BSD returns no events or no events with future dates.
+            If provider returns no events or no events with future dates.
         """
         # 1. Check cache
         cached = self._load_cache()
@@ -110,15 +108,15 @@ class BSDFixtureProvider:
             logger.debug("Cache HIT — returning cached fixture schedule")
             return cached
 
-        # 2. Fetch from BSD API
-        logger.debug("Cache MISS — fetching from BSD API")
+        # 2. Fetch from live API
+        logger.debug("Cache MISS — fetching from live API")
         raw_events = fetch_raw_matches(
-            self._api_key, BSD_API_URL, UCL_LEAGUE_ID,
+            self._api_key, getattr(self, "_api_url", ""), 0,
         )
 
         if not raw_events:
             raise FixtureProviderError(
-                "BSD returned 0 events for UCL (league_id=7)"
+                "Provider returned 0 events for UCL"
             )
 
         # 3. Filter to future-dated / upcoming events
@@ -126,11 +124,11 @@ class BSDFixtureProvider:
 
         if not future_events:
             raise FixtureProviderError(
-                f"BSD returned {len(raw_events)} events, "
+                f"Provider returned {len(raw_events)} events, "
                 f"0 with future dates"
             )
 
-        # 4. Build schedule from BSD events
+        # 4. Build schedule from events
         schedule = self._build_schedule(future_events)
 
         # 5. Validate
@@ -168,8 +166,8 @@ class BSDFixtureProvider:
 
     # ── Schedule building ─────────────────────────────────────────────────
 
-    def _build_schedule(self, bsd_events: list[dict]) -> FixtureSchedule:
-        """Map BSD API events to a FixtureSchedule dataclass.
+    def _build_schedule(self, events: list[dict]) -> FixtureSchedule:
+        """Map API events to a FixtureSchedule dataclass.
 
         1. Builds alias lookup from self._aliases
         2. Registers all team names from self._teams_data into the lookup
@@ -189,7 +187,7 @@ class BSDFixtureProvider:
 
         # Normalise and group events by round_number
         matchdays: dict[int, list[Match]] = {}
-        for event in bsd_events:
+        for event in events:
             home_raw = event.get("home_team", "")
             away_raw = event.get("away_team", "")
             home_norm = normalize_team(home_raw, alias_lookup)
@@ -225,7 +223,7 @@ class BSDFixtureProvider:
 
         if not ordered_matchdays:
             raise FixtureProviderError(
-                "No matchdays could be built from BSD events"
+                "No matchdays could be built from provider events"
             )
 
         return FixtureSchedule(teams=teams, matchdays=ordered_matchdays)

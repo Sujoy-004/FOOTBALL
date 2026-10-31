@@ -30,17 +30,12 @@ indefinitely.
 
 `web/common.py` → `get_data_provider()` resolves providers in this order:
 
-1. `DATA_PROVIDER=bsd` + BSD key → `BSDDataProvider`
-2. `DATA_PROVIDER=football-data` + FDO key → `FootballDataOrgProvider`
-3. **`DATA_PROVIDER` unset → BSD *first*, then football-data**
-4. no usable key → `None`
+1. `DATA_PROVIDER=football-data` + FDO key → `FootballDataOrgProvider`
+2. `DATA_PROVIDER` unset → `FootballDataOrgProvider` when key present
+3. no usable key → `None`
 
-Rule 3 is the trap. With `DATA_PROVIDER` unset and both keys present, **BSD
-wins**. BSD's `fetch_matches` returns a *rolling upcoming-events window*, not a
-season. `competitions/laliga/src/pipeline.py` → `fetch_live_data()` writes
-whatever the provider returns into the season store as the complete fixture
-list, then derives `availability` from that fragment. A 7-fixture next-matchday
-response therefore replaces a 380-fixture season and is labelled complete.
+Football-Data.org is the sole match data provider. Its `fetch_matches` returns
+full season schedules, avoiding rolling-window partial replacement traps.
 
 **`DATA_PROVIDER` is load-bearing, not a preference.** It is pinned in `.env`
 to `football-data` with a comment explaining why. Do not remove it.
@@ -210,8 +205,7 @@ Barcelona 7 played / 21 pts, Atlético 16, Betis 16, Real Madrid 15.
 1. A partial provider response must never be written as a complete season.
    `fully_received` is an assertion about the whole season, not about the
    response.
-2. `DATA_PROVIDER` stays pinned. Unset means BSD, which means a rolling
-   window, which means falsification.
+2. `DATA_PROVIDER` stays configured to football-data for complete full season schedules.
 3. Restore from `git`, then re-ingest. Never hand-edit a store.
 4. Two independent human sources, minimum, before declaring real data falsified.
 5. Any provider window smaller than the full season is suspect on sight — a

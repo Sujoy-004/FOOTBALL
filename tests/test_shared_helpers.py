@@ -103,7 +103,7 @@ def test_kernel_patch_is_seen_by_competition_brain(monkeypatch, tmp_path):
 
     from competitions.worldcup.src.pipeline import fetch_live_data  # noqa: PLC0415
 
-    fetch_live_data("bsd", "fdo", tmp_path)
+    fetch_live_data("fdo", tmp_path)
 
     assert len(calls) == 1, (
         "the World Cup brain did not call the patched kernel provider factory; "

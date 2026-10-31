@@ -606,15 +606,15 @@ def resolve_played_matches(
         return provider.load()
 
     elif args.mode == "live":
-        api_key = args.api_key or os.environ.get("BSD_API_KEY")
+        api_key = args.api_key or os.environ.get("FOOTBALL_DATA_ORG_KEY")
         if not api_key:
-            logger.error("BSD_API_KEY required for live mode")
+            logger.error("FOOTBALL_DATA_ORG_KEY required for live mode")
             sys.exit(1)
-        from competitions.ucl.src.result_provider import BSDMatchResultProvider
+        from competitions.ucl.src.result_provider import LiveMatchResultProvider
         team_aliases_path = os.path.join(data_dir, "team_aliases.json")
         with open(team_aliases_path, encoding="utf-8") as f:
             team_aliases = json.load(f)
-        provider = BSDMatchResultProvider(
+        provider = LiveMatchResultProvider(
             api_key, team_aliases, asdict(fixtures_schedule),
         )
         return provider.load()
@@ -906,10 +906,11 @@ def resolve_active_data_dir(data_dir: str | Path) -> str:
 
 def run_deterministic_compute(
     data_dir: str,
-    bsd_api_key: str = "",
+    *args,
     football_data_org_key: str = "",
     team_aliases: dict[str, str] | None = None,
     provider_season: str | None = None,
+    **kwargs,
 ) -> dict:
     """Deterministic computation from real results — pure logic, no web globals.
 
@@ -1212,11 +1213,13 @@ def run_deterministic_compute(
 
 def run_compute_all(
     data_dir: str,
-    bsd_api_key: str = "",
+    *args,
+    football_data_org_key: str = "",
     seed: int = 42,
     n_iterations: int = 10000,
     team_aliases: dict[str, str] | None = None,
     provider_season: str | None = None,
+    **kwargs,
 ) -> dict:
     """Compute all results or run simulation — pure logic, no web globals.
 
@@ -1241,7 +1244,7 @@ def run_compute_all(
     mode, mode_reason = resolve_compute_mode(data_dir)
 
     if mode == "results":
-        return run_deterministic_compute(data_dir, bsd_api_key, team_aliases=team_aliases)
+        return run_deterministic_compute(data_dir, football_data_org_key=football_data_org_key, team_aliases=team_aliases)
     if mode == "error":
         return {"error": f"results.json unreadable: {mode_reason}", "boot": boot}
 

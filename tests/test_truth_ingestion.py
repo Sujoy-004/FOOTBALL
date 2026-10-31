@@ -14,7 +14,7 @@ Guarantees:
    (Argentina vs Cape Verde regression).
 6. UCL fixture-name alias coverage is complete — for the historical root
    fixtures AND the active-season (draw) fixtures.
-7. UCL live ingestion normalizes the raw BSD provider spellings that were
+7. UCL live ingestion normalizes the raw provider spellings that were
    logged as "unmatchable team names", and refuses finished events that
    carry no score evidence instead of fabricating a 0-0.
 8. Roadmap criterion 3 end-to-end: a run that was ATTEMPTED and completes
@@ -293,7 +293,7 @@ def test_ucl_active_season_fixture_self_resolution():
 
 
 def test_ucl_provider_aliases_normalize_to_canonical():
-    """6/UCL. The raw BSD spellings behind the 'unmatchable team names'
+    """6/UCL. The raw provider spellings behind the 'unmatchable team names'
     warnings normalize to a canonical fixture team name."""
     from football_core.fetcher import normalize_team
 

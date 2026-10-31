@@ -15,11 +15,9 @@ Chronological project log. Newest entries first. States:
 - `TheOddsApiOddsProvider` — official The Odds API v4 adapter (1X2, decimal,
   EU books); deterministic primary-book selection (default `pinnacle`, else
   most-recently-updated, ties broken lexically).
-- `BSDOddsProvider` — re-shapes the existing BSD event feed onto the generic
-  layer (no BSD behavior change).
-- `ODDS_PROVIDER` configuration (`the-odds-api | bsd | auto | none`), kept
+- `ODDS_PROVIDER` configuration (`the-odds-api | auto | none`), kept
   separate from `DATA_PROVIDER` (fixtures/results). `auto` precedence:
-  the-odds-api → bsd → none.
+  the-odds-api → none.
 - LaLiga adapter retains its full public API over the generic layer
   (backward compatible; `acquire_laliga_odds(odds_mode=...)` added).
 - Freshness: `provider_last_update` (bookmaker timestamp) and `fetched_at`
@@ -70,7 +68,6 @@ Chronological project log. Newest entries first. States:
 - `MarketOddsSignal` integration: live odds decorate fixtures and feed the
   ensemble.
 - `market_only` strategy remains selectable-only (candidate, not promoted).
-- Existing BSD odds path preserved.
 - Regression coverage: odds ingestion, market_only strategy, historical
   leakage prevention.
 

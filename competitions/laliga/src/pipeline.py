@@ -35,7 +35,6 @@ from competitions.laliga.src.constants import (
     CONFIG_DIR,
     DATA_DIR,
     HISTORICAL_REPLAY_PATH,
-    LALIGA_BSD_LEAGUE_ID,
     LALIGA_FDO_COMPETITION_ID,
     N_MATCHDAYS,
     SHIPPED_SEASON,
@@ -456,15 +455,14 @@ def _results_stage_row(state: str, count: int, detail: str) -> dict:
 
 def fetch_live_data(
     data_dir=DATA_DIR,
-    bsd_api_key: str = "",
     provider=None,
     football_data_org_key: str = "",
-    league_id: int = LALIGA_BSD_LEAGUE_ID,
     fdo_competition_id: str = LALIGA_FDO_COMPETITION_ID,
+    **kwargs,
 ) -> dict:
     """Refresh the active season from a live provider. Never raises.
 
-    Providers return BSD-compatible flat events; each is normalized onto
+    Providers return normalized flat events; each is normalized onto
     the shipped canonical team vocabulary and written to the season store.
     Returns the truth-ingestion summary the web layer records.
     The returned ``report`` carries ``changed`` / ``changed_match_ids`` (the
@@ -647,7 +645,7 @@ def fetch_live_data(
     if results_changed:
         _season_store.write_results(results_payload, data_dir, SHIPPED_SEASON)
 
-    odds_summary = acquire_laliga_odds(data_dir, SHIPPED_SEASON, bsd_api_key)
+    odds_summary = acquire_laliga_odds(data_dir, SHIPPED_SEASON)
     odds_public = {k: v for k, v in odds_summary.items() if k != "matches"}
 
     # D-13: the success report is built AFTER the fetch, with success DERIVED

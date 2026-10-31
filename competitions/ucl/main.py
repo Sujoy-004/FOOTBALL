@@ -50,18 +50,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     # ── Resolve credentials ──────────────────────────────────────────────
-    bsd_key = os.environ.get("BSD_API_KEY", "")
     fdo_key = os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
 
     # ── Select provider ──────────────────────────────────────────────────
     from web.common import get_data_provider
 
-    provider = get_data_provider(bsd_key, fdo_key, bsd_league_id=7)
+    provider = get_data_provider(football_data_org_key=fdo_key)
     provider_name = type(provider).__name__ if provider else "none"
 
     if provider is None:
-        print("[error] No data provider available — set BSD_API_KEY or "
-              "FOOTBALL_DATA_ORG_KEY", file=sys.stderr)
+        print("[error] No data provider available — set FOOTBALL_DATA_ORG_KEY", file=sys.stderr)
         return 1
 
     # ── Step 1: Ingestion ────────────────────────────────────────────────
@@ -81,9 +79,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ingest = fetch_live_data(
         str(data_dir),
-        bsd_api_key=bsd_key,
         football_data_org_key=fdo_key,
-        ucl_league_id=7,
         provider=provider,
     )
 
@@ -114,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
 
     compute = run_compute_all(
         str(data_dir),
-        bsd_api_key=bsd_key,
+        football_data_org_key=fdo_key,
         seed=args.seed,
         n_iterations=args.n_iterations,
         provider_season=provider_season,

@@ -61,7 +61,7 @@ def test_attempted_with_zero_received_is_provider_empty():
 
 
 def test_attempted_with_empty_counters_is_provider_empty():
-    assert derive_success("bsd", True, {}) == (False, "deferred/provider-empty")
+    assert derive_success("test-provider", True, {}) == (False, "deferred/provider-empty")
 
 
 # ── 1. deferred: nothing was attempted, so nothing succeeded ────────────────
@@ -84,10 +84,10 @@ def test_not_attempted_with_zero_counters_is_deferred():
 def test_invariant_violation_fails_closed_with_provider_warning(caplog):
     counters = _counters(received=5, normalized=4, ingested=4)
     with caplog.at_level(logging.WARNING, logger="football_core.fetcher"):
-        success, reason = derive_success("bsd", True, counters)
+        success, reason = derive_success("test-provider", True, counters)
     assert success is False
     assert reason == "counter_inconsistent"
-    assert any("bsd" in record.message for record in caplog.records), (
+    assert any("test-provider" in record.message for record in caplog.records), (
         "the warning must name the provider so the broken run is traceable"
     )
 
@@ -96,4 +96,4 @@ def test_missing_counter_key_is_treated_as_a_violation():
     # received > 0 so rule 2 does not fire, but the skipped_* keys are absent:
     # absence of evidence can never read as a consistent run.
     counters = {"received": 72, "normalized": 72, "ingested": 72}
-    assert derive_success("bsd", True, counters) == (False, "counter_inconsistent")
+    assert derive_success("test-provider", True, counters) == (False, "counter_inconsistent")

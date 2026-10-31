@@ -94,39 +94,46 @@ def _usable_key(value: str | None) -> str | None:
 
 
 def get_data_provider(
-    bsd_api_key: str, football_data_org_key: str, bsd_league_id: int
+    *args,
+    football_data_org_key: str = "",
+    **kwargs,
 ) -> Any:
     """Single provider-selection factory for every competition.
 
     Precedence:
       1. DATA_PROVIDER=football-data + FDO key  -> FootballDataOrgProvider
-      2. DATA_PROVIDER=bsd + BSD key            -> BSDDataProvider
-      3. no env var -> auto-detect (FDO first, then BSD fallback)
-      4. no usable key at all -> None (caller skips live fetch)
+      2. no env var -> FootballDataOrgProvider if key is present
+      3. no usable key at all -> None (caller skips live fetch)
 
     Empty or "your_..." placeholder keys never select a provider.
 
     Credentials are read from ``os.environ`` when this is called, never when
     this module is imported, so a cold boot makes zero provider calls.
     """
-    from football_core.data_providers.bsd_provider import BSDDataProvider
     from football_core.data_providers.football_data_org_provider import (
         FootballDataOrgProvider,
     )
 
-    bsd_key = _usable_key(bsd_api_key)
-    fdo_key = _usable_key(football_data_org_key)
+    fdo_key = None
+    if len(args) >= 2:
+        # Positional compatibility: (ignored_key, football_data_org_key, ...)
+        fdo_key = _usable_key(args[1]) or _usable_key(args[0])
+    elif len(args) == 1:
+        fdo_key = _usable_key(args[0])
+
+    if not fdo_key:
+        fdo_key = _usable_key(
+            football_data_org_key
+            or kwargs.get("football_data_org_key")
+            or kwargs.get("fdo_key")
+            or os.environ.get("FOOTBALL_DATA_ORG_KEY")
+        )
+
     mode = os.getenv("DATA_PROVIDER", "").lower()
-
-    if mode == "football-data" and fdo_key:
+    if mode in ("", "football-data", "auto") and fdo_key:
         return FootballDataOrgProvider(fdo_key)
-    if mode == "bsd" and bsd_key:
-        return BSDDataProvider(bsd_key, league_id=bsd_league_id)
-
     if fdo_key:
         return FootballDataOrgProvider(fdo_key)
-    if bsd_key:
-        return BSDDataProvider(bsd_key, league_id=bsd_league_id)
     return None
 
 

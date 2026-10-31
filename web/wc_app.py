@@ -72,10 +72,6 @@ load_dotenv()
 # Credentials are read at CALL time, never frozen at import: os.environ can
 # be populated (or overridden) long after this module was imported, and a
 # frozen constant would keep resolving to the empty pre-import value.
-def _bsd_key() -> str:
-    return os.environ.get("BSD_API_KEY", "")
-
-
 def _football_data_org_key() -> str:
     return os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
 
@@ -394,7 +390,7 @@ def _fetch_live_data() -> dict:
     stamp_before = _observed_stamp()
     try:
         report = _pipeline_fetch(
-            _bsd_key(), _football_data_org_key(), DATA_DIR)
+            _football_data_org_key(), DATA_DIR)
     except Exception:  # never let a refresh crash boot; mark stale
         logger.exception("worldcup live fetch failed")
         report = {"provider": None, "attempted": True, "success": False,
@@ -522,7 +518,7 @@ def _run_wc_simulation(progress_cb, count: int, seed: Optional[int],
     facts = _wc_known_fact_ids()
     result = run_simulation_compute(
         DATA_DIR, iterations=count, seed=seed, weights=weights,
-        bsd_api_key=_bsd_key(), football_data_org_key=_football_data_org_key(),
+        football_data_org_key=_football_data_org_key(),
         progress_cb=progress_cb,
     )
     result["sim_results_stamp"] = stamp
@@ -1114,7 +1110,6 @@ def _run_calibration_runner(progress_cb, count, seed):
     from competitions.worldcup.src.pipeline import run_calibration_compute
     return run_calibration_compute(
         DATA_DIR,
-        bsd_api_key=_bsd_key(),
         football_data_org_key=_football_data_org_key(),
         progress_cb=progress_cb,
     )

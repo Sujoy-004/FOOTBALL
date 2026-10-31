@@ -2,7 +2,7 @@
 
 Covers the ``football_core.odds`` abstraction: provider interface + contract,
 The Odds API adapter parsing (events, bookmakers, h2h extraction,
-deterministic primary-book selection, duplicate books), BSD adapter, provider
+deterministic primary-book selection, duplicate books), provider
 resolution (``ODDS_PROVIDER`` modes + auto precedence + failures), canonical
 fixture mapping with competition isolation, kickoff mismatch, validation,
 provider_last_update freshness, storage state, and the MarketOddsSignal /
@@ -20,9 +20,7 @@ import pytest
 
 from football_core import odds as core
 from football_core.odds import (
-    BSD,
     THE_ODDS_API,
-    LEAGUE_IDS,
     SPORT_KEYS,
     STATUS_AVAILABLE,
     STATUS_INVALID,
@@ -34,7 +32,6 @@ from football_core.odds import (
     STATE_ODDS_MISSING,
     STATE_ODDS_PARTIAL,
     STATE_PARSER_ERROR,
-    BSDOddsProvider,
     OddsProvider,
     ProviderNotConfiguredError,
     ProviderParseError,
@@ -139,9 +136,7 @@ def _store(data_dir: Path, fixtures=None, events=None, provider="the-odds-api",
 
 def test_provider_interface_contract():
     assert isinstance(TheOddsApiOddsProvider("k"), OddsProvider)
-    assert isinstance(BSDOddsProvider("k"), OddsProvider)
     assert TheOddsApiOddsProvider("k").name == "the-odds-api"
-    assert BSDOddsProvider("k").name == "bsd"
 
     class Bogus(OddsProvider):
         pass
@@ -154,7 +149,6 @@ def test_sport_and_league_keys_are_competition_config():
     assert SPORT_KEYS["laliga"] == "soccer_spain_la_liga"
     assert SPORT_KEYS["ucl"] == "soccer_uefa_champs_league"
     assert SPORT_KEYS["world_cup"] == "soccer_fifa_world_cup"
-    assert LEAGUE_IDS["laliga"] == 3 and LEAGUE_IDS["ucl"] == 7 and LEAGUE_IDS["world_cup"] == 27
 
 
 # ── The Odds API adapter: parsing/selection ──────────────────────────────
@@ -265,30 +259,7 @@ class TestTheOddsApiProvider:
             prov.fetch_events("mystery_league")
 
 
-# ── BSD adapter ──────────────────────────────────────────────────────────
 
-
-class TestBSDOddsProvider:
-    def test_normalizes_flat_events(self):
-        raw = [{"id": "e1", "home_team": "Malaga", "away_team": "Espanyol",
-                "event_date": "2026-10-09T19:00:00Z", "status": "notstarted",
-                "odds_home": 2.1, "odds_draw": 3.3, "odds_away": 3.4}]
-        prov = BSDOddsProvider("k")
-        events = prov.fetch_events("laliga", fetch_fn=lambda: raw)
-        ev = events[0]
-        assert (ev["odds_home"], ev["odds_draw"], ev["odds_away"]) == (2.1, 3.3, 3.4)
-        assert ev["bookmaker_key"] == "bsd" and ev["provider_last_update"] is None
-
-    def test_http_failure_becomes_unavailable(self):
-        prov = BSDOddsProvider("k")
-        with pytest.raises(ProviderUnavailableError):
-            prov.fetch_events("laliga",
-                              fetch_fn=lambda: (_ for _ in ()).throw(ConnectionError("down")))
-
-    def test_unknown_competition(self):
-        prov = BSDOddsProvider("k")
-        with pytest.raises(ProviderNotConfiguredError):
-            prov.fetch_events("no_such", fetch_fn=lambda: [])
 
 
 # ── provider resolution / ODDS_PROVIDER ──────────────────────────────────
@@ -312,20 +283,11 @@ class TestResolution:
         name, prov = resolve_odds_provider(env={"ODDS_PROVIDER": "the-odds-api"})
         assert name == "the-odds-api" and prov is None
 
-    def test_bsd_mode(self):
-        name, prov = resolve_odds_provider(
-            env={"ODDS_PROVIDER": "bsd", "BSD_API_KEY": "key_123"})
-        assert name == "bsd" and isinstance(prov, BSDOddsProvider)
-
     def test_auto_prefers_the_odds_api(self):
         name, prov = resolve_odds_provider(env={
-            "ODDS_PROVIDER": "auto", "THE_ODDS_API_KEY": "toa",
-            "BSD_API_KEY": "bsd"})
+            "ODDS_PROVIDER": "auto", "THE_ODDS_API_KEY": "toa"})
         assert name == "the-odds-api" and isinstance(prov, TheOddsApiOddsProvider)
 
-    def test_auto_falls_back_to_bsd(self):
-        name, prov = resolve_odds_provider(env={"ODDS_PROVIDER": "auto", "BSD_API_KEY": "bsd"})
-        assert name == "bsd" and isinstance(prov, BSDOddsProvider)
 
     def test_auto_with_no_keys_is_none(self):
         name, prov = resolve_odds_provider(env={"ODDS_PROVIDER": "auto"})
@@ -557,7 +519,7 @@ class TestLaLigaEntryPoint:
         monkeypatch.setattr(core, "resolve_odds_provider",
                             lambda mode=None, **kw: ("the-odds-api", FakeOddsProvider()))
         from competitions.laliga.src.odds import acquire_laliga_odds, load_odds as ll_load
-        out = acquire_laliga_odds(tmp_path, "2026/27", "", odds_mode="auto", now=NOW)
+        out = acquire_laliga_odds(tmp_path, "2026/27", odds_mode="auto", now=NOW)
         assert out["state"] == STATE_ODDS_PARTIAL
         assert out["provider"] == "the-odds-api"
         assert out["counts"]["available"] == 1
@@ -569,7 +531,7 @@ class TestLaLigaEntryPoint:
         _season_store.write_fixtures({"provider": "T", "fixtures": FIXTURES},
                                      tmp_path, "2026/27")
         from competitions.laliga.src.odds import acquire_laliga_odds
-        out = acquire_laliga_odds(tmp_path, "2026/27", "some_key", odds_mode="none", now=NOW)
+        out = acquire_laliga_odds(tmp_path, "2026/27", odds_mode="none", now=NOW)
         assert out["state"] == STATE_NOT_CONFIGURED
         assert out["reason"] == "odds_provider_none"
 
@@ -580,7 +542,7 @@ class TestLaLigaEntryPoint:
         monkeypatch.setattr(core, "resolve_odds_provider",
                             lambda mode=None, **kw: ("the-odds-api", None))
         from competitions.laliga.src.odds import acquire_laliga_odds
-        out = acquire_laliga_odds(tmp_path, "2026/27", "", odds_mode="the-odds-api", now=NOW)
+        out = acquire_laliga_odds(tmp_path, "2026/27", odds_mode="the-odds-api", now=NOW)
         assert out["state"] == STATE_NOT_CONFIGURED
         assert out["reason"] == "no_odds_credential"
 
@@ -601,5 +563,5 @@ class TestLaLigaEntryPoint:
         monkeypatch.setattr(core, "resolve_odds_provider",
                             lambda mode=None, **kw: ("the-odds-api", Failing()))
         from competitions.laliga.src.odds import acquire_laliga_odds
-        out = acquire_laliga_odds(tmp_path, "2026/27", "", odds_mode="auto", now=NOW)
+        out = acquire_laliga_odds(tmp_path, "2026/27", odds_mode="auto", now=NOW)
         assert out["state"] == STATE_CONFIGURED_BUT_UNAVAILABLE

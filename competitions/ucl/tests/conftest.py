@@ -913,7 +913,7 @@ def sample_result():
     )
 
 
-# ── BSD fixture data fixtures (Plan 05) ─────────────────────────────────────────
+# ── Live fixture data fixtures (Plan 05) ─────────────────────────────────────────
 
 
 @pytest.fixture
@@ -960,11 +960,11 @@ def ucl_runtime_dir_with_backfill(ucl_runtime_dir):
 
 
 @pytest.fixture
-def bsd_response_data():
-    """Returns the BSD API snapshot response for offline unit tests."""
+def live_response_data():
+    """Returns the API snapshot response for offline unit tests."""
     fixtures_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "tests", "fixtures", "bsd_response.json",
+        "tests", "fixtures", "live_response.json",
     )
     with open(fixtures_path) as f:
         return json.load(f)
@@ -986,7 +986,7 @@ def sample_36_teams_data():
 
 @pytest.fixture
 def sample_cached_fixtures(tmp_path, sample_fixture_schedule):
-    """Pre-seeds a valid BSD cache file and returns the cache directory path.
+    """Pre-seeds a valid cache file and returns the cache directory path.
 
     Writes a cache dict with ``expires_at`` 2 hours in the future and
     the full fixture schedule serialised via dataclasses.asdict().
@@ -1052,7 +1052,7 @@ def sample_prediction_context():
 
 @pytest.fixture
 def sample_match_with_odds_data(sample_match_data):
-    """Like sample_match_data but with BSD odds fields."""
+    """Like sample_match_data but with odds fields."""
     return {**sample_match_data,
         "odds_home": 2.10,
         "odds_draw": 3.40,

@@ -113,7 +113,7 @@ def test_football_snapshot_env_forces_zero_network(monkeypatch, raw):
     _CountingProvider.calls = 0
     monkeypatch.setenv("FOOTBALL_SNAPSHOT", raw)
     monkeypatch.setattr("football_core.runtime_support.get_data_provider",
-                        lambda b, f, l=None: prov)
+                        lambda *a, **k: prov)
 
     # The override wins over every normal-mode path (there is no menu).
     d = startup.run_startup_flow(echo=lambda s: None)
@@ -140,7 +140,7 @@ def test_forced_snapshot_decision_is_zero_network(monkeypatch):
     prov = _CountingProvider()
     _CountingProvider.calls = 0
     monkeypatch.setattr("football_core.runtime_support.get_data_provider",
-                        lambda b, f, l=None: prov)
+                        lambda *a, **k: prov)
 
     startup.set_session_decision(startup.StartupDecision("snapshot", ""))
     assert startup.is_snapshot_mode() is True
@@ -181,7 +181,7 @@ def test_auto_empty_provider_reports_stale_and_preserves_stores(monkeypatch):
     prov = _CountingProvider(payload=[], last_error="provider down")
     _CountingProvider.calls = 0
     monkeypatch.setattr("football_core.runtime_support.get_data_provider",
-                        lambda b, f, l=None: prov)
+                        lambda *a, **k: prov)
 
     before = {**_hash_json_dir(WC_DATA), **_hash_json_dir(UCL_DATA)}
 
@@ -219,7 +219,7 @@ def test_auto_raising_provider_never_touches_stores(monkeypatch):
             raise RuntimeError("network unreachable")
 
     monkeypatch.setattr("football_core.runtime_support.get_data_provider",
-                        lambda b, f, l=None: _Raising())
+                        lambda *a, **k: _Raising())
 
     before = {**_hash_json_dir(WC_DATA), **_hash_json_dir(UCL_DATA)}
 
@@ -271,7 +271,7 @@ def test_auto_succeeding_provider_ingests_into_tmp_store(tmp_path, monkeypatch):
     provider = _CountingProvider(payload=[event])
     _CountingProvider.calls = 0
     monkeypatch.setattr("football_core.runtime_support.get_data_provider",
-                        lambda b, f, l=None: provider)
+                        lambda *a, **k: provider)
     monkeypatch.setattr(ucl_app, "DATA_DIR", tmp_data)
 
     repo_before = _hash_json_dir(UCL_DATA)

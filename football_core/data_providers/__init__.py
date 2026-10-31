@@ -1,1 +1,1 @@
-"""Data providers for external API sources — BSD, football-data.org, etc."""
+"""Data providers for external API sources — football-data.org, etc."""

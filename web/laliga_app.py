@@ -43,7 +43,6 @@ from competitions.laliga.src import seasons as season_store
 from competitions.laliga.src.constants import (
     BLEND_CALIBRATION_PATH,
     DATA_DIR,
-    LALIGA_BSD_LEAGUE_ID,
     LALIGA_FDO_COMPETITION_ID,
     SHIPPED_SEASON,
 )
@@ -80,10 +79,6 @@ _CALIBRATION_THRESHOLD = 30
 # Credentials are read at CALL time, never frozen at import: os.environ can
 # be populated (or overridden) long after this module was imported, and a
 # frozen constant would keep resolving to the empty pre-import value.
-def _bsd_key() -> str:
-    return os.environ.get("BSD_API_KEY", "")
-
-
 def _football_data_org_key() -> str:
     return os.environ.get("FOOTBALL_DATA_ORG_KEY", "")
 
@@ -427,14 +422,13 @@ def _fetch_live_data():
     from web.common import get_data_provider
     from competitions.laliga.src.pipeline import fetch_live_data as _brain_fetch
 
-    provider = get_data_provider(
-        _bsd_key(), _football_data_org_key(), LALIGA_BSD_LEAGUE_ID)
+    provider = get_data_provider("", _football_data_org_key())
     if provider is None:
         logger.warning(
             "[LaLiga] NOT_CONFIGURED - no data provider available "
-            "(BSD key configured: %s, football-data key configured: %s, "
+            "(football-data key configured: %s, "
             "DATA_PROVIDER=%s); skipping live fetch",
-            bool(_bsd_key()), bool(_football_data_org_key()),
+            bool(_football_data_org_key()),
             os.environ.get("DATA_PROVIDER", "") or "(unset)",
         )
         _store_refresh_report(False, "no data provider configured", None,
@@ -446,10 +440,8 @@ def _fetch_live_data():
         stamp_before = _observed_stamp()
         summary = _brain_fetch(
             str(DATA_DIR),
-            bsd_api_key=_bsd_key(),
             provider=provider,
             football_data_org_key=_football_data_org_key(),
-            league_id=LALIGA_BSD_LEAGUE_ID,
             fdo_competition_id=LALIGA_FDO_COMPETITION_ID,
         )
     except Exception as exc:

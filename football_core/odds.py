@@ -10,7 +10,7 @@ Contract
 - Normalization reuse: ``football_core.predictors.odds.remove_vig`` (single
   book). No per-provider de-vig.
 - Fixture authority stays with the existing fixture/result providers (FDO,
-  BSD). Odds providers are enrichment only and never create fixtures: events
+  The Odds API). Odds providers are enrichment only and never create fixtures: events
   map onto canonical fixtures (folded team pair, kickoff date, home/away
   identity) or are rejected (unmappable / flipped / kickoff_mismatch /
   cancelled-postponed / duplicate-event-id).
@@ -26,14 +26,12 @@ Providers
   ``primary_book`` (default ``pinnacle``) when it carries a complete h2h set,
   else the most recently updated book, ties broken lexically. Decimal prices
   are matched by folded team name (not by outcome ordering).
-- ``BSDOddsProvider``: wraps the existing ``BSDDataProvider`` (league id from
-  ``LEAGUE_IDS``) and re-shapes its flat events to the same normalized record.
 
 Configuration (separate from ``DATA_PROVIDER`` which keeps meaning
 "fixtures/results"):
-- ``ODDS_PROVIDER=the-odds-api|bsd|auto|none`` (unset keeps legacy behavior:
-  competitions use their pre-existing odds source, e.g. LaLiga uses BSD).
-- ``auto`` priority (documented, deterministic): the-odds-api -> bsd -> none.
+- ``ODDS_PROVIDER=the-odds-api|auto|none`` (unset keeps legacy behavior:
+  competitions use their pre-existing odds source, e.g. LaLiga uses The Odds API).
+- ``auto`` priority: the-odds-api -> none.
 - The provider that actually supplied odds is reported in every summary/store.
 
 Freshness
@@ -63,7 +61,6 @@ from pathlib import Path
 
 import requests
 
-from football_core.data_providers.bsd_provider import BSDDataProvider
 from football_core.domain import redact_secrets
 from football_core.fetcher import fold_team_key
 from football_core.predictors.odds import remove_vig
@@ -73,18 +70,12 @@ logger = logging.getLogger(__name__)
 
 MARKET = "1X2"
 THE_ODDS_API = "the-odds-api"
-BSD = "bsd"
 ODDS_API_BASE = "https://api.the-odds-api.com/v4/sports/{sport}/odds/"
 
 SPORT_KEYS = {
     "laliga": "soccer_spain_la_liga",
     "ucl": "soccer_uefa_champs_league",
     "world_cup": "soccer_fifa_world_cup",
-}
-LEAGUE_IDS = {
-    "laliga": 3,
-    "ucl": 7,
-    "world_cup": 27,
 }
 
 ODDS_MAX_AGE_HOURS = 24
@@ -334,65 +325,15 @@ class TheOddsApiOddsProvider(OddsProvider):
         return (None, None, None)
 
 
-# ── BSD adapter ──────────────────────────────────────────────────────────
-
-
-class BSDOddsProvider(OddsProvider):
-    """Re-shapes the existing BSDDataProvider feed into normalized events."""
-
-    name = BSD
-
-    def __init__(self, api_key: str, league_ids: dict[str, int] | None = None,
-                 endpoint: str | None = None):
-        self.api_key = api_key
-        self.league_ids = dict(league_ids or LEAGUE_IDS)
-        self._endpoint = endpoint
-
-    def endpoint_for(self, competition: str) -> str:
-        if self._endpoint:
-            return self._endpoint
-        lid = self.league_ids.get(competition, "")
-        return f"https://sports.bzzoiro.com/api/events/?league_id={lid}"
-
-    def fetch_events(self, competition: str, *, fetch_fn=None) -> list[dict]:
-        lid = self.league_ids.get(competition)
-        if not lid:
-            raise ProviderNotConfiguredError(f"no bsd league id for {competition!r}")
-        try:
-            if fetch_fn is not None:
-                raw = list(fetch_fn() or [])
-            else:
-                raw = list(BSDDataProvider(self.api_key, league_id=lid).fetch_matches() or [])
-        except Exception as exc:
-            raise ProviderUnavailableError(f"bsd fetch failed: {exc}") from exc
-        return [self._normalize_event(e) for e in raw if isinstance(e, dict)]
-
-    def _normalize_event(self, e: dict) -> dict:
-        return {
-            "id": e.get("id"),
-            "home_team": e.get("home_team"),
-            "away_team": e.get("away_team"),
-            "event_date": e.get("event_date"),
-            "status": e.get("status") or "scheduled",
-            "odds_home": e.get("odds_home"), "odds_draw": e.get("odds_draw"),
-            "odds_away": e.get("odds_away"),
-            "bookmaker": "BSD", "bookmaker_key": "bsd",
-            "provider_last_update": None,
-            "provider": self.name, "provenance": self.endpoint_for("x"),
-            "n_books": 1,
-        }
-
-
 # ── provider resolution ──────────────────────────────────────────────────
 
 
 def resolve_odds_provider(mode: str | None = None, *, env: Mapping[str, str] | None = None,
                           the_odds_api_key: str | None = None,
-                          bsd_api_key: str | None = None
                           ) -> tuple[str | None, OddsProvider | None]:
     """Determine the active odds provider (deterministic).
 
-    ``mode``: ODDS_PROVIDER value. ``auto`` priority: the-odds-api -> bsd.
+    ``mode``: ODDS_PROVIDER value (the-odds-api | auto | none).
     Returns (provider_name, provider); provider is None when the requested
     mode has no usable credential. Mode ``""``/``none`` resolve to (None, None)
     (``none`` is handled by callers as an explicit disable).
@@ -401,17 +342,11 @@ def resolve_odds_provider(mode: str | None = None, *, env: Mapping[str, str] | N
     mode = (mode if mode is not None else env.get("ODDS_PROVIDER") or "").strip().lower()
     toa = _odds_key_usable(the_odds_api_key if the_odds_api_key is not None
                            else env.get("THE_ODDS_API_KEY"))
-    bsd = _odds_key_usable(bsd_api_key if bsd_api_key is not None else env.get("BSD_API_KEY"))
-    if mode == THE_ODDS_API:
-        return (THE_ODDS_API, TheOddsApiOddsProvider(toa)) if toa else (THE_ODDS_API, None)
-    if mode == BSD:
-        return (BSD, BSDOddsProvider(bsd)) if bsd else (BSD, None)
-    if mode == "auto":
+    if mode in (THE_ODDS_API, "auto"):
         if toa:
             return (THE_ODDS_API, TheOddsApiOddsProvider(toa))
-        if bsd:
-            return (BSD, BSDOddsProvider(bsd))
-        return (None, None)
+        if mode == THE_ODDS_API:
+            return (THE_ODDS_API, None)
     return (None, None)
 
 

@@ -37,13 +37,13 @@ class TestFixtureProviderProtocol:
         assert hasattr(FixtureProvider, "load")
         assert callable(FixtureProvider.load)
 
-    def test_bsd_provider_conforms(self):
-        """A BSDFixtureProvider stub should pass isinstance(FixtureProvider) check."""
-        class BSDFixtureProviderStub:
+    def test_live_provider_conforms(self):
+        """A LiveFixtureProvider stub should pass isinstance(FixtureProvider) check."""
+        class LiveFixtureProviderStub:
             def load(self) -> FixtureSchedule:
                 return FixtureSchedule(teams=[], matchdays=[])
 
-        provider = BSDFixtureProviderStub()
+        provider = LiveFixtureProviderStub()
         assert isinstance(provider, FixtureProvider)
 
     def test_repo_provider_conforms(self):
@@ -166,7 +166,7 @@ class TestRepoFixtureProvider:
 
         monkeypatch.setattr(builtins, "open", _windows_default_open)
         # Count-based UCL validation (36 teams / 8 matchdays) is out of scope
-        # here — same no-op pattern as the BSD tests above.
+        # here — same no-op pattern as the live provider tests above.
         monkeypatch.setattr(
             "competitions.ucl.src.provider.validate_ucl_fixtures",
             lambda fixtures: None,
@@ -195,24 +195,24 @@ class TestRepoFixtureProvider:
             provider.load()
 
 
-class TestBSDFixtureProvider:
-    """Tests for BSDFixtureProvider — BSD fetch, future-date filtering, caching."""
+class TestLiveFixtureProvider:
+    """Tests for LiveFixtureProvider — live API fetch, future-date filtering, caching."""
 
     def test_fetches_and_parses_upcoming_events(
-        self, monkeypatch, bsd_response_data, sample_36_teams_data, tmp_path,
+        self, monkeypatch, live_response_data, sample_36_teams_data, tmp_path,
     ):
-        """BSD response with upcoming events returns valid FixtureSchedule."""
-        from competitions.ucl.src.provider import BSDFixtureProvider
+        """API response with upcoming events returns valid FixtureSchedule."""
+        from competitions.ucl.src.provider import LiveFixtureProvider
 
         def mock_fetch(api_key, api_url, league_id, timeout=10):
-            return bsd_response_data
+            return live_response_data
 
         monkeypatch.setattr(
             "competitions.ucl.src.provider.fetch_raw_matches",
             mock_fetch,
         )
 
-        # Monkeypatch validate() to no-op: BSD snapshot only has 4 events (1 matchday),
+        # Monkeypatch validate() to no-op: Snapshot only has 4 events (1 matchday),
         # which won't pass the full 36-team/8-matchday UCL validation. The parse pipeline
         # is tested here; validation is tested separately in TestFixtureScheduleValidation.
         monkeypatch.setattr(
@@ -220,8 +220,8 @@ class TestBSDFixtureProvider:
             lambda fixtures: None,
         )
 
-        # Provide aliases mapping BSD API team names to canonical names
-        bsd_aliases = {
+        # Provide aliases mapping API team names to canonical names
+        provider_aliases = {
             "Man City": ["Manchester City"],
             "Bayern": ["Bayern Munich"],
             "PSG": ["Paris Saint-Germain"],
@@ -229,9 +229,9 @@ class TestBSDFixtureProvider:
             "Inter": ["Inter Milan"],
         }
 
-        provider = BSDFixtureProvider(
+        provider = LiveFixtureProvider(
             api_key="test_key",
-            aliases=bsd_aliases,
+            aliases=provider_aliases,
             cache_dir=str(tmp_path),
             teams_data=sample_36_teams_data,
         )
@@ -241,15 +241,15 @@ class TestBSDFixtureProvider:
         assert len(schedule.matchdays) > 0
 
     def test_empty_response_raises(self, monkeypatch, sample_36_teams_data, tmp_path):
-        """BSD returning empty list should raise FixtureProviderError."""
-        from competitions.ucl.src.provider import BSDFixtureProvider, FixtureProviderError
+        """Provider returning empty list should raise FixtureProviderError."""
+        from competitions.ucl.src.provider import LiveFixtureProvider, FixtureProviderError
 
         monkeypatch.setattr(
             "competitions.ucl.src.provider.fetch_raw_matches",
             lambda api_key, api_url, league_id, timeout=10: [],
         )
 
-        provider = BSDFixtureProvider(
+        provider = LiveFixtureProvider(
             api_key="test_key",
             aliases={},
             cache_dir=str(tmp_path),
@@ -261,10 +261,10 @@ class TestBSDFixtureProvider:
     def test_only_finished_events_raises(
         self, monkeypatch, sample_36_teams_data, tmp_path,
     ):
-        """BSD returning only finished events should raise FixtureProviderError (no future dates)."""
-        from competitions.ucl.src.provider import BSDFixtureProvider, FixtureProviderError
+        """Provider returning only finished events should raise FixtureProviderError (no future dates)."""
+        from competitions.ucl.src.provider import LiveFixtureProvider, FixtureProviderError
 
-        # Filter bsd_response_data to only finished events
+        # Filter live_response_data to only finished events
         finished_only = [
             e for e in [
                 {"id": 20001, "status": "finished", "home_team": "Man City",
@@ -281,7 +281,7 @@ class TestBSDFixtureProvider:
             lambda api_key, api_url, league_id, timeout=10: finished_only,
         )
 
-        provider = BSDFixtureProvider(
+        provider = LiveFixtureProvider(
             api_key="test_key",
             aliases={},
             cache_dir=str(tmp_path),
@@ -294,7 +294,7 @@ class TestBSDFixtureProvider:
         self, monkeypatch, sample_36_teams_data, sample_cached_fixtures,
     ):
         """Valid cache should return schedule without calling fetch_raw_matches."""
-        from competitions.ucl.src.provider import BSDFixtureProvider
+        from competitions.ucl.src.provider import LiveFixtureProvider
 
         # Monkeypatch validate: cached data comes from asdict(full_schedule)
         # and will re-validate after load. This is the correct validation gate
@@ -316,7 +316,7 @@ class TestBSDFixtureProvider:
             mock_fetch,
         )
 
-        provider = BSDFixtureProvider(
+        provider = LiveFixtureProvider(
             api_key="test_key",
             aliases={},
             cache_dir=str(sample_cached_fixtures),

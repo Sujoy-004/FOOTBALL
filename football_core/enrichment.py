@@ -1,11 +1,11 @@
-"""Match enrichment: extract stats and context from raw BSD event dicts.
+"""Match enrichment: extract stats and context from raw event dicts.
 
 Phase 17 — Enriched Match Context. Two extractors:
   - extract_stats(): P0 stat fields from live_stats (yellow/red cards,
     shots on target, possession)
   - extract_context(): venue name and referee name from top-level fields
 
-Each returns None when BSD returned no data, or a partial dict per
+Each returns None when provider returned no data, or a partial dict per
 the sparse-fields convention (D-07). Only P0 fields are extracted in
 this phase — deferred fields are ignored.
 """
@@ -41,11 +41,11 @@ _CONTEXT_SOURCE_MAP: dict[str, tuple[str, str]] = {
 
 
 def extract_stats(raw_event: dict) -> dict | None:
-    """Extract P0 match statistics from a raw BSD event dict.
+    """Extract P0 match statistics from a raw event dict.
 
     Reads ``live_stats.home`` and ``live_stats.away``, resolves each
     internal field name through the FIELD_MAP, and returns a flat dict
-    of internal → value. Returns ``None`` when BSD returned no stats
+    of internal → value. Returns ``None`` when provider returned no stats
     (``live_stats`` is ``None`` or empty).
 
     Per D-07 (sparse-fields convention): only fields that actually
@@ -64,9 +64,9 @@ def extract_stats(raw_event: dict) -> dict | None:
 
     result: dict = {}
 
-    for internal_name, bsd_leaf in _STATS_FIELD_MAP.items():
+    for internal_name, raw_leaf in _STATS_FIELD_MAP.items():
         source = home if internal_name.endswith("_home") else away
-        val = source.get(bsd_leaf)
+        val = source.get(raw_leaf)
         if val is not None:
             result[internal_name] = int(val) if isinstance(val, (int, float)) else val
 
@@ -74,7 +74,7 @@ def extract_stats(raw_event: dict) -> dict | None:
 
 
 def extract_context(raw_event: dict) -> dict | None:
-    """Extract match context (venue, referee) from a raw BSD event dict.
+    """Extract match context (venue, referee) from a raw event dict.
 
     Reads top-level ``venue`` and ``referee`` dicts, extracts the
     ``name`` key from each. Returns ``None`` when neither source is
