@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # be updated by a provider correction.  Metadata (stats, context,
 # ai_preview) is preserved from the original entry regardless of the
 # provider response.
-_WC_FACTUAL_FIELDS = ("home_score", "away_score", "winner", "is_draw", "completed_at")
+_WC_FACTUAL_FIELDS = ("team_a", "team_b", "home_score", "away_score", "winner", "is_draw", "completed_at")
 
 
 def _build_match_entry(

@@ -125,20 +125,38 @@ def resolve_knockout_slot_teams(
     if all_group_matches_played:
         results = {}
         for gl, g in groups_dict.items():
-            results[gl] = {
-                m["match_id"]: {
-                    "team_a": m["team_a"],
-                    "team_b": m["team_b"],
-                    "score_a": played_groups[m["match_id"]]["home_score"],
-                    "score_b": played_groups[m["match_id"]]["away_score"],
-                    "winner": played_groups[m["match_id"]].get("winner"),
-                    "yellow_cards_a": played_groups[m["match_id"]].get("yellow_cards_a", 0),
-                    "red_cards_a": played_groups[m["match_id"]].get("red_cards_a", 0),
-                    "yellow_cards_b": played_groups[m["match_id"]].get("yellow_cards_b", 0),
-                    "red_cards_b": played_groups[m["match_id"]].get("red_cards_b", 0),
+            results[gl] = {}
+            for m in g.get("matches", []):
+                mid = m["match_id"]
+                pg = played_groups[mid]
+                ta = m["team_a"]
+                tb = m["team_b"]
+                pg_ta = pg.get("team_a") or pg.get("home_team")
+                if ta == pg_ta:
+                    sa = pg.get("home_score", 0)
+                    sb = pg.get("away_score", 0)
+                    yca = pg.get("yellow_cards_a", 0)
+                    ycb = pg.get("yellow_cards_b", 0)
+                    rca = pg.get("red_cards_a", 0)
+                    rcb = pg.get("red_cards_b", 0)
+                else:
+                    sa = pg.get("away_score", 0)
+                    sb = pg.get("home_score", 0)
+                    yca = pg.get("yellow_cards_b", 0)
+                    ycb = pg.get("yellow_cards_a", 0)
+                    rca = pg.get("red_cards_b", 0)
+                    rcb = pg.get("red_cards_a", 0)
+                results[gl][mid] = {
+                    "team_a": ta,
+                    "team_b": tb,
+                    "score_a": sa,
+                    "score_b": sb,
+                    "winner": pg.get("winner"),
+                    "yellow_cards_a": yca,
+                    "red_cards_a": rca,
+                    "yellow_cards_b": ycb,
+                    "red_cards_b": rcb,
                 }
-                for m in g.get("matches", [])
-            }
         standings = compute_standings(results, elo_ratings)
         third_ranked = rank_third_placed(standings)
         advancers = select_advancers(standings, third_ranked)
