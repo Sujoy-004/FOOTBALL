@@ -787,6 +787,112 @@
       gap: 12px;
     }
 
+    /* Top-Down Knockout Tournament Tree */
+    .bracket-top-down-tree {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      margin-top: 14px;
+      width: 100%;
+    }
+
+    .tree-tier {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .tree-tier-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--poster-border-strong);
+      color: var(--poster-text);
+      letter-spacing: 0.06em;
+    }
+
+    .tree-tier-grid {
+      display: grid;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .tree-grid-r32 {
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    }
+
+    .tree-grid-r16 {
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    }
+
+    .tree-grid-qf {
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    }
+
+    .tree-grid-sf {
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+
+    .tree-grid-final {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin: 8px 0;
+    }
+
+    .tree-connector-down {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin: 14px 0 6px 0;
+      width: 100%;
+    }
+
+    .tree-connector-down .connector-line {
+      flex: 1;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--poster-border-strong), transparent);
+    }
+
+    .tree-connector-down .connector-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: var(--poster-accent);
+      background: var(--poster-surface-subtle);
+      border: 1px solid var(--poster-border-strong);
+      padding: 4px 14px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .match-tile-final {
+      background: var(--poster-surface);
+      border: 2px solid var(--poster-accent) !important;
+      border-left: 4px solid var(--poster-accent) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      position: relative;
+    }
+
+    .group-match-list {
+      display: none;
+      flex-direction: column;
+    }
+
+    .group-match-list.open {
+      display: flex;
+    }
+
     /* ==========================================================================
        TAB 4: MONTE CARLO SIMULATION SHELL
        ========================================================================== */
@@ -3674,422 +3780,9 @@
                                         "xgA": 1.2
                               }
                     ]
-          },
-          {
-                    "name": "R32",
-                    "matches": [
-                              {
-                                        "id": "M73",
-                                        "h": "South Africa",
-                                        "a": "Canada",
-                                        "sH": "0",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M74",
-                                        "h": "Germany",
-                                        "a": "Paraguay",
-                                        "sH": "1",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M75",
-                                        "h": "Netherlands",
-                                        "a": "Morocco",
-                                        "sH": "1",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M76",
-                                        "h": "Brazil",
-                                        "a": "Japan",
-                                        "sH": "2",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M77",
-                                        "h": "France",
-                                        "a": "Sweden",
-                                        "sH": "3",
-                                        "sA": "0",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M78",
-                                        "h": "Ivory Coast",
-                                        "a": "Norway",
-                                        "sH": "1",
-                                        "sA": "2",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M79",
-                                        "h": "Mexico",
-                                        "a": "Ecuador",
-                                        "sH": "2",
-                                        "sA": "0",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M80",
-                                        "h": "England",
-                                        "a": "DR Congo",
-                                        "sH": "2",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M81",
-                                        "h": "United States",
-                                        "a": "Bosnia and Herzegovina",
-                                        "sH": "2",
-                                        "sA": "0",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M82",
-                                        "h": "Belgium",
-                                        "a": "Senegal",
-                                        "sH": "3",
-                                        "sA": "2",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M83",
-                                        "h": "Portugal",
-                                        "a": "Croatia",
-                                        "sH": "2",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M84",
-                                        "h": "Spain",
-                                        "a": "Austria",
-                                        "sH": "3",
-                                        "sA": "0",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M85",
-                                        "h": "Switzerland",
-                                        "a": "Algeria",
-                                        "sH": "2",
-                                        "sA": "0",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M86",
-                                        "h": "Argentina",
-                                        "a": "Cape Verde",
-                                        "sH": "3",
-                                        "sA": "2",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M87",
-                                        "h": "Colombia",
-                                        "a": "Ghana",
-                                        "sH": "1",
-                                        "sA": "0",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M88",
-                                        "h": "Australia",
-                                        "a": "Egypt",
-                                        "sH": "1",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              }
-                    ]
-          },
-          {
-                    "name": "R16",
-                    "matches": [
-                              {
-                                        "id": "M89",
-                                        "h": "Paraguay",
-                                        "a": "France",
-                                        "sH": "0",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M90",
-                                        "h": "Canada",
-                                        "a": "Morocco",
-                                        "sH": "0",
-                                        "sA": "3",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M91",
-                                        "h": "Brazil",
-                                        "a": "Norway",
-                                        "sH": "1",
-                                        "sA": "2",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M92",
-                                        "h": "Mexico",
-                                        "a": "England",
-                                        "sH": "2",
-                                        "sA": "3",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M93",
-                                        "h": "Portugal",
-                                        "a": "Spain",
-                                        "sH": "0",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M94",
-                                        "h": "United States",
-                                        "a": "Belgium",
-                                        "sH": "1",
-                                        "sA": "4",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M95",
-                                        "h": "Argentina",
-                                        "a": "Egypt",
-                                        "sH": "3",
-                                        "sA": "2",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "M96",
-                                        "h": "Switzerland",
-                                        "a": "Colombia",
-                                        "sH": "0",
-                                        "sA": "0",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              }
-                    ]
-          },
-          {
-                    "name": "QF",
-                    "matches": [
-                              {
-                                        "id": "QF_1",
-                                        "h": "France",
-                                        "a": "Morocco",
-                                        "sH": "2",
-                                        "sA": "0",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "QF_2",
-                                        "h": "Norway",
-                                        "a": "England",
-                                        "sH": "1",
-                                        "sA": "2",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "QF_3",
-                                        "h": "Spain",
-                                        "a": "Belgium",
-                                        "sH": "2",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "QF_4",
-                                        "h": "Argentina",
-                                        "a": "Switzerland",
-                                        "sH": "3",
-                                        "sA": "1",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              }
-                    ]
-          },
-          {
-                    "name": "SF",
-                    "matches": [
-                              {
-                                        "id": "SF_1",
-                                        "h": "France",
-                                        "a": "Spain",
-                                        "sH": "0",
-                                        "sA": "2",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              },
-                              {
-                                        "id": "SF_2",
-                                        "h": "England",
-                                        "a": "Argentina",
-                                        "sH": "1",
-                                        "sA": "2",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              }
-                    ]
-          },
-          {
-                    "name": "TPP",
-                    "matches": [
-                              {
-                                        "id": "TPP",
-                                        "h": "France",
-                                        "a": "England",
-                                        "sH": "4",
-                                        "sA": "6",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              }
-                    ]
-          },
-          {
-                    "name": "FINAL",
-                    "matches": [
-                              {
-                                        "id": "FINAL",
-                                        "h": "Spain",
-                                        "a": "Argentina",
-                                        "sH": "1",
-                                        "sA": "0",
-                                        "fact": true,
-                                        "eloH": 1850,
-                                        "eloA": 1800,
-                                        "xgH": 1.5,
-                                        "xgA": 1.2
-                              }
-                    ]
           }
-]},
+        ]
+      },
 
       ucl: {
         id: "ucl",
@@ -4299,6 +3992,14 @@
       const activePane = document.getElementById(`pane-${tabKey}`);
       if (activeBtn) activeBtn.classList.add('active');
       if (activePane) activePane.classList.add('active');
+
+      const compData = POSTER_DATA[activeComp];
+      if (compData) {
+        if (tabKey === 'overview') renderOverviewTab(compData);
+        else if (tabKey === 'standings') renderStandingsTab(compData);
+        else if (tabKey === 'bracket') renderBracketTab(compData);
+        else if (tabKey === 'simulation') renderSimulationTab(compData);
+      }
     }
 
     // Render Overview Tab
@@ -4343,7 +4044,7 @@
       container.innerHTML = '';
 
       if (data.id === 'worldcup') {
-        // WC: 12 Groups Grid
+        // WC: 12 Groups Grid (Groups A through L)
         const grid = document.createElement('div');
         grid.className = 'groups-grid';
         (data.groups || []).forEach(g => {
@@ -4380,51 +4081,9 @@
           grid.appendChild(card);
         });
         container.appendChild(grid);
-
-        // Third-Place Qualification Table
-        if (Array.isArray(data.thirdPlace) && data.thirdPlace.length > 0) {
-          const tpCard = document.createElement('div');
-          tpCard.className = 'poster-card';
-          tpCard.style.marginTop = '24px';
-          let tpRows = '';
-          data.thirdPlace.forEach(tp => {
-            const advances = tp.rank <= 8;
-            tpRows += `
-              <tr style="${advances ? 'background: rgba(16, 185, 129, 0.05);' : ''}">
-                <td style="font-family: var(--font-mono); font-weight: 700; width: 32px; color: ${advances ? 'var(--poster-accent)' : 'inherit'};">${tp.rank}</td>
-                <td style="font-family: var(--font-mono); font-weight: 700; color: var(--poster-accent); width: 65px;">GRP ${tp.group}</td>
-                <td><b>${tp.name}</b></td>
-                <td class="num-col" style="font-weight: 700;">${tp.pts}</td>
-                <td class="num-col">${tp.gd > 0 ? '+' + tp.gd : tp.gd}</td>
-                <td class="num-col">${tp.gs}</td>
-                <td class="num-col">
-                  <span class="${advances ? 'badge-fact' : 'badge-sim'}" style="font-size: 9px; padding: 2px 6px;">${tp.status}</span>
-                </td>
-              </tr>
-            `;
-          });
-          tpCard.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 8px;">
-              <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
-                BEST 3RD-PLACED TEAMS // 8 OF 12 ADVANCE TO ROUND OF 32
-              </h3>
-              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
-                RANKED BY PTS &gt; GD &gt; GOALS SCORED &gt; FAIR PLAY
-              </span>
-            </div>
-            <table class="table-swiss">
-              <thead>
-                <tr>
-                  <th>#</th><th>GROUP</th><th>TEAM</th><th class="num-col">PTS</th><th class="num-col">GD</th><th class="num-col">GS</th><th class="num-col">STATUS</th>
-                </tr>
-              </thead>
-              <tbody>${tpRows}</tbody>
-            </table>
-          `;
-          container.appendChild(tpCard);
-        }
+        // Best 3rd-placed table removed per design refinement
       } else if (data.id === 'ucl') {
-        // UCL: Swiss Table
+        // UCL: Swiss Table (36 Teams)
         const card = document.createElement('div');
         card.className = 'poster-card';
         let rows = '';
@@ -4457,7 +4116,7 @@
         `;
         container.appendChild(card);
       } else if (data.id === 'laliga') {
-        // LaLiga Table
+        // LaLiga Table (20 Clubs)
         const card = document.createElement('div');
         card.className = 'poster-card';
         let rows = '';
@@ -4491,200 +4150,352 @@
       }
     }
 
+    // Helper: Create Single Match Card
+    function createMatchTile(m, isFinal = false, customHeader = null) {
+      const tile = document.createElement('div');
+      tile.className = `match-tile-swiss ${isFinal ? 'match-tile-final' : ''}`;
+      if (isFinal) {
+        tile.style.minWidth = '340px';
+        tile.style.maxWidth = '460px';
+      }
+      tile.onclick = () => openMatchModal(m);
+
+      const teamH = m.h || 'TBD';
+      const teamA = m.a || 'TBD';
+      const isWinnerH = m.winner && (m.winner === teamH);
+      const isWinnerA = m.winner && (m.winner === teamA);
+      const isPlayedFact = m.fact || (m.sH !== '—' && m.sH !== '?' && m.sH != null && m.sA !== '—' && m.sA !== '?' && m.sA != null);
+
+      let badgeText = isPlayedFact ? 'PLAYED FACT' : 'SCHEDULED';
+      let badgeClass = isPlayedFact ? 'badge-fact' : 'badge-sim';
+
+      let footerCallout = '';
+      if (isFinal && m.winner) {
+        footerCallout = `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-accent); font-weight: 800; margin-top: 6px; border-top: 1px solid var(--poster-accent); padding-top: 6px; text-align: center;">🏆 ${m.winner.toUpperCase()} WORLD CHAMPION</div>`;
+      } else if (customHeader && customHeader.includes('THIRD') && m.winner) {
+        footerCallout = `<div style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent); font-weight: 800; margin-top: 6px; border-top: 1px dashed var(--poster-border); padding-top: 5px; text-align: center;">🥉 ${m.winner.toUpperCase()} THIRD PLACE</div>`;
+      } else if (m.winner) {
+        footerCallout = `<div style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent); font-weight: 700; margin-top: 4px; border-top: 1px dashed var(--poster-border); padding-top: 4px;">▶ ${m.winner} ADVANCES</div>`;
+      }
+
+      tile.innerHTML = `
+        <div class="m-tile-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+          <span class="${badgeClass}" style="font-size: 9px; padding: 1px 5px;">${customHeader ? customHeader : badgeText}</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-dim);">${m.id ? '#' + m.id : ''}</span>
+        </div>
+        <div class="m-tile-team" style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin: 2px 0;">
+          <span class="m-tile-name" style="${isWinnerH ? 'font-weight: 800; color: var(--poster-accent);' : 'font-weight: 600;'}">${teamH}</span>
+          <span class="m-tile-score" style="font-family: var(--font-mono); font-weight: 800; font-size: 14px; ${isWinnerH ? 'color: var(--poster-accent);' : ''}">${m.sH != null ? m.sH : '—'}</span>
+        </div>
+        <div class="m-tile-team" style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin: 2px 0;">
+          <span class="m-tile-name" style="${isWinnerA ? 'font-weight: 800; color: var(--poster-accent);' : 'font-weight: 600;'}">${teamA}</span>
+          <span class="m-tile-score" style="font-family: var(--font-mono); font-weight: 800; font-size: 14px; ${isWinnerA ? 'color: var(--poster-accent);' : ''}">${m.sA != null ? m.sA : '—'}</span>
+        </div>
+        ${footerCallout}
+      `;
+
+      return tile;
+    }
+
+    // Helper: Render Top-Down Knockout Tournament Tree
+    function renderTopDownTree(bracketStages, compId) {
+      const treeContainer = document.createElement('div');
+      treeContainer.className = 'bracket-top-down-tree';
+
+      // Separate Final and Third-Place Play-off from preliminary tiers
+      const finalsStage = bracketStages.find(s => (s.stageId === 'FINAL' || s.stage.toUpperCase().includes('FINAL')) && !s.stage.toUpperCase().includes('SEMI') && !s.stage.toUpperCase().includes('QUARTER') && !s.stage.toUpperCase().includes('THIRD'));
+      const tppStage = bracketStages.find(s => s.stageId === 'TPP' || s.stage.toUpperCase().includes('THIRD'));
+      
+      const prelimStages = bracketStages.filter(s => s !== finalsStage && s !== tppStage);
+
+      function getConnectorLabel(stage, nextStage) {
+        const count = stage.matches.length;
+        if (count >= 16) return '▼ 16 WINNERS ADVANCE TO ROUND OF 16 ▼';
+        if (count === 8 && (stage.stageId === 'playoff' || stage.stage.toUpperCase().includes('PLAY-OFF'))) return '▼ 8 PLAY-OFF WINNERS ADVANCE TO ROUND OF 16 ▼';
+        if (count === 8) return '▼ 8 WINNERS ADVANCE TO QUARTER-FINALS ▼';
+        if (count === 4) return '▼ 4 WINNERS ADVANCE TO SEMI-FINALS ▼';
+        if (count === 2) return compId === 'worldcup' ? '▼ SEMI-FINAL WINNERS ADVANCE TO CHAMPIONSHIP FINAL ▼' : '▼ ADVANCE TO CHAMPIONS LEAGUE FINAL ▼';
+        return '▼ ADVANCE TO NEXT STAGE ▼';
+      }
+
+      // Render preliminary tiers (R32 -> R16 -> QF -> SF)
+      prelimStages.forEach((stage, idx) => {
+        const tier = document.createElement('div');
+        tier.className = 'tree-tier';
+
+        const header = document.createElement('div');
+        header.className = 'tree-tier-header';
+        header.innerHTML = `
+          <span>${stage.stage}</span>
+          <span style="color: var(--poster-accent);">${stage.matches.length} FIXTURES</span>
+        `;
+        tier.appendChild(header);
+
+        const grid = document.createElement('div');
+        if (stage.matches.length >= 16) {
+          grid.className = 'tree-tier-grid tree-grid-r32';
+        } else if (stage.matches.length >= 8) {
+          grid.className = 'tree-tier-grid tree-grid-r16';
+        } else if (stage.matches.length >= 4) {
+          grid.className = 'tree-tier-grid tree-grid-qf';
+        } else {
+          grid.className = 'tree-tier-grid tree-grid-sf';
+        }
+
+        stage.matches.forEach(m => {
+          grid.appendChild(createMatchTile(m, false));
+        });
+        tier.appendChild(grid);
+        treeContainer.appendChild(tier);
+
+        // Connector pointing downward
+        const nextStage = prelimStages[idx + 1] || finalsStage;
+        if (nextStage) {
+          const conn = document.createElement('div');
+          conn.className = 'tree-connector-down';
+          conn.innerHTML = `
+            <div class="connector-line"></div>
+            <div class="connector-label">${getConnectorLabel(stage, nextStage)}</div>
+            <div class="connector-line"></div>
+          `;
+          treeContainer.appendChild(conn);
+        }
+      });
+
+      // Apex Tier: Championship Final & Third-Place Play-off
+      if (finalsStage || tppStage) {
+        const apexTier = document.createElement('div');
+        apexTier.className = 'tree-tier';
+
+        const apexHeader = document.createElement('div');
+        apexHeader.className = 'tree-tier-header';
+        apexHeader.innerHTML = `
+          <span>${compId === 'worldcup' ? 'WORLD CUP CHAMPIONSHIP PODIUM' : 'CHAMPIONS LEAGUE GRAND FINAL'}</span>
+          <span style="color: var(--poster-accent);">${compId === 'worldcup' ? 'METLIFE STADIUM, NY/NJ' : 'ALLIANZ ARENA, MUNICH'}</span>
+        `;
+        apexTier.appendChild(apexHeader);
+
+        const apexGrid = document.createElement('div');
+        apexGrid.className = 'tree-grid-final';
+
+        if (finalsStage && finalsStage.matches && finalsStage.matches.length > 0) {
+          const finalMatch = finalsStage.matches[0];
+          const finalCard = createMatchTile(finalMatch, true, compId === 'worldcup' ? '🏆 WORLD CUP GRAND FINAL' : '🏆 UEFA CHAMPIONS LEAGUE FINAL');
+          apexGrid.appendChild(finalCard);
+        }
+
+        if (tppStage && tppStage.matches && tppStage.matches.length > 0) {
+          const tppMatch = tppStage.matches[0];
+          const tppCard = createMatchTile(tppMatch, false, '🥉 THIRD-PLACE PLAY-OFF');
+          apexGrid.appendChild(tppCard);
+        }
+
+        apexTier.appendChild(apexGrid);
+        treeContainer.appendChild(apexTier);
+      }
+
+      return treeContainer;
+    }
+
     // Render Bracket / Fixtures Tab
     function renderBracketTab(data) {
       const container = document.getElementById('bracket-content-container');
       container.innerHTML = '';
 
-      // Section 1: Knockout Stages Bracket Ladder
-      if (data.bracketStages && data.bracketStages.length > 0) {
-        const koHeader = document.createElement('div');
-        koHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
-        koHeader.innerHTML = `
-          <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
-            ${data.name.toUpperCase()} // KNOCKOUT BRACKET ARENA
-          </h3>
-          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
-            CLICK ANY FIXTURE TO OPEN THE POISSON CRUCIBLE &amp; WHAT-IF TESTER
-          </span>
-        `;
-        container.appendChild(koHeader);
-
-        const ladder = document.createElement('div');
-        ladder.className = 'bracket-stage-ladder';
-        data.bracketStages.forEach(stage => {
-          const col = document.createElement('div');
-          col.className = 'stage-col';
-          col.innerHTML = `<div class="stage-col-header"><span>${stage.stage}</span></div>`;
-          (stage.matches || []).forEach(m => {
-            const tile = document.createElement('div');
-            tile.className = 'match-tile-swiss';
-            tile.onclick = () => openMatchModal(m);
-            const isWinnerH = m.winner && (m.winner === m.h);
-            const isWinnerA = m.winner && (m.winner === m.a);
-            tile.innerHTML = `
-              <div class="m-tile-header">
-                <span class="${m.fact ? 'badge-fact' : 'badge-sim'}" style="font-size: 9px; padding: 1px 4px;">${m.fact ? 'PLAYED FACT' : 'SCHEDULED'}</span>
-                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-dim);">${m.id ? '#' + m.id : ''}</span>
-              </div>
-              <div class="m-tile-team">
-                <span class="m-tile-name" style="${isWinnerH ? 'font-weight: 800; color: var(--poster-accent);' : ''}">${m.h}</span>
-                <span class="m-tile-score" style="${isWinnerH ? 'color: var(--poster-accent);' : ''}">${m.sH}</span>
-              </div>
-              <div class="m-tile-team">
-                <span class="m-tile-name" style="${isWinnerA ? 'font-weight: 800; color: var(--poster-accent);' : ''}">${m.a}</span>
-                <span class="m-tile-score" style="${isWinnerA ? 'color: var(--poster-accent);' : ''}">${m.sA}</span>
-              </div>
-              ${m.winner ? `<div style="font-size: 10px; color: var(--poster-accent); font-weight: 700; margin-top: 3px;">&#9654; ${m.winner} ADVANCES</div>` : ''}
-            `;
-            col.appendChild(tile);
-          });
-          ladder.appendChild(col);
-        });
-        container.appendChild(ladder);
-      }
-
-      // Section 2: Group Stage Fixture Accordions (World Cup)
-      if (Array.isArray(data.groupRounds) && data.groupRounds.length > 0) {
-        const grpHeader = document.createElement('div');
-        grpHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-top: 32px; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
-        grpHeader.innerHTML = `
-          <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
-            GROUP STAGE MATCHES &amp; FIXTURES // 12 GROUPS
-          </h3>
-          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
-            72 MATCHES · EXPAND ANY GROUP FOR DETAILED HEAD-TO-HEAD CRUCIBLE
-          </span>
-        `;
-        container.appendChild(grpHeader);
-
-        const accordion = document.createElement('div');
-        accordion.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;';
-        data.groupRounds.forEach(r => {
-          const card = document.createElement('div');
-          card.className = 'group-card';
-          card.style.cssText = 'background: var(--poster-surface); border: 1px solid var(--poster-border);';
-          
-          let matchRowsHtml = '';
-          (r.matches || []).forEach(m => {
-            const hEsc = m.h.replace(/'/g, "\'");
-            const aEsc = m.a.replace(/'/g, "\'");
-            matchRowsHtml += `
-              <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
-                <span style="flex:1; text-align:right; font-weight:${m.sH > m.sA ? '700' : '500'};">${m.h}</span>
-                <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent);">${m.sH} – ${m.sA}</span>
-                <span style="flex:1; font-weight:${m.sA > m.sH ? '700' : '500'};">${m.a}</span>
-                <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
-              </div>
-            `;
-          });
-
-          card.innerHTML = `
-            <div class="group-header" style="cursor: pointer; display: flex; justify-content: space-between; padding: 10px 12px; background: var(--poster-surface-subtle); border-bottom: 1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
-              <span style="font-weight: 800; text-transform: uppercase;">${r.name}</span>
-              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">
-                ${r.matches.length} MATCHES &#9662;
+      if (data.id === 'worldcup') {
+        // WORLD CUP:
+        // 1. ABOVE: GROUP STAGE MATCH RESULTS // 12 GROUPS (Only group stage results!)
+        if (Array.isArray(data.groupRounds) && data.groupRounds.length > 0) {
+          const strictlyGroups = data.groupRounds.filter(r => (r.name || '').toUpperCase().includes('GROUP'));
+          if (strictlyGroups.length > 0) {
+            const grpHeader = document.createElement('div');
+            grpHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
+            grpHeader.innerHTML = `
+              <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+                GROUP STAGE MATCH RESULTS // 12 GROUPS
+              </h3>
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+                72 MATCHES · FACTUAL RESULTS FROM GROUPS A–L · CLICK ANY MATCH TO OPEN POISSON CRUCIBLE
               </span>
-            </div>
-            <div class="group-match-list open" style="display: flex; flex-direction: column;">
-              ${matchRowsHtml}
-            </div>
+            `;
+            container.appendChild(grpHeader);
+
+            const accordion = document.createElement('div');
+            accordion.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-bottom: 36px;';
+            strictlyGroups.forEach(r => {
+              const card = document.createElement('div');
+              card.className = 'group-card';
+              card.style.cssText = 'background: var(--poster-surface); border: 1px solid var(--poster-border);';
+              
+              let matchRowsHtml = '';
+              (r.matches || []).forEach(m => {
+                const hEsc = (m.h || '').replace(/'/g, "\\'");
+                const aEsc = (m.a || '').replace(/'/g, "\\'");
+                const isHWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sH) > parseInt(m.sA);
+                const isAWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sA) > parseInt(m.sH);
+                matchRowsHtml += `
+                  <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
+                    <span style="flex:1; text-align:right; ${isHWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.h}</span>
+                    <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px;">${m.sH} – ${m.sA}</span>
+                    <span style="flex:1; ${isAWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.a}</span>
+                    <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+                  </div>
+                `;
+              });
+
+              card.innerHTML = `
+                <div class="group-header" style="cursor: pointer; display: flex; justify-content: space-between; padding: 10px 12px; background: var(--poster-surface-subtle); border-bottom: 1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
+                  <span style="font-weight: 800; text-transform: uppercase;">${r.name}</span>
+                  <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">
+                    ${r.matches.length} RESULTS &#9662;
+                  </span>
+                </div>
+                <div class="group-match-list open" style="flex-direction: column;">
+                  ${matchRowsHtml}
+                </div>
+              `;
+              accordion.appendChild(card);
+            });
+            container.appendChild(accordion);
+          }
+        }
+
+        // 2. BELOW: WORLD CUP 2026 // KNOCKOUT BRACKET ARENA in Top-Down Tree Format
+        if (data.bracketStages && data.bracketStages.length > 0) {
+          const koHeader = document.createElement('div');
+          koHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
+          koHeader.innerHTML = `
+            <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+              WORLD CUP 2026 // KNOCKOUT BRACKET ARENA
+            </h3>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+              TOP-DOWN TOURNAMENT TREE · CLICK ANY FIXTURE TO OPEN POISSON CRUCIBLE
+            </span>
           `;
-          accordion.appendChild(card);
-        });
-        container.appendChild(accordion);
-      }
+          container.appendChild(koHeader);
 
-      // Section 3: League Matchdays (UCL Swiss Phase)
-      if (Array.isArray(data.leagueMatchdays) && data.leagueMatchdays.length > 0) {
-        const uclHeader = document.createElement('div');
-        uclHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-top: 24px; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
-        uclHeader.innerHTML = `
-          <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
-            SWISS LEAGUE PHASE // MATCHDAYS 1–8
-          </h3>
-          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
-            CLICK ANY FIXTURE FOR POISSON SCORELINE DENSITY
-          </span>
-        `;
-        container.appendChild(uclHeader);
+          const tree = renderTopDownTree(data.bracketStages, 'worldcup');
+          container.appendChild(tree);
+        }
+      } else if (data.id === 'ucl') {
+        // UEFA CHAMPIONS LEAGUE:
+        // 1. ABOVE: SWISS LEAGUE PHASE MATCH RESULTS
+        if (Array.isArray(data.leagueMatchdays) && data.leagueMatchdays.length > 0) {
+          const uclHeader = document.createElement('div');
+          uclHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
+          uclHeader.innerHTML = `
+            <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+              SWISS LEAGUE PHASE MATCH RESULTS // MATCHDAYS 1–3
+            </h3>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+              54 PLAYED FIXTURES · CLICK FOR POISSON SCORELINE DENSITY &amp; INTEL
+            </span>
+          `;
+          container.appendChild(uclHeader);
 
-        const grid = document.createElement('div');
-        grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;';
-        data.leagueMatchdays.forEach(md => {
-          const card = document.createElement('div');
-          card.className = 'group-card';
-          let mRows = '';
-          (md.matches || []).forEach(m => {
-            const hEsc = m.h.replace(/'/g, "\'");
-            const aEsc = m.a.replace(/'/g, "\'");
-            mRows += `
-              <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
-                <span style="flex:1; text-align:right;">${m.h}</span>
-                <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent);">${m.sH} – ${m.sA}</span>
-                <span style="flex:1;">${m.a}</span>
-                <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+          const grid = document.createElement('div');
+          grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-bottom: 36px;';
+          data.leagueMatchdays.forEach(md => {
+            const card = document.createElement('div');
+            card.className = 'group-card';
+            let mRows = '';
+            (md.matches || []).forEach(m => {
+              const hEsc = (m.h || '').replace(/'/g, "\\'");
+              const aEsc = (m.a || '').replace(/'/g, "\\'");
+              const isHWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sH) > parseInt(m.sA);
+              const isAWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sA) > parseInt(m.sH);
+              mRows += `
+                <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
+                  <span style="flex:1; text-align:right; ${isHWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.h}</span>
+                  <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px;">${m.sH} – ${m.sA}</span>
+                  <span style="flex:1; ${isAWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.a}</span>
+                  <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+                </div>
+              `;
+            });
+            card.innerHTML = `
+              <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
+                <span style="font-weight: 800;">${md.name}</span>
+                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">${md.matches.length} RESULTS &#9662;</span>
+              </div>
+              <div class="group-match-list open" style="flex-direction: column;">
+                ${mRows}
               </div>
             `;
+            grid.appendChild(card);
           });
-          card.innerHTML = `
-            <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
-              <span style="font-weight: 800;">${md.name}</span>
-              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">${md.matches.length} TIES &#9662;</span>
-            </div>
-            <div class="group-match-list open" style="display: flex; flex-direction: column;">
-              ${mRows}
-            </div>
+          container.appendChild(grid);
+        }
+
+        // 2. BELOW: UEFA CHAMPIONS LEAGUE // KNOCKOUT BRACKET ARENA in Top-Down Tree Format
+        if (data.bracketStages && data.bracketStages.length > 0) {
+          const koHeader = document.createElement('div');
+          koHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
+          koHeader.innerHTML = `
+            <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+              UEFA CHAMPIONS LEAGUE // KNOCKOUT BRACKET ARENA
+            </h3>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+              TOP-DOWN TOURNAMENT TREE · TWO-LEGGED TIES &amp; GRAND FINAL
+            </span>
           `;
-          grid.appendChild(card);
-        });
-        container.appendChild(grid);
-      }
+          container.appendChild(koHeader);
 
-      // Section 4: LaLiga Matchdays
-      if (Array.isArray(data.matchdays) && data.matchdays.length > 0) {
-        const llHeader = document.createElement('div');
-        llHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
-        llHeader.innerHTML = `
-          <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
-            LALIGA EA SPORTS 2026/27 // 38 MATCHDAYS
-          </h3>
-          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
-            COLLAPSIBLE SCHEDULE · CLICK FOR PREDICTIVE ARENA
-          </span>
-        `;
-        container.appendChild(llHeader);
+          const tree = renderTopDownTree(data.bracketStages, 'ucl');
+          container.appendChild(tree);
+        }
+      } else if (data.id === 'laliga') {
+        // LALIGA: REGULAR SEASON MATCH RESULTS // 38 MATCHDAYS
+        if (Array.isArray(data.matchdays) && data.matchdays.length > 0) {
+          const llHeader = document.createElement('div');
+          llHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
+          llHeader.innerHTML = `
+            <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+              REGULAR SEASON MATCH RESULTS // 38 MATCHDAYS
+            </h3>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+              380 FIXTURES · 102 PLAYED MATCHES WITH VERIFIED SCORES · CLICK TO INSPECT
+            </span>
+          `;
+          container.appendChild(llHeader);
 
-        const grid = document.createElement('div');
-        grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;';
-        data.matchdays.forEach(md => {
-          const card = document.createElement('div');
-          card.className = 'group-card';
-          let mRows = '';
-          (md.matches || []).forEach(m => {
-            const hEsc = m.h.replace(/'/g, "\'");
-            const aEsc = m.a.replace(/'/g, "\'");
-            mRows += `
-              <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
-                <span style="flex:1; text-align:right;">${m.h}</span>
-                <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent);">${m.sH} – ${m.sA}</span>
-                <span style="flex:1;">${m.a}</span>
-                <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+          const grid = document.createElement('div');
+          grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;';
+          data.matchdays.forEach(md => {
+            const card = document.createElement('div');
+            card.className = 'group-card';
+            let mRows = '';
+            const isPlayedMd = md.matches && md.matches.some(m => m.fact);
+            (md.matches || []).forEach(m => {
+              const hEsc = (m.h || '').replace(/'/g, "\\'");
+              const aEsc = (m.a || '').replace(/'/g, "\\'");
+              const isHWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sH) > parseInt(m.sA);
+              const isAWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sA) > parseInt(m.sH);
+              mRows += `
+                <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
+                  <span style="flex:1; text-align:right; ${isHWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.h}</span>
+                  <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px;">${m.sH} – ${m.sA}</span>
+                  <span style="flex:1; ${isAWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.a}</span>
+                  <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+                </div>
+              `;
+            });
+            const isOpen = isPlayedMd;
+            card.innerHTML = `
+              <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
+                <span style="font-weight: 800;">MATCHDAY ${md.matchday}</span>
+                <span style="font-family: var(--font-mono); font-size: 10px; color: ${isPlayedMd ? '#10B981' : 'var(--poster-accent)'};">
+                  ${isPlayedMd ? 'PLAYED RESULTS' : 'SCHEDULED'} (${md.matches.length}) &#9662;
+                </span>
+              </div>
+              <div class="group-match-list ${isOpen ? 'open' : ''}" style="flex-direction: column;">
+                ${mRows}
               </div>
             `;
+            grid.appendChild(card);
           });
-          card.innerHTML = `
-            <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
-              <span style="font-weight: 800;">MATCHDAY ${md.matchday}</span>
-              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">${md.matches.length} MATCHES &#9662;</span>
-            </div>
-            <div class="group-match-list open" style="display: flex; flex-direction: column;">
-              ${mRows}
-            </div>
-          `;
-          grid.appendChild(card);
-        });
-        container.appendChild(grid);
+          container.appendChild(grid);
+        }
       }
     }
 
@@ -4714,7 +4525,7 @@
     // Backend API Live Synchronization (Truth Engine Overlay)
     async function syncCompetitionFromBackend(compKey) {
       try {
-        // 1. Fetch primary data
+        // 1. Fetch primary data (/api/data)
         const dataRes = await fetch(`/${compKey}/api/data`);
         if (dataRes.ok) {
           const live = await dataRes.json();
@@ -4750,14 +4561,13 @@
             }));
             if (mappedElo.length > 0 && POSTER_DATA[compKey]) {
               POSTER_DATA[compKey].eloList = mappedElo;
-              if (currentActiveTab === 'overview') renderOverviewTab(POSTER_DATA[compKey]);
             }
           }
         }
 
-        // 2. Tournament specific Standings & Bracket APIs
+        // 2. Tournament specific Standings & Bracket / Fixtures APIs
         if (compKey === 'worldcup') {
-          // Fetch WC Standings (12 Groups + Best 3rd-place teams)
+          // Standings (12 Groups)
           const stdRes = await fetch('/worldcup/api/standings');
           if (stdRes.ok) {
             const stdData = await stdRes.json();
@@ -4783,21 +4593,9 @@
                 teams: groupsMap[g].sort((a, b) => a.pos - b.pos)
               }));
             }
-            if (Array.isArray(stdData.third_place) && stdData.third_place.length > 0) {
-              POSTER_DATA.worldcup.thirdPlace = stdData.third_place.map((tp, idx) => ({
-                rank: idx + 1,
-                group: tp.group,
-                name: tp.team,
-                pts: tp.pts,
-                gd: tp.gd,
-                gs: tp.gs,
-                status: idx < 8 ? 'ADVANCES TO R32' : 'ELIMINATED'
-              }));
-            }
-            if (currentActiveTab === 'standings') renderStandingsTab(POSTER_DATA.worldcup);
           }
 
-          // Fetch WC Bracket (Knockout Tree R32->R16->QF->SF->TPP->FINAL + Group Matches)
+          // Bracket & Group Fixtures
           const brRes = await fetch('/worldcup/api/bracket/data');
           if (brRes.ok) {
             const brData = await brRes.json();
@@ -4812,6 +4610,7 @@
               const rawMatches = tree[stg] || [];
               const lbl = (labels[stg] || stg).toUpperCase();
               return {
+                stageId: stg,
                 stage: `${lbl} (${rawMatches.length} TIES)`,
                 matches: rawMatches.map(m => {
                   const score = m.score || {};
@@ -4837,9 +4636,11 @@
               };
             });
 
+            // STRICTLY filter for Group Stage matches only (12 groups)
             if (Array.isArray(brData.chronological_rounds) && brData.chronological_rounds.length > 0) {
-              POSTER_DATA.worldcup.groupRounds = brData.chronological_rounds.map(r => ({
-                name: r.round_name || 'Group Matches',
+              const groupOnly = brData.chronological_rounds.filter(r => (r.round_name || '').startsWith('Group '));
+              POSTER_DATA.worldcup.groupRounds = groupOnly.map(r => ({
+                name: (r.round_name || 'Group Matches').toUpperCase(),
                 matches: (r.matches || []).map(m => ({
                   id: m.match_id,
                   h: m.team_a,
@@ -4854,8 +4655,6 @@
                 }))
               }));
             }
-
-            if (currentActiveTab === 'bracket') renderBracketTab(POSTER_DATA.worldcup);
           }
         } else if (compKey === 'ucl') {
           // UCL Standings
@@ -4875,7 +4674,62 @@
                 pts: t.pts,
                 zone: t.zone === 'top_8' ? 'TOP 8 (ROUND OF 16)' : (t.zone === 'playoff' ? 'PLAY-OFF' : 'ELIMINATED')
               }));
-              if (currentActiveTab === 'standings') renderStandingsTab(POSTER_DATA.ucl);
+            }
+          }
+
+          // UCL Bracket & Swiss League Matches
+          const uclBrRes = await fetch('/ucl/api/bracket');
+          if (uclBrRes.ok) {
+            const uclBr = await uclBrRes.json();
+            if (uclBr.league_matchdays) {
+              POSTER_DATA.ucl.leagueMatchdays = Object.keys(uclBr.league_matchdays).sort().map(k => ({
+                name: `MATCHDAY ${k.replace('MD', '')}`,
+                matches: (uclBr.league_matchdays[k] || []).map(m => ({
+                  id: m.match_id,
+                  h: m.team_a,
+                  a: m.team_b,
+                  sH: m.home_score != null ? String(m.home_score) : '—',
+                  sA: m.away_score != null ? String(m.away_score) : '—',
+                  fact: m.status === 'played' || (m.home_score != null && m.away_score != null),
+                  eloH: 1950,
+                  eloA: 1900,
+                  xgH: 1.8,
+                  xgA: 1.1
+                }))
+              }));
+            }
+
+            if (uclBr.stages) {
+              const order = uclBr.stage_order || ['playoff', 'R16', 'QF', 'SF', 'FINAL'];
+              const stageLabels = {
+                playoff: 'Knockout Play-offs',
+                R16: 'Round of 16',
+                QF: 'Quarter-finals',
+                SF: 'Semi-finals',
+                FINAL: 'Grand Final'
+              };
+              POSTER_DATA.ucl.bracketStages = order.filter(s => s !== 'league').map(stg => {
+                const rawMatches = (uclBr.stages[stg] || {}).matches || [];
+                const lbl = (stageLabels[stg] || stg).toUpperCase();
+                return {
+                  stageId: stg,
+                  stage: `${lbl} (${rawMatches.length} TIES)`,
+                  matches: rawMatches.map(m => ({
+                    id: m.id || m.match_id,
+                    h: m.team_a || 'TBD',
+                    a: m.team_b || 'TBD',
+                    sH: m.aggregate_a != null ? String(m.aggregate_a) : '—',
+                    sA: m.aggregate_b != null ? String(m.aggregate_b) : '—',
+                    winner: m.winner || null,
+                    fact: m.status === 'played',
+                    round: stg,
+                    eloH: 1950,
+                    eloA: 1900,
+                    xgH: 1.8,
+                    xgA: 1.2
+                  }))
+                };
+              });
             }
           }
         } else if (compKey === 'laliga') {
@@ -4895,7 +4749,29 @@
                 ga: s.goals_against,
                 pts: s.pts != null ? s.pts : s.points
               }));
-              if (currentActiveTab === 'standings') renderStandingsTab(POSTER_DATA.laliga);
+            }
+          }
+
+          // LaLiga Fixtures
+          const llFixRes = await fetch('/laliga/api/fixtures');
+          if (llFixRes.ok) {
+            const llFix = await llFixRes.json();
+            if (Array.isArray(llFix.matchdays)) {
+              POSTER_DATA.laliga.matchdays = llFix.matchdays.map(md => ({
+                matchday: md.matchday,
+                matches: (md.matches || []).map(m => ({
+                  id: m.match_id,
+                  h: m.home_team || m.team_a,
+                  a: m.away_team || m.team_b,
+                  sH: m.home_score != null ? String(m.home_score) : '—',
+                  sA: m.away_score != null ? String(m.away_score) : '—',
+                  fact: m.status === 'finished' || m.status === 'played' || (m.home_score != null && m.away_score != null),
+                  eloH: 1900,
+                  eloA: 1850,
+                  xgH: 1.6,
+                  xgA: 1.1
+                }))
+              }));
             }
           }
         }
@@ -4912,8 +4788,16 @@
               sf: parseFloat(t.sf_prob || t.sf || 0),
               qf: parseFloat(t.qf_prob || t.qf || 0)
             }));
-            if (currentActiveTab === 'simulation') renderSimulationTab(POSTER_DATA[compKey]);
           }
+        }
+
+        // ALWAYS re-render the currently active tab when sync completes!
+        if (activeComp === compKey) {
+          const compData = POSTER_DATA[compKey];
+          if (currentActiveTab === 'overview') renderOverviewTab(compData);
+          else if (currentActiveTab === 'standings') renderStandingsTab(compData);
+          else if (currentActiveTab === 'bracket') renderBracketTab(compData);
+          else if (currentActiveTab === 'simulation') renderSimulationTab(compData);
         }
       } catch (err) {
         console.info('Live API sync notice:', err);
