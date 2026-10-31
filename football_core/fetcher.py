@@ -201,7 +201,14 @@ def fetch_raw_matches(api_key: str, api_url: str, league_id: int = 0, timeout: i
                 if isinstance(data, list):
                     return data
                 if isinstance(data, dict):
-                    return data.get("matches", data.get("events", data.get("results", [])))
+                    res = data.get("matches")
+                    if res is None:
+                        res = data.get("events")
+                    if res is None:
+                        res = data.get("results")
+                    if isinstance(res, list):
+                        return res
+                    return []
                 return []
             if resp.status_code == 401:
                 return []
