@@ -88,6 +88,7 @@ def test_live_mode_still_reaches_provider(monkeypatch):
 
     monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: LiveProv())
+    monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     # ensure NOT snapshot
     monkeypatch.setattr("football_core.runtime_support._snapshot_session", False)
     wc_pipeline.fetch_live_data("", "", WC_DATA)
@@ -113,6 +114,7 @@ def test_failed_refresh_persists_only_into_redirected_ledger(
 
     monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: EmptyProv())
+    monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     monkeypatch.setattr("football_core.runtime_support._snapshot_session", False)
 
     import competitions.worldcup.src.pipeline as wc_pipeline
@@ -141,6 +143,7 @@ def test_unreadable_data_files_return_structured_report(
 
     monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: StubProv())
+    monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     monkeypatch.setattr("football_core.runtime_support._snapshot_session", False)
 
     report = wc_pipeline.fetch_live_data("", "", tmp_path)

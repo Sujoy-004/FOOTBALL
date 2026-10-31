@@ -197,6 +197,7 @@ def test_live_mode_still_reaches_provider(monkeypatch):
 
     monkeypatch.setattr("football_core.runtime_support.get_data_provider",
                         lambda b, f, l=None: LiveProv())
+    monkeypatch.delenv("FOOTBALL_SNAPSHOT", raising=False)
     # ensure NOT snapshot
     import web.startup as startup
     startup.set_session_decision(startup.StartupDecision("live-configured", ""))
