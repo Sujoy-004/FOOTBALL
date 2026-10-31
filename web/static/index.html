@@ -659,7 +659,7 @@
        ========================================================================== */
     .groups-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 16px;
     }
 
@@ -1539,47 +1539,2557 @@
           { team: "Germany", champion: 7.0, final: 15.2, sf: 27.5, qf: 49.0 }
         ],
         groups: [
-          { name: "GROUP A", teams: [
-            { pos: 1, name: "Mexico", p: 3, w: 2, d: 1, l: 0, gf: 5, ga: 2, pts: 7 },
-            { pos: 2, name: "Italy", p: 3, w: 2, d: 0, l: 1, gf: 4, ga: 2, pts: 6 },
-            { pos: 3, name: "South Korea", p: 3, w: 1, d: 0, l: 2, gf: 3, ga: 4, pts: 3 },
-            { pos: 4, name: "South Africa", p: 3, w: 0, d: 1, l: 2, gf: 1, ga: 5, pts: 1 }
-          ]},
-          { name: "GROUP B", teams: [
-            { pos: 1, name: "Canada", p: 3, w: 2, d: 0, l: 1, gf: 4, ga: 3, pts: 6 },
-            { pos: 2, name: "Switzerland", p: 3, w: 1, d: 2, l: 0, gf: 3, ga: 2, pts: 5 },
-            { pos: 3, name: "Nigeria", p: 3, w: 1, d: 1, l: 1, gf: 4, ga: 4, pts: 4 },
-            { pos: 4, name: "Chile", p: 3, w: 0, d: 1, l: 2, gf: 2, ga: 4, pts: 1 }
-          ]},
-          { name: "GROUP C", teams: [
-            { pos: 1, name: "Spain", p: 3, w: 3, d: 0, l: 0, gf: 8, ga: 1, pts: 9 },
-            { pos: 2, name: "Uruguay", p: 3, w: 2, d: 0, l: 1, gf: 5, ga: 3, pts: 6 },
-            { pos: 3, name: "Morocco", p: 3, w: 1, d: 0, l: 2, gf: 3, ga: 5, pts: 3 },
-            { pos: 4, name: "New Zealand", p: 3, w: 0, d: 0, l: 3, gf: 0, ga: 7, pts: 0 }
-          ]}
-        ],
+          {
+                    "name": "GROUP A",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "Mexico",
+                                        "p": 3,
+                                        "w": 3,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 6,
+                                        "ga": 0,
+                                        "pts": 9
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "South Africa",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 3,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "South Korea",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 3,
+                                        "pts": 3
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Czech Republic",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 6,
+                                        "pts": 1
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP B",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "Switzerland",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 7,
+                                        "ga": 3,
+                                        "pts": 7
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Canada",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 8,
+                                        "ga": 3,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Bosnia and Herzegovina",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 5,
+                                        "ga": 6,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Qatar",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 10,
+                                        "pts": 1
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP C",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "Brazil",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 7,
+                                        "ga": 1,
+                                        "pts": 7
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Morocco",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 6,
+                                        "ga": 3,
+                                        "pts": 7
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Scotland",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 1,
+                                        "ga": 4,
+                                        "pts": 3
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Haiti",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 8,
+                                        "pts": 0
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP D",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "United States",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 8,
+                                        "ga": 4,
+                                        "pts": 6
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Australia",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 2,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Paraguay",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 4,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "T\u00fcrkiye",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 3,
+                                        "ga": 5,
+                                        "pts": 3
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP E",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "Germany",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 10,
+                                        "ga": 4,
+                                        "pts": 6
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Ivory Coast",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 4,
+                                        "ga": 2,
+                                        "pts": 6
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Ecuador",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 2,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Cura\u00e7ao",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 1,
+                                        "ga": 9,
+                                        "pts": 1
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP F",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "Netherlands",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 10,
+                                        "ga": 4,
+                                        "pts": 7
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Japan",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 2,
+                                        "l": 0,
+                                        "gf": 7,
+                                        "ga": 3,
+                                        "pts": 5
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Sweden",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 7,
+                                        "ga": 7,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Tunisia",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 12,
+                                        "pts": 0
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP G",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "Belgium",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 2,
+                                        "l": 0,
+                                        "gf": 6,
+                                        "ga": 2,
+                                        "pts": 5
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Egypt",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 2,
+                                        "l": 0,
+                                        "gf": 5,
+                                        "ga": 3,
+                                        "pts": 5
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Iran",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 3,
+                                        "ga": 3,
+                                        "pts": 3
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "New Zealand",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 4,
+                                        "ga": 10,
+                                        "pts": 1
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP H",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "Spain",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 5,
+                                        "ga": 0,
+                                        "pts": 7
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Cape Verde",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 2,
+                                        "pts": 3
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Uruguay",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 2,
+                                        "l": 0,
+                                        "gf": 3,
+                                        "ga": 4,
+                                        "pts": 2
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Saudi Arabia",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 2,
+                                        "l": 0,
+                                        "gf": 1,
+                                        "ga": 5,
+                                        "pts": 2
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP I",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "France",
+                                        "p": 3,
+                                        "w": 3,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 10,
+                                        "ga": 2,
+                                        "pts": 9
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Norway",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 8,
+                                        "ga": 7,
+                                        "pts": 6
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Senegal",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 8,
+                                        "ga": 6,
+                                        "pts": 3
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Iraq",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 1,
+                                        "ga": 12,
+                                        "pts": 0
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP J",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "Argentina",
+                                        "p": 3,
+                                        "w": 3,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 8,
+                                        "ga": 1,
+                                        "pts": 9
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Austria",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 6,
+                                        "ga": 6,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Algeria",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 5,
+                                        "ga": 7,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Jordan",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 3,
+                                        "ga": 8,
+                                        "pts": 0
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP K",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "Colombia",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 4,
+                                        "ga": 1,
+                                        "pts": 7
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Portugal",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 2,
+                                        "l": 0,
+                                        "gf": 6,
+                                        "ga": 1,
+                                        "pts": 5
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "DR Congo",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 4,
+                                        "ga": 3,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Uzbekistan",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 11,
+                                        "pts": 0
+                              }
+                    ]
+          },
+          {
+                    "name": "GROUP L",
+                    "teams": [
+                              {
+                                        "pos": 1,
+                                        "name": "England",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 6,
+                                        "ga": 2,
+                                        "pts": 7
+                              },
+                              {
+                                        "pos": 2,
+                                        "name": "Croatia",
+                                        "p": 3,
+                                        "w": 2,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 5,
+                                        "ga": 5,
+                                        "pts": 6
+                              },
+                              {
+                                        "pos": 3,
+                                        "name": "Ghana",
+                                        "p": 3,
+                                        "w": 1,
+                                        "d": 1,
+                                        "l": 0,
+                                        "gf": 2,
+                                        "ga": 2,
+                                        "pts": 4
+                              },
+                              {
+                                        "pos": 4,
+                                        "name": "Panama",
+                                        "p": 3,
+                                        "w": 0,
+                                        "d": 0,
+                                        "l": 0,
+                                        "gf": 0,
+                                        "ga": 4,
+                                        "pts": 0
+                              }
+                    ]
+          }
+],
+        thirdPlace: [
+          {
+                    "rank": 1,
+                    "group": "K",
+                    "name": "DR Congo",
+                    "pts": 4,
+                    "gd": 1,
+                    "gs": 4,
+                    "status": "ADVANCES TO R32"
+          },
+          {
+                    "rank": 2,
+                    "group": "F",
+                    "name": "Sweden",
+                    "pts": 4,
+                    "gd": 0,
+                    "gs": 7,
+                    "status": "ADVANCES TO R32"
+          },
+          {
+                    "rank": 3,
+                    "group": "E",
+                    "name": "Ecuador",
+                    "pts": 4,
+                    "gd": 0,
+                    "gs": 2,
+                    "status": "ADVANCES TO R32"
+          },
+          {
+                    "rank": 4,
+                    "group": "L",
+                    "name": "Ghana",
+                    "pts": 4,
+                    "gd": 0,
+                    "gs": 2,
+                    "status": "ADVANCES TO R32"
+          },
+          {
+                    "rank": 5,
+                    "group": "B",
+                    "name": "Bosnia and Herzegovina",
+                    "pts": 4,
+                    "gd": -1,
+                    "gs": 5,
+                    "status": "ADVANCES TO R32"
+          },
+          {
+                    "rank": 6,
+                    "group": "J",
+                    "name": "Algeria",
+                    "pts": 4,
+                    "gd": -2,
+                    "gs": 5,
+                    "status": "ADVANCES TO R32"
+          },
+          {
+                    "rank": 7,
+                    "group": "D",
+                    "name": "Paraguay",
+                    "pts": 4,
+                    "gd": -2,
+                    "gs": 2,
+                    "status": "ADVANCES TO R32"
+          },
+          {
+                    "rank": 8,
+                    "group": "I",
+                    "name": "Senegal",
+                    "pts": 3,
+                    "gd": 2,
+                    "gs": 8,
+                    "status": "ADVANCES TO R32"
+          },
+          {
+                    "rank": 9,
+                    "group": "G",
+                    "name": "Iran",
+                    "pts": 3,
+                    "gd": 0,
+                    "gs": 3,
+                    "status": "ELIMINATED"
+          },
+          {
+                    "rank": 10,
+                    "group": "A",
+                    "name": "South Korea",
+                    "pts": 3,
+                    "gd": -1,
+                    "gs": 2,
+                    "status": "ELIMINATED"
+          },
+          {
+                    "rank": 11,
+                    "group": "C",
+                    "name": "Scotland",
+                    "pts": 3,
+                    "gd": -3,
+                    "gs": 1,
+                    "status": "ELIMINATED"
+          },
+          {
+                    "rank": 12,
+                    "group": "H",
+                    "name": "Uruguay",
+                    "pts": 2,
+                    "gd": -1,
+                    "gs": 3,
+                    "status": "ELIMINATED"
+          }
+],
         bracketStages: [
-          { stage: "ROUND OF 16", matches: [
-            { h: "Spain", a: "Croatia", sH: "3", sA: "1", fact: true, eloH: 2042, eloA: 1920, xgH: 2.1, xgA: 0.9 },
-            { h: "Argentina", a: "Uruguay", sH: "2", sA: "0", fact: true, eloH: 2018, eloA: 1910, xgH: 1.8, xgA: 0.7 },
-            { h: "France", a: "Italy", sH: "2", sA: "1", fact: true, eloH: 2025, eloA: 1930, xgH: 1.6, xgA: 1.1 },
-            { h: "Brazil", a: "Japan", sH: "3", sA: "0", fact: true, eloH: 2005, eloA: 1860, xgH: 2.4, xgA: 0.5 }
-          ]},
-          { stage: "QUARTER-FINALS", matches: [
-            { h: "Spain", a: "Argentina", sH: "2", sA: "1", fact: true, eloH: 2042, eloA: 2018, xgH: 1.85, xgA: 1.20 },
-            { h: "France", a: "Brazil", sH: "54%", sA: "46%", fact: false, eloH: 2025, eloA: 2005, xgH: 1.62, xgA: 1.48 },
-            { h: "England", a: "Germany", sH: "52%", sA: "48%", fact: false, eloH: 1980, eloA: 1965, xgH: 1.45, xgA: 1.35 },
-            { h: "Portugal", a: "Netherlands", sH: "51%", sA: "49%", fact: false, eloH: 1970, eloA: 1950, xgH: 1.50, xgA: 1.40 }
-          ]},
-          { stage: "SEMI-FINALS", matches: [
-            { h: "Spain", a: "France / BRA", sH: "58%", sA: "42%", fact: false, eloH: 2042, eloA: 2015, xgH: 1.75, xgA: 1.35 },
-            { h: "ENG / GER", a: "POR / NED", sH: "50%", sA: "50%", fact: false, eloH: 1975, eloA: 1960, xgH: 1.40, xgA: 1.40 }
-          ]},
-          { stage: "WORLD CUP FINAL", matches: [
-            { h: "TBD FINALIST 1", a: "TBD FINALIST 2", sH: "--", sA: "--", fact: false, eloH: 2020, eloA: 2010, xgH: 1.50, xgA: 1.40 }
-          ]}
-        ]
-      },
+          {
+                    "stage": "ROUND OF 32 (16 TIES)",
+                    "matches": [
+                              {
+                                        "id": "M73",
+                                        "h": "South Africa",
+                                        "a": "Canada",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "winner": "Canada",
+                                        "fact": true,
+                                        "probA": 8.5,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M74",
+                                        "h": "Germany",
+                                        "a": "Paraguay",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "winner": "Paraguay",
+                                        "fact": true,
+                                        "probA": 95.9,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M75",
+                                        "h": "Netherlands",
+                                        "a": "Morocco",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "winner": "Morocco",
+                                        "fact": true,
+                                        "probA": 68.5,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M76",
+                                        "h": "Brazil",
+                                        "a": "Japan",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "winner": "Brazil",
+                                        "fact": true,
+                                        "probA": 74.9,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M77",
+                                        "h": "France",
+                                        "a": "Sweden",
+                                        "sH": "3",
+                                        "sA": "0",
+                                        "winner": "France",
+                                        "fact": true,
+                                        "probA": 96.7,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M78",
+                                        "h": "Ivory Coast",
+                                        "a": "Norway",
+                                        "sH": "1",
+                                        "sA": "2",
+                                        "winner": "Norway",
+                                        "fact": true,
+                                        "probA": 48.9,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M79",
+                                        "h": "Mexico",
+                                        "a": "Ecuador",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "winner": "Mexico",
+                                        "fact": true,
+                                        "probA": 55.0,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M80",
+                                        "h": "England",
+                                        "a": "DR Congo",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "winner": "England",
+                                        "fact": true,
+                                        "probA": 97.0,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M81",
+                                        "h": "United States",
+                                        "a": "Bosnia and Herzegovina",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "winner": "United States",
+                                        "fact": true,
+                                        "probA": 94.3,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M82",
+                                        "h": "Belgium",
+                                        "a": "Senegal",
+                                        "sH": "3",
+                                        "sA": "2",
+                                        "winner": "Belgium",
+                                        "fact": true,
+                                        "probA": 58.6,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M83",
+                                        "h": "Portugal",
+                                        "a": "Croatia",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "winner": "Portugal",
+                                        "fact": true,
+                                        "probA": 59.9,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M84",
+                                        "h": "Spain",
+                                        "a": "Austria",
+                                        "sH": "3",
+                                        "sA": "0",
+                                        "winner": "Spain",
+                                        "fact": true,
+                                        "probA": 87.1,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M85",
+                                        "h": "Switzerland",
+                                        "a": "Algeria",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "winner": "Switzerland",
+                                        "fact": true,
+                                        "probA": 88.8,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M86",
+                                        "h": "Argentina",
+                                        "a": "Cape Verde",
+                                        "sH": "3",
+                                        "sA": "2",
+                                        "winner": "Argentina",
+                                        "fact": true,
+                                        "probA": 98.7,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M87",
+                                        "h": "Colombia",
+                                        "a": "Ghana",
+                                        "sH": "1",
+                                        "sA": "0",
+                                        "winner": "Colombia",
+                                        "fact": true,
+                                        "probA": 79.9,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M88",
+                                        "h": "Australia",
+                                        "a": "Egypt",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "winner": "Egypt",
+                                        "fact": true,
+                                        "probA": 82.4,
+                                        "round": "R32",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "stage": "ROUND OF 16 (8 TIES)",
+                    "matches": [
+                              {
+                                        "id": "M89",
+                                        "h": "Paraguay",
+                                        "a": "France",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "winner": "France",
+                                        "fact": true,
+                                        "probA": 3.1,
+                                        "round": "R16",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M90",
+                                        "h": "Canada",
+                                        "a": "Morocco",
+                                        "sH": "0",
+                                        "sA": "3",
+                                        "winner": "Morocco",
+                                        "fact": true,
+                                        "probA": 34.7,
+                                        "round": "R16",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M91",
+                                        "h": "Brazil",
+                                        "a": "Norway",
+                                        "sH": "1",
+                                        "sA": "2",
+                                        "winner": "Norway",
+                                        "fact": true,
+                                        "probA": 96.7,
+                                        "round": "R16",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M92",
+                                        "h": "Mexico",
+                                        "a": "England",
+                                        "sH": "2",
+                                        "sA": "3",
+                                        "winner": "England",
+                                        "fact": true,
+                                        "probA": 24.0,
+                                        "round": "R16",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M93",
+                                        "h": "Portugal",
+                                        "a": "Spain",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "winner": "Spain",
+                                        "fact": true,
+                                        "probA": 32.5,
+                                        "round": "R16",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M94",
+                                        "h": "United States",
+                                        "a": "Belgium",
+                                        "sH": "1",
+                                        "sA": "4",
+                                        "winner": "Belgium",
+                                        "fact": true,
+                                        "probA": 38.7,
+                                        "round": "R16",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M95",
+                                        "h": "Argentina",
+                                        "a": "Egypt",
+                                        "sH": "3",
+                                        "sA": "2",
+                                        "winner": "Argentina",
+                                        "fact": true,
+                                        "probA": 97.0,
+                                        "round": "R16",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M96",
+                                        "h": "Switzerland",
+                                        "a": "Colombia",
+                                        "sH": "0",
+                                        "sA": "0",
+                                        "winner": "Switzerland",
+                                        "fact": true,
+                                        "probA": 84.8,
+                                        "round": "R16",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "stage": "QUARTER-FINALS (4 TIES)",
+                    "matches": [
+                              {
+                                        "id": "QF_1",
+                                        "h": "France",
+                                        "a": "Morocco",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "winner": "France",
+                                        "fact": true,
+                                        "probA": 70.7,
+                                        "round": "QF",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "QF_2",
+                                        "h": "Norway",
+                                        "a": "England",
+                                        "sH": "1",
+                                        "sA": "2",
+                                        "winner": "England",
+                                        "fact": true,
+                                        "probA": 4.1,
+                                        "round": "QF",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "QF_3",
+                                        "h": "Spain",
+                                        "a": "Belgium",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "winner": "Spain",
+                                        "fact": true,
+                                        "probA": 77.7,
+                                        "round": "QF",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "QF_4",
+                                        "h": "Argentina",
+                                        "a": "Switzerland",
+                                        "sH": "3",
+                                        "sA": "1",
+                                        "winner": "Argentina",
+                                        "fact": true,
+                                        "probA": 79.9,
+                                        "round": "QF",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "stage": "SEMI-FINALS (2 TIES)",
+                    "matches": [
+                              {
+                                        "id": "SF_1",
+                                        "h": "France",
+                                        "a": "Spain",
+                                        "sH": "0",
+                                        "sA": "2",
+                                        "winner": "Spain",
+                                        "fact": true,
+                                        "probA": 36.8,
+                                        "round": "SF",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "SF_2",
+                                        "h": "England",
+                                        "a": "Argentina",
+                                        "sH": "1",
+                                        "sA": "2",
+                                        "winner": "Argentina",
+                                        "fact": true,
+                                        "probA": 40.8,
+                                        "round": "SF",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "stage": "THIRD-PLACE PLAY-OFF (1 TIES)",
+                    "matches": [
+                              {
+                                        "id": "TPP",
+                                        "h": "France",
+                                        "a": "England",
+                                        "sH": "4",
+                                        "sA": "6",
+                                        "winner": "England",
+                                        "fact": true,
+                                        "probA": 51.9,
+                                        "round": "TPP",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "stage": "FINAL (1 TIES)",
+                    "matches": [
+                              {
+                                        "id": "FINAL",
+                                        "h": "Spain",
+                                        "a": "Argentina",
+                                        "sH": "1",
+                                        "sA": "0",
+                                        "winner": "Spain",
+                                        "fact": true,
+                                        "probA": 56.0,
+                                        "round": "FINAL",
+                                        "eloH": 1950,
+                                        "eloA": 1900,
+                                        "xgH": 1.7,
+                                        "xgA": 1.2
+                              }
+                    ]
+          }
+],
+        groupRounds: [
+          {
+                    "name": "Group A",
+                    "matches": [
+                              {
+                                        "id": "GS_A_01",
+                                        "h": "Mexico",
+                                        "a": "South Africa",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_A_02",
+                                        "h": "Mexico",
+                                        "a": "South Korea",
+                                        "sH": "1",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_A_03",
+                                        "h": "Mexico",
+                                        "a": "Czech Republic",
+                                        "sH": "0",
+                                        "sA": "3",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_A_04",
+                                        "h": "South Africa",
+                                        "a": "South Korea",
+                                        "sH": "1",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_A_05",
+                                        "h": "South Africa",
+                                        "a": "Czech Republic",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_A_06",
+                                        "h": "South Korea",
+                                        "a": "Czech Republic",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group B",
+                    "matches": [
+                              {
+                                        "id": "GS_B_01",
+                                        "h": "Canada",
+                                        "a": "Bosnia and Herzegovina",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_B_02",
+                                        "h": "Canada",
+                                        "a": "Qatar",
+                                        "sH": "6",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_B_03",
+                                        "h": "Canada",
+                                        "a": "Switzerland",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_B_04",
+                                        "h": "Bosnia and Herzegovina",
+                                        "a": "Qatar",
+                                        "sH": "3",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_B_05",
+                                        "h": "Bosnia and Herzegovina",
+                                        "a": "Switzerland",
+                                        "sH": "4",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_B_06",
+                                        "h": "Qatar",
+                                        "a": "Switzerland",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group C",
+                    "matches": [
+                              {
+                                        "id": "GS_C_01",
+                                        "h": "Brazil",
+                                        "a": "Morocco",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_C_02",
+                                        "h": "Brazil",
+                                        "a": "Haiti",
+                                        "sH": "3",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_C_03",
+                                        "h": "Brazil",
+                                        "a": "Scotland",
+                                        "sH": "0",
+                                        "sA": "3",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_C_04",
+                                        "h": "Morocco",
+                                        "a": "Haiti",
+                                        "sH": "4",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_C_05",
+                                        "h": "Morocco",
+                                        "a": "Scotland",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_C_06",
+                                        "h": "Haiti",
+                                        "a": "Scotland",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group D",
+                    "matches": [
+                              {
+                                        "id": "GS_D_01",
+                                        "h": "United States",
+                                        "a": "Paraguay",
+                                        "sH": "4",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_D_02",
+                                        "h": "United States",
+                                        "a": "Australia",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_D_03",
+                                        "h": "United States",
+                                        "a": "T\u00fcrkiye",
+                                        "sH": "3",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_D_04",
+                                        "h": "Paraguay",
+                                        "a": "Australia",
+                                        "sH": "0",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_D_05",
+                                        "h": "Paraguay",
+                                        "a": "T\u00fcrkiye",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_D_06",
+                                        "h": "Australia",
+                                        "a": "T\u00fcrkiye",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group E",
+                    "matches": [
+                              {
+                                        "id": "GS_E_01",
+                                        "h": "Germany",
+                                        "a": "Cura\u00e7ao",
+                                        "sH": "7",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_E_02",
+                                        "h": "Germany",
+                                        "a": "Ivory Coast",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_E_03",
+                                        "h": "Germany",
+                                        "a": "Ecuador",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_E_04",
+                                        "h": "Cura\u00e7ao",
+                                        "a": "Ivory Coast",
+                                        "sH": "0",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_E_05",
+                                        "h": "Cura\u00e7ao",
+                                        "a": "Ecuador",
+                                        "sH": "0",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_E_06",
+                                        "h": "Ivory Coast",
+                                        "a": "Ecuador",
+                                        "sH": "1",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group F",
+                    "matches": [
+                              {
+                                        "id": "GS_F_01",
+                                        "h": "Netherlands",
+                                        "a": "Japan",
+                                        "sH": "2",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_F_02",
+                                        "h": "Netherlands",
+                                        "a": "Sweden",
+                                        "sH": "5",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_F_03",
+                                        "h": "Netherlands",
+                                        "a": "Tunisia",
+                                        "sH": "1",
+                                        "sA": "3",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_F_04",
+                                        "h": "Japan",
+                                        "a": "Sweden",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_F_05",
+                                        "h": "Japan",
+                                        "a": "Tunisia",
+                                        "sH": "0",
+                                        "sA": "4",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_F_06",
+                                        "h": "Sweden",
+                                        "a": "Tunisia",
+                                        "sH": "5",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group G",
+                    "matches": [
+                              {
+                                        "id": "GS_G_01",
+                                        "h": "Belgium",
+                                        "a": "Egypt",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_G_02",
+                                        "h": "Belgium",
+                                        "a": "Iran",
+                                        "sH": "0",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_G_03",
+                                        "h": "Belgium",
+                                        "a": "New Zealand",
+                                        "sH": "1",
+                                        "sA": "5",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_G_04",
+                                        "h": "Egypt",
+                                        "a": "Iran",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_G_05",
+                                        "h": "Egypt",
+                                        "a": "New Zealand",
+                                        "sH": "1",
+                                        "sA": "3",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_G_06",
+                                        "h": "Iran",
+                                        "a": "New Zealand",
+                                        "sH": "2",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group H",
+                    "matches": [
+                              {
+                                        "id": "GS_H_01",
+                                        "h": "Spain",
+                                        "a": "Cape Verde",
+                                        "sH": "0",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_H_02",
+                                        "h": "Spain",
+                                        "a": "Saudi Arabia",
+                                        "sH": "4",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_H_03",
+                                        "h": "Spain",
+                                        "a": "Uruguay",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_H_04",
+                                        "h": "Cape Verde",
+                                        "a": "Saudi Arabia",
+                                        "sH": "0",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_H_05",
+                                        "h": "Cape Verde",
+                                        "a": "Uruguay",
+                                        "sH": "2",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_H_06",
+                                        "h": "Saudi Arabia",
+                                        "a": "Uruguay",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group I",
+                    "matches": [
+                              {
+                                        "id": "GS_I_01",
+                                        "h": "France",
+                                        "a": "Senegal",
+                                        "sH": "3",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_I_02",
+                                        "h": "France",
+                                        "a": "Iraq",
+                                        "sH": "3",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_I_03",
+                                        "h": "France",
+                                        "a": "Norway",
+                                        "sH": "1",
+                                        "sA": "4",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_I_04",
+                                        "h": "Senegal",
+                                        "a": "Iraq",
+                                        "sH": "5",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_I_05",
+                                        "h": "Senegal",
+                                        "a": "Norway",
+                                        "sH": "3",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_I_06",
+                                        "h": "Iraq",
+                                        "a": "Norway",
+                                        "sH": "1",
+                                        "sA": "4",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group J",
+                    "matches": [
+                              {
+                                        "id": "GS_J_01",
+                                        "h": "Argentina",
+                                        "a": "Algeria",
+                                        "sH": "3",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_J_02",
+                                        "h": "Argentina",
+                                        "a": "Austria",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_J_03",
+                                        "h": "Argentina",
+                                        "a": "Jordan",
+                                        "sH": "1",
+                                        "sA": "3",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_J_04",
+                                        "h": "Algeria",
+                                        "a": "Austria",
+                                        "sH": "3",
+                                        "sA": "3",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_J_05",
+                                        "h": "Algeria",
+                                        "a": "Jordan",
+                                        "sH": "1",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_J_06",
+                                        "h": "Austria",
+                                        "a": "Jordan",
+                                        "sH": "3",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group K",
+                    "matches": [
+                              {
+                                        "id": "GS_K_01",
+                                        "h": "Portugal",
+                                        "a": "DR Congo",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_K_02",
+                                        "h": "Portugal",
+                                        "a": "Uzbekistan",
+                                        "sH": "5",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_K_03",
+                                        "h": "Portugal",
+                                        "a": "Colombia",
+                                        "sH": "0",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_K_04",
+                                        "h": "DR Congo",
+                                        "a": "Uzbekistan",
+                                        "sH": "3",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_K_05",
+                                        "h": "DR Congo",
+                                        "a": "Colombia",
+                                        "sH": "1",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_K_06",
+                                        "h": "Uzbekistan",
+                                        "a": "Colombia",
+                                        "sH": "1",
+                                        "sA": "3",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "Group L",
+                    "matches": [
+                              {
+                                        "id": "GS_L_01",
+                                        "h": "England",
+                                        "a": "Croatia",
+                                        "sH": "4",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_L_02",
+                                        "h": "England",
+                                        "a": "Ghana",
+                                        "sH": "0",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_L_03",
+                                        "h": "England",
+                                        "a": "Panama",
+                                        "sH": "0",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_L_04",
+                                        "h": "Croatia",
+                                        "a": "Ghana",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_L_05",
+                                        "h": "Croatia",
+                                        "a": "Panama",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "GS_L_06",
+                                        "h": "Ghana",
+                                        "a": "Panama",
+                                        "sH": "1",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "R32",
+                    "matches": [
+                              {
+                                        "id": "M73",
+                                        "h": "South Africa",
+                                        "a": "Canada",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M74",
+                                        "h": "Germany",
+                                        "a": "Paraguay",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M75",
+                                        "h": "Netherlands",
+                                        "a": "Morocco",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M76",
+                                        "h": "Brazil",
+                                        "a": "Japan",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M77",
+                                        "h": "France",
+                                        "a": "Sweden",
+                                        "sH": "3",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M78",
+                                        "h": "Ivory Coast",
+                                        "a": "Norway",
+                                        "sH": "1",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M79",
+                                        "h": "Mexico",
+                                        "a": "Ecuador",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M80",
+                                        "h": "England",
+                                        "a": "DR Congo",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M81",
+                                        "h": "United States",
+                                        "a": "Bosnia and Herzegovina",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M82",
+                                        "h": "Belgium",
+                                        "a": "Senegal",
+                                        "sH": "3",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M83",
+                                        "h": "Portugal",
+                                        "a": "Croatia",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M84",
+                                        "h": "Spain",
+                                        "a": "Austria",
+                                        "sH": "3",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M85",
+                                        "h": "Switzerland",
+                                        "a": "Algeria",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M86",
+                                        "h": "Argentina",
+                                        "a": "Cape Verde",
+                                        "sH": "3",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M87",
+                                        "h": "Colombia",
+                                        "a": "Ghana",
+                                        "sH": "1",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M88",
+                                        "h": "Australia",
+                                        "a": "Egypt",
+                                        "sH": "1",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "R16",
+                    "matches": [
+                              {
+                                        "id": "M89",
+                                        "h": "Paraguay",
+                                        "a": "France",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M90",
+                                        "h": "Canada",
+                                        "a": "Morocco",
+                                        "sH": "0",
+                                        "sA": "3",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M91",
+                                        "h": "Brazil",
+                                        "a": "Norway",
+                                        "sH": "1",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M92",
+                                        "h": "Mexico",
+                                        "a": "England",
+                                        "sH": "2",
+                                        "sA": "3",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M93",
+                                        "h": "Portugal",
+                                        "a": "Spain",
+                                        "sH": "0",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M94",
+                                        "h": "United States",
+                                        "a": "Belgium",
+                                        "sH": "1",
+                                        "sA": "4",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M95",
+                                        "h": "Argentina",
+                                        "a": "Egypt",
+                                        "sH": "3",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "M96",
+                                        "h": "Switzerland",
+                                        "a": "Colombia",
+                                        "sH": "0",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "QF",
+                    "matches": [
+                              {
+                                        "id": "QF_1",
+                                        "h": "France",
+                                        "a": "Morocco",
+                                        "sH": "2",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "QF_2",
+                                        "h": "Norway",
+                                        "a": "England",
+                                        "sH": "1",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "QF_3",
+                                        "h": "Spain",
+                                        "a": "Belgium",
+                                        "sH": "2",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "QF_4",
+                                        "h": "Argentina",
+                                        "a": "Switzerland",
+                                        "sH": "3",
+                                        "sA": "1",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "SF",
+                    "matches": [
+                              {
+                                        "id": "SF_1",
+                                        "h": "France",
+                                        "a": "Spain",
+                                        "sH": "0",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              },
+                              {
+                                        "id": "SF_2",
+                                        "h": "England",
+                                        "a": "Argentina",
+                                        "sH": "1",
+                                        "sA": "2",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "TPP",
+                    "matches": [
+                              {
+                                        "id": "TPP",
+                                        "h": "France",
+                                        "a": "England",
+                                        "sH": "4",
+                                        "sA": "6",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          },
+          {
+                    "name": "FINAL",
+                    "matches": [
+                              {
+                                        "id": "FINAL",
+                                        "h": "Spain",
+                                        "a": "Argentina",
+                                        "sH": "1",
+                                        "sA": "0",
+                                        "fact": true,
+                                        "eloH": 1850,
+                                        "eloA": 1800,
+                                        "xgH": 1.5,
+                                        "xgA": 1.2
+                              }
+                    ]
+          }
+]},
 
       ucl: {
         id: "ucl",
@@ -1833,18 +4343,19 @@
       container.innerHTML = '';
 
       if (data.id === 'worldcup') {
-        // WC: Groups
+        // WC: 12 Groups Grid
         const grid = document.createElement('div');
         grid.className = 'groups-grid';
-        data.groups.forEach(g => {
+        (data.groups || []).forEach(g => {
           const card = document.createElement('div');
           card.className = 'group-card';
           let rows = '';
-          g.teams.forEach(t => {
+          (g.teams || []).forEach(t => {
+            const isTop2 = t.pos <= 2;
             rows += `
-              <tr>
-                <td style="font-family: var(--font-mono); width: 20px;">${t.pos}</td>
-                <td><b>${t.name}</b></td>
+              <tr style="${isTop2 ? 'font-weight: 600;' : ''}">
+                <td style="font-family: var(--font-mono); width: 22px; color: ${isTop2 ? 'var(--poster-accent)' : 'inherit'};">${t.pos}</td>
+                <td><b>${t.name}</b> ${isTop2 ? '<span style="font-size:9px; color:var(--poster-accent); margin-left:3px;">●</span>' : ''}</td>
                 <td class="num-col">${t.p}</td>
                 <td class="num-col">${t.w}</td>
                 <td class="num-col">${t.d}</td>
@@ -1857,7 +4368,7 @@
           card.innerHTML = `
             <div class="group-header">
               <span>${g.name}</span>
-              <span style="font-family: var(--font-mono); font-size: 10px;">TOP 2 + BEST 3RD QUALIFY</span>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-dim);">TOP 2 ADVANCE</span>
             </div>
             <table class="table-swiss">
               <thead>
@@ -1869,15 +4380,58 @@
           grid.appendChild(card);
         });
         container.appendChild(grid);
+
+        // Third-Place Qualification Table
+        if (Array.isArray(data.thirdPlace) && data.thirdPlace.length > 0) {
+          const tpCard = document.createElement('div');
+          tpCard.className = 'poster-card';
+          tpCard.style.marginTop = '24px';
+          let tpRows = '';
+          data.thirdPlace.forEach(tp => {
+            const advances = tp.rank <= 8;
+            tpRows += `
+              <tr style="${advances ? 'background: rgba(16, 185, 129, 0.05);' : ''}">
+                <td style="font-family: var(--font-mono); font-weight: 700; width: 32px; color: ${advances ? 'var(--poster-accent)' : 'inherit'};">${tp.rank}</td>
+                <td style="font-family: var(--font-mono); font-weight: 700; color: var(--poster-accent); width: 65px;">GRP ${tp.group}</td>
+                <td><b>${tp.name}</b></td>
+                <td class="num-col" style="font-weight: 700;">${tp.pts}</td>
+                <td class="num-col">${tp.gd > 0 ? '+' + tp.gd : tp.gd}</td>
+                <td class="num-col">${tp.gs}</td>
+                <td class="num-col">
+                  <span class="${advances ? 'badge-fact' : 'badge-sim'}" style="font-size: 9px; padding: 2px 6px;">${tp.status}</span>
+                </td>
+              </tr>
+            `;
+          });
+          tpCard.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 8px;">
+              <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+                BEST 3RD-PLACED TEAMS // 8 OF 12 ADVANCE TO ROUND OF 32
+              </h3>
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+                RANKED BY PTS &gt; GD &gt; GOALS SCORED &gt; FAIR PLAY
+              </span>
+            </div>
+            <table class="table-swiss">
+              <thead>
+                <tr>
+                  <th>#</th><th>GROUP</th><th>TEAM</th><th class="num-col">PTS</th><th class="num-col">GD</th><th class="num-col">GS</th><th class="num-col">STATUS</th>
+                </tr>
+              </thead>
+              <tbody>${tpRows}</tbody>
+            </table>
+          `;
+          container.appendChild(tpCard);
+        }
       } else if (data.id === 'ucl') {
         // UCL: Swiss Table
         const card = document.createElement('div');
         card.className = 'poster-card';
         let rows = '';
-        data.swissTable.forEach(t => {
+        (data.swissTable || []).forEach(t => {
           rows += `
-            <tr class="${t.tier}">
-              <td style="font-family: var(--font-mono); width: 32px;">${t.pos}</td>
+            <tr>
+              <td style="font-family: var(--font-mono); width: 28px;">${t.pos}</td>
               <td><b>${t.name}</b></td>
               <td class="num-col">${t.p}</td>
               <td class="num-col">${t.w}</td>
@@ -1885,34 +4439,32 @@
               <td class="num-col">${t.l}</td>
               <td class="num-col">${t.gf}:${t.ga}</td>
               <td class="num-col" style="color: var(--poster-accent); font-weight: 800;">${t.pts}</td>
-              <td class="num-col" style="font-family: var(--font-mono); font-size: 10px;">
-                ${t.pos <= 8 ? 'DIRECT R16 QUALIFIER' : (t.pos <= 24 ? 'PLAYOFF SEED' : 'ELIMINATED')}
-              </td>
+              <td class="num-col" style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-dim);">${t.zone}</td>
             </tr>
           `;
         });
         card.innerHTML = `
-          <div class="card-title-bar">
-            <h2 class="card-title">UEFA CHAMPIONS LEAGUE // 36-TEAM SWISS STANDINGS</h2>
-            <span class="card-subtitle">RANKS 1-8 DIRECT TO R16 // 9-24 TO PLAYOFFS</span>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 8px;">
+            <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">UEFA SINGLE 36-TEAM LEAGUE STAGE</h3>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">TOP 8 ADVANCE DIRECTLY TO R16 · 9-24 ENTER PLAY-OFFS</span>
           </div>
           <table class="table-swiss">
             <thead>
-              <tr><th>#</th><th>CLUB</th><th class="num-col">P</th><th class="num-col">W</th><th class="num-col">D</th><th class="num-col">L</th><th class="num-col">GOALS</th><th class="num-col">PTS</th><th class="num-col">QUALIFICATION HORIZON</th></tr>
+              <tr><th>#</th><th>CLUB</th><th class="num-col">P</th><th class="num-col">W</th><th class="num-col">D</th><th class="num-col">L</th><th class="num-col">GD</th><th class="num-col">PTS</th><th class="num-col">ZONE</th></tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
         `;
         container.appendChild(card);
-      } else {
-        // LaLiga: League Table
+      } else if (data.id === 'laliga') {
+        // LaLiga Table
         const card = document.createElement('div');
         card.className = 'poster-card';
         let rows = '';
-        data.laligaTable.forEach(t => {
+        (data.standings || []).forEach(t => {
           rows += `
-            <tr class="${t.tier}">
-              <td style="font-family: var(--font-mono); width: 32px;">${t.pos}</td>
+            <tr>
+              <td style="font-family: var(--font-mono); width: 28px;">${t.pos}</td>
               <td><b>${t.name}</b></td>
               <td class="num-col">${t.p}</td>
               <td class="num-col">${t.w}</td>
@@ -1920,20 +4472,17 @@
               <td class="num-col">${t.l}</td>
               <td class="num-col">${t.gf}:${t.ga}</td>
               <td class="num-col" style="color: var(--poster-accent); font-weight: 800;">${t.pts}</td>
-              <td class="num-col" style="font-family: var(--font-mono); font-size: 10px;">
-                ${t.pos <= 4 ? 'CHAMPIONS LEAGUE (TOP 4)' : (t.pos <= 6 ? 'EUROPA / CONFERENCE' : (t.pos >= 18 ? 'RELEGATION ZONE' : 'MID-TABLE'))}
-              </td>
             </tr>
           `;
         });
         card.innerHTML = `
-          <div class="card-title-bar">
-            <h2 class="card-title">LALIGA EA SPORTS // OFFICIAL CLASSIFICATION</h2>
-            <span class="card-subtitle">MATCHDAY 33/38 // TIEBREAKERS: HEAD-TO-HEAD</span>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 8px;">
+            <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">LALIGA EA SPORTS 2026/27 TABLE</h3>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">TOP 4 QUALIFY FOR UEFA CHAMPIONS LEAGUE</span>
           </div>
           <table class="table-swiss">
             <thead>
-              <tr><th>#</th><th>CLUB</th><th class="num-col">P</th><th class="num-col">W</th><th class="num-col">D</th><th class="num-col">L</th><th class="num-col">GOALS</th><th class="num-col">PTS</th><th class="num-col">EUROPEAN / RELEGATION HORIZON</th></tr>
+              <tr><th>#</th><th>CLUB</th><th class="num-col">P</th><th class="num-col">W</th><th class="num-col">D</th><th class="num-col">L</th><th class="num-col">GD</th><th class="num-col">PTS</th></tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
@@ -1947,68 +4496,195 @@
       const container = document.getElementById('bracket-content-container');
       container.innerHTML = '';
 
-      if (data.bracketStages) {
-        // Knockout Ladder (WC / UCL)
+      // Section 1: Knockout Stages Bracket Ladder
+      if (data.bracketStages && data.bracketStages.length > 0) {
+        const koHeader = document.createElement('div');
+        koHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
+        koHeader.innerHTML = `
+          <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+            ${data.name.toUpperCase()} // KNOCKOUT BRACKET ARENA
+          </h3>
+          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+            CLICK ANY FIXTURE TO OPEN THE POISSON CRUCIBLE &amp; WHAT-IF TESTER
+          </span>
+        `;
+        container.appendChild(koHeader);
+
         const ladder = document.createElement('div');
         ladder.className = 'bracket-stage-ladder';
         data.bracketStages.forEach(stage => {
           const col = document.createElement('div');
           col.className = 'stage-col';
-          col.innerHTML = `<div class="stage-col-header"><span>${stage.stage}</span><span>${stage.matches.length} TIES</span></div>`;
-          stage.matches.forEach(m => {
+          col.innerHTML = `<div class="stage-col-header"><span>${stage.stage}</span></div>`;
+          (stage.matches || []).forEach(m => {
             const tile = document.createElement('div');
-            tile.className = `match-tile-swiss ${m.fact ? 'fact-match' : 'sim-match'}`;
+            tile.className = 'match-tile-swiss';
             tile.onclick = () => openMatchModal(m);
+            const isWinnerH = m.winner && (m.winner === m.h);
+            const isWinnerA = m.winner && (m.winner === m.a);
             tile.innerHTML = `
-              <div class="tile-meta">
-                <span>${m.fact ? 'FACT: PLAYED' : 'SIMULATED PATH'}</span>
-                <span>CLICK FOR CRUCIBLE</span>
+              <div class="m-tile-header">
+                <span class="${m.fact ? 'badge-fact' : 'badge-sim'}" style="font-size: 9px; padding: 1px 4px;">${m.fact ? 'PLAYED FACT' : 'SCHEDULED'}</span>
+                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-dim);">${m.id ? '#' + m.id : ''}</span>
               </div>
-              <div class="tile-team-row ${m.fact && parseInt(m.sH) > parseInt(m.sA) ? 'winner' : ''}">
-                <span>${m.h}</span>
-                <span class="tile-score">${m.sH}</span>
+              <div class="m-tile-team">
+                <span class="m-tile-name" style="${isWinnerH ? 'font-weight: 800; color: var(--poster-accent);' : ''}">${m.h}</span>
+                <span class="m-tile-score" style="${isWinnerH ? 'color: var(--poster-accent);' : ''}">${m.sH}</span>
               </div>
-              <div class="tile-team-row ${m.fact && parseInt(m.sA) > parseInt(m.sH) ? 'winner' : ''}">
-                <span>${m.a}</span>
-                <span class="tile-score">${m.sA}</span>
+              <div class="m-tile-team">
+                <span class="m-tile-name" style="${isWinnerA ? 'font-weight: 800; color: var(--poster-accent);' : ''}">${m.a}</span>
+                <span class="m-tile-score" style="${isWinnerA ? 'color: var(--poster-accent);' : ''}">${m.sA}</span>
               </div>
+              ${m.winner ? `<div style="font-size: 10px; color: var(--poster-accent); font-weight: 700; margin-top: 3px;">&#9654; ${m.winner} ADVANCES</div>` : ''}
             `;
             col.appendChild(tile);
           });
           ladder.appendChild(col);
         });
         container.appendChild(ladder);
-      } else if (data.fixtures) {
-        // Fixtures Schedule for LaLiga
-        const schedule = document.createElement('div');
-        schedule.className = 'fixtures-schedule';
-        data.fixtures.forEach(block => {
+      }
+
+      // Section 2: Group Stage Fixture Accordions (World Cup)
+      if (Array.isArray(data.groupRounds) && data.groupRounds.length > 0) {
+        const grpHeader = document.createElement('div');
+        grpHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-top: 32px; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
+        grpHeader.innerHTML = `
+          <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+            GROUP STAGE MATCHES &amp; FIXTURES // 12 GROUPS
+          </h3>
+          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+            72 MATCHES · EXPAND ANY GROUP FOR DETAILED HEAD-TO-HEAD CRUCIBLE
+          </span>
+        `;
+        container.appendChild(grpHeader);
+
+        const accordion = document.createElement('div');
+        accordion.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;';
+        data.groupRounds.forEach(r => {
           const card = document.createElement('div');
-          card.className = 'poster-card';
-          card.innerHTML = `<div class="card-title-bar"><h3 class="card-title">${block.matchday}</h3></div>`;
-          block.matches.forEach(m => {
-            const tile = document.createElement('div');
-            tile.className = `match-tile-swiss ${m.fact ? 'fact-match' : 'sim-match'}`;
-            tile.onclick = () => openMatchModal(m);
-            tile.innerHTML = `
-              <div class="tile-meta">
-                <span>${m.fact ? 'PLAYED FACT' : 'FORECAST'}</span>
-                <span>${m.fact ? 'RESULT VERIFIED' : 'PROBABILITY MODEL'}</span>
-              </div>
-              <div class="tile-team-row">
-                <span>${m.h}</span>
-                <span class="tile-score">${m.sH}</span>
-              </div>
-              <div class="tile-team-row">
-                <span>${m.a}</span>
-                <span class="tile-score">${m.sA}</span>
+          card.className = 'group-card';
+          card.style.cssText = 'background: var(--poster-surface); border: 1px solid var(--poster-border);';
+          
+          let matchRowsHtml = '';
+          (r.matches || []).forEach(m => {
+            const hEsc = m.h.replace(/'/g, "\'");
+            const aEsc = m.a.replace(/'/g, "\'");
+            matchRowsHtml += `
+              <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
+                <span style="flex:1; text-align:right; font-weight:${m.sH > m.sA ? '700' : '500'};">${m.h}</span>
+                <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent);">${m.sH} – ${m.sA}</span>
+                <span style="flex:1; font-weight:${m.sA > m.sH ? '700' : '500'};">${m.a}</span>
+                <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
               </div>
             `;
-            card.appendChild(tile);
           });
-          schedule.appendChild(card);
+
+          card.innerHTML = `
+            <div class="group-header" style="cursor: pointer; display: flex; justify-content: space-between; padding: 10px 12px; background: var(--poster-surface-subtle); border-bottom: 1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
+              <span style="font-weight: 800; text-transform: uppercase;">${r.name}</span>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">
+                ${r.matches.length} MATCHES &#9662;
+              </span>
+            </div>
+            <div class="group-match-list open" style="display: flex; flex-direction: column;">
+              ${matchRowsHtml}
+            </div>
+          `;
+          accordion.appendChild(card);
         });
-        container.appendChild(schedule);
+        container.appendChild(accordion);
+      }
+
+      // Section 3: League Matchdays (UCL Swiss Phase)
+      if (Array.isArray(data.leagueMatchdays) && data.leagueMatchdays.length > 0) {
+        const uclHeader = document.createElement('div');
+        uclHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-top: 24px; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
+        uclHeader.innerHTML = `
+          <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+            SWISS LEAGUE PHASE // MATCHDAYS 1–8
+          </h3>
+          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+            CLICK ANY FIXTURE FOR POISSON SCORELINE DENSITY
+          </span>
+        `;
+        container.appendChild(uclHeader);
+
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;';
+        data.leagueMatchdays.forEach(md => {
+          const card = document.createElement('div');
+          card.className = 'group-card';
+          let mRows = '';
+          (md.matches || []).forEach(m => {
+            const hEsc = m.h.replace(/'/g, "\'");
+            const aEsc = m.a.replace(/'/g, "\'");
+            mRows += `
+              <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
+                <span style="flex:1; text-align:right;">${m.h}</span>
+                <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent);">${m.sH} – ${m.sA}</span>
+                <span style="flex:1;">${m.a}</span>
+                <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+              </div>
+            `;
+          });
+          card.innerHTML = `
+            <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
+              <span style="font-weight: 800;">${md.name}</span>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">${md.matches.length} TIES &#9662;</span>
+            </div>
+            <div class="group-match-list open" style="display: flex; flex-direction: column;">
+              ${mRows}
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+        container.appendChild(grid);
+      }
+
+      // Section 4: LaLiga Matchdays
+      if (Array.isArray(data.matchdays) && data.matchdays.length > 0) {
+        const llHeader = document.createElement('div');
+        llHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
+        llHeader.innerHTML = `
+          <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
+            LALIGA EA SPORTS 2026/27 // 38 MATCHDAYS
+          </h3>
+          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+            COLLAPSIBLE SCHEDULE · CLICK FOR PREDICTIVE ARENA
+          </span>
+        `;
+        container.appendChild(llHeader);
+
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;';
+        data.matchdays.forEach(md => {
+          const card = document.createElement('div');
+          card.className = 'group-card';
+          let mRows = '';
+          (md.matches || []).forEach(m => {
+            const hEsc = m.h.replace(/'/g, "\'");
+            const aEsc = m.a.replace(/'/g, "\'");
+            mRows += `
+              <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
+                <span style="flex:1; text-align:right;">${m.h}</span>
+                <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent);">${m.sH} – ${m.sA}</span>
+                <span style="flex:1;">${m.a}</span>
+                <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+              </div>
+            `;
+          });
+          card.innerHTML = `
+            <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
+              <span style="font-weight: 800;">MATCHDAY ${md.matchday}</span>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">${md.matches.length} MATCHES &#9662;</span>
+            </div>
+            <div class="group-match-list open" style="display: flex; flex-direction: column;">
+              ${mRows}
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+        container.appendChild(grid);
       }
     }
 
@@ -2038,10 +4714,10 @@
     // Backend API Live Synchronization (Truth Engine Overlay)
     async function syncCompetitionFromBackend(compKey) {
       try {
+        // 1. Fetch primary data
         const dataRes = await fetch(`/${compKey}/api/data`);
         if (dataRes.ok) {
           const live = await dataRes.json();
-          // Update hero stats
           if (live.n_teams != null) {
             document.getElementById('stat-teams').textContent = live.n_teams;
             if (POSTER_DATA[compKey]) POSTER_DATA[compKey].stats.teams = live.n_teams;
@@ -2060,29 +4736,11 @@
             if (POSTER_DATA[compKey]) POSTER_DATA[compKey].stats.topTeam = live.champion.toUpperCase();
           }
 
-          // Ingestion status
           const acqMode = document.getElementById('acq-mode');
           if (acqMode) acqMode.textContent = (live.mode || 'LIVE').toUpperCase();
           const acqStatus = document.getElementById('acq-status');
           if (acqStatus) acqStatus.textContent = live.availability || 'AVAILABLE';
 
-          // Overlay real LaLiga standings if available
-          if (compKey === 'laliga' && Array.isArray(live.standings) && live.standings.length > 0) {
-            POSTER_DATA.laliga.standings = live.standings.map((s, idx) => ({
-              pos: s.position || (idx + 1),
-              name: s.team,
-              p: s.played,
-              w: s.wins,
-              d: s.draws,
-              l: s.losses,
-              gf: s.goals_for,
-              ga: s.goals_against,
-              pts: s.pts != null ? s.pts : s.points
-            }));
-            if (currentActiveTab === 'standings') renderStandingsTab(POSTER_DATA[compKey]);
-          }
-
-          // Overlay real teams Elo if available
           if (Array.isArray(live.teams) && live.teams.length > 0) {
             const mappedElo = live.teams.slice(0, 8).map(t => ({
               name: t.name || t.team,
@@ -2090,14 +4748,159 @@
               delta: t.delta ? (t.delta > 0 ? `+${t.delta}` : `${t.delta}`) : '+0',
               tier: t.tier || 'PRO'
             }));
-            if (mappedElo.length > 0) {
+            if (mappedElo.length > 0 && POSTER_DATA[compKey]) {
               POSTER_DATA[compKey].eloList = mappedElo;
               if (currentActiveTab === 'overview') renderOverviewTab(POSTER_DATA[compKey]);
             }
           }
         }
 
-        // Fetch live simulation output if available
+        // 2. Tournament specific Standings & Bracket APIs
+        if (compKey === 'worldcup') {
+          // Fetch WC Standings (12 Groups + Best 3rd-place teams)
+          const stdRes = await fetch('/worldcup/api/standings');
+          if (stdRes.ok) {
+            const stdData = await stdRes.json();
+            if (Array.isArray(stdData.standings) && stdData.standings.length > 0) {
+              const groupsMap = {};
+              stdData.standings.forEach(t => {
+                const g = t.group || 'A';
+                if (!groupsMap[g]) groupsMap[g] = [];
+                groupsMap[g].push({
+                  pos: t.position || (groupsMap[g].length + 1),
+                  name: t.team,
+                  p: t.played != null ? t.played : 3,
+                  w: t.wins != null ? t.wins : Math.floor((t.pts || 0) / 3),
+                  d: t.draws != null ? t.draws : ((t.pts || 0) % 3),
+                  l: t.losses != null ? t.losses : 0,
+                  gf: t.gs != null ? t.gs : 0,
+                  ga: t.ga != null ? t.ga : 0,
+                  pts: t.pts != null ? t.pts : 0
+                });
+              });
+              POSTER_DATA.worldcup.groups = Object.keys(groupsMap).sort().map(g => ({
+                name: `GROUP ${g}`,
+                teams: groupsMap[g].sort((a, b) => a.pos - b.pos)
+              }));
+            }
+            if (Array.isArray(stdData.third_place) && stdData.third_place.length > 0) {
+              POSTER_DATA.worldcup.thirdPlace = stdData.third_place.map((tp, idx) => ({
+                rank: idx + 1,
+                group: tp.group,
+                name: tp.team,
+                pts: tp.pts,
+                gd: tp.gd,
+                gs: tp.gs,
+                status: idx < 8 ? 'ADVANCES TO R32' : 'ELIMINATED'
+              }));
+            }
+            if (currentActiveTab === 'standings') renderStandingsTab(POSTER_DATA.worldcup);
+          }
+
+          // Fetch WC Bracket (Knockout Tree R32->R16->QF->SF->TPP->FINAL + Group Matches)
+          const brRes = await fetch('/worldcup/api/bracket/data');
+          if (brRes.ok) {
+            const brData = await brRes.json();
+            const tree = brData.knockout_tree || {};
+            const order = brData.stage_order || ['R32', 'R16', 'QF', 'SF', 'TPP', 'FINAL'];
+            const labels = brData.stage_labels || {
+              R32: 'Round of 32', R16: 'Round of 16', QF: 'Quarter-finals',
+              SF: 'Semi-finals', TPP: 'Third-place play-off', FINAL: 'Final'
+            };
+
+            POSTER_DATA.worldcup.bracketStages = order.map(stg => {
+              const rawMatches = tree[stg] || [];
+              const lbl = (labels[stg] || stg).toUpperCase();
+              return {
+                stage: `${lbl} (${rawMatches.length} TIES)`,
+                matches: rawMatches.map(m => {
+                  const score = m.score || {};
+                  const isFact = !!(m.played || m.winner);
+                  const sh = isFact ? (score.home != null ? score.home : '—') : '?';
+                  const sa = isFact ? (score.away != null ? score.away : '—') : '?';
+                  return {
+                    id: m.match_id,
+                    h: m.team_a,
+                    a: m.team_b,
+                    sH: String(sh),
+                    sA: String(sa),
+                    winner: m.winner || null,
+                    fact: isFact,
+                    probA: m.prob_a != null ? Math.round(m.prob_a * 100) : 50,
+                    round: stg,
+                    eloH: 1950,
+                    eloA: 1900,
+                    xgH: 1.7,
+                    xgA: 1.2
+                  };
+                })
+              };
+            });
+
+            if (Array.isArray(brData.chronological_rounds) && brData.chronological_rounds.length > 0) {
+              POSTER_DATA.worldcup.groupRounds = brData.chronological_rounds.map(r => ({
+                name: r.round_name || 'Group Matches',
+                matches: (r.matches || []).map(m => ({
+                  id: m.match_id,
+                  h: m.team_a,
+                  a: m.team_b,
+                  sH: m.home_score != null ? String(m.home_score) : (m.played ? '—' : '?'),
+                  sA: m.away_score != null ? String(m.away_score) : (m.played ? '—' : '?'),
+                  fact: !!(m.played || (m.home_score != null && m.away_score != null)),
+                  eloH: 1850,
+                  eloA: 1800,
+                  xgH: 1.5,
+                  xgA: 1.2
+                }))
+              }));
+            }
+
+            if (currentActiveTab === 'bracket') renderBracketTab(POSTER_DATA.worldcup);
+          }
+        } else if (compKey === 'ucl') {
+          // UCL Standings
+          const uclStdRes = await fetch('/ucl/api/standings');
+          if (uclStdRes.ok) {
+            const uclStd = await uclStdRes.json();
+            if (Array.isArray(uclStd.standings) && uclStd.standings.length > 0) {
+              POSTER_DATA.ucl.swissTable = uclStd.standings.map(t => ({
+                pos: t.position,
+                name: t.team,
+                p: t.played,
+                w: t.wins,
+                d: t.draws,
+                l: t.losses,
+                gf: t.gs,
+                ga: t.ga,
+                pts: t.pts,
+                zone: t.zone === 'top_8' ? 'TOP 8 (ROUND OF 16)' : (t.zone === 'playoff' ? 'PLAY-OFF' : 'ELIMINATED')
+              }));
+              if (currentActiveTab === 'standings') renderStandingsTab(POSTER_DATA.ucl);
+            }
+          }
+        } else if (compKey === 'laliga') {
+          // LaLiga Standings
+          const llStdRes = await fetch('/laliga/api/data');
+          if (llStdRes.ok) {
+            const llData = await llStdRes.json();
+            if (Array.isArray(llData.standings) && llData.standings.length > 0) {
+              POSTER_DATA.laliga.standings = llData.standings.map((s, idx) => ({
+                pos: s.position || (idx + 1),
+                name: s.team,
+                p: s.played,
+                w: s.wins,
+                d: s.draws,
+                l: s.losses,
+                gf: s.goals_for,
+                ga: s.goals_against,
+                pts: s.pts != null ? s.pts : s.points
+              }));
+              if (currentActiveTab === 'standings') renderStandingsTab(POSTER_DATA.laliga);
+            }
+          }
+        }
+
+        // 3. Simulation Projections
         const simRes = await fetch(`/${compKey}/api/simulation`);
         if (simRes.ok) {
           const simData = await simRes.json();
@@ -2113,7 +4916,7 @@
           }
         }
       } catch (err) {
-        console.info('Live API sync note:', err);
+        console.info('Live API sync notice:', err);
       }
     }
 
