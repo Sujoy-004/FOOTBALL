@@ -99,9 +99,9 @@ def get_data_provider(
     """Single provider-selection factory for every competition.
 
     Precedence:
-      1. DATA_PROVIDER=bsd + BSD key            -> BSDDataProvider
-      2. DATA_PROVIDER=football-data + FDO key  -> FootballDataOrgProvider
-      3. no env var -> auto-detect (BSD first, then FDO)
+      1. DATA_PROVIDER=football-data + FDO key  -> FootballDataOrgProvider
+      2. DATA_PROVIDER=bsd + BSD key            -> BSDDataProvider
+      3. no env var -> auto-detect (FDO first, then BSD fallback)
       4. no usable key at all -> None (caller skips live fetch)
 
     Empty or "your_..." placeholder keys never select a provider.
@@ -118,15 +118,15 @@ def get_data_provider(
     fdo_key = _usable_key(football_data_org_key)
     mode = os.getenv("DATA_PROVIDER", "").lower()
 
-    if mode == "bsd" and bsd_key:
-        return BSDDataProvider(bsd_key, league_id=bsd_league_id)
     if mode == "football-data" and fdo_key:
         return FootballDataOrgProvider(fdo_key)
-
-    if bsd_key:
+    if mode == "bsd" and bsd_key:
         return BSDDataProvider(bsd_key, league_id=bsd_league_id)
+
     if fdo_key:
         return FootballDataOrgProvider(fdo_key)
+    if bsd_key:
+        return BSDDataProvider(bsd_key, league_id=bsd_league_id)
     return None
 
 

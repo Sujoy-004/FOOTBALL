@@ -52,9 +52,15 @@ def test_bsd_mode_selects_bsd_with_league_id(monkeypatch):
     assert provider.league_id == 3
 
 
-def test_auto_prefers_bsd(monkeypatch):
+def test_auto_prefers_fdo(monkeypatch):
     provider = get_data_provider("bsd-key", "fdo-key", 3)
+    assert isinstance(provider, FootballDataOrgProvider)
+
+
+def test_auto_falls_back_to_bsd(monkeypatch):
+    provider = get_data_provider("bsd-key", "", 3)
     assert isinstance(provider, BSDDataProvider)
+    assert provider.league_id == 3
 
 
 def test_auto_falls_back_to_fdo(monkeypatch):
