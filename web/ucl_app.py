@@ -766,17 +766,17 @@ def compute_all() -> dict:
     if mode == "results":
         return deterministic_compute()
     if mode == "error":
-        # Real results exist but are unreadable: surface the failure instead
-        # of fabricating a simulated season over them.
         return {
             "error": mode_reason,
             "mode": "results",
             "boot": [{"step": "Select data mode", "status": "error", "elapsed": 0.0,
                       "output": f"[error] {mode_reason}"}],
         }
-    from competitions.ucl.src.orchestrator import run_compute_all as _f
-    result = _f(str(DATA_DIR), football_data_org_key=_football_data_org_key(), team_aliases=_UCL_TEAM_ALIASES)
+    # Under simulation mode on read path: NEVER run synchronous MC simulation!
+    # Return deterministic baseline with simulation metadata marked stale/rebuilding.
+    result = deterministic_compute()
     result["mode"] = "simulation"
+    result["simulation_stale"] = True
     result["boot"] = result.get("boot", [])
     return result
 
