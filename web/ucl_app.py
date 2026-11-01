@@ -1414,7 +1414,10 @@ def api_validation():
         elo_ratings = _snap().get("elo_ratings", {})
         if not elo_ratings:
             team_names = list({m["team_a"] for m in results} | {m["team_b"] for m in results})
-            elo_ratings = fetch_team_elos(team_names) or {}
+            try:
+                elo_ratings = fetch_team_elos(team_names) or {}
+            except Exception:
+                elo_ratings = {}
 
         from football_core.evaluation import compute_metrics
         from football_core.elo import expected_score

@@ -454,7 +454,10 @@ def run_monte_carlo(
         from competitions.ucl.src.elo_fetcher import fetch_team_elos
 
         team_names = [t["name"] for t in fixtures["schedule"]["teams"]]
-        elo_ratings = fetch_team_elos(team_names)
+        try:
+            elo_ratings = fetch_team_elos(team_names)
+        except Exception:
+            elo_ratings = {}
 
     # ── 2-5. Run N realizations via the generic engine ───────────────────
     # Exchange 3 migration: iteration mechanics, RNG ownership, validation
