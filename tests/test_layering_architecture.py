@@ -129,6 +129,9 @@ NO_NETWORK_MODULES = (
     "competitions.ucl.src.pipeline",
     "competitions.laliga.src.pipeline",
     "football_core.reconcile",
+    "football_core.persistence",
+    "football_core.persistence.normalizer",
+    "football_core.persistence.engine",
 )
 
 #: Public names of the web-layer invalidation owner (Phase 5). A competition

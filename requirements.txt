@@ -4,6 +4,7 @@ uvicorn>=0.29
 requests>=2.31
 numpy>=1.26
 python-dotenv>=1.0
+psycopg2-binary>=2.9.9
 
 # testing
 pytest>=8.0
