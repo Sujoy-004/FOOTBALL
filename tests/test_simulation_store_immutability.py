@@ -1,9 +1,11 @@
 """SIM-03: a simulation run never touches a canonical factual store.
 
 The rule this file pins: **after a simulation run, no canonical factual store
-file under ``competitions/*/data/`` has changed.** The ONE sanctioned
-exception is ``snapshot.json`` — the simulated artifact (Assumption A1). That
-carve-out is EXPLICIT and it is load-bearing: the test below proves that
+file under ``competitions/*/data/`` has changed.** The sanctioned exceptions
+are ``snapshot.json`` (the simulated artifact, Assumption A1) and ``retirements.json``
+(append-only invalidation records written by simulation-driven reconciliation without
+modifying canonical match or standings stores). That carve-out is EXPLICIT and
+it is load-bearing: the test below proves that
 
 1. the hash map really does cover every canonical file (so the gate is real,
    not a test that silently excluded everything), and
@@ -14,8 +16,8 @@ Two levels are covered:
 
 * the **pipeline** level (``run_mc_simulation``) — the computation itself
   must not write a store, and
-* the **app** level (a real ``POST /api/simulate``) — the only file the
-  served path may create is the sanctioned ``snapshot.json``.
+* the **app** level (a real ``POST /api/simulate``) — the only files the
+  served path may touch/create are the sanctioned simulation artifacts.
 """
 
 from __future__ import annotations
@@ -35,6 +37,8 @@ UCL_DATA = ROOT / "competitions" / "ucl" / "data"
 
 #: The ONE file a simulation run is allowed to write (Assumption A1).
 SANCTIONED_SIMULATED_ARTIFACT = "snapshot.json"
+#: Sanctioned simulation and reconciliation artifacts (D-02).
+SANCTIONED_SIMULATION_ARTIFACTS = {SANCTIONED_SIMULATED_ARTIFACT, "retirements.json"}
 
 
 def _hash_tree(root: Path, exclude: Optional[Iterable[str]] = None) -> dict[str, str]:
@@ -42,8 +46,11 @@ def _hash_tree(root: Path, exclude: Optional[Iterable[str]] = None) -> dict[str,
 
     Args:
         root: The directory to hash.
-        exclude: File NAMES to leave out. Used for the sanctioned simulated
-            artifact (``snapshot.json``), which is allowed to change.
+        exclude: File NAMES to leave out. Used for sanctioned simulation and
+            reconciliation artifacts (``snapshot.json``, ``retirements.json``),
+            where simulation-driven reconciliation writes append-only invalidation
+            records to ``retirements.json`` without modifying canonical match or
+            standings stores.
     """
     excluded = set(exclude or ())
     out: dict[str, str] = {}
@@ -159,7 +166,7 @@ class TestServedRunWritesOnlyTheSanctionedArtifact:
         elo = _offline_elo()
         holder.publish_data("ucl", {"elo_ratings": elo, "champion": None},
                             mode="results", stamp=app._observed_stamp())
-        before = _hash_tree(tmp_path, exclude={SANCTIONED_SIMULATED_ARTIFACT})
+        before = _hash_tree(tmp_path, exclude=SANCTIONED_SIMULATION_ARTIFACTS)
 
         try:
             with TestClient(ucl_app) as client:
@@ -178,7 +185,7 @@ class TestServedRunWritesOnlyTheSanctionedArtifact:
         finally:
             holder.clear_sim("ucl")
 
-        after = _hash_tree(tmp_path, exclude={SANCTIONED_SIMULATED_ARTIFACT})
+        after = _hash_tree(tmp_path, exclude=SANCTIONED_SIMULATION_ARTIFACTS)
         assert after == before
         # The sanctioned artifact WAS produced — the carve-out is load-bearing.
         assert (tmp_path / SANCTIONED_SIMULATED_ARTIFACT).exists()
