@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Optional
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 from football_core.domain import redact_secrets
 from football_core.persistence.normalizer import normalize_database_url
+from football_core.persistence.schema import metadata
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +66,34 @@ def reset_engine() -> None:
     _engine = None
     _schema_ready = False
     _schema_retry_after = 0.0
+
+
+def init_db(engine: Engine | None = None) -> bool:
+    """Create all tables defined in schema metadata."""
+    target_engine = engine or get_engine()
+    if target_engine is None:
+        return False
+    try:
+        metadata.create_all(target_engine)
+        return True
+    except SQLAlchemyError as exc:
+        safe_msg = redact_secrets(str(exc))
+        logger.error("Database schema init failed: %s", safe_msg)
+        return False
+
+
+def ensure_schema() -> bool:
+    """Ensure database tables exist, retrying at most once per cooldown period."""
+    global _schema_ready, _schema_retry_after
+    if _schema_ready:
+        return True
+    now = time.monotonic()
+    if now < _schema_retry_after:
+        return False
+    _schema_ready = init_db()
+    if not _schema_ready:
+        _schema_retry_after = now + _SCHEMA_RETRY_COOLDOWN
+    return _schema_ready
 
 
 def check_db_health() -> tuple[str, bool]:
