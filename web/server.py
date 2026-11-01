@@ -114,10 +114,14 @@ async def _boot_step(label: str, fn, *args):
         logger.error("[boot] %s failed: %s", label, redact_secrets(str(exc)))
         return None
 
-
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
+    from football_core.persistence import auto_seed_if_empty, check_db_health, ensure_schema, is_database_configured
+    from web.health import register_db_checker
     from web.startup import apply_session_overrides, run_startup_flow
+
+    # Register pluggable DB health probe hook (PERS-03, D-08)
+    register_db_checker(check_db_health)
 
     # Startup decision (never prompts; normal modes are always
     # fresh-first — see web.startup). Trivial env reads: stays sync.
@@ -127,6 +131,11 @@ async def lifespan(app: fastapi.FastAPI):
             apply_session_overrides(decision.fdo_key)
     except Exception as exc:
         logger.warning("[boot] startup flow skipped: %s", exc)
+
+    # Database schema check and non-destructive auto-seed if configured (PERS-01, PERS-03)
+    if is_database_configured():
+        await _boot_step("database schema check", ensure_schema)
+        await _boot_step("database auto-seed", auto_seed_if_empty)
 
     import web.wc_app as _wc
     import web.ucl_app as _ucl
