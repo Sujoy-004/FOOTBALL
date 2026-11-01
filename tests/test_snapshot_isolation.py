@@ -26,7 +26,7 @@ def isolate_snapshot_state():
     try:
         yield
     finally:
-        startup._last_decision = orig_decision
+        startup.set_session_decision(orig_decision)
         runtime_support._snapshot_session = orig_snapshot_session
         competitions.reset_lazy_gates()
         os.environ.clear()
