@@ -14,6 +14,26 @@ UCL_DATA = ROOT / "competitions" / "ucl" / "data"
 
 
 @pytest.fixture(autouse=True)
+def isolate_snapshot_state():
+    import os
+    import web.startup as startup
+    import football_core.runtime_support as runtime_support
+    import web.competitions as competitions
+
+    orig_decision = startup._last_decision
+    orig_snapshot_session = runtime_support._snapshot_session
+    orig_env = dict(os.environ)
+    try:
+        yield
+    finally:
+        startup._last_decision = orig_decision
+        runtime_support._snapshot_session = orig_snapshot_session
+        competitions.reset_lazy_gates()
+        os.environ.clear()
+        os.environ.update(orig_env)
+
+
+@pytest.fixture(autouse=True)
 def isolated_refresh_ledger(tmp_path, monkeypatch):
     """Keep every refresh-ledger write inside the test sandbox.
 
