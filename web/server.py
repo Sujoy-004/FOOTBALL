@@ -243,9 +243,18 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 asgi_app: ASGIApp = _NoCacheASGI(no_store_for_competition_api(app))
 
 def build_arg_parser() -> argparse.ArgumentParser:
+    default_port = int(os.environ.get("PORT", "8080"))
+    default_host = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
+
     parser = argparse.ArgumentParser(
         prog="python -m web.server",
         description="Run the FOOTBALL prediction server.")
+    parser.add_argument(
+        "--port", type=int, default=default_port,
+        help=f"Port to bind server (default: {default_port} from $PORT or 8080)")
+    parser.add_argument(
+        "--host", type=str, default=default_host,
+        help=f"Host address to bind server (default: {default_host} from $HOST or 127.0.0.1/0.0.0.0)")
     parser.add_argument(
         "--offline", action="store_true",
         help="Explicit OFFLINE execution mode: equivalent to "
@@ -269,5 +278,5 @@ if __name__ == "__main__":
     parser = build_arg_parser()
     args = parser.parse_args()
     configure_server_env(args)
-    uvicorn.run("web.server:asgi_app", host="127.0.0.1", port=8080,
+    uvicorn.run("web.server:asgi_app", host=args.host, port=args.port,
                 reload=False)
