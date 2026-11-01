@@ -133,6 +133,8 @@ NO_NETWORK_MODULES = (
     "football_core.persistence.normalizer",
     "football_core.persistence.engine",
     "football_core.persistence.schema",
+    "football_core.persistence.repository",
+    "football_core.persistence.seeder",
 )
 
 #: Public names of the web-layer invalidation owner (Phase 5). A competition
