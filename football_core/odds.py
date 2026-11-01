@@ -55,6 +55,7 @@ import json
 import logging
 import math
 import os
+import re
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -130,6 +131,13 @@ def parse_utc(value) -> datetime | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+
+def sanitize_odds_url(url: str) -> str:
+    """Redact apiKey query parameters from URLs before logging or diagnostics."""
+    if not url:
+        return url
+    return re.sub(r"([?&]apiKey=)[^&]+", r"\1[REDACTED]", url, flags=re.IGNORECASE)
 
 
 def _odds_key_usable(api_key: str | None) -> str | None:
@@ -247,7 +255,8 @@ class TheOddsApiOddsProvider(OddsProvider):
             resp = (http_fn(url, params) if http_fn is not None
                     else requests.get(url, params=params, timeout=self.timeout))
         except Exception as exc:
-            msg = redact_secrets(str(exc))
+            raw_msg = str(exc)
+            msg = redact_secrets(sanitize_odds_url(raw_msg))
             if self.api_key and self.api_key in (msg or ""):
                 msg = (msg or "").replace(self.api_key, "[REDACTED]")
             raise ProviderUnavailableError(
@@ -283,7 +292,7 @@ class TheOddsApiOddsProvider(OddsProvider):
             "odds_home": prices[0], "odds_draw": prices[1], "odds_away": prices[2],
             "bookmaker": bookmaker, "bookmaker_key": bookmaker_key,
             "provider_last_update": provider_last_update,
-            "provider": self.name, "provenance": url,
+            "provider": self.name, "provenance": sanitize_odds_url(url),
             "n_books": len([b for b in (ev.get("bookmakers") or []) if isinstance(b, dict)]),
         }
 
@@ -370,7 +379,7 @@ def _missing_record(fixture: dict, now: datetime, *, provider: str, bookmaker: s
         "status": STATUS_MISSING,
         "reason": "odds_not_available",
         "event_id": None,
-        "provenance": endpoint,
+        "provenance": sanitize_odds_url(endpoint),
         "normalized": False,
     }
 
@@ -396,7 +405,7 @@ def _available_record(fixture: dict, event: dict, odds_home, odds_draw, odds_awa
         "status": status,
         "reason": reason,
         "event_id": str(event.get("id")),
-        "provenance": event.get("provenance") or endpoint,
+        "provenance": sanitize_odds_url(str(event.get("provenance") or endpoint)),
         "normalized": True,
     }
 
