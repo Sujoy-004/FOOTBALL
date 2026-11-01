@@ -366,4 +366,9 @@ def redact_secrets(text: str | None) -> str | None:
         s,
         flags=re.IGNORECASE,
     )
+    s = re.sub(
+        r'(://[^:]+:)[^@]+(@)',
+        r'\1[REDACTED]\2',
+        s,
+    )
     return s

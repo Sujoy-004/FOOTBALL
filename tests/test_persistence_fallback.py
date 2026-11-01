@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 import pytest
 from sqlalchemy import select, text
+from starlette.testclient import TestClient
 
-from football_core.persistence.engine import ensure_schema, get_engine, reset_engine
+from football_core.persistence.engine import check_db_health, ensure_schema, get_engine, reset_engine
 from football_core.persistence.repository import (
     append_retirement_records,
     load_competition_state,
@@ -17,13 +19,17 @@ from football_core.persistence.repository import (
 )
 from football_core.persistence.schema import competition_states, match_records, metadata, retirement_records
 from football_core.persistence.seeder import auto_seed_if_empty, is_match_records_empty, seed_competition_matches
+from web.health import register_db_checker
+from web.server import app
 
 
 @pytest.fixture(autouse=True)
 def cleanup():
     reset_engine()
+    register_db_checker(None)
     yield
     reset_engine()
+    register_db_checker(None)
 
 
 # ============================================================================
@@ -306,4 +312,86 @@ def test_auto_seed_skips_when_database_unconfigured(monkeypatch: pytest.MonkeyPa
     """When DATABASE_URL is unset, auto_seed_if_empty returns False immediately."""
     monkeypatch.delenv("DATABASE_URL", raising=False)
     assert auto_seed_if_empty() is False
+
+
+# ============================================================================
+# Health Check & Resilience Tests (PERS-03, D-08, T-09-06)
+# ============================================================================
+
+
+def test_health_reports_fallback_json_when_url_unset(monkeypatch: pytest.MonkeyPatch):
+    """When DATABASE_URL is unset, /health reports database: fallback_json and HTTP 200."""
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    register_db_checker(check_db_health)
+
+    with TestClient(app) as client:
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        payload = resp.json()
+        assert payload["database"] == "fallback_json"
+        assert payload["status"] == "ok"
+
+
+def test_health_reports_sqlite_when_sqlite_url_set(monkeypatch: pytest.MonkeyPatch):
+    """When DATABASE_URL is configured with SQLite, /health reports database: sqlite and HTTP 200."""
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    register_db_checker(check_db_health)
+
+    with TestClient(app) as client:
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        payload = resp.json()
+        assert payload["database"] == "sqlite"
+        assert payload["status"] == "ok"
+
+
+def test_health_reports_503_when_configured_database_unreachable(monkeypatch: pytest.MonkeyPatch):
+    """When DATABASE_URL is set but unreachable, /health degrades to HTTP 503 and status unhealthy."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql://baduser:badpass@127.0.0.1:59999/baddb")
+    register_db_checker(check_db_health)
+
+    with TestClient(app) as client:
+        resp = client.get("/health")
+        assert resp.status_code == 503
+        payload = resp.json()
+        assert payload["database"] == "postgres"
+        assert payload["status"] == "unhealthy"
+
+
+def test_secrets_redacted_in_database_error_logs(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
+    """Trigger connection failure with password in DATABASE_URL and assert password is not leaked in log records."""
+    secret_pass = "super_secret_neon_password_xyz987"
+    monkeypatch.setenv("DATABASE_URL", f"postgresql://neonuser:{secret_pass}@127.0.0.1:59999/neondb")
+    reset_engine()
+
+    with caplog.at_level("ERROR"):
+        status_label, is_healthy = check_db_health()
+
+    assert is_healthy is False
+    assert status_label == "postgres"
+    captured_logs = caplog.text
+    assert secret_pass not in captured_logs
+    assert "[REDACTED]" in captured_logs or "59999" in captured_logs
+
+
+def test_zero_network_at_import_time(monkeypatch: pytest.MonkeyPatch):
+    """Verify that importing any persistence module never initiates network socket connections."""
+    import socket
+
+    def forbidden_socket(*args, **kwargs):
+        raise AssertionError("Network socket initiated during persistence import!")
+
+    monkeypatch.setattr(socket, "socket", forbidden_socket)
+
+    modules_to_test = [
+        "football_core.persistence",
+        "football_core.persistence.normalizer",
+        "football_core.persistence.engine",
+        "football_core.persistence.schema",
+        "football_core.persistence.repository",
+        "football_core.persistence.seeder",
+    ]
+    for mod_name in modules_to_test:
+        importlib.import_module(mod_name)
+
 

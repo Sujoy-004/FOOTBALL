@@ -61,8 +61,8 @@ def reset_engine() -> None:
     if _engine is not None:
         try:
             _engine.dispose()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Engine disposal ignored: %s", exc)
     _engine = None
     _schema_ready = False
     _schema_retry_after = 0.0
