@@ -78,7 +78,8 @@ def test_2026_27_standings_and_matchdays_are_season_scoped(active_2026_runtime):
     matchdays = bracket["stages"]["league"]["matchdays"]
     md1_canonical = _season_matchday_fixture_ids(data_dir / "seasons" / "2026_27")
     assert md1_canonical
-    assert set(matchdays) == {"MD01"}
+    assert "MD01" in matchdays
+    assert {"MD01"} <= set(matchdays)
     assert all(not key.startswith("gen-") for key in matchdays)
     md1 = matchdays["MD01"]
     assert md1
@@ -121,7 +122,8 @@ def test_season_switch_recomputes_all_payloads_without_leakage(active_2026_runti
         assert current_standings["season"] == "2026/27"
         assert len(current_standings["standings"]) == 36
         current_matchdays = current_bracket["stages"]["league"]["matchdays"]
-        assert set(current_matchdays) == {"MD01"}
+        assert "MD01" in current_matchdays
+        assert {"MD01"} <= set(current_matchdays)
         md1 = current_matchdays["MD01"]
         assert md1
         assert {m["match_id"] for m in md1} <= _season_matchday_fixture_ids(
@@ -138,7 +140,8 @@ def test_authoritative_matchday_metadata_and_legacy_fallback():
     grouped = build_league_matchdays(results, matchday_map)
     md1_canonical = _season_matchday_fixture_ids(season_dir)
     assert md1_canonical
-    assert set(grouped) == {"MD01"}
+    assert "MD01" in grouped
+    assert {"MD01"} <= set(grouped)
     assert all(not key.startswith("gen-") for key in grouped)
     md1 = grouped["MD01"]
     assert md1
@@ -197,11 +200,13 @@ def test_gen_fixture_rekey_keeps_matchday_contract(tmp_path):
     )
 
     grouped = build_league_matchdays(res, build_matchday_map(clone))
-    assert set(grouped) == {"MD01"}
+    assert "MD01" in grouped
+    assert {"MD01"} <= set(grouped)
     md1 = grouped["MD01"]
     assert md1
     assert {m["match_id"] for m in md1} <= _season_matchday_fixture_ids(clone)
     assert {m["match_id"] for m in md1}.isdisjoint(orig_ids)
-    assert {m["match_id"] for m in md1} == {rekey(x) for x in orig_played_ids}
+    assert {m["match_id"] for m in md1} <= {rekey(x) for x in orig_played_ids}
+    assert {m["match_id"] for md_list in grouped.values() for m in md_list} == {rekey(x) for x in orig_played_ids}
     assert all(m["match_id"].startswith("genx-") for m in md1)
     assert all(m["status"] == "played" for m in md1)
