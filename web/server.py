@@ -63,6 +63,7 @@ class _NoCacheASGI:
 
 from web.cache_control import no_store_for_competition_api
 from web.competitions import REGISTRY, consume_lazy_gate
+from web.health import router as health_router
 
 
 HERE = Path(__file__).parent
@@ -216,6 +217,7 @@ async def lifespan(app: fastapi.FastAPI):
 
 
 app = fastapi.FastAPI(title="FOOTBALL", lifespan=lifespan)
+app.include_router(health_router)
 
 
 @app.get("/")
