@@ -253,7 +253,7 @@ def resolve_elo(
     Precedence:
 
     1. ``elo_file`` (snapshot) — missing teams fall back to DEFAULT_ELO;
-    2. ``use_live`` — best-effort ClubElo fetch via the orchestrator;
+    2. ``use_live`` — best-effort seed+replay resolution via the orchestrator;
     3. offline default — coefficient-derived ratings from the league draw
        (``1400 + coeff/max_coeff * 400``, mirroring ``web/ucl_app``).
 

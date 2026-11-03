@@ -89,7 +89,7 @@ outputs are blended per outcome by `EnsembleEngine`.
 
 | Signal | Source | Degrades to |
 |---|---|---|
-| `refined_elo` | context Elo ratings (ClubElo) | 1500 default |
+| `refined_elo` | context Elo ratings self-calculated (seed + local result replay via `football_core.elo_replay`) | 1500 default |
 | `market_odds` | devigged bookmaker odds on ingested events | uniform thirds |
 | `rolling_form` | recent results via a history provider | neutral form |
 | `squad_value` | squad-value JSON (log-ratio transform) | median imputation |
@@ -268,15 +268,15 @@ python -m pytest -q --tb=no -p no:cacheprovider 2>&1 | Select-String "^(FAILED|E
   projection and are not labeled per-node yet.
 - Simulations cannot be cancelled; progress polling is one-shot after a
   terminal state.
-- UCL offline Elo falls back to UEFA-coefficient-derived ratings.
-- UCL 2026/27 Elo coverage is measured, not assumed: all 36 draw teams
-  resolve to verified ClubElo slugs (was 22/36 before those mappings were
-  added). The mappings are purely additive keys in the tracked
-  `competitions/ucl/data/team_aliases.json` — no team identity was edited.
-  Nuance: Man City, Man United, and Paris SG expose no per-team ClubElo
-  history rows and resolve only through the daily ranking snapshot, so any
-  of them reverts to the coefficient fallback if its ranking period lapses
-  between refreshes. The UI renders coverage and provenance instead of
+- UCL Elo with no usable seed falls back to UEFA-coefficient-derived ratings.
+- UCL 2026/27 Elo coverage is measured, not assumed: all 36 draw team ratings
+  are self-calculated at runtime — the committed seed snapshot plus a
+  chronological replay of locally stored played results dated strictly after
+  the seed's as-of (`football_core.elo_replay`). Sessions whose seed cannot
+  resolve every fixture team degrade to the coefficient fallback for the whole
+  set; never a partial mix or a fabricated fill. `competitions/ucl/data/
+  team_aliases.json` and the fixtures' `clubelo_name` fields live on as
+  committed identity data. The UI renders coverage and provenance instead of
   implying full coverage.
 - No accuracy/skill claims: labeled history is still accumulating.
 

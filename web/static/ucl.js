@@ -436,12 +436,12 @@ function _signalStatusCell(s) {
   const prov = s.provenance;
   if (prov === "coefficient_derived") {
     html += ' <span class="dim" style="display:block;font-size:10px;font-weight:normal">'
-      + 'Offline coefficient estimates — no ClubElo ratings</span>';
+      + 'Offline coefficient estimates — no self-calculated Elo ratings</span>';
   } else if (typeof coverage === "number" && typeof coverageTotal === "number"
       && coverageTotal > 0 && coveragePct != null && coveragePct < 100) {
     html += ' <span class="dim" style="display:block;font-size:10px;font-weight:normal">'
       + coverage + '/' + coverageTotal + ' teams rated (' + Number(coveragePct).toFixed(1)
-      + '%); remaining use a neutral baseline (1500), not ClubElo data</span>';
+      + '%); remaining use a neutral baseline (1500, not stored seed data)</span>';
   }
   return html;
 }

@@ -588,3 +588,65 @@ class TestLaLigaAdapter:
         monkeypatch.setattr(lp, "load_results", lambda *a, **k: [])
         assert lp.elo_source(str(tmp_path)) == {"provenance": "seeded", "as_of": "2026-09-21"}
 
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ── Kernel robustness branches (exact-line coverage: 98, 143-144, 212-216) ──
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class TestKernelRobustnessBranches:
+    """Branches not natural to the adapters but part of the fail-closed gate."""
+
+    def test_full_timestamp_seed_filters_at_or_before_row(self):
+        """A full-timestamp seed uses the plain string compare branch."""
+        outcome = replay_elo(
+            {"A": 1500.0, "B": 1500.0}, "2026-10-01T21:00:00",
+            [_row("A", "B", 2, 0, "2026-10-01T21:00:00")], base_k=60,
+        )
+        assert outcome.replayed == 0 and outcome.skipped == 1
+        assert outcome.ratings == {"A": 1500.0, "B": 1500.0}
+
+    def test_full_timestamp_seed_replays_later_row(self):
+        outcome = replay_elo(
+            {"A": 1500.0, "B": 1500.0}, "2026-10-01T21:00:00",
+            [_row("A", "B", 2, 0, "2026-10-01T21:00:01")], base_k=60,
+        )
+        assert outcome.replayed == 1 and outcome.skipped == 0
+        assert outcome.as_of == "2026-10-01T21:00:01"
+
+    def test_non_mapping_rows_skipped(self):
+        """A non-Mapping entry in the row iterable is skipped, not fatal."""
+        valid = _row("A", "B", 2, 0, "2026-10-02")
+        outcome = replay_elo(
+            {"A": 1500.0, "B": 1500.0}, "", [None, valid], base_k=60,
+        )
+        assert outcome.replayed == 1 and outcome.skipped == 1
+        assert outcome.as_of == "2026-10-02"
+
+    def test_update_ratings_exception_skips_row_and_continues(self, monkeypatch):
+        """One row's update_ratings failure skips that row and counts it; the
+        next row still replays and stamps the outcome as-of."""
+        import football_core.elo_replay as kernel_mod
+
+        real = kernel_mod.update_ratings
+        calls = {"n": 0}
+
+        def flaky(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise ValueError("simulated transient failure")
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(kernel_mod, "update_ratings", flaky)
+        outcome = kernel_mod.replay_elo(
+            {"A": 1500.0, "B": 1500.0}, "",
+            [_row("A", "B", 1, 0, "2026-10-02"),
+             _row("B", "A", 0, 1, "2026-10-03")],
+            base_k=60,
+        )
+        assert calls["n"] == 2
+        assert outcome.replayed == 1 and outcome.skipped == 1
+        assert outcome.as_of == "2026-10-03"
+        # First row's failure left the seed values; second row moved them ±30.
+        assert outcome.ratings == {"A": 1530.0, "B": 1470.0}
+

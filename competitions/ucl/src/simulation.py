@@ -415,8 +415,9 @@ def run_monte_carlo(
 ) -> dict:
     """Run Monte Carlo simulation of UCL league phase.
 
-    Orchestrates the full simulation pipeline: optionally fetches Elo
-    ratings from ClubElo, precomputes matchup lambdas once, runs
+    Orchestrates the full simulation pipeline: optionally self-calculates
+    Elo ratings from the stored seed + locally replayed results
+    (network-free), precomputes matchup lambdas once, runs
     *n_iterations* of the league phase (match simulation → standings),
     and aggregates per-team zone/champion probabilities and stat averages.
 
@@ -425,7 +426,8 @@ def run_monte_carlo(
     fixtures:
         UCL fixture schedule dict (36 teams, 144 matches).
     elo_ratings:
-        ``{team_name: Elo}``.  Fetched from ClubElo if ``None``.
+        ``{team_name: Elo}``.  Self-calculated from the seed+replay
+        kernel if ``None``.
     n_iterations:
         Number of Monte Carlo iterations (default 10 000).
     seed:
@@ -433,8 +435,8 @@ def run_monte_carlo(
     uefa_coefficients:
         ``{team_name: coefficient}`` for tiebreaker step 10.
     team_aliases:
-        ``{team_name: clubelo_slug}`` mapping.  Loaded from
-        ``data/team_aliases.json`` if not provided.
+        ``{team_name: alias_slug}`` committed identity mapping.  Loaded
+        from ``data/team_aliases.json`` if not provided.
     compute_ci:
         If True, compute bootstrap confidence intervals on champion
         probabilities (default False).

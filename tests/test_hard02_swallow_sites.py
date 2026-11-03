@@ -59,8 +59,13 @@ SANCTIONED: dict[str, str] = {
         "optional config: corrupt == missing == the same {} default "
         "(narrow JSONDecodeError/OSError, freshness path untouched)"
     ),
-    "competitions/laliga/src/pipeline.py::load_elo_ratings": (
-        "optional Elo seed: corrupt == missing == the same {} default"
+    "competitions/laliga/src/pipeline.py::_elo_seed_doc": (
+        "optional Elo seed document: corrupt == missing == the same {} "
+        "default; the kernel path (_elo_replay) turns no usable seed into "
+        "the honest 'unavailable' provenance (no fabricated fill). "
+        "Replaces the old load_elo_ratings entry removed by the 261102-cg7 "
+        "seed+replay rewrite, which rerouted load_elo_ratings through the "
+        "fail-closed kernel with no default-shape swallow left"
     ),
     "competitions/laliga/src/pipeline.py::_alias_lookup": (
         "optional alias file: corrupt == missing == the same {} default"

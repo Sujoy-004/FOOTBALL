@@ -928,8 +928,9 @@ def run_mc_simulation(
     Exchange 3 truth semantics:
     - real league results on disk are injected as immutable facts into
       every iteration (never resampled);
-    - an explicit ``elo_ratings_override`` avoids live ClubElo calls so a
-      simulation can run fully offline (snapshot mode);
+    - an explicit ``elo_ratings_override`` avoids recompute calls so a
+      simulation can run fully offline (snapshot mode); the seed+replay
+      compute itself is network-free;
     - ``seed=None`` lets the generic engine generate a seed that is
       returned in the payload for reproducibility.
 

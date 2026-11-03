@@ -3,7 +3,7 @@
 ## Overview
 
 ```text
-Elo ratings (ClubElo API + eloratings.net sync)
+Elo ratings (self-calculated seed+replay kernel + eloratings.net offline sync)
         ↓
 5-signal refinement ensemble          refined_elo · market_odds ·
 (EnsembleEngine, weighted blend)      rolling_form · squad_value · rest_days
@@ -43,7 +43,7 @@ CompetitionRegistry ── FastAPI shell ── dashboard
 | `signals/` | The five signal implementations (+ `cached.py` cache-backed signal honoring stored draw probabilities) |
 | `groups.py` | Poisson match model: expected goals from rating diff, cached CDF sampling, played-result injection, league-format sampler, tiebreaker chains |
 | `knockout.py` | Knockout primitives: single match (+ET/pens), two-legged ties, blended-prob resolution with matchup-aware Elo fallback |
-| `elo.py` / `elo_fetcher.py` / `elo_sync.py` | Elo math; ClubElo fetch; eloratings.net TSV sync with graduated correction |
+| `elo.py` / `elo_replay.py` / `elo_sync.py` | Elo math; competition-agnostic seed+replay kernel (reuses `update_ratings`/`compute_k_factor`; offline); eloratings.net TSV sync with graduated correction |
 | `predictors/odds.py` | Single-book devig (`remove_vig`) — the canonical vig-removal math |
 | `odds.py` | Generic live market-odds layer: `OddsProvider` contract, `TheOddsApiOddsProvider`, `ODDS_PROVIDER` resolution (the-odds-api/auto/none), deterministic primary-book selection, canonical acquisition core (fixture mapping, validation, freshness, state, store), observability. Data provider (`DATA_PROVIDER`) stays fixtures/results-only |
 | `data_providers/` | football-data.org result/event provider (`fetch_matches` only) |
@@ -221,7 +221,7 @@ World Cup has none. See `docs/FIXTURE-IDENTITY.md`.
 
 | Signal | Data source | Degradation |
 |---|---|---|
-| `refined_elo` | context Elo ratings (ClubElo) | defaults to 1500 |
+| `refined_elo` | context Elo ratings self-calculated (seed + local result replay) | defaults to 1500 |
 | `market_odds` | devigged bookmaker odds from the live odds provider (`ODDS_PROVIDER`: The Odds API) | uniform thirds |
 | `rolling_form` | recent results via a result-history provider | neutral form |
 | `squad_value` | committed squad-value JSON (log-ratio sigmoid); path injected by the owning competition | uniform thirds |

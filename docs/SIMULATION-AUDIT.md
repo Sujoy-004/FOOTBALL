@@ -191,7 +191,8 @@ allowing runs either way.
   full parity dict incl. `sim_state_payload`, deterministic output, and
   `_meta` `{n_simulations, seed (engine-resolved), engine_version, provenance
   with `league_matches_conditioned`}` (`:1052-1063`). Offline-safe via
-  `elo_ratings_override` (web caches boot Elo; snapshot mode skips ClubElo).
+  `elo_ratings_override` (web caches boot Elo; snapshot mode self-calculates
+  from the seed+replay kernel, which is network-free).
 - **Mode resolution** (`orchestrator.resolve_compute_mode` `:789-838`):
   `results` iff a readable non-empty `results.json` (season-dir first);
   knockout availability is reported separately and never flips the mode;
