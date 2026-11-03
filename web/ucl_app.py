@@ -1,6 +1,6 @@
 """UEFA Champions League — FastAPI sub-app mounted under /ucl."""
 from __future__ import annotations
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 import logging
 
@@ -1328,7 +1328,7 @@ def api_reset():
 
 
 @ucl_app.post("/api/refresh")
-def api_refresh():
+def api_refresh(request: fastapi.Request = None):
     """Explicit acquisition trigger for the UCL (plan 02-06).
 
     No snapshot short-circuit here: the wrapper self-gates, so an explicit
@@ -1338,6 +1338,10 @@ def api_refresh():
     counters, season, staleness); HTTP stays 200 because a truthful
     failure is data, not an HTTP error.
     """
+    from web.security import enforce_refresh_permission
+
+    enforce_refresh_permission(request)
+
     from web.competitions import REGISTRY
 
     try:

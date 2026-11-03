@@ -60,6 +60,33 @@ def verify_admin_key(request: Request) -> bool:
     return True
 
 
+def enforce_refresh_permission(request: Optional[Request] = None) -> None:
+    """Enforce SEC-05: block public manual refresh in production unless authorized with ADMIN_KEY.
+
+    If request is None or not in production:
+      Bypassed immediately (preserves direct Python calls in tests and dev workflow).
+
+    In production (ENVIRONMENT=production or RENDER=true):
+      Requires valid ADMIN_KEY matching X-Admin-Key header or ?admin_key= query parameter.
+      Otherwise raises HTTPException(403).
+    """
+    if request is None or not is_production():
+        return
+
+    admin_key = os.environ.get("ADMIN_KEY", "").strip()
+    header_key = request.headers.get("x-admin-key", "").strip()
+    query_key = request.query_params.get("admin_key", "").strip()
+    provided = header_key or query_key
+
+    if admin_key and provided and hmac.compare_digest(provided, admin_key):
+        return
+
+    raise HTTPException(
+        status_code=403,
+        detail="Manual refresh is disabled in production to protect API quotas. Use automated sync or authorized admin endpoint.",
+    )
+
+
 class SecretRedactingFilter(logging.Filter):
     """Logging filter that scrubs credentials from log records and tracebacks."""
 

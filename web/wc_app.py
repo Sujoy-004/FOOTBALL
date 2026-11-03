@@ -444,7 +444,7 @@ def api_data():
 
 
 @wc_app.post("/api/refresh")
-def api_refresh():
+def api_refresh(request: fastapi.Request = None):
     """Explicit acquisition trigger for the World Cup (plan 02-06).
 
     Delegates to the competition-scoped adapter — the SAME path the
@@ -459,6 +459,10 @@ def api_refresh():
     (attempted runs only) and the snapshot is rebuilt from disk so
     subsequent ``GET /api/data`` shows the freshly ingested facts.
     """
+    from web.security import enforce_refresh_permission
+
+    enforce_refresh_permission(request)
+
     from web.competitions import REGISTRY
 
     try:
