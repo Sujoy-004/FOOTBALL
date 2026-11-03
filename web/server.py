@@ -225,7 +225,13 @@ async def lifespan(app: fastapi.FastAPI):
             "unavailable",
             None,
         )
-    yield
+    from web.sync_worker import sync_worker
+
+    sync_worker.start()
+    try:
+        yield
+    finally:
+        await sync_worker.stop()
 
 
 app = fastapi.FastAPI(title="FOOTBALL", lifespan=lifespan)
