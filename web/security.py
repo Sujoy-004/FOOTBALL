@@ -7,17 +7,57 @@ SEC-03: CORS restricts browser access to authorized origins and Cloudflare Pages
 
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 from typing import Optional
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from football_core.domain import redact_secrets
 
 logger = logging.getLogger(__name__)
+
+
+def is_production() -> bool:
+    """True if running in production or on Render."""
+    env = os.environ.get("ENVIRONMENT", "").strip().lower()
+    render = os.environ.get("RENDER", "").strip().lower()
+    return env == "production" or render == "true"
+
+
+def verify_admin_key(request: Request) -> bool:
+    """Verify admin key for operator actions.
+
+    In production (ENVIRONMENT=production or RENDER=true):
+      Requires ADMIN_KEY set in environment and matching X-Admin-Key header
+      or ?admin_key= query parameter. Uses constant-time hmac.compare_digest.
+      Raises HTTPException(403) on mismatch/absence.
+
+    In non-production:
+      If ADMIN_KEY is configured, it must match.
+      If ADMIN_KEY is not configured, logs a warning and permits access for local convenience.
+    """
+    admin_key = os.environ.get("ADMIN_KEY", "").strip()
+    header_val = request.headers.get("x-admin-key", "")
+    query_val = request.query_params.get("admin_key", "")
+    provided = (header_val or query_val or "").strip()
+
+    if is_production():
+        if not admin_key or not provided or not hmac.compare_digest(provided, admin_key):
+            raise HTTPException(status_code=403, detail="Invalid or missing admin key")
+        return True
+
+    # Non-production
+    if admin_key:
+        if not provided or not hmac.compare_digest(provided, admin_key):
+            raise HTTPException(status_code=403, detail="Invalid or missing admin key")
+    else:
+        logger.warning("[security] Admin sync called without configured ADMIN_KEY in non-production mode")
+
+    return True
 
 
 class SecretRedactingFilter(logging.Filter):

@@ -33,8 +33,9 @@ logger = logging.getLogger(__name__)
 mimetypes.add_type('image/webp', '.webp')
 
 import fastapi
+from fastapi import HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -237,7 +238,7 @@ async def lifespan(app: fastapi.FastAPI):
 app = fastapi.FastAPI(title="FOOTBALL", lifespan=lifespan)
 
 from fastapi.middleware.cors import CORSMiddleware
-from web.security import get_allowed_origins, register_exception_handlers
+from web.security import get_allowed_origins, register_exception_handlers, verify_admin_key
 
 app.add_middleware(
     CORSMiddleware,
@@ -251,6 +252,18 @@ app.add_middleware(
 register_exception_handlers(app)
 
 app.include_router(health_router)
+
+
+@app.post("/api/admin/sync")
+async def admin_sync(request: Request):
+    """Authenticated operator endpoint to trigger sync across all competitions."""
+    verify_admin_key(request)
+    from web.sync_worker import sync_worker
+
+    if sync_worker._lock.locked():
+        raise HTTPException(status_code=409, detail="Sync already in progress")
+    report = await sync_worker.run_sync_all(force=True)
+    return JSONResponse(report)
 
 
 @app.get("/")
