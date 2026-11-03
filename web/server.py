@@ -64,6 +64,9 @@ class _NoCacheASGI:
 from web.cache_control import no_store_for_competition_api
 from web.competitions import REGISTRY, consume_lazy_gate
 from web.health import router as health_router
+from web.security import install_logging_filters
+
+install_logging_filters()
 
 
 HERE = Path(__file__).parent

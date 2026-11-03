@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.parse
 from dataclasses import InitVar, dataclass
 from enum import Enum
 from pathlib import Path
@@ -348,24 +349,52 @@ def redact_secrets(text: str | None) -> str | None:
     if not s:
         return s
 
+    secret_values: set[str] = set()
     for k, v in os.environ.items():
-        if any(term in k.upper() for term in ("KEY", "TOKEN", "SECRET", "PASS")):
+        k_upper = k.upper()
+        if any(term in k_upper for term in ("KEY", "TOKEN", "SECRET", "PASS", "ADMIN")):
             val = v.strip()
-            if len(val) >= 4 and val in s:
-                s = s.replace(val, "[REDACTED]")
+            if len(val) >= 4:
+                secret_values.add(val)
+        elif "DATABASE_URL" in k_upper or "DB_URL" in k_upper:
+            val = v.strip()
+            if val:
+                try:
+                    parsed = urllib.parse.urlsplit(val)
+                    if parsed.password and len(parsed.password) >= 4:
+                        secret_values.add(parsed.password)
+                        unquoted = urllib.parse.unquote(parsed.password)
+                        if len(unquoted) >= 4:
+                            secret_values.add(unquoted)
+                except Exception:
+                    pass
 
+    for val in secret_values:
+        if val in s:
+            s = s.replace(val, "[REDACTED]")
+
+    # Redact common key=value patterns in text
     s = re.sub(
-        r'''(["']?(?:api[_-]?key|token|secret|password|access[_-]?token)["']?\s*[:=]\s*["']?)([^"'&\s,}\]]+)(["']?)''',
+        r'''(["']?(?:api[_-]?key|token|secret|password|access[_-]?token|admin[_-]?key)["']?\s*[:=]\s*["']?)([^"'&\s,}\]]+)(["']?)''',
         r'\1[REDACTED]\3',
         s,
         flags=re.IGNORECASE,
     )
+    # Redact query string parameter values (?apiKey=... or &admin_key=...)
+    s = re.sub(
+        r'([?&](?:api[_-]?key|token|secret|password|admin[_-]?key)=)[^&]+',
+        r'\1[REDACTED]',
+        s,
+        flags=re.IGNORECASE,
+    )
+    # Redact Authorization header values
     s = re.sub(
         r'((?:Bearer|Token)\s+)[A-Za-z0-9_\-\.~+/]+=*',
         r'\1[REDACTED]',
         s,
         flags=re.IGNORECASE,
     )
+    # Redact URL credentials: postgres://user:password@host
     s = re.sub(
         r'(://[^:]+:)[^@]+(@)',
         r'\1[REDACTED]\2',
