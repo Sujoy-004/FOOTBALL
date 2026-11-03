@@ -451,11 +451,11 @@ def run_monte_carlo(
     """
     # ── 1. Fetch / resolve Elo ratings ──────────────────────────────────
     if elo_ratings is None:
-        from competitions.ucl.src.elo_fetcher import fetch_team_elos
+        from competitions.ucl.src.elo_fetcher import compute_self_calculated_elos
 
         team_names = [t["name"] for t in fixtures["schedule"]["teams"]]
         try:
-            elo_ratings = fetch_team_elos(team_names)
+            elo_ratings = compute_self_calculated_elos(team_names)
         except Exception:
             elo_ratings = {}
 
@@ -538,10 +538,10 @@ def run_monte_carlo(
             entry["champion_ci_upper"] = ci_hi
             entry["champion_ci_width_pct"] = (ci_hi - ci_lo) * 100.0
 
-    from competitions.ucl.src.elo_fetcher import get_clubelo_snapshot_date
+    from competitions.ucl.src.elo_fetcher import elo_computed_at
 
     return {
-        "snapshot_date": get_clubelo_snapshot_date(),
+        "snapshot_date": elo_computed_at(),
         "n_iterations": n,
         "seed": resolved_seed,
         "teams": teams_out,

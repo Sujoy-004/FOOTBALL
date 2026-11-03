@@ -32,7 +32,8 @@ _REAL_TEAMS_POT4 = [
 
 _ALL_36_TEAMS = _REAL_TEAMS_POT1 + _REAL_TEAMS_POT2 + _REAL_TEAMS_POT3 + _REAL_TEAMS_POT4
 
-# Realistic ClubElo ratings (from ClubElo snapshot circa 2025/26 pre-season)
+# Realistic stored seed ratings (from the committed Elo snapshot,
+# circa 2025/26 pre-season) — the snapshot fixtures the replay engine runs from
 _ELO_RATINGS = {
     "Man City": 1971.0,
     "Bayern": 1956.0,
@@ -134,7 +135,9 @@ def _load_real_fixtures():
     with open(fixtures_path) as f:
         return json.load(f)
 
-_CLUBELO_NAMES = {
+# Committed DATA identity map (decision 5): team_aliases.json keeps the
+# alias identity as a stored field even though no scraper resolves it.
+_ALIAS_NAMES = {
     "PSG": "Paris SG",
     "Real Madrid": "Real Madrid",
     "Man City": "Man City",
@@ -196,12 +199,12 @@ def _build_sample_matchday(teams_subset, pots, matchday_id: int, offset: int):
     return matches
 
 
-def _build_team_entry(name, pot_map, elo_map, clubelo_map, coeff_map):
+def _build_team_entry(name, pot_map, elo_map, alias_map, coeff_map):
     """Build a single team entry dict for the schedule."""
     return {
         "name": name,
         "pot": pot_map[name],
-        "clubelo_name": clubelo_map[name],
+        "clubelo_name": alias_map[name],
         "coefficient": coeff_map[name],
     }
 
@@ -213,14 +216,14 @@ def _build_team_entry(name, pot_map, elo_map, clubelo_map, coeff_map):
 def sample_36_teams():
     """Returns a dict of 36 UCL team names mapped to their Elo ratings and pot assignments.
 
-    Uses realistic 2025/26 UCL teams with verified ClubElo ratings.
+    Uses realistic 2025/26 UCL teams with realistic stored seed ratings.
     """
     teams = {}
     for name in _ALL_36_TEAMS:
         teams[name] = {
             "elo": _ELO_RATINGS[name],
             "pot": _POT_MAP[name],
-            "clubelo_name": _CLUBELO_NAMES[name],
+            "clubelo_name": _ALIAS_NAMES[name],
             "coefficient": _UEFA_COEFFICIENTS[name],
         }
     return teams
@@ -315,19 +318,6 @@ def sample_invalid_fixtures():
         {"schedule": invalid2["schedule"], "expected_error": "duplicate"},
         {"schedule": invalid3["schedule"], "expected_error": "pot"},
     ]
-
-
-# ── Live API test marker ────────────────────────────────────────────────────
-
-
-def pytest_addoption(parser):
-    """Add a ``--live`` flag to run live ClubElo API tests."""
-    parser.addoption(
-        "--live",
-        action="store_true",
-        default=False,
-        help="Run live ClubElo API integration tests",
-    )
 
 
 # ── Match simulation fixtures (Plan 02, Tasks 3 & 4) ──────────────────────
@@ -977,7 +967,7 @@ def sample_36_teams_data():
         {
             "name": name,
             "pot": _POT_MAP[name],
-            "clubelo_name": _CLUBELO_NAMES[name],
+            "clubelo_name": _ALIAS_NAMES[name],
             "coefficient": _UEFA_COEFFICIENTS[name],
         }
         for name in _ALL_36_TEAMS

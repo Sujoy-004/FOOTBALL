@@ -1,9 +1,8 @@
 """UCL Predictor — Swiss league phase simulation, standings, Monte Carlo, and knockout."""
 
 from competitions.ucl.src.elo_fetcher import (
-    fetch_team_elos,
-    get_clubelo_snapshot_date,
-    resolve_clubelo_name,
+    compute_self_calculated_elos,
+    elo_computed_at,
 )
 from competitions.ucl.src.groups import (
     compute_swiss_standings,
@@ -24,9 +23,8 @@ from competitions.ucl.src.simulation import (
 )
 
 __all__ = [
-    "fetch_team_elos",
-    "resolve_clubelo_name",
-    "get_clubelo_snapshot_date",
+    "compute_self_calculated_elos",
+    "elo_computed_at",
     "precompute_swiss_matchup_lambdas",
     "simulate_swiss_matches",
     "compute_swiss_standings",

@@ -237,42 +237,63 @@ def build_sim_state_payload(
     return payload
 
 
-def _attach_elo_as_of(signal_stats: dict, elo_provenance: str | None) -> None:
-    """Label real ClubElo ratings with when they were actually read.
+def _attach_elo_as_of(
+    signal_stats: dict,
+    elo_provenance: str | None,
+    as_of: str | None = None,
+) -> None:
+    """Label real seed/replay Elo ratings with when they were computed.
 
     Both compute paths build their own ``signal_stats``, so this is called
-    from each. A coefficient estimate gets no date: guessing one from the
-    season would be a fiction.
+    from each. ``self_calculated``/``seeded`` provenance carries the
+    kernel outcome's as-of date (from ``_resolve_elo_ratings`` — the
+    parameter keeps legacy callers honest by defaulting to the stored
+    cache's stamp); a coefficient estimate gets no date: guessing one
+    from the season would be a fiction.
     """
-    if elo_provenance != "clubelo":
+    if elo_provenance not in ("self_calculated", "seeded"):
         return
     refined = signal_stats.get("refined_elo")
     if isinstance(refined, dict):
-        from competitions.ucl.src.elo_fetcher import elo_store_fetched_at
-        refined["as_of"] = elo_store_fetched_at()
+        if as_of is None:
+            from competitions.ucl.src.elo_fetcher import elo_computed_at
+            as_of = elo_computed_at()
+        refined["as_of"] = as_of
 
 
-def _resolve_elo_ratings(team_names: list[str]) -> dict[str, float]:
-    """Snapshot-safe Elo resolution.
+def _resolve_elo_ratings(
+    team_names: list[str],
+) -> tuple[dict[str, float], str, str]:
+    """Self-calculated Elo resolution (snapshot-safe by construction).
 
-    Snapshot mode guarantees ZERO live requests, so ClubElo is skipped and
-    coefficient-derived ratings are used directly. Live mode goes through
-    the stored ClubElo snapshot, which re-fetches only when it is stale or
-    missing a team, and degrades to coefficients on failure.
+    The seed+replay kernel (``football_core.elo_replay``) performs zero
+    network requests in every mode, so snapshot mode OFFERS the same
+    call as live mode — decision D-02 keeps only the no-seed
+    coefficient fallback for degraded sessions. Provenance is derived
+    from the kernel's own ReplayOutcome (its ``replayed`` count), never
+    from a file-declared source field (T-quick-02):
+
+    - ``self_calculated`` when ratings exist and the kernel replayed >0 rows;
+    - ``seeded`` when ratings exist with zero replayed rows;
+    - ``unavailable`` when the seed store itself could not produce ratings
+      (the caller degrades to coefficient-derived ratings).
+
+    Returns ``(ratings, provenance, as_of)``.
     """
-    from football_core.runtime_support import is_snapshot_mode
+    from competitions.ucl.src.elo_fetcher import (
+        compute_elo_outcome,
+        elo_computed_at,
+    )
 
-    if not is_snapshot_mode():
-        from competitions.ucl.src.elo_fetcher import refresh_elos_if_stale
-        try:
-            ratings = refresh_elos_if_stale(team_names)
-        except Exception as exc:
-            logger.warning("UCL Elo fetch failed (%s); using coefficient fallback", exc)
-            ratings = {}
-        if ratings:
-            return ratings
-    # Coefficient fallback (also the offline path for live mode failures).
-    return {}
+    try:
+        ratings, outcome = compute_elo_outcome(team_names)
+    except Exception as exc:
+        logger.warning("UCL Elo compute failed (%s); using coefficient fallback", exc)
+        return {}, "unavailable", ""
+    if not ratings or outcome is None:
+        return {}, "unavailable", ""
+    provenance = "self_calculated" if outcome.replayed > 0 else "seeded"
+    return ratings, provenance, elo_computed_at()
 
 
 
@@ -975,8 +996,7 @@ def run_deterministic_compute(
         _, league_shell_availability, _ = load_json_store(
             Path(_active_data_dir) / "results.json")
         team_names = [t.name for t in provider.teams]
-        elo_ratings = _resolve_elo_ratings(team_names)
-        elo_provenance = "clubelo" if elo_ratings else None
+        elo_ratings, elo_provenance, elo_as_of = _resolve_elo_ratings(team_names)
         if not elo_ratings:
             coefficients = {t.name: t.coefficient for t in provider.teams}
             max_coeff = max(coefficients.values()) if coefficients else 100.0
@@ -985,6 +1005,7 @@ def run_deterministic_compute(
                 for team in team_names
             }
             elo_provenance = "coefficient_derived" if elo_ratings else "unavailable"
+            elo_as_of = ""
             boot.append({
                 "step": "Elo fallback (coefficients)",
                 "status": "ok",
@@ -1026,18 +1047,18 @@ def run_deterministic_compute(
                 "weight": round(engine.weights.get("refined_elo", 0), 4),
             },
         }
-        # REAL measured per-team ClubElo coverage (never hardcoded): the
-        # fetch fills every team and uses the exact DEFAULT_ELO placeholder
-        # for unresolved clubs, so coverage counts non-placeholder ratings.
-        # Coefficient-derived ratings are NOT ClubElo and are reported as
-        # coverage=0 / provenance="coefficient_derived".
+        # REAL measured per-team rating coverage (never hardcoded): the
+        # seed+replay kernel fills every seeded team, so coverage counts
+        # non-placeholder ratings from the stored Elo snapshot.
+        # Coefficient-derived ratings are NOT stored Elo data and are
+        # reported as coverage=0 / provenance="coefficient_derived".
         signal_stats["refined_elo"].update(
             compute_elo_coverage(team_names, elo_ratings, elo_provenance)
         )
-        _attach_elo_as_of(signal_stats, elo_provenance)
+        _attach_elo_as_of(signal_stats, elo_provenance, elo_as_of)
         if historical_file:
             # rolling_form keys off historical match results, not Elo rating
-            # coverage; per-team ClubElo coverage does not apply to it.
+            # coverage; per-team Elo coverage does not apply to it.
             signal_stats["rolling_form"] = {
                 "n_matches": 144, "available": 144, "available_pct": 100.0,
                 "weight": round(engine.weights.get("rolling_form", 0), 4),
@@ -1093,10 +1114,9 @@ def run_deterministic_compute(
         }
 
     team_names = [t.name for t in provider.teams]
-    from competitions.ucl.src.elo_fetcher import fetch_team_elos
 
-    elo_ratings = _step("Fetch Elo ratings", lambda: _resolve_elo_ratings(team_names))
-    elo_provenance = "clubelo" if elo_ratings else None
+    elo_ratings, elo_provenance, elo_as_of = _step(
+        "Compute Elo ratings", lambda: _resolve_elo_ratings(team_names))
     if not elo_ratings:
         elo_ratings = {}
         coefficients = {t.name: t.coefficient for t in provider.teams}
@@ -1105,14 +1125,7 @@ def run_deterministic_compute(
             c = coefficients.get(t, 50)
             elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
         elo_provenance = "coefficient_derived" if elo_ratings else "unavailable"
-    if not elo_ratings:
-        elo_ratings = {}
-        coefficients = {t.name: t.coefficient for t in provider.teams}
-        max_coeff = max(coefficients.values()) if coefficients else 100
-        for t in team_names:
-            c = coefficients.get(t, 50)
-            elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
-        elo_provenance = "coefficient_derived" if elo_ratings else "unavailable"
+        elo_as_of = ""
         boot.append({"step": "Elo fallback (coefficients)", "status": "ok", "elapsed": 0.0, "output": f"[{ts()}] Elo fallback"})
 
     standings = _step(
@@ -1133,7 +1146,7 @@ def run_deterministic_compute(
     os.unlink(_results_tmp.name)
 
     signal_stats = _step("Evaluate signals", lambda: compute_signal_eval(results, engine, elo_ratings, elo_provenance=elo_provenance))
-    _attach_elo_as_of(signal_stats, elo_provenance)
+    _attach_elo_as_of(signal_stats, elo_provenance, elo_as_of)
 
     def _was_in_semis(t: str) -> bool:
         for m in knockout.get("rounds", {}).get("SF", []):
@@ -1260,14 +1273,8 @@ def run_compute_all(
         return {"error": "fixtures load failed", "boot": boot}
 
     team_names = [t.name for t in provider.teams]
-    elo_ratings = _step("Fetch Elo ratings", lambda: _resolve_elo_ratings(team_names))
-    if not elo_ratings:
-        elo_ratings = {}
-        coefficients = {t.name: t.coefficient for t in provider.teams}
-        max_coeff = max(coefficients.values()) if coefficients else 100
-        for t in team_names:
-            c = coefficients.get(t, 50)
-            elo_ratings[t] = 1400.0 + (c / max_coeff) * 400.0
+    elo_ratings, _elo_provenance, _elo_as_of = _step(
+        "Compute Elo ratings", lambda: _resolve_elo_ratings(team_names))
     if not elo_ratings:
         elo_ratings = {}
         coefficients = {t.name: t.coefficient for t in provider.teams}

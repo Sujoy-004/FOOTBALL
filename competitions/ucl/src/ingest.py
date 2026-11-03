@@ -1349,6 +1349,10 @@ def _upsert_season_results(
             "team_b": canon[1] if canon else away,
             "home_score": home_score,
             "away_score": away_score,
+            # Additive key: lets the seed+replay Elo kernel date-filter
+            # future appended rows (strictly-after the seed as-of). Rows
+            # without a date are skipped by the kernel, fail closed.
+            "event_date": ev.get("event_date") or "",
         }
 
         if fid in existing_by_id:

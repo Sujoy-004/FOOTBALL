@@ -35,7 +35,7 @@ from competitions.ucl.src.pipeline import (
     run_mc_simulation as _run_mc_simulation_pipeline,
     run_calibration_task as _run_calibration_task_pipeline,
 )
-from competitions.ucl.src.elo_fetcher import fetch_team_elos
+from competitions.ucl.src.elo_fetcher import compute_self_calculated_elos
 from competitions.ucl.src.provider import RepoFixtureProvider
 from football_core.elo import expected_score
 from football_core.fetcher import derive_success
@@ -1051,17 +1051,18 @@ def api_elo():
     """Elo ratings for the Elo view — network-free, source-labelled.
 
     Preference order, first tier that produces numbers wins:
-      a) the boot cache, when it holds real ClubElo values;
+      a) the boot cache, when it holds real stored Elo values (computed
+         offline at boot from the committed seed + local result stores);
       b) the coefficient-derived boot ratings (the degraded tier, still shown
          so the view is not blank, always labelled "coefficient");
       c) nothing -> an explicit empty state.
 
     ``source`` names the tier the numbers actually came from, and ``as_of``
-    is when they were read (empty unless they are real ClubElo values, since
-    a coefficient estimate has no date).
+    is when they were computed (empty unless they are real stored values,
+    since a coefficient estimate has no date).
 
-    A GET never fetches: the cache was populated at boot from the stored
-    ClubElo snapshot, and this handler only reads it.
+    A GET never computes: the cache was populated at boot by the seed+replay
+    kernel, and this handler only reads it.
     """
     snap = _snap()
     ratings = {
@@ -1073,12 +1074,13 @@ def api_elo():
     provenance = refined_elo.get("provenance")
     coefficient_derived = provenance == "coefficient_derived"
     if coefficient_derived:
-        # Boot could not reach ClubElo, so these are placeholders. Keep them
-        # only as the last resort — a real on-disk source outranks them.
+        # Boot fell back to coefficient placeholders, so these are not real
+        # ratings. Keep them only as the last resort — a real on-disk source
+        # outranks them.
         ratings, source, as_of = {}, "coefficient", ""
     elif ratings:
         # Boot labels the ratings' own provenance; report that, not a guess.
-        source, as_of = provenance or "clubelo", refined_elo.get("as_of") or ""
+        source, as_of = provenance or "self_calculated", refined_elo.get("as_of") or ""
     else:
         source, as_of = "empty", ""
 
@@ -1415,7 +1417,7 @@ def api_validation():
         if not elo_ratings:
             team_names = list({m["team_a"] for m in results} | {m["team_b"] for m in results})
             try:
-                elo_ratings = fetch_team_elos(team_names) or {}
+                elo_ratings = compute_self_calculated_elos(team_names) or {}
             except Exception:
                 elo_ratings = {}
 
@@ -1733,12 +1735,13 @@ def api_what_if(req: dict = None):
                 for t in team_names}
 
     # Elo resolution mirrors the season runner: reuse the boot-time ratings
-    # when present; only reach for ClubElo as a live fallback, and degrade
-    # to coefficient-derived ratings offline instead of failing the request.
+    # when present; only reach for locally recomputed (seed + replay) values
+    # as a live fallback, and degrade to coefficient-derived ratings offline
+    # instead of failing the request.
     elo_ratings = _snap().get("elo_ratings") or {}
     if not elo_ratings:
         try:
-            elo_ratings = fetch_team_elos(team_names) or {}
+            elo_ratings = compute_self_calculated_elos(team_names) or {}
         except Exception:
             elo_ratings = {}
     if not elo_ratings:

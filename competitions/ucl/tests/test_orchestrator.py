@@ -97,10 +97,10 @@ class TestShellRefinedEloCoverage:
     """No-results shell branch: refined_elo coverage is MEASURED, not hardcoded."""
 
     def test_live_fetch_2026_27_reports_measured_22_of_36(self, tmp_path, monkeypatch):
-        """Fetch path: 22 real ClubElo ratings + 14x1500.0 => 22/36 carrier.
+        """Compute path: 22 real stored ratings + 14x1500.0 => 22/36 carrier.
 
         Regression for the old hardcoded ``n_matches=144, available=144,
-        available_pct=100.0`` which implied full ClubElo coverage.
+        available_pct=100.0`` which implied full stored-Elo coverage.
         """
         import competitions.ucl.src.orchestrator as orch
 
@@ -108,12 +108,14 @@ class TestShellRefinedEloCoverage:
         names = _season_team_names(dp)
         assert len(names) == 36, "draw fixtures must describe 36 teams"
 
-        # Simulate a SUCCESSFUL live fetch: every team present, unresolved
-        # clubs at the exact DEFAULT_ELO placeholder (fetch_team_elos fills
-        # every requested team; see football_core/elo_fetcher.py).
+        # Simulate a SUCCESSFUL seed+replay compute: every team present,
+        # unresolved clubs at the exact DEFAULT_ELO placeholder (the
+        # stamped placeholder is what the coverage gate excludes).
         elo_ratings = {t: 1520.0 + i for i, t in enumerate(names[:22])}
         elo_ratings.update({t: float(DEFAULT_ELO) for t in names[22:]})
-        monkeypatch.setattr(orch, "_resolve_elo_ratings", lambda _n: elo_ratings)
+        monkeypatch.setattr(
+            orch, "_resolve_elo_ratings",
+            lambda _n: (elo_ratings, "self_calculated", ""))
 
         result = orch.run_deterministic_compute(str(dp))
         re = result["signals"]["refined_elo"]
@@ -126,20 +128,21 @@ class TestShellRefinedEloCoverage:
         assert re["coverage"] == 22
         assert re["coverage_total"] == 36
         assert re["coverage_pct"] == 61.1
-        assert re["provenance"] == "clubelo"
+        assert re["provenance"] == "self_calculated"
         # rolling_form keys off HISTORICAL RESULTS, not Elo rating coverage:
-        # per-team ClubElo coverage does not apply to it (documented decision).
+        # per-team stored-Elo coverage does not apply to it (documented decision).
         assert "coverage" not in result["signals"]["rolling_form"]
         assert "provenance" not in result["signals"]["rolling_form"]
 
-    def test_coefficient_fallback_reports_zero_clubelo_coverage(
+    def test_coefficient_fallback_reports_zero_stored_elo_coverage(
         self, tmp_path, monkeypatch
     ):
-        """Offline/snapshot fallback => coefficient values are NOT ClubElo."""
+        """Offline/snapshot fallback => coefficient values are NOT stored Elo."""
         import competitions.ucl.src.orchestrator as orch
 
         dp = _shell_data_dir(tmp_path)
-        monkeypatch.setattr(orch, "_resolve_elo_ratings", lambda _n: {})
+        monkeypatch.setattr(
+            orch, "_resolve_elo_ratings", lambda _n: ({}, "unavailable", ""))
 
         result = orch.run_deterministic_compute(str(dp))
         re = result["signals"]["refined_elo"]
@@ -157,14 +160,14 @@ class TestShellRefinedEloCoverage:
             b.get("step") == "Elo fallback (coefficients)" for b in result["boot"]
         )
         # When provenance is coefficient_derived the UI must not present
-        # ClubElo coverage — a 0-coverage entry is the honest signal.
+        # stored-Elo coverage — a 0-coverage entry is the honest signal.
         assert re["coverage"] == 0
 
 
 class TestCompletedSeasonSignalCoverage:
     """pipeline.compute_signal_eval: refined_elo carries the same 4 keys."""
 
-    def test_completed_season_36_of_36_clubelo(self):
+    def test_completed_season_36_of_36_self_static(self):
         from competitions.ucl.src.orchestrator import build_signal_engine
         from competitions.ucl.src.pipeline import compute_signal_eval
 
@@ -185,26 +188,27 @@ class TestCompletedSeasonSignalCoverage:
             {"team_a": names[2], "team_b": names[3],
              "home_score": 1, "away_score": 1, "match_id": "MD01_02"},
         ]
-        stats = compute_signal_eval(results, engine, elo_ratings, elo_provenance="clubelo")
+        stats = compute_signal_eval(
+            results, engine, elo_ratings, elo_provenance="self_calculated")
         re = stats["refined_elo"]
 
         assert re["coverage"] == 36
         assert re["coverage_total"] == 36
         assert re["coverage_pct"] == 100.0
-        assert re["provenance"] == "clubelo"
+        assert re["provenance"] == "self_calculated"
         # Existing per-match semantics + accuracy keys untouched.
         assert re["n_matches"] == 2
         assert re["available"] == 2
         assert re["available_pct"] == 100.0
         assert "accuracy" in re and "brier" in re
 
-    def test_compute_signal_eval_coefficient_provenance_not_clubelo(self):
-        """A coefficient-derived ratings dict must not be presented as ClubElo."""
+    def test_compute_signal_eval_coefficient_provenance_not_stored_elo(self):
+        """A coefficient-derived ratings dict must not be presented as stored Elo."""
         from competitions.ucl.src.orchestrator import build_signal_engine
         from competitions.ucl.src.pipeline import compute_signal_eval
 
         names = ["Team A", "Team B"]
-        # Coefficient band values — none are ClubElo data.
+        # Coefficient band values — none are stored Elo data.
         elo_ratings = {names[0]: 1450.0, names[1]: 1740.0}
         engine = build_signal_engine(elo_ratings)
         results = [
@@ -235,20 +239,20 @@ class TestEloCoverageBoundary:
             "D": float(DEFAULT_ELO),  # exact placeholder => NOT covered
             # "E" missing entirely => NOT covered (never default-filled)
         }
-        out = compute_elo_coverage(names, ratings, "clubelo")
+        out = compute_elo_coverage(names, ratings, "seeded")
         assert out["coverage"] == 2
         assert out["coverage_total"] == 5
         assert out["coverage_pct"] == 40.0
-        assert out["provenance"] == "clubelo"
+        assert out["provenance"] == "seeded"
 
     def test_partial_coverage_never_defaults_missing_team(self):
         from competitions.ucl.src.pipeline import compute_elo_coverage
 
         ratings = {"A": 1520.0, "B": float(DEFAULT_ELO)}
-        out = compute_elo_coverage(["A", "B", "C"], ratings, "clubelo")
+        out = compute_elo_coverage(["A", "B", "C"], ratings, "seeded")
         assert out["coverage"] == 1
         assert out["coverage_total"] == 3
-        assert out["provenance"] == "clubelo"
+        assert out["provenance"] == "seeded"
 
     def test_unavailable_provenance_zero_coverage(self):
         from competitions.ucl.src.pipeline import compute_elo_coverage
@@ -262,8 +266,43 @@ class TestEloCoverageBoundary:
     def test_empty_team_names_is_safe(self):
         from competitions.ucl.src.pipeline import compute_elo_coverage
 
-        out = compute_elo_coverage([], {}, "clubelo")
+        out = compute_elo_coverage([], {}, "seeded")
         assert out == {
             "coverage": 0, "coverage_total": 0, "coverage_pct": 0.0,
-            "provenance": "clubelo",
+            "provenance": "seeded",
         }
+
+    def test_self_calculated_provenance_counts_real_values(self):
+        """The replay-kernel vocabulary is covered the same as seeded."""
+        from competitions.ucl.src.pipeline import compute_elo_coverage
+
+        out = compute_elo_coverage(["A", "B"], {"A": 1520.0, "B": 1470.0},
+                                  "self_calculated")
+        assert out["coverage"] == 2
+        assert out["coverage_total"] == 2
+        assert out["provenance"] == "self_calculated"
+
+
+class TestAttachEloAsOf:
+    """Real seed/replay provenance carries the compute stamp; fallbacks get none."""
+
+    def test_attach_for_self_calculated_and_seeded(self):
+        from competitions.ucl.src.orchestrator import _attach_elo_as_of
+
+        for provenance in ("self_calculated", "seeded"):
+            stats = {"refined_elo": {}}
+            _attach_elo_as_of(stats, provenance, "2026-10-03T00:00:00+00:00")
+            assert stats["refined_elo"]["as_of"] == "2026-10-03T00:00:00+00:00"
+
+    def test_no_attach_for_fallback_provenance(self):
+        from competitions.ucl.src.orchestrator import _attach_elo_as_of
+
+        for provenance in ("coefficient_derived", "unavailable", None):
+            stats = {"refined_elo": {}}
+            _attach_elo_as_of(stats, provenance, "2026-10-03T00:00:00+00:00")
+            assert "as_of" not in stats["refined_elo"]
+
+    def test_survives_missing_refined_elo_block(self):
+        from competitions.ucl.src.orchestrator import _attach_elo_as_of
+
+        _attach_elo_as_of({}, "self_calculated", "2026-10-03T00:00:00+00:00")

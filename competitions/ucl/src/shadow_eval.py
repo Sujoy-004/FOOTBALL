@@ -287,14 +287,22 @@ def resolve_elo(
         try:
             from competitions.ucl.src.orchestrator import _resolve_elo_ratings
 
-            live = _resolve_elo_ratings(teams)
+            live_ratings, provenance, _as_of = _resolve_elo_ratings(teams)
         except Exception as exc:  # pragma: no cover - network/import guarded
             logger.warning("[shadow] live Elo resolution failed (%s)", exc)
-            live = {}
-        if live:
+            live_ratings, provenance = {}, None
+        if live_ratings:
+            self_calculated = provenance == "self_calculated"
             return (
-                {t: float(live.get(t, default)) for t in teams},
-                {"source": "clubelo", "file": None},
+                {t: float(live_ratings.get(t, default)) for t in teams},
+                {
+                    # Replay-kernel provenance carries through unchanged;
+                    # a seeded store resolves via the seed label, never a
+                    # fabricated live-source claim.
+                    "source": provenance or "seeded",
+                    "replayed": self_calculated,
+                    "file": None,
+                },
             )
 
     data_dir = data_dir or DATA_DIR

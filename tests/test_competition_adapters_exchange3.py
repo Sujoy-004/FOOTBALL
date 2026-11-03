@@ -161,8 +161,9 @@ class TestApiValidationContract:
         for f in ("fixtures.json", "team_aliases.json"):
             shutil.copy(UCL_DATA / f, tmp_path / f)
         monkeypatch.setattr(app, "DATA_DIR", tmp_path)
-        # Pre-seed cache so the offline Elo override is used (no ClubElo);
-        # derive ratings from fixture coefficients like the boot fallback.
+        # Pre-seed cache so the offline Elo override is used (no replay
+        # compute); the redesign fallback derives ratings from fixture
+        # coefficients like the boot fallback.
         fixtures = json.loads((UCL_DATA / "fixtures.json").read_text("utf-8"))
         teams = fixtures["schedule"]["teams"]
         coeffs = {t["name"]: t["coefficient"] for t in teams}

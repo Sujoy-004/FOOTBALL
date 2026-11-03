@@ -159,12 +159,13 @@ def compute_signal_eval(
     """Evaluate signal accuracy against real results.
 
     ``elo_provenance`` is the caller-detected source of ``elo_ratings``
-    ("clubelo" / "coefficient_derived" / "unavailable"). When omitted it is
-    derived sensibly: non-empty ratings are assumed to be fetched ClubElo
-    data (the completed-season path resolves via a real fetch).
+    ("self_calculated" / "seeded" / "coefficient_derived" / "unavailable").
+    When omitted it is derived honestly from what the caller passed:
+    non-empty ratings are assumed to be the runtime seed+replay kernel's
+    values (the completed-season path resolves via the local replay).
     """
     if elo_provenance is None:
-        elo_provenance = "clubelo" if elo_ratings else "unavailable"
+        elo_provenance = "self_calculated" if elo_ratings else "unavailable"
     refined_elo_coverage = compute_elo_coverage(
         list(elo_ratings.keys()), elo_ratings, elo_provenance
     )
@@ -228,14 +229,16 @@ def compute_elo_coverage(
     elo_ratings: dict[str, float],
     provenance: str,
 ) -> dict:
-    """Honest per-team ClubElo rating coverage for the refined_elo signal.
+    """Honest per-team rating coverage for the refined_elo signal.
 
-    A team counts as COVERED iff its ``elo_ratings`` value is a real ClubElo
-    rating. The fetcher fills every requested team, using the exact
-    ``DEFAULT_ELO`` (1500.0) placeholder when no ClubElo data resolves, so a
+    A team counts as COVERED iff its ``elo_ratings`` value is a real stored
+    rating. The seed+replay kernel fills every seeded team, using the exact
+    ``DEFAULT_ELO`` (1500.0) placeholder when no stored data resolves, so a
     non-default value is the practical binary test (and the 1500.0 boundary
     is the intended regression surface). Coefficient-derived ratings must
-    never be presented as ClubElo coverage (coverage=0).
+    never be presented as stored-Elo coverage (coverage=0) — seeded values
+    are real stored ratings and DO count; only availability-by-fallback
+    provenance ("coefficient_derived" / "unavailable") stays uncovered.
 
     Returns additive-only payload keys (existing n_matches/available keys are
     per-MATCH prediction availability and are NOT touched here):
@@ -245,7 +248,7 @@ def compute_elo_coverage(
 
     default_elo = float(DEFAULT_ELO)
     coverage_total = len(team_names)
-    if provenance == "clubelo":
+    if provenance in ("self_calculated", "seeded"):
         coverage = sum(
             1
             for team in team_names
@@ -959,14 +962,15 @@ def run_mc_simulation(
         elo_ratings = dict(elo_ratings_override)
     else:
         team_names = [t.name for t in provider.teams]
-        from football_core.runtime_support import is_snapshot_mode
+        # The seed+replay kernel is network-free by construction, so the
+        # compute is offered in snapshot mode too; only the no-seed case
+        # degrades to coefficient-derived ratings.
         elo_ratings = {}
-        if not is_snapshot_mode():
-            try:
-                from competitions.ucl.src.elo_fetcher import fetch_team_elos
-                elo_ratings = fetch_team_elos(team_names) or {}
-            except Exception as exc:
-                logger.warning("UCL Elo fetch failed (%s); using coefficient fallback", exc)
+        try:
+            from competitions.ucl.src.elo_fetcher import compute_self_calculated_elos
+            elo_ratings = compute_self_calculated_elos(team_names) or {}
+        except Exception as exc:
+            logger.warning("UCL Elo compute failed (%s); using coefficient fallback", exc)
         if not elo_ratings:
             coefficients = {t.name: t.coefficient for t in provider.teams}
             max_coeff = max(coefficients.values()) if coefficients else 100

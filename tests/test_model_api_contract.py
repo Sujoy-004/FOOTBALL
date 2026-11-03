@@ -7,8 +7,8 @@ the hard rule that a cold (unbooted) cache degrades to an empty payload
 instead of a 500 or invented data.
 
 Offline by construction: the endpoints read in-memory caches and shipped seed
-files only, and the one network-capable helper (ClubElo fetch) is poisoned in
-``test_elo_never_fetches``.
+files only, and the compute helper (the seed+replay kernel entry point) is
+poisoned in ``test_elo_never_fetches``.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 ELO_KEYS = {"ratings", "source", "as_of"}
-ELO_SOURCES = {"seed", "live", "clubelo", "coefficient", "teams", "empty"}
+ELO_SOURCES = {"seed", "seeded", "self_calculated", "coefficient", "teams", "empty"}
 BLEND_KEYS = {
     "n_signals_available",
     "available_signals",
@@ -113,7 +113,7 @@ def test_elo_empty_state_never_raises(competition: str, monkeypatch, fake_cache)
 
 
 @pytest.mark.parametrize(
-    "competition, expected", [("ucl", "clubelo"), ("laliga", "seed")]
+    "competition, expected", [("ucl", "self_calculated"), ("laliga", "seed")]
 )
 def test_elo_prefers_cache_ratings_over_seed(
     competition: str, expected: str, monkeypatch, fake_cache
@@ -127,19 +127,19 @@ def test_elo_prefers_cache_ratings_over_seed(
     assert payload["source"] == expected
 
 
-def test_elo_reports_when_clubelo_ratings_were_read(monkeypatch, fake_cache):
-    """Real ClubElo values carry the store's fetch stamp, not a blank."""
+def test_elo_self_calculated_ratings_carry_kernel_as_of(monkeypatch, fake_cache):
+    """Self-calculated boot ratings are labelled with the kernel compute stamp."""
     import web.ucl_app as ucl
 
     fake_cache("ucl", {
         "elo_ratings": {"Real Madrid": 1832.5},
         "signals": {"refined_elo": {
-            "provenance": "clubelo",
+            "provenance": "self_calculated",
             "as_of": "2026-09-30T04:15:00+00:00",
         }},
     })
     payload = TestClient(ucl.ucl_app).get("/api/elo").json()
-    assert payload["source"] == "clubelo"
+    assert payload["source"] == "self_calculated"
     assert payload["as_of"] == "2026-09-30T04:15:00+00:00"
 
 
@@ -174,13 +174,13 @@ def test_elo_worldcup_reads_teams_cache(fake_cache):
 
 
 def test_elo_never_fetches(monkeypatch):
-    """A GET must never reach ClubElo (monkeypatched to explode)."""
+    """A GET must never recompute Elo ratings (kernel entry point poisoned)."""
     import web.ucl_app as ucl
 
     def _boom(*_args, **_kwargs):
-        raise AssertionError("/api/elo must not fetch Elo ratings")
+        raise AssertionError("/api/elo must not recompute Elo ratings")
 
-    monkeypatch.setattr(ucl, "fetch_team_elos", _boom)
+    monkeypatch.setattr(ucl, "compute_self_calculated_elos", _boom)
     assert TestClient(ucl.ucl_app).get("/api/elo").status_code == 200
 
 
