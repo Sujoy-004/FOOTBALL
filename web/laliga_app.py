@@ -759,8 +759,9 @@ def _seed_as_of() -> str:
 
 @laliga_app.get("/api/elo")
 def api_elo():
-    """Elo ratings for the Elo view: the loaded cache first, else the shipped
-    seed file. No fetch, no recompute, never a 500.
+    """Elo ratings for the Elo view: the loaded cache first, else the
+    seed+replay kernel. No fetch, no recompute in the GET path beyond the
+    cache read, never a 500.
     """
     ratings = {
         team: float(value)
@@ -769,9 +770,17 @@ def api_elo():
     } or load_elo_ratings(DATA_DIR)
     if not ratings:
         return JSONResponse({"ratings": {}, "source": "empty", "as_of": ""})
-    # The cache itself is built from the shipped seed (compute_deterministic
-    # -> load_elo_ratings), so the seed's own snapshot_date is the real date.
-    return JSONResponse({"ratings": ratings, "source": "seed", "as_of": _seed_as_of()})
+    # The boot cache itself comes from the seed+replay kernel
+    # (compute_deterministic -> load_elo_ratings), so its honest source
+    # label is the kernel's: "self_calculated" or "seeded". "seeded"
+    # carries the committed seed file's snapshot date as the fallback
+    # as-of when the kernel outcome has none.
+    from competitions.laliga.src.pipeline import elo_source
+
+    prov = elo_source(DATA_DIR, _active_season_token())
+    source = prov["provenance"] or "seeded"
+    as_of = prov["as_of"] or (_seed_as_of() if source == "seeded" else "")
+    return JSONResponse({"ratings": ratings, "source": source, "as_of": as_of})
 
 
 def _cold_start_blend(n_matches: int) -> dict:

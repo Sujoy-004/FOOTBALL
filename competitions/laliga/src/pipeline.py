@@ -85,7 +85,8 @@ def load_team_names(data_dir=DATA_DIR, season_token=None) -> list[str]:
     return sorted(names)
 
 
-def load_elo_ratings(data_dir=DATA_DIR, season_token=None) -> dict[str, float]:
+def _elo_seed_doc(data_dir=DATA_DIR) -> dict:
+    """Committed Elo seed document, or ``{}`` when missing/corrupt."""
     path = Path(data_dir) / "elo_seed.json"
     if not path.exists():
         return {}
@@ -93,8 +94,61 @@ def load_elo_ratings(data_dir=DATA_DIR, season_token=None) -> dict[str, float]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
-    ratings = payload.get("ratings", {}) if isinstance(payload, dict) else {}
-    return {k: float(v) for k, v in ratings.items() if isinstance(v, (int, float))}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _elo_replay(data_dir=DATA_DIR, season_token=None) -> tuple[dict[str, float], str, str]:
+    """ONE seed+replay code path for LaLiga Elo.
+
+    Seed: the committed ``elo_seed.json`` ratings (snapshot_date = the
+    seed's as-of). Rows: this season's ``status == "finished"`` result
+    rows normalized into the kernel row contract (qualifying strictly
+    after the seed snapshot). Returns ``(ratings, provenance, as_of)``
+    with provenance ``self_calculated`` (replayed>0) / ``seeded`` (zero
+    replayed) / ``unavailable`` (no usable seed) and the kernel as_of.
+    The seed file itself is never rewritten — it is the committed input.
+    """
+    from football_core.elo_replay import replay_elo
+
+    seed_doc = _elo_seed_doc(data_dir)
+    seed_ratings = seed_doc.get("ratings", {}) if isinstance(seed_doc, dict) else {}
+    seed_ratings = {k: float(v) for k, v in seed_ratings.items()
+                    if isinstance(v, (int, float)) and not isinstance(v, bool)}
+    if not seed_ratings:
+        return {}, "unavailable", ""
+    seed_as_of = seed_doc.get("snapshot_date") or ""
+
+    rows = []
+    for m in load_results(data_dir, season_token):
+        if not isinstance(m, dict) or m.get("status") != STATUS_FINISHED:
+            continue
+        rows.append({
+            "team_a": m.get("home_team") or "",
+            "team_b": m.get("away_team") or "",
+            "home_score": m.get("home_score"),
+            "away_score": m.get("away_score"),
+            "date": m.get("event_date") or "",
+            # explicit winner pass-through (no penalty shootouts in league
+            # play; the kernel validates direction/consistency, fail-closed)
+            "winner": m.get("winner"),
+        })
+
+    outcome = replay_elo(seed_ratings, seed_as_of, rows, base_k=30)
+    ratings = {team: float(v) for team, v in outcome.ratings.items()}
+    provenance = "self_calculated" if outcome.replayed > 0 else ("seeded" if ratings else "unavailable")
+    return ratings, provenance, outcome.as_of
+
+
+def load_elo_ratings(data_dir=DATA_DIR, season_token=None) -> dict[str, float]:
+    """Seed + locally replayed Elo ratings (the value view of _elo_replay)."""
+    ratings, _provenance, _as_of = _elo_replay(data_dir, season_token)
+    return ratings
+
+
+def elo_source(data_dir=DATA_DIR, season_token=None) -> dict[str, str]:
+    """Honest Elo provenance view: ``{"provenance": ..., "as_of": ...}``."""
+    _ratings, provenance, as_of = _elo_replay(data_dir, season_token)
+    return {"provenance": provenance, "as_of": as_of}
 
 
 def _alias_lookup(data_dir=DATA_DIR) -> dict[str, str]:
@@ -277,7 +331,7 @@ def compute_signal_eval(
     LaLiga result-row shape (``home_team``/``away_team``/``home_score``).
     """
     if elo_provenance is None:
-        elo_provenance = "shipped" if elo_ratings else "unavailable"
+        elo_provenance = "self_calculated" if elo_ratings else "unavailable"
     from football_core.signal import PredictionContext
 
     signal_matches = [
@@ -412,9 +466,16 @@ def compute_deterministic(data_dir=DATA_DIR, season_token=None) -> dict:
 
     engine = build_signal_engine(elo_ratings,
                                  results_file=str(_season_store.season_dir(data_dir, season_token) / "results.json"))
-    signals = compute_signal_eval(results, engine, elo_ratings) if results else {}
+    # The Elo seed+replay tuple is captured once and passed through
+    # explicitly: the cached payload advertises where its ratings came
+    # from ("self_calculated"/"seeded", never the retired shipped label).
+    elo_prov = elo_source(data_dir, season_token)
+    signals = (
+        compute_signal_eval(results, engine, elo_ratings, elo_provenance=elo_prov["provenance"])
+        if results else {}
+    )
 
-    return {
+    payload = {
         "mode": "results",
         "teams": teams_top,
         "all_teams": all_teams,
@@ -430,11 +491,13 @@ def compute_deterministic(data_dir=DATA_DIR, season_token=None) -> dict:
         "availability": availability,
         "phase": phase,
         "elo_ratings": elo_ratings,
+        "elo_provenance": elo_prov["provenance"],
+        **({"elo_as_of": elo_prov["as_of"]} if elo_prov["as_of"] else {}),
         "fixtures": fixtures,
         "_results": results,
         "_elo_fallback": not elo_ratings,
     }
-
+    return payload
 
 # ── acquisition (live refresh) ───────────────────────────────────────────
 

@@ -84,6 +84,20 @@ def _numeric(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _at_or_before_seed(date: str, seed_as_of: str) -> bool:
+    """D-01 comparison honoring precision mismatch.
+
+    A bare-date seed (``YYYY-MM-DD``, e.g. LaLiga's snapshot_date) means
+    "ratings as of end of that day": rows sharing that day count as
+    at-or-before regardless of their time-of-day. When the seed carries a
+    full timestamp the plain string comparison already orders correctly
+    (a full timestamp sorts after its own date prefix).
+    """
+    if len(seed_as_of) == 10:
+        return date[:min(len(date), 10)] <= seed_as_of
+    return date <= seed_as_of
+
+
 def replay_elo(
     seed: Mapping[str, float],
     seed_as_of: str,
@@ -141,7 +155,7 @@ def replay_elo(
         ):
             skipped += 1
             continue
-        if seed_as_of and date <= seed_as_of:
+        if seed_as_of and _at_or_before_seed(date, seed_as_of):
             # The seed already reflects this result — replaying it would
             # double count. Skipped, counted, never replayed.
             skipped += 1

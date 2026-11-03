@@ -966,7 +966,16 @@ def api_match_what_if(req: dict = None):
         from competitions.worldcup.src.engine import build_engine_from_caches
 
         teams_raw = load_json(DATA_DIR, "teams.json")
-        baseline_elos = {n: float(d.get("elo", 1500)) for n, d in teams_raw.items()}
+        # Baseline Elos: seed+replay kernel first (ratings current to the
+        # elapsed tournament), raw teams.json as the degraded fallback.
+        try:
+            from competitions.worldcup.src.elo_runtime import computed_baseline_elos
+            baseline_elos = computed_baseline_elos(DATA_DIR) or {}
+        except Exception as kernel_exc:
+            logger.warning("WC Elo kernel baseline failed (%s); using teams.json", kernel_exc)
+            baseline_elos = {}
+        if not baseline_elos:
+            baseline_elos = {n: float(d.get("elo", 1500)) for n, d in teams_raw.items()}
         adjusted_elos = dict(baseline_elos)
         adjusted_elos[ta] = baseline_elos.get(ta, 1500.0) + elo_delta
         adjusted_elos[tb] = max(100.0, baseline_elos.get(tb, 1500.0) - elo_delta)
@@ -1064,6 +1073,20 @@ def api_what_if(req: dict = None):
         return JSONResponse({"error": "bracket slot unresolved"})
 
     teams_raw = load_json(DATA_DIR, "teams.json")
+    # Seed+replay Elo overlay: ratings current to the elapsed tournament
+    # (played_groups.json + played.json) applied on top of teams.json.
+    # Kernel failure keeps the raw seed values rather than failing the
+    # whole simulation — the degraded baseline is labelled by callers.
+    try:
+        from competitions.worldcup.src.elo_runtime import computed_baseline_elos
+        runtime_elos = computed_baseline_elos(DATA_DIR) or {}
+    except Exception as kernel_exc:
+        logger.warning("WC Elo kernel replay failed (%s); using raw teams.json", kernel_exc)
+        runtime_elos = {}
+    if runtime_elos:
+        for _name, _entry in teams_raw.items():
+            if isinstance(_entry, dict) and _name in runtime_elos:
+                _entry["elo"] = runtime_elos[_name]
     groups_raw = load_groups(DATA_DIR, teams=teams_raw)
     bracket_raw = json.loads((DATA_DIR / "bracket.json").read_text(encoding="utf-8"))
     annex_c = load_annex_c(DATA_DIR)

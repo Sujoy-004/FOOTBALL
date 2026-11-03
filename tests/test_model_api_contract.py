@@ -113,7 +113,7 @@ def test_elo_empty_state_never_raises(competition: str, monkeypatch, fake_cache)
 
 
 @pytest.mark.parametrize(
-    "competition, expected", [("ucl", "self_calculated"), ("laliga", "seed")]
+    "competition, expected", [("ucl", "self_calculated"), ("laliga", "self_calculated")]
 )
 def test_elo_prefers_cache_ratings_over_seed(
     competition: str, expected: str, monkeypatch, fake_cache
