@@ -561,14 +561,8 @@ async def lifespan(app: fastapi.FastAPI):
 
 
 laliga_app = fastapi.FastAPI(lifespan=lifespan)
-
-
-@laliga_app.exception_handler(Exception)
-async def _json_error_handler(request, exc):
-    logging.getLogger(__name__).error(
-        "[LaLiga] unhandled error on %s: %s", request.url.path, exc)
-    return JSONResponse({"error": f"internal error: {exc.__class__.__name__}"},
-                        status_code=500)
+from web.security import register_exception_handlers
+register_exception_handlers(laliga_app)
 
 
 @laliga_app.get("/api/data")

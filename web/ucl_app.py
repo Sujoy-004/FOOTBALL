@@ -795,15 +795,8 @@ async def lifespan(app: fastapi.FastAPI):
 
 
 ucl_app = fastapi.FastAPI(lifespan=lifespan)
-
-@ucl_app.exception_handler(Exception)
-async def _json_error_handler(request, exc):
-    """Never emit an empty/non-JSON body - the SPA parses every response."""
-    import logging as _logging
-    _logging.getLogger(__name__).error(
-        "[UCL] unhandled error on %s: %s", request.url.path, exc)
-    return JSONResponse({"error": f"internal error: {exc.__class__.__name__}"},
-                        status_code=500)
+from web.security import register_exception_handlers
+register_exception_handlers(ucl_app)
 
 
 @ucl_app.get("/api/data")

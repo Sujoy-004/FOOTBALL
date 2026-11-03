@@ -417,6 +417,8 @@ def _fetch_live_data() -> dict:
 
 
 wc_app = fastapi.FastAPI()
+from web.security import register_exception_handlers
+register_exception_handlers(wc_app)
 
 
 @wc_app.get("/api/data")

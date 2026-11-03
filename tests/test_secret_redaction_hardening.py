@@ -157,3 +157,71 @@ def test_install_logging_filters_attaches_to_all_targets():
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access", "football_core", "web"):
         l = logging.getLogger(name)
         assert any(isinstance(f, SecretRedactingFilter) for f in l.filters)
+
+
+def test_root_app_http_exception_secret_redaction(monkeypatch):
+    from fastapi import HTTPException
+    from starlette.testclient import TestClient
+    from web.server import app
+
+    monkeypatch.setenv("ADMIN_KEY", "ultra_secret_admin_key_111")
+
+    @app.get("/_test_security/http_exc")
+    def raise_http_exc():
+        raise HTTPException(
+            status_code=400,
+            detail="Failed authentication with ultra_secret_admin_key_111",
+        )
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/_test_security/http_exc")
+    assert resp.status_code == 400
+    assert "ultra_secret_admin_key_111" not in resp.text
+    assert "[REDACTED]" in resp.text
+    assert resp.json()["detail"] == "Failed authentication with [REDACTED]"
+    assert resp.json()["error"] == "Failed authentication with [REDACTED]"
+
+
+def test_root_app_generic_exception_shielding():
+    from starlette.testclient import TestClient
+    from web.server import app
+
+    @app.get("/_test_security/runtime_err")
+    def raise_runtime():
+        raise RuntimeError("Secret db connection failed: postgresql://admin:leakedpass@db:5432/main")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/_test_security/runtime_err")
+    assert resp.status_code == 500
+    assert resp.json() == {"error": "internal error: RuntimeError"}
+    assert "leakedpass" not in resp.text
+    assert "Traceback" not in resp.text
+
+
+def test_subapps_exception_handlers_registered(monkeypatch):
+    from starlette.testclient import TestClient
+    from web.wc_app import wc_app
+    from web.ucl_app import ucl_app
+    from web.laliga_app import laliga_app
+
+    monkeypatch.setenv("SECRET_SUBAPP_KEY", "subapp_secret_val_999")
+
+    @wc_app.get("/_test_security/err")
+    def wc_err():
+        raise ValueError("WC error with subapp_secret_val_999")
+
+    @ucl_app.get("/_test_security/err")
+    def ucl_err():
+        raise ValueError("UCL error with subapp_secret_val_999")
+
+    @laliga_app.get("/_test_security/err")
+    def laliga_err():
+        raise ValueError("LaLiga error with subapp_secret_val_999")
+
+    for sub_app in (wc_app, ucl_app, laliga_app):
+        client = TestClient(sub_app, raise_server_exceptions=False)
+        resp = client.get("/_test_security/err")
+        assert resp.status_code == 500
+        assert resp.json() == {"error": "internal error: ValueError"}
+        assert "subapp_secret_val_999" not in resp.text
+
