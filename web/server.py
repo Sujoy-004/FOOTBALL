@@ -229,6 +229,19 @@ async def lifespan(app: fastapi.FastAPI):
 
 
 app = fastapi.FastAPI(title="FOOTBALL", lifespan=lifespan)
+
+from fastapi.middleware.cors import CORSMiddleware
+from web.security import get_allowed_origins
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_allowed_origins(),
+    allow_origin_regex=r"^https://.*\.pages\.dev$",
+    allow_methods=["GET", "POST", "OPTIONS", "HEAD"],
+    allow_headers=["Content-Type", "Authorization", "X-Admin-Key", "Accept", "Origin", "X-Requested-With"],
+    allow_credentials=True,
+)
+
 app.include_router(health_router)
 
 
