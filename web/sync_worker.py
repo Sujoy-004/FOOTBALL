@@ -98,7 +98,7 @@ class SyncWorker:
             try:
                 await self._task
             except asyncio.CancelledError:
-                pass
+                logger.info("[sync_worker] Shutdown join: background sync task cancelled (expected)")
         self._task = None
 
 
