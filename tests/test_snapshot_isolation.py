@@ -168,10 +168,8 @@ def test_served_ucl_js_parses_with_node_if_available(snapshot_env, tmp_path):
     node = shutil.which("node")
     if node is None:
         pytest.skip("node not available")
-    from fastapi.testclient import TestClient
     from web.server import app as server_app
-    with TestClient(server_app):
-        r = client_get_js(server_app)
+    r = client_get_js(server_app)
     js_file = tmp_path / "ucl_served.js"
     js_file.write_bytes(r.content)
     chk = subprocess.run([node, "--check", str(js_file)],
