@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -44,7 +44,7 @@ def get_engine() -> Optional[Engine]:
         return None
 
     is_sqlite = db_url.startswith("sqlite")
-    connect_args = {"check_same_thread": False} if is_sqlite else {"connect_timeout": 10}
+    connect_args: dict[str, Any] = {"check_same_thread": False} if is_sqlite else {"connect_timeout": 10}
 
     _engine = create_engine(
         db_url,
