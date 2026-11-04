@@ -43,7 +43,7 @@ def active_2026_runtime(tmp_path, monkeypatch):
     set_current_season(data_dir, "2026/27", basis="draw", provider="ucl.draw.2026_27")
 
     monkeypatch.setattr(app, "DATA_DIR", data_dir)
-    monkeypatch.setattr(orchestrator, "_resolve_elo_ratings", lambda _teams: {})
+    monkeypatch.setattr(orchestrator, "_resolve_elo_ratings", lambda _teams: ({}, "unavailable", ""))
     monkeypatch.setenv("FOOTBALL_SNAPSHOT", "1")
     competitions.reset_lazy_gates()
     app._refresh_report = {}
