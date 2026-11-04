@@ -367,7 +367,7 @@ def redact_secrets(text: str | None) -> str | None:
                         if len(unquoted) >= 4:
                             secret_values.add(unquoted)
                 except Exception:
-                    pass
+                    continue
 
     for val in secret_values:
         if val in s:
