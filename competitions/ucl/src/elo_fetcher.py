@@ -238,9 +238,10 @@ def compute_elo_outcome(
     if not seed:
         return {}, None
 
+    seed_fetched_at = seed_doc.get("fetched_at")
     outcome = replay_elo(
         seed,
-        seed_doc.get("fetched_at") if isinstance(seed_doc.get("fetched_at"), str) else "",
+        seed_fetched_at if isinstance(seed_fetched_at, str) else "",
         _candidate_rows(active_dir, root_dir),
         base_k=30,
     )
