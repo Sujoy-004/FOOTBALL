@@ -1,0 +1,5 @@
+# wrangler.toml
+# Cloudflare Pages static edge deployment configuration
+name = "football-frontend"
+compatibility_date = "2026-01-01"
+pages_build_output_dir = "web/static"

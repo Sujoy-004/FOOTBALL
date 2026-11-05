@@ -1,0 +1,10 @@
+# Cloudflare Pages static asset exclusions
+*.test.mjs
+*.test.js
+*.md
+.git*
+*.py
+*.pyc
+__pycache__
+.DS_Store
+Thumbs.db
