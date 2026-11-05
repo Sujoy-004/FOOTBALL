@@ -308,11 +308,15 @@ class TestWebParity:
         assert rr["status"] == "ok"
         assert rr["mode"] == "results"
 
-    def test_snapshot_mode_skips_refresh(self, monkeypatch):
-        from web.server import app as server_app
-
+    def test_snapshot_mode_skips_refresh(self, served, monkeypatch):
+        # Use the module-scoped ``served`` client rather than opening a second
+        # TestClient here: this is the LAST test of the module, so a private
+        # client's shutdown would race the fixture's still-pending sync task
+        # cross-loop (SyncWorker.stop awaits a task bound to the fixture's
+        # portal loop → RuntimeError). Sharing ``served`` keeps the refresh
+        # gate check (``is_snapshot_mode()`` reads the flag at request time)
+        # and lets the fixture's own teardown do the cleanup.
         monkeypatch.setenv("FOOTBALL_SNAPSHOT", "1")
         monkeypatch.setattr("football_core.runtime_support._snapshot_session", True)
-        with TestClient(server_app) as client:
-            r = client.post("/laliga/api/refresh").json()
-            assert r["status"] == "skipped"
+        r = served.post("/laliga/api/refresh").json()
+        assert r["status"] == "skipped"
