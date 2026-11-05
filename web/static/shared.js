@@ -3,25 +3,7 @@
 // entry, the reload hook is supplied by each competition module, and the
 // shell owns all lifecycle wiring (activate/stop/visibility/tab clicks).
 import { createRefreshManager } from "./refresh.js";
-
-// ── Safe JSON fetch ──────────────────────────────────────────────────
-// Never blindly parse: surfaces status + URL + body snippet on failure so
-// empty/truncated/error responses produce a readable message instead of
-// "Unexpected end of input".
-async function safeJson(url, options) {
-  const r = await fetch(url, options);
-  const t = await r.text();
-  if (!r.ok) {
-    throw new Error("[" + r.status + "] " + url + ": "
-      + (t.slice(0, 120) || "empty body"));
-  }
-  try {
-    return JSON.parse(t);
-  } catch (e) {
-    throw new Error("[" + r.status + "] " + url
-      + ": non-JSON response (" + (t.slice(0, 80) || "empty body") + ")");
-  }
-}
+import { getApiBaseUrl, resolveApiUrl, safeJson } from "./api.js";
 
 // ── Lightweight loading indicator ────────────────────────────────────
 // Injects a theme-consistent skeleton shimmer + label into targetEl, REPLACING
@@ -1052,7 +1034,7 @@ async function _startSim(apiPrefix, onComplete, bodyBuilder) {
   progressFill.style.width = "0%";
   progressLbl.textContent = "Starting simulation...";
   try {
-    const resp = await (await fetch(apiPrefix + "/simulate", {
+    const resp = await (await fetch(resolveApiUrl(apiPrefix + "/simulate"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(bodyBuilder(iters, seed)),
     })).json();
@@ -1072,7 +1054,7 @@ async function _startSim(apiPrefix, onComplete, bodyBuilder) {
     await new Promise((resolve, reject) => {
       const poll = setInterval(async () => {
         try {
-          const p = await (await fetch(apiPrefix + "/simulation/progress/" + taskId)).json();
+          const p = await (await fetch(resolveApiUrl(apiPrefix + "/simulation/progress/" + taskId))).json();
           if (p.error) { clearInterval(poll); reject(new Error(p.error)); return; }
           progressFill.style.width = p.progress + "%";
           const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
@@ -1316,6 +1298,8 @@ export {
   renderBlendView,
   loadModelViews,
   openIntelModal,
+  getApiBaseUrl,
+  resolveApiUrl,
   safeJson,
   renderLoading,
   configureCompetitionRefresh,
