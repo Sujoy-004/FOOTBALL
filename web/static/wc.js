@@ -5,7 +5,7 @@ import {
   configureCompetitionRefresh, renderSimulationShell, bindSimulationShell,
   renderEloView, renderBlendView, loadModelViews,
   renderAcquisitionPanel, renderAvailabilityBanner, renderAvailPanel,
-  refreshButtonHtml, retiredCountLine,
+  refreshButtonHtml, retiredCountLine, resolveApiUrl,
 } from "./shared.js";
 
 const API = "/worldcup/api";
@@ -35,27 +35,27 @@ export function init(comp) {
 async function _loadWcPayloads(gen) {
   let ov = null;
   try {
-    ov = await fetch(API + "/overview").then(r => r.json());
+    ov = await fetch(resolveApiUrl(API + "/overview")).then(r => r.json());
   } catch (e) { console.error("overview load failed:", e); }
   if (_stale(gen)) return null;
   let s = null;
   try {
-    s = await fetch(API + "/standings").then(r => r.json());
+    s = await fetch(resolveApiUrl(API + "/standings")).then(r => r.json());
   } catch {}
   if (_stale(gen)) return null;
   let br = null;
   try {
-    br = await fetch(API + "/bracket").then(r => r.json());
+    br = await fetch(resolveApiUrl(API + "/bracket")).then(r => r.json());
   } catch {}
   if (_stale(gen)) return null;
   let bd = null;
   try {
-    bd = await fetch(API + "/bracket/data").then(r => r.json());
+    bd = await fetch(resolveApiUrl(API + "/bracket/data")).then(r => r.json());
   } catch {}
   if (_stale(gen)) return null;
   let fb = null;
   try {
-    fb = await fetch(API + "/bracket/full").then(r => r.json());
+    fb = await fetch(resolveApiUrl(API + "/bracket/full")).then(r => r.json());
   } catch {}
   if (_stale(gen)) return null;
   return { overview: ov, standings: s, bracket: br, bracketData: bd, fullBracket: fb };
@@ -213,7 +213,7 @@ document.addEventListener("click", async (e) => {
   _bannerOverride = { state: "refreshing", ctx: { comp: "World Cup" } };
   updateStatus();
   try {
-    const resp = await fetch("/worldcup/api/refresh", {
+    const resp = await fetch(resolveApiUrl("/worldcup/api/refresh"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
@@ -395,7 +395,7 @@ function renderSimulation() {
       onComplete: async function() {
         const gen = _transitionGen;
         try {
-          const simResp = await (await fetch(API + "/simulation")).json();
+          const simResp = await (await fetch(resolveApiUrl(API + "/simulation"))).json();
           if (!_stale(gen)) {
             appState.simBracket = simResp.full_bracket ? simResp.full_bracket : null;
             appState.simMeta = simResp.simulation_meta || null;
@@ -680,7 +680,7 @@ async function openMatchModal(mid) {
   document.getElementById("modalOverlay").classList.add("show");
 
   let insight;
-  try { insight = await (await fetch(API + "/match/insight?match_id=" + mid)).json(); } catch { insight = { error: "fetch failed" }; }
+  try { insight = await (await fetch(resolveApiUrl(API + "/match/insight?match_id=" + mid))).json(); } catch { insight = { error: "fetch failed" }; }
   if (insight.error) {
     bodyEl.innerHTML = '<div style="color:#ff6b6b;font-size:12px">Failed to load match insight.</div>';
     return;
@@ -797,7 +797,7 @@ window.__sendWhatIf = async function (mid, ta, tb) {
   resultDiv.style.display = "block";
   resultDiv.innerHTML = '<div style="color:#15565B;font-size:11px">Running match what-if...</div>';
   try {
-    const resp = await (await fetch(API + "/match/what-if", {
+    const resp = await (await fetch(resolveApiUrl(API + "/match/what-if"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ match_id: mid, elo_delta: eloDelta })
     })).json();

@@ -8,6 +8,7 @@ import {
   renderSimulationShell, bindSimulationShell,
   renderEloView, renderBlendView, loadModelViews,
   renderAvailabilityBanner, renderAvailPanel, refreshButtonHtml, retiredCountLine,
+  resolveApiUrl,
 } from "./shared.js";
 
 const API = "/ucl/api";
@@ -318,7 +319,7 @@ document.addEventListener("click", async (e) => {
   _bannerOverride = { state: "refreshing", ctx: { comp: "UCL" } };
   updateStatus();
   try {
-    const resp = await fetch("/ucl/api/refresh", {
+    const resp = await fetch(resolveApiUrl("/ucl/api/refresh"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });

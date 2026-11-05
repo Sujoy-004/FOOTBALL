@@ -162,3 +162,54 @@ def test_cors_direct_tournament_api_endpoints(client):
         resp = client.get(ep, headers=headers)
         assert resp.status_code in (200, 503)
         assert resp.headers.get("access-control-allow-origin") == "https://football-app.pages.dev"
+
+
+def test_zero_bare_unrouted_api_calls_in_js_modules():
+    """Verify that every fetch call in tournament JS modules resolves through resolveApiUrl."""
+    js_files = [
+        STATIC_DIR / "wc.js",
+        STATIC_DIR / "ucl.js",
+        STATIC_DIR / "laliga.js",
+        STATIC_DIR / "shared.js",
+    ]
+    import re
+
+    # Pattern finding fetch calls that don't pass resolveApiUrl
+    fetch_pattern = re.compile(r"fetch\(([^,\)]+)", re.MULTILINE)
+
+    for js_path in js_files:
+        assert js_path.exists(), f"{js_path.name} must exist"
+        text = js_path.read_text(encoding="utf-8")
+        matches = fetch_pattern.findall(text)
+        for target in matches:
+            target_clean = target.strip()
+            # In api.js, target is targetUrl. In tournament files, it must use resolveApiUrl
+            assert "resolveApiUrl" in target_clean, (
+                f"Unrouted fetch call found in {js_path.name}: fetch({target_clean})"
+            )
+
+
+def test_zero_bare_unrouted_api_calls_in_index_html():
+    """Verify that all fetch calls in index.html resolve through _resolveApiUrl."""
+    import re
+    index_html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    fetch_pattern = re.compile(r"fetch\(([^,\)]+)", re.MULTILINE)
+    matches = fetch_pattern.findall(index_html)
+    assert len(matches) >= 10, f"Expected at least 10 fetch calls in index.html, found {len(matches)}"
+
+    for target in matches:
+        target_clean = target.strip()
+        assert "_resolveApiUrl" in target_clean or "resolveApiUrl" in target_clean, (
+            f"Unrouted fetch call found in index.html: fetch({target_clean})"
+        )
+
+
+def test_module_import_and_export_wiring():
+    """Verify that shared.js exports resolveApiUrl and tournament modules import it."""
+    shared_text = (STATIC_DIR / "shared.js").read_text(encoding="utf-8")
+    assert "resolveApiUrl" in shared_text
+    assert "getApiBaseUrl" in shared_text
+
+    for mod_name in ("wc.js", "ucl.js", "laliga.js"):
+        mod_text = (STATIC_DIR / mod_name).read_text(encoding="utf-8")
+        assert "resolveApiUrl" in mod_text, f"{mod_name} must reference resolveApiUrl"

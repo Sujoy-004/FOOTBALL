@@ -11,6 +11,7 @@ import {
   renderSimulationShell, bindSimulationShell,
   renderEloView, renderBlendView, loadModelViews,
   renderAvailabilityBanner, renderAvailPanel, refreshButtonHtml, retiredCountLine,
+  resolveApiUrl,
 } from "./shared.js";
 
 const API = "/laliga/api";
@@ -269,7 +270,7 @@ document.addEventListener("click", async (e) => {
   _bannerOverride = { state: "refreshing", ctx: { comp: "LaLiga" } };
   _applyStatus();
   try {
-    const resp = await fetch("/laliga/api/refresh", {
+    const resp = await fetch(resolveApiUrl("/laliga/api/refresh"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });

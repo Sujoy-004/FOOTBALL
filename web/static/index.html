@@ -1611,6 +1611,13 @@
        APPLICATION CONTROLLER SCRIPT
        ======================================================================== -->
   <script>
+    function _resolveApiUrl(path) {
+      if (typeof window !== "undefined" && typeof window.resolveApiUrl === "function") {
+        return window.resolveApiUrl(path);
+      }
+      return path;
+    }
+
     // Master Dataset for 3 Tournaments
     const POSTER_DATA = {
       worldcup: {
@@ -4548,7 +4555,7 @@
         // 0. Fetch Elo ratings (/api/elo) for dynamic fixture and ranking overlays
         let eloMap = {};
         try {
-          const eloRes = await fetch(`/${compKey}/api/elo`);
+          const eloRes = await fetch(_resolveApiUrl(`/${compKey}/api/elo`));
           if (eloRes.ok) {
             const eloData = await eloRes.json();
             if (eloData && typeof eloData.ratings === 'object') {
@@ -4575,7 +4582,7 @@
         };
 
         // 1. Fetch primary data (/api/data)
-        const dataRes = await fetch(`/${compKey}/api/data`);
+        const dataRes = await fetch(_resolveApiUrl(`/${compKey}/api/data`));
         if (dataRes.ok) {
           const live = await dataRes.json();
           if (live.n_teams != null) {
@@ -4630,7 +4637,7 @@
         // 2. Tournament specific Standings & Bracket / Fixtures APIs
         if (compKey === 'worldcup') {
           // Standings (12 Groups)
-          const stdRes = await fetch('/worldcup/api/standings');
+          const stdRes = await fetch(_resolveApiUrl('/worldcup/api/standings'));
           if (stdRes.ok) {
             const stdData = await stdRes.json();
             if (Array.isArray(stdData.standings) && stdData.standings.length > 0) {
@@ -4658,7 +4665,7 @@
           }
 
           // Bracket & Group Fixtures
-          const brRes = await fetch('/worldcup/api/bracket/data');
+          const brRes = await fetch(_resolveApiUrl('/worldcup/api/bracket/data'));
           if (brRes.ok) {
             const brData = await brRes.json();
             const tree = brData.knockout_tree || {};
@@ -4728,7 +4735,7 @@
           }
         } else if (compKey === 'ucl') {
           // UCL Standings
-          const uclStdRes = await fetch('/ucl/api/standings');
+          const uclStdRes = await fetch(_resolveApiUrl('/ucl/api/standings'));
           if (uclStdRes.ok) {
             const uclStd = await uclStdRes.json();
             if (Array.isArray(uclStd.standings) && uclStd.standings.length > 0) {
@@ -4748,7 +4755,7 @@
           }
 
           // UCL Bracket & Swiss League Matches
-          const uclBrRes = await fetch('/ucl/api/bracket');
+          const uclBrRes = await fetch(_resolveApiUrl('/ucl/api/bracket'));
           if (uclBrRes.ok) {
             const uclBr = await uclBrRes.json();
             if (uclBr.league_matchdays) {
@@ -4814,7 +4821,7 @@
           }
         } else if (compKey === 'laliga') {
           // LaLiga Standings
-          const llStdRes = await fetch('/laliga/api/data');
+          const llStdRes = await fetch(_resolveApiUrl('/laliga/api/data'));
           if (llStdRes.ok) {
             const llData = await llStdRes.json();
             if (Array.isArray(llData.standings) && llData.standings.length > 0) {
@@ -4833,7 +4840,7 @@
           }
 
           // LaLiga Fixtures
-          const llFixRes = await fetch('/laliga/api/fixtures');
+          const llFixRes = await fetch(_resolveApiUrl('/laliga/api/fixtures'));
           if (llFixRes.ok) {
             const llFix = await llFixRes.json();
             if (Array.isArray(llFix.matchdays)) {
@@ -4865,7 +4872,7 @@
 
         // 1b. Fetch Blend / Calibration data (/api/blend)
         try {
-          const blendRes = await fetch(`/${compKey}/api/blend`);
+          const blendRes = await fetch(_resolveApiUrl(`/${compKey}/api/blend`));
           if (blendRes.ok) {
             const blendData = await blendRes.json();
             const weights = (blendData && typeof blendData.blend_weights === 'object') ? blendData.blend_weights : {};
@@ -4927,7 +4934,7 @@
 
         // 3. Simulation Projections (/api/simulation)
         try {
-          const simRes = await fetch(`/${compKey}/api/simulation`);
+          const simRes = await fetch(_resolveApiUrl(`/${compKey}/api/simulation`));
           if (simRes.ok) {
             const simData = await simRes.json();
             if (Array.isArray(simData.top_teams) && simData.top_teams.length > 0) {
@@ -5024,7 +5031,7 @@
       if (label) label.textContent = 'FETCHING...';
 
       try {
-        const res = await fetch(`/${activeComp}/refresh`, { method: 'POST' });
+        const res = await fetch(_resolveApiUrl(`/${activeComp}/refresh`), { method: 'POST' });
         await syncCompetitionFromBackend(activeComp);
         const acqTime = document.getElementById('acq-time');
         if (acqTime) acqTime.textContent = 'JUST NOW (VERIFIED)';
