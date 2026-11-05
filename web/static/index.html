@@ -4902,13 +4902,23 @@
                     const { xgH, xgA } = calcXgFromElo(eH, eA, false);
                     let homeName = m.team_a;
                     let awayName = m.team_b;
-                    if (!homeName && m.slot_sources) {
-                      if (m.slot_sources.position_a != null) homeName = `Seed #${m.slot_sources.position_a}`;
-                      else if (m.slot_sources.home_seed != null) homeName = `Seed #${m.slot_sources.home_seed}`;
-                    }
-                    if (!awayName && m.slot_sources) {
-                      if (m.slot_sources.position_b != null) awayName = `Seed #${m.slot_sources.position_b}`;
-                      else if (m.slot_sources.away_playoff_tie != null) awayName = `Play-off ${m.slot_sources.away_playoff_tie} Winner`;
+                    const isFactualMode = !document.getElementById('masthead-mode-pill')?.classList.contains('simulated-active');
+                    if (isFactualMode && m.status !== 'played') {
+                      if (m.slot_sources) {
+                        if (m.slot_sources.position_a != null) homeName = `Seed #${m.slot_sources.position_a}`;
+                        else if (m.slot_sources.home_seed != null) homeName = `Seed #${m.slot_sources.home_seed}`;
+                        if (m.slot_sources.position_b != null) awayName = `Seed #${m.slot_sources.position_b}`;
+                        else if (m.slot_sources.away_playoff_tie != null) awayName = `Play-off ${m.slot_sources.away_playoff_tie} Winner`;
+                      }
+                    } else {
+                      if (!homeName && m.slot_sources) {
+                        if (m.slot_sources.position_a != null) homeName = `Seed #${m.slot_sources.position_a}`;
+                        else if (m.slot_sources.home_seed != null) homeName = `Seed #${m.slot_sources.home_seed}`;
+                      }
+                      if (!awayName && m.slot_sources) {
+                        if (m.slot_sources.position_b != null) awayName = `Seed #${m.slot_sources.position_b}`;
+                        else if (m.slot_sources.away_playoff_tie != null) awayName = `Play-off ${m.slot_sources.away_playoff_tie} Winner`;
+                      }
                     }
                     return {
                       id: m.id || m.match_id,
