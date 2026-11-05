@@ -1,11 +1,15 @@
 # FOOTBALL
 
+[![Live App](https://img.shields.io/badge/Live%20Website-football.iamsujoy004.workers.dev-brightgreen?style=for-the-badge&logo=cloudflare)](https://football.iamsujoy004.workers.dev)
+
 A shared football prediction and Monte Carlo simulation engine with
 competition-specific brains — World Cup 2026, UEFA Champions League 2026/27
 (the active default, draw-derived; the 2025/26 season remains selectable as
 completed history), and LaLiga EA Sports 2026/27 — where real played matches
 are immutable facts and every simulated number is explicitly labeled as
 simulated.
+
+**Live Application:** [https://football.iamsujoy004.workers.dev](https://football.iamsujoy004.workers.dev)
 
 ## What it does
 
