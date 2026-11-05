@@ -740,9 +740,14 @@ def build_competition_state(data_dir, mode: str = MODE_RESULTS, sim_payload: Opt
     templates, source_map, quarters, round_slots = _round_templates(rules_matches)
     playoff_templates, playoff_slots = _playoff_templates(dp)
 
+    league_complete = (
+        phase.get("phase") in ("league_stage_complete", "knockout_playoffs", "knockout", "completed")
+        or (isinstance(phase.get("progress"), dict) and phase["progress"].get("played", 0) >= _TOTAL_LEAGUE_MATCHES)
+    )
+
     if ko_availability is DataAvailability.AVAILABLE:
         ko_store = _normalise_ko_store(ko_payload)
-    elif ko_availability is DataAvailability.MISSING and league_availability is DataAvailability.AVAILABLE:
+    elif ko_availability is DataAvailability.MISSING and league_availability is DataAvailability.AVAILABLE and league_complete:
         ko_store = _populate_ko_from_standings(_active_dp, dp)
     else:
         ko_store = _empty_ko_store()

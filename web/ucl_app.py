@@ -1005,10 +1005,26 @@ def api_standings():
 @ucl_app.get("/api/bracket")
 def api_bracket():
     payload = dict(_competition_state())
-    # Compatibility alias for older consumers of the league matchday rows.
-    payload["league_matchdays"] = (
-        payload.get("stages", {}).get("league", {}).get("matchdays")
-        or _snap().get("league_matchdays", {}))
+    # Compatibility alias for consumers of the league matchday rows, including upcoming fixtures.
+    try:
+        from competitions.ucl.src.pipeline import build_league_matchdays, build_matchday_map, load_results
+        from competitions.ucl.src.orchestrator import resolve_active_data_dir
+        from football_core.domain import load_json_store, DataAvailability
+        active_dp = resolve_active_data_dir(DATA_DIR)
+        fixtures_payload, fixtures_avail, _ = load_json_store(active_dp / "fixtures.json")
+        fixtures_list = None
+        if fixtures_avail is DataAvailability.AVAILABLE and isinstance(fixtures_payload, dict):
+            fixtures_list = fixtures_payload.get("fixtures")
+            if not fixtures_list and isinstance(fixtures_payload.get("schedule"), dict):
+                fixtures_list = fixtures_payload["schedule"].get("matches")
+        payload["league_matchdays"] = build_league_matchdays(
+            load_results(active_dp), build_matchday_map(active_dp), fixtures=fixtures_list
+        )
+    except Exception:
+        payload["league_matchdays"] = (
+            payload.get("stages", {}).get("league", {}).get("matchdays")
+            or _snap().get("league_matchdays", {})
+        )
     # Same lifecycle view as /api/data (cheap reuse, one discover call each).
     payload["lifecycle"] = _lifecycle_view()
     return JSONResponse(payload)

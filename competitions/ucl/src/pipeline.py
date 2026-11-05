@@ -835,18 +835,22 @@ def build_matchday_map(data_dir: str | Path) -> dict[str, int]:
 def build_league_matchdays(
     results: list[dict],
     matchday_map: dict[str, int] | None = None,
+    fixtures: list[dict] | None = None,
 ) -> dict[str, list[dict]]:
-    """Group results by authoritative matchday, with legacy fallback.
+    """Group results and scheduled fixtures by authoritative matchday.
 
     Each row gains explicit canonical state fields (Exchange 2 truth
-    contract): ``status`` ("played" — rows come from the results ledger),
-    derived ``winner``, and ``provenance``.
+    contract): ``status`` ("played" or "scheduled"), derived ``winner``,
+    and ``provenance``.
     """
     from football_core.domain import canonical_from_result_entry
 
     mds: dict[str, list[dict]] = defaultdict(list)
+    played_ids = set()
     for m in results:
         match_id = m.get("match_id", "")
+        if match_id:
+            played_ids.add(match_id)
         prefix = match_id.split("_")[0]
         matchday = matchday_map.get(match_id) if matchday_map else None
         key = f"MD{matchday:02d}" if isinstance(matchday, int) and matchday >= 1 else prefix
@@ -856,6 +860,35 @@ def build_league_matchdays(
         row["status"] = cm.status.value
         row["provenance"] = "official"
         mds[key].append(row)
+
+    if fixtures:
+        for f in fixtures:
+            if not isinstance(f, dict):
+                continue
+            mid = f.get("match_id", "")
+            if not mid or mid in played_ids:
+                continue
+            matchday = matchday_map.get(mid) if matchday_map else None
+            if matchday is None:
+                matchday = f.get("official_matchday") or f.get("simulation_matchday")
+            try:
+                matchday_int = int(matchday)
+            except (TypeError, ValueError):
+                matchday_int = None
+            key = f"MD{matchday_int:02d}" if matchday_int and matchday_int >= 1 else "MD_UPCOMING"
+            row = {
+                "match_id": mid,
+                "team_a": f.get("team_a") or f.get("home_team"),
+                "team_b": f.get("team_b") or f.get("away_team"),
+                "home_score": None,
+                "away_score": None,
+                "winner": None,
+                "status": "scheduled",
+                "provenance": "official",
+                "event_date": f.get("event_date"),
+            }
+            mds[key].append(row)
+
     return dict(sorted(mds.items()))
 
 

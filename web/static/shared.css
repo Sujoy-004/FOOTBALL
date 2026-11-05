@@ -2139,3 +2139,37 @@ body.theme-light.competition-laliga {
   white-space: nowrap;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   GLOBAL SHIMMER SKELETON LOADING ANIMATION
+   ══════════════════════════════════════════════════════════════════════ */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--poster-surface-subtle, rgba(255, 255, 255, 0.04)) 25%,
+    var(--poster-border, rgba(255, 255, 255, 0.12)) 50%,
+    var(--poster-surface-subtle, rgba(255, 255, 255, 0.04)) 75%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: skeleton-shimmer 1.5s infinite ease-in-out !important;
+  border-radius: 4px;
+  color: transparent !important;
+  user-select: none;
+  pointer-events: none;
+}
+
+.skeleton-card {
+  border: 1px solid var(--poster-border, rgba(255, 255, 255, 0.08));
+  background: var(--poster-surface, #090D13);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+

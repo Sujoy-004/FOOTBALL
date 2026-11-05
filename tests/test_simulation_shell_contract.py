@@ -259,7 +259,8 @@ def test_no_direct_simulate_post_outside_shared_poll():
     """The POST /simulate path exists exactly once, inside the shared popup;
     competitions route through it via bindSimulationShell, never directly."""
     assert SHARED.count('"/simulate"') == 1
-    assert 'fetch(apiPrefix + "/simulate", {' in SHARED
+    assert ('fetch(resolveApiUrl(apiPrefix + "/simulate"), {' in SHARED
+            or 'fetch(apiPrefix + "/simulate", {' in SHARED)
     for src, name in ((UCL, "ucl.js"), (WC, "wc.js"), (LALIGA, "laliga.js")):
         assert '"/simulate"' not in src, name
         assert 'API + "/simulate"' not in src, name

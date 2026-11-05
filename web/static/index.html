@@ -1215,6 +1215,46 @@
     .footer-col span b {
       color: var(--poster-text);
     }
+
+    /* ==========================================================================
+       GLOBAL SHIMMER SKELETON LOADING ANIMATION
+       ========================================================================== */
+    @keyframes skeleton-shimmer {
+      0% {
+        background-position: -200% 0;
+      }
+      100% {
+        background-position: 200% 0;
+      }
+    }
+
+    .skeleton-shimmer {
+      background: linear-gradient(
+        90deg,
+        var(--poster-surface-subtle) 25%,
+        var(--poster-border) 50%,
+        var(--poster-surface-subtle) 75%
+      );
+      background-size: 200% 100%;
+      animation: skeleton-shimmer 1.5s infinite ease-in-out;
+      border-radius: 4px;
+      color: transparent !important;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .skeleton-card {
+      border: 1px solid var(--poster-border);
+      background: var(--poster-surface);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .skeleton-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 14px;
+    }
   </style>
 </head>
 <body class="theme-worldcup">
@@ -3804,7 +3844,7 @@
         watermark: "UCL",
         standingsLabel: "SWISS LEAGUE TABLE (36 TEAMS)",
         bracketLabel: "KNOCKOUT PHASE (2-LEGGED)",
-        stats: { teams: 36, played: 144, unplayed: "45 UNPLAYED", topTeam: "REAL MADRID", topProb: "— PROJECTION" },
+        stats: { teams: 36, played: 18, unplayed: "126 UNPLAYED", topTeam: "—", topProb: "— PROJECTION" },
         eloList: [
           { name: "Real Madrid", elo: 2014, delta: "+24", tier: "POT 1" },
           { name: "Manchester City", elo: 1998, delta: "+15", tier: "POT 1" },
@@ -3813,51 +3853,11 @@
           { name: "Barcelona", elo: 1960, delta: "+11", tier: "POT 1" },
           { name: "Paris Saint-Germain", elo: 1955, delta: "-5", tier: "POT 1" }
         ],
-        signals: [
-          { name: "1. Self-Calculated Elo Matrix", weight: "30%", pct: 30 },
-          { name: "2. The Odds API Market Implied", weight: "28%", pct: 28 },
-          { name: "3. Domestic & European Form (EMA)", weight: "18%", pct: 18 },
-          { name: "4. Squad Market Valuation (Transfermarkt)", weight: "14%", pct: 14 },
-          { name: "5. Calendar Congestion & Rest Advantage", weight: "10%", pct: 10 }
-        ],
-        progression: [
-          { team: "Real Madrid", champion: 31.2, final: 46.5, sf: 64.0, qf: 84.2 },
-          { team: "Man City", champion: 26.5, final: 41.0, sf: 58.2, qf: 79.0 },
-          { team: "Bayern Munich", champion: 16.4, final: 28.5, sf: 45.0, qf: 68.0 },
-          { team: "Arsenal", champion: 14.1, final: 24.0, sf: 40.1, qf: 63.5 },
-          { team: "Barcelona", champion: 11.8, final: 19.5, sf: 33.0, qf: 54.0 }
-        ],
-        swissTable: [
-          { pos: 1, name: "Real Madrid", p: 8, w: 7, d: 1, l: 0, gf: 21, ga: 7, pts: 22, tier: "tier-direct" },
-          { pos: 2, name: "Liverpool", p: 8, w: 7, d: 0, l: 1, gf: 18, ga: 5, pts: 21, tier: "tier-direct" },
-          { pos: 3, name: "Barcelona", p: 8, w: 6, d: 1, l: 1, gf: 22, ga: 10, pts: 19, tier: "tier-direct" },
-          { pos: 4, name: "Arsenal", p: 8, w: 6, d: 1, l: 1, gf: 16, ga: 4, pts: 19, tier: "tier-direct" },
-          { pos: 5, name: "Bayern Munich", p: 8, w: 5, d: 1, l: 2, gf: 19, ga: 9, pts: 16, tier: "tier-direct" },
-          { pos: 9, name: "Manchester City", p: 8, w: 4, d: 2, l: 2, gf: 15, ga: 8, pts: 14, tier: "tier-playoff" },
-          { pos: 10, name: "Juventus", p: 8, w: 4, d: 2, l: 2, gf: 12, ga: 7, pts: 14, tier: "tier-playoff" },
-          { pos: 25, name: "Paris SG", p: 8, w: 2, d: 2, l: 4, gf: 9, ga: 12, pts: 8, tier: "tier-eliminated" }
-        ],
-        bracketStages: [
-          { stage: "ROUND OF 16 (AGGREGATE)", matches: [
-            { h: "Real Madrid", a: "RB Leipzig", sH: "2", sA: "1 (agg 4-2)", fact: true, eloH: 2014, eloA: 1860, xgH: 1.9, xgA: 1.1 },
-            { h: "Man City", a: "FC Copenhagen", sH: "3", sA: "1 (agg 5-1)", fact: true, eloH: 1998, eloA: 1720, xgH: 2.6, xgA: 0.6 },
-            { h: "Bayern Munich", a: "Lazio", sH: "3", sA: "0 (agg 3-1)", fact: true, eloH: 1985, eloA: 1810, xgH: 2.2, xgA: 0.8 },
-            { h: "Arsenal", a: "Porto", sH: "1", sA: "0 (agg 2-2, 4-2p)", fact: true, eloH: 1972, eloA: 1840, xgH: 1.5, xgA: 0.7 }
-          ]},
-          { stage: "QUARTER-FINALS", matches: [
-            { h: "Real Madrid", a: "Manchester City", sH: "1", sA: "1 (agg 4-4, 4-3p)", fact: true, eloH: 2014, eloA: 1998, xgH: 1.82, xgA: 1.38 },
-            { h: "Bayern Munich", a: "Arsenal", sH: "1", sA: "0 (agg 3-2)", fact: true, eloH: 1985, eloA: 1972, xgH: 1.70, xgA: 1.45 },
-            { h: "Paris SG", a: "Barcelona", sH: "4", sA: "1 (agg 6-4)", fact: true, eloH: 1955, eloA: 1960, xgH: 2.10, xgA: 1.40 },
-            { h: "Borussia Dortmund", a: "Atlético Madrid", sH: "4", sA: "2 (agg 5-4)", fact: true, eloH: 1890, eloA: 1910, xgH: 1.95, xgA: 1.50 }
-          ]},
-          { stage: "SEMI-FINALS", matches: [
-            { h: "Real Madrid", a: "Manchester City", sH: "48.2%", sA: "26.4%", fact: false, eloH: 2014, eloA: 1998, xgH: 1.82, xgA: 1.38 },
-            { h: "Bayern Munich", a: "Arsenal", sH: "42.0%", sA: "35.5%", fact: false, eloH: 1985, eloA: 1972, xgH: 1.70, xgA: 1.45 }
-          ]},
-          { stage: "CHAMPIONS LEAGUE FINAL", matches: [
-            { h: "MAD / MCI", a: "BAY / ARS", sH: "--", sA: "--", fact: false, eloH: 2005, eloA: 1980, xgH: 1.60, xgA: 1.50 }
-          ]}
-        ]
+        signals: [],
+        progression: [],
+        swissTable: [],
+        leagueMatchdays: [],
+        bracketStages: []
       },
 
       laliga: {
@@ -3869,7 +3869,7 @@
         watermark: "LALIGA",
         standingsLabel: "LEAGUE TABLE (20 CLUBS)",
         bracketLabel: "FIXTURES & SCHEDULE",
-        stats: { teams: 20, played: 330, unplayed: "50 UNPLAYED", topTeam: "REAL MADRID", topProb: "— PROJECTION" },
+        stats: { teams: 20, played: 110, unplayed: "270 UNPLAYED", topTeam: "—", topProb: "— PROJECTION" },
         eloList: [
           { name: "Real Madrid", elo: 2014, delta: "+31", tier: "CHAMPIONSHIP" },
           { name: "Barcelona", elo: 1968, delta: "+19", tier: "CHAMPIONSHIP" },
@@ -3878,41 +3878,10 @@
           { name: "Real Sociedad", elo: 1835, delta: "+4", tier: "EUROPA" },
           { name: "Real Betis", elo: 1820, delta: "+2", tier: "CONFERENCE" }
         ],
-        signals: [
-          { name: "1. Domestic Historical Elo", weight: "32%", pct: 32 },
-          { name: "2. LaLiga Market Odds Implied", weight: "28%", pct: 28 },
-          { name: "3. 6-Game Rolling Form EMA", weight: "20%", pct: 20 },
-          { name: "4. Squad Depth & Roster Value", weight: "12%", pct: 12 },
-          { name: "5. Home Ground Advantage Factor", weight: "8%", pct: 8 }
-        ],
-        progression: [
-          { team: "Real Madrid", champion: 64.2, final: 98.2, sf: 99.8, qf: 100.0 },
-          { team: "Barcelona", champion: 28.5, final: 91.0, sf: 98.5, qf: 100.0 },
-          { team: "Atlético Madrid", champion: 7.3, final: 62.0, sf: 88.0, qf: 99.1 }
-        ],
-        laligaTable: [
-          { pos: 1, name: "Real Madrid", p: 33, w: 26, d: 6, l: 1, gf: 71, ga: 22, pts: 84, tier: "tier-direct" },
-          { pos: 2, name: "Barcelona", p: 33, w: 22, d: 7, l: 4, gf: 68, ga: 37, pts: 73, tier: "tier-direct" },
-          { pos: 3, name: "Girona", p: 33, w: 22, d: 5, l: 6, gf: 69, ga: 40, pts: 71, tier: "tier-direct" },
-          { pos: 4, name: "Atlético Madrid", p: 33, w: 20, d: 4, l: 9, gf: 59, ga: 35, pts: 64, tier: "tier-direct" },
-          { pos: 5, name: "Athletic Club", p: 33, w: 16, d: 10, l: 7, gf: 53, ga: 33, pts: 58, tier: "tier-playoff" },
-          { pos: 6, name: "Real Sociedad", p: 33, w: 13, d: 12, l: 8, gf: 46, ga: 35, pts: 51, tier: "tier-playoff" },
-          { pos: 18, name: "Cádiz CF", p: 33, w: 4, d: 14, l: 15, gf: 23, ga: 46, pts: 26, tier: "tier-relegation" },
-          { pos: 19, name: "Granada CF", p: 33, w: 4, d: 9, l: 20, gf: 36, ga: 65, pts: 21, tier: "tier-relegation" },
-          { pos: 20, name: "UD Almería", p: 33, w: 1, d: 11, l: 21, gf: 32, ga: 67, pts: 14, tier: "tier-relegation" }
-        ],
-        fixtures: [
-          { matchday: "MATCHDAY 34", matches: [
-            { h: "Real Madrid", a: "Cádiz CF", sH: "3", sA: "0", fact: true, eloH: 2014, eloA: 1720, xgH: 2.8, xgA: 0.4 },
-            { h: "Girona", a: "Barcelona", sH: "4", sA: "2", fact: true, eloH: 1880, eloA: 1968, xgH: 2.1, xgA: 1.9 },
-            { h: "Mallorca", a: "Atlético Madrid", sH: "0", sA: "1", fact: true, eloH: 1770, eloA: 1910, xgH: 0.8, xgA: 1.4 }
-          ]},
-          { matchday: "MATCHDAY 35 (UPCOMING)", matches: [
-            { h: "Granada CF", a: "Real Madrid", sH: "12%", sA: "76%", fact: false, eloH: 1680, eloA: 2014, xgH: 0.6, xgA: 2.5 },
-            { h: "Barcelona", a: "Real Sociedad", sH: "65%", sA: "15%", fact: false, eloH: 1968, eloA: 1835, xgH: 1.9, xgA: 1.0 },
-            { h: "Atlético Madrid", a: "Celta Vigo", sH: "70%", sA: "12%", fact: false, eloH: 1910, eloA: 1750, xgH: 2.2, xgA: 0.8 }
-          ]}
-        ]
+        signals: [],
+        progression: [],
+        standings: [],
+        matchdays: []
       }
     };
 
@@ -4057,6 +4026,90 @@
       }
     }
 
+    // Render Standings Skeleton Placeholder
+    function renderSkeletonStandings(compKey) {
+      const container = document.getElementById('standings-content-container');
+      if (!container) return;
+      const title = compKey === 'ucl' ? 'UEFA SINGLE 36-TEAM LEAGUE STAGE' : (compKey === 'laliga' ? 'LALIGA EA SPORTS 2026/27 TABLE' : 'STANDINGS');
+      const rowCount = compKey === 'ucl' ? 18 : 12;
+      let rows = '';
+      for (let i = 1; i <= rowCount; i++) {
+        rows += `
+          <tr>
+            <td style="font-family: var(--font-mono); width: 28px; color: var(--poster-text-dim);">${i}</td>
+            <td><div class="skeleton-shimmer" style="height: 14px; width: ${110 + (i * 9) % 70}px; border-radius: 3px;"></div></td>
+            <td class="num-col"><div class="skeleton-shimmer" style="height: 14px; width: 18px; margin-left: auto; border-radius: 3px;"></div></td>
+            <td class="num-col"><div class="skeleton-shimmer" style="height: 14px; width: 18px; margin-left: auto; border-radius: 3px;"></div></td>
+            <td class="num-col"><div class="skeleton-shimmer" style="height: 14px; width: 18px; margin-left: auto; border-radius: 3px;"></div></td>
+            <td class="num-col"><div class="skeleton-shimmer" style="height: 14px; width: 18px; margin-left: auto; border-radius: 3px;"></div></td>
+            <td class="num-col"><div class="skeleton-shimmer" style="height: 14px; width: 32px; margin-left: auto; border-radius: 3px;"></div></td>
+            <td class="num-col"><div class="skeleton-shimmer" style="height: 14px; width: 22px; margin-left: auto; border-radius: 3px;"></div></td>
+            ${compKey === 'ucl' ? '<td class="num-col"><div class="skeleton-shimmer" style="height: 14px; width: 70px; margin-left: auto; border-radius: 3px;"></div></td>' : ''}
+          </tr>
+        `;
+      }
+      container.innerHTML = `
+        <div class="poster-card skeleton-card">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 8px;">
+            <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">${title}</h3>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-accent); display: flex; align-items: center; gap: 6px;">
+              <span class="refresh-spinner" style="width: 10px; height: 10px; border-width: 1.5px; border-color: var(--poster-accent); border-top-color: transparent; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span>
+              SYNCING FACTUAL STORE & STANDINGS...
+            </span>
+          </div>
+          <table class="table-swiss">
+            <thead>
+              <tr><th>#</th><th>CLUB</th><th class="num-col">P</th><th class="num-col">W</th><th class="num-col">D</th><th class="num-col">L</th><th class="num-col">GD</th><th class="num-col">PTS</th>${compKey === 'ucl' ? '<th class="num-col">ZONE</th>' : ''}</tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Render Fixtures / Bracket Skeleton Placeholder
+    function renderSkeletonBracket(compKey) {
+      const container = document.getElementById('bracket-content-container');
+      if (!container) return;
+      const title = compKey === 'ucl' ? 'SWISS LEAGUE PHASE // 8 MATCHDAYS' : (compKey === 'laliga' ? 'REGULAR SEASON MATCHES // 38 MATCHDAYS' : 'FIXTURES & SCHEDULE');
+      let cards = '';
+      for (let c = 1; c <= 4; c++) {
+        let mRows = '';
+        for (let r = 0; r < 5; r++) {
+          mRows += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--poster-border);">
+              <div class="skeleton-shimmer" style="height: 12px; width: 35%; border-radius: 3px;"></div>
+              <div class="skeleton-shimmer" style="height: 14px; width: 32px; border-radius: 3px;"></div>
+              <div class="skeleton-shimmer" style="height: 12px; width: 35%; border-radius: 3px;"></div>
+            </div>
+          `;
+        }
+        cards += `
+          <div class="group-card skeleton-card" style="padding: 0; overflow: hidden; background: var(--poster-surface);">
+            <div style="padding: 10px 12px; background: var(--poster-surface-subtle); border-bottom: 1px solid var(--poster-border); display: flex; justify-content: space-between; align-items: center;">
+              <div class="skeleton-shimmer" style="height: 12px; width: 90px; border-radius: 3px;"></div>
+              <div class="skeleton-shimmer" style="height: 10px; width: 60px; border-radius: 3px;"></div>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+              ${mRows}
+            </div>
+          </div>
+        `;
+      }
+      container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;">
+          <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">${title}</h3>
+          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-accent); display: flex; align-items: center; gap: 6px;">
+            <span class="refresh-spinner" style="width: 10px; height: 10px; border-width: 1.5px; border-color: var(--poster-accent); border-top-color: transparent; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span>
+            SYNCING MATCHDAYS & FIXTURES...
+          </span>
+        </div>
+        <div class="skeleton-grid">
+          ${cards}
+        </div>
+      `;
+    }
+
     // Render Standings Tab (WC Groups vs UCL Swiss Table vs LaLiga 20 Clubs)
     function renderStandingsTab(data) {
       const container = document.getElementById('standings-content-container');
@@ -4103,6 +4156,10 @@
         // Best 3rd-placed table removed per design refinement
       } else if (data.id === 'ucl') {
         // UCL: Swiss Table (36 Teams)
+        if (!data.swissTable || data.swissTable.length === 0) {
+          renderSkeletonStandings('ucl');
+          return;
+        }
         const card = document.createElement('div');
         card.className = 'poster-card';
         let rows = '';
@@ -4136,6 +4193,10 @@
         container.appendChild(card);
       } else if (data.id === 'laliga') {
         // LaLiga Table (20 Clubs)
+        if (!data.standings || data.standings.length === 0) {
+          renderSkeletonStandings('laliga');
+          return;
+        }
         const card = document.createElement('div');
         card.className = 'poster-card';
         let rows = '';
@@ -4398,16 +4459,24 @@
         }
       } else if (data.id === 'ucl') {
         // UEFA CHAMPIONS LEAGUE:
-        // 1. ABOVE: SWISS LEAGUE PHASE MATCH RESULTS
+        if (!data.leagueMatchdays || data.leagueMatchdays.length === 0) {
+          renderSkeletonBracket('ucl');
+          return;
+        }
+        // 1. ABOVE: SWISS LEAGUE PHASE MATCH RESULTS & FIXTURES
         if (Array.isArray(data.leagueMatchdays) && data.leagueMatchdays.length > 0) {
+          const totalMatches = data.leagueMatchdays.reduce((acc, md) => acc + (md.matches ? md.matches.length : 0), 0);
+          const playedCount = data.leagueMatchdays.reduce((acc, md) => acc + (md.matches ? md.matches.filter(m => m.fact).length : 0), 0);
+          const totalMds = data.leagueMatchdays.length;
+
           const uclHeader = document.createElement('div');
           uclHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
           uclHeader.innerHTML = `
             <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
-              SWISS LEAGUE PHASE MATCH RESULTS // MATCHDAYS 1–3
+              SWISS LEAGUE PHASE // ${totalMds} MATCHDAYS
             </h3>
             <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
-              54 PLAYED FIXTURES · CLICK FOR POISSON SCORELINE DENSITY &amp; INTEL
+              ${totalMatches} FIXTURES · ${playedCount} PLAYED · ${totalMatches - playedCount} UPCOMING · CLICK FOR POISSON SCORELINE DENSITY &amp; INTEL
             </span>
           `;
           container.appendChild(uclHeader);
@@ -4418,24 +4487,30 @@
             const card = document.createElement('div');
             card.className = 'group-card';
             let mRows = '';
+            const isPlayedMd = md.matches && md.matches.some(m => m.fact);
+            const playedInMd = (md.matches || []).filter(m => m.fact).length;
             (md.matches || []).forEach(m => {
               const hEsc = (m.h || '').replace(/'/g, "\\'");
               const aEsc = (m.a || '').replace(/'/g, "\\'");
-              const isHWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sH) > parseInt(m.sA);
-              const isAWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sA) > parseInt(m.sH);
+              const isHWin = m.fact && m.sH !== '—' && m.sA !== '—' && parseInt(m.sH) > parseInt(m.sA);
+              const isAWin = m.fact && m.sH !== '—' && m.sA !== '—' && parseInt(m.sA) > parseInt(m.sH);
+              const scoreDisplay = m.fact ? `${m.sH} – ${m.sA}` : 'VS';
               mRows += `
                 <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
                   <span style="flex:1; text-align:right; ${isHWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.h}</span>
-                  <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px;">${m.sH} – ${m.sA}</span>
+                  <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px; font-size:${m.fact ? '12px' : '10px'};">${scoreDisplay}</span>
                   <span style="flex:1; ${isAWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.a}</span>
                   <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
                 </div>
               `;
             });
+            const statusLabel = isPlayedMd
+              ? (playedInMd === md.matches.length ? 'PLAYED' : `${playedInMd}/${md.matches.length} PLAYED`)
+              : 'SCHEDULED';
             card.innerHTML = `
               <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
                 <span style="font-weight: 800;">${md.name}</span>
-                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">${md.matches.length} RESULTS &#9662;</span>
+                <span style="font-family: var(--font-mono); font-size: 10px; color: ${isPlayedMd ? '#10B981' : 'var(--poster-accent)'};">${statusLabel} (${md.matches.length}) &#9662;</span>
               </div>
               <div class="group-match-list open" style="flex-direction: column;">
                 ${mRows}
@@ -4464,47 +4539,64 @@
           container.appendChild(tree);
         }
       } else if (data.id === 'laliga') {
-        // LALIGA: REGULAR SEASON MATCH RESULTS // 38 MATCHDAYS
+        // LALIGA: REGULAR SEASON MATCH RESULTS & FIXTURES // 38 MATCHDAYS
+        if (!data.matchdays || data.matchdays.length === 0) {
+          renderSkeletonBracket('laliga');
+          return;
+        }
         if (Array.isArray(data.matchdays) && data.matchdays.length > 0) {
+          const totalMatches = data.matchdays.reduce((acc, md) => acc + (md.matches ? md.matches.length : 0), 0);
+          const playedCount = data.matchdays.reduce((acc, md) => acc + (md.matches ? md.matches.filter(m => m.fact).length : 0), 0);
+          const totalMds = data.matchdays.length;
+
           const llHeader = document.createElement('div');
           llHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 2px solid var(--poster-border-strong); padding-bottom: 6px;';
           llHeader.innerHTML = `
             <h3 style="font-family: var(--font-display); font-size: 14px; text-transform: uppercase;">
-              REGULAR SEASON MATCH RESULTS // 38 MATCHDAYS
+              REGULAR SEASON MATCHES // ${totalMds} MATCHDAYS
             </h3>
             <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
-              380 FIXTURES · 102 PLAYED MATCHES WITH VERIFIED SCORES · CLICK TO INSPECT
+              ${totalMatches} FIXTURES · ${playedCount} PLAYED · ${totalMatches - playedCount} UPCOMING · CLICK TO INSPECT
             </span>
           `;
           container.appendChild(llHeader);
 
           const grid = document.createElement('div');
           grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;';
-          data.matchdays.forEach(md => {
+          let firstUpcomingIndex = data.matchdays.findIndex(md => !(md.matches && md.matches.some(m => m.fact)));
+          if (firstUpcomingIndex === -1) firstUpcomingIndex = data.matchdays.length - 1;
+
+          data.matchdays.forEach((md, idx) => {
             const card = document.createElement('div');
             card.className = 'group-card';
             let mRows = '';
             const isPlayedMd = md.matches && md.matches.some(m => m.fact);
+            const isNextUpcoming = idx === firstUpcomingIndex;
+            const isOpen = isPlayedMd || isNextUpcoming;
+            const playedInMd = (md.matches || []).filter(m => m.fact).length;
             (md.matches || []).forEach(m => {
               const hEsc = (m.h || '').replace(/'/g, "\\'");
               const aEsc = (m.a || '').replace(/'/g, "\\'");
-              const isHWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sH) > parseInt(m.sA);
-              const isAWin = m.sH !== '—' && m.sA !== '—' && parseInt(m.sA) > parseInt(m.sH);
+              const isHWin = m.fact && m.sH !== '—' && m.sA !== '—' && parseInt(m.sH) > parseInt(m.sA);
+              const isAWin = m.fact && m.sH !== '—' && m.sA !== '—' && parseInt(m.sA) > parseInt(m.sH);
+              const scoreDisplay = m.fact ? `${m.sH} – ${m.sA}` : 'VS';
               mRows += `
                 <div class="md-row" onclick="openMatchModal({h: '${hEsc}', a: '${aEsc}', sH: '${m.sH}', sA: '${m.sA}', fact: ${m.fact}, eloH: ${m.eloH}, eloA: ${m.eloA}, xgH: ${m.xgH}, xgA: ${m.xgA}})" style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid var(--poster-border); cursor:pointer; font-size:12px;">
                   <span style="flex:1; text-align:right; ${isHWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.h}</span>
-                  <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px;">${m.sH} – ${m.sA}</span>
+                  <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px; font-size:${m.fact ? '12px' : '10px'};">${scoreDisplay}</span>
                   <span style="flex:1; ${isAWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.a}</span>
                   <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
                 </div>
               `;
             });
-            const isOpen = isPlayedMd;
+            const statusLabel = isPlayedMd
+              ? (playedInMd === md.matches.length ? 'PLAYED' : `${playedInMd}/${md.matches.length} PLAYED`)
+              : (isNextUpcoming ? 'NEXT UPCOMING' : 'SCHEDULED');
             card.innerHTML = `
               <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
                 <span style="font-weight: 800;">MATCHDAY ${md.matchday}</span>
-                <span style="font-family: var(--font-mono); font-size: 10px; color: ${isPlayedMd ? '#10B981' : 'var(--poster-accent)'};">
-                  ${isPlayedMd ? 'PLAYED RESULTS' : 'SCHEDULED'} (${md.matches.length}) &#9662;
+                <span style="font-family: var(--font-mono); font-size: 10px; color: ${isPlayedMd ? '#10B981' : (isNextUpcoming ? 'var(--poster-accent)' : 'var(--poster-text-dim)')};">
+                  ${statusLabel} (${md.matches.length}) &#9662;
                 </span>
               </div>
               <div class="group-match-list ${isOpen ? 'open' : ''}" style="flex-direction: column;">
@@ -4808,10 +4900,20 @@
                     const eH = getTeamElo(m.team_a, 1950);
                     const eA = getTeamElo(m.team_b, 1900);
                     const { xgH, xgA } = calcXgFromElo(eH, eA, false);
+                    let homeName = m.team_a;
+                    let awayName = m.team_b;
+                    if (!homeName && m.slot_sources) {
+                      if (m.slot_sources.position_a != null) homeName = `Seed #${m.slot_sources.position_a}`;
+                      else if (m.slot_sources.home_seed != null) homeName = `Seed #${m.slot_sources.home_seed}`;
+                    }
+                    if (!awayName && m.slot_sources) {
+                      if (m.slot_sources.position_b != null) awayName = `Seed #${m.slot_sources.position_b}`;
+                      else if (m.slot_sources.away_playoff_tie != null) awayName = `Play-off ${m.slot_sources.away_playoff_tie} Winner`;
+                    }
                     return {
                       id: m.id || m.match_id,
-                      h: m.team_a || 'TBD',
-                      a: m.team_b || 'TBD',
+                      h: homeName || 'TBD',
+                      a: awayName || 'TBD',
                       sH: m.aggregate_a != null ? String(m.aggregate_a) : '—',
                       sA: m.aggregate_b != null ? String(m.aggregate_b) : '—',
                       winner: m.winner || null,
@@ -4985,46 +5087,74 @@
     }
 
     // Run Monte Carlo Simulation Trigger
-    function triggerSimulation() {
+    async function triggerSimulation() {
       if (isSimulating) return;
       isSimulating = true;
       const btn = document.getElementById('btn-run-simulation');
       const pBox = document.getElementById('sim-progress-box');
       const pInner = document.getElementById('sim-progress-inner');
       const modePill = document.getElementById('masthead-mode-pill');
-      const nRuns = document.getElementById('sim-iterations-select').value;
+      const nRuns = parseInt(document.getElementById('sim-iterations-select').value) || 10000;
 
       btn.disabled = true;
       btn.innerHTML = '<span>SIMULATING MULTIVERSE...</span>';
       pBox.style.display = 'block';
+      pInner.style.width = '15%';
 
-      let pct = 0;
-      const timer = setInterval(() => {
-        pct += 20;
-        pInner.style.width = `${pct}%`;
-        if (pct >= 100) {
-          clearInterval(timer);
-          setTimeout(() => {
-            isSimulating = false;
-            btn.disabled = false;
-            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>EXECUTE SIMULATION</span>`;
-            pBox.style.display = 'none';
-            pInner.style.width = '0%';
+      try {
+        const startRes = await fetch(_resolveApiUrl(`/${activeComp}/api/simulate`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ iterations: nRuns })
+        });
 
-            // Set Mode Pill
-            modePill.classList.add('simulated-active');
-            document.getElementById('mode-text').textContent = `MODE: SIMULATION (${parseInt(nRuns).toLocaleString()} RUNS)`;
-
-            // Subtle Monte Carlo Jitter
-            const prog = POSTER_DATA[activeComp].progression;
-            prog.forEach(p => {
-              const diff = (Math.random() - 0.5) * 3;
-              p.champion = Math.max(1, p.champion + diff);
-            });
-            renderSimulationTab(POSTER_DATA[activeComp]);
-          }, 300);
+        if (startRes.ok) {
+          const startData = await startRes.json();
+          const taskId = startData.task_id;
+          if (taskId) {
+            let finished = false;
+            let attempts = 0;
+            while (!finished && attempts < 50) {
+              await new Promise(r => setTimeout(r, 400));
+              attempts++;
+              try {
+                const pollRes = await fetch(_resolveApiUrl(`/${activeComp}/api/simulation/progress/${taskId}`));
+                if (pollRes.ok) {
+                  const pollData = await pollRes.json();
+                  const pct = Math.max(20, Math.min(95, pollData.percent || (pollData.progress ? Math.round(pollData.progress * 100) : attempts * 6)));
+                  pInner.style.width = `${pct}%`;
+                  if (pollData.status === 'completed' || pollData.status === 'done' || pollData.complete) {
+                    finished = true;
+                    pInner.style.width = '100%';
+                  } else if (pollData.status === 'failed') {
+                    throw new Error(pollData.error || 'Simulation task failed');
+                  }
+                }
+              } catch (_) {}
+            }
+          }
         }
-      }, 80);
+      } catch (err) {
+        console.warn('Simulation API notice (offline/snapshot fallback):', err);
+      }
+
+      setTimeout(async () => {
+        isSimulating = false;
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>EXECUTE SIMULATION</span>`;
+        pBox.style.display = 'none';
+        pInner.style.width = '0%';
+
+        // Set Mode Pill
+        modePill.classList.add('simulated-active');
+        document.getElementById('mode-text').textContent = `MODE: SIMULATION (${nRuns.toLocaleString()} RUNS)`;
+
+        // Refresh simulation results into UI
+        await syncCompetitionFromBackend(activeComp);
+        if (currentActiveTab === 'simulation') {
+          renderSimulationTab(POSTER_DATA[activeComp]);
+        }
+      }, 350);
     }
 
     // Reset Simulation Back to Fact
@@ -5043,7 +5173,7 @@
       if (label) label.textContent = 'FETCHING...';
 
       try {
-        const res = await fetch(_resolveApiUrl(`/${activeComp}/refresh`), { method: 'POST' });
+        const res = await fetch(_resolveApiUrl(`/${activeComp}/api/refresh`), { method: 'POST' });
         if (res.status === 502 || res.status === 503) {
           if (typeof window.probeBackendHealth === 'function') {
             const apiBase = (typeof getApiBaseUrl === 'function') ? getApiBaseUrl() : '';

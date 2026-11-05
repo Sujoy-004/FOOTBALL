@@ -1183,7 +1183,13 @@ def run_deterministic_compute(
 
     n_total_matches = len(results)
     matchday_map = build_matchday_map(_active_data_dir)
-    league_matchdays = build_league_matchdays(results, matchday_map)
+    fixtures_payload, fixtures_avail, _ = load_json_store(Path(_active_data_dir) / "fixtures.json")
+    fixtures_list = None
+    if fixtures_avail is DataAvailability.AVAILABLE and isinstance(fixtures_payload, dict):
+        fixtures_list = fixtures_payload.get("fixtures")
+        if not fixtures_list and isinstance(fixtures_payload.get("schedule"), dict):
+            fixtures_list = fixtures_payload["schedule"].get("matches")
+    league_matchdays = build_league_matchdays(results, matchday_map, fixtures=fixtures_list)
     n_matchdays = len(league_matchdays) or 1
 
     from competitions.ucl.src.seasons import LOCAL_HISTORICAL_SEASON, get_current_season
