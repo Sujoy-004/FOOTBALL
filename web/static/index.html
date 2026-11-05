@@ -5182,7 +5182,15 @@
         }
         await syncCompetitionFromBackend(activeComp);
         const acqTime = document.getElementById('acq-time');
-        if (acqTime) acqTime.textContent = 'JUST NOW (VERIFIED)';
+        if (acqTime) {
+          if (res.ok) {
+            acqTime.textContent = 'JUST NOW (VERIFIED)';
+          } else if (res.status === 403) {
+            acqTime.textContent = 'SNAPSHOT (QUOTA GUARD)';
+          } else {
+            acqTime.textContent = 'SNAPSHOT VERIFIED';
+          }
+        }
       } catch (err) {
         console.warn('Refresh notice (offline / snapshot mode active):', err);
         if (typeof window.probeBackendHealth === 'function') {
