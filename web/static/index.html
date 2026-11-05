@@ -5047,13 +5047,16 @@
           const simRes = await fetch(_resolveApiUrl(`/${compKey}/api/simulation`));
           if (simRes.ok) {
             const simData = await simRes.json();
-            if (Array.isArray(simData.top_teams) && simData.top_teams.length > 0) {
-              POSTER_DATA[compKey].progression = simData.top_teams.map(t => ({
+            const list = (Array.isArray(simData.top_teams) && simData.top_teams.length > 0)
+              ? simData.top_teams
+              : (Array.isArray(simData.odds) && simData.odds.length > 0 ? simData.odds : []);
+            if (list.length > 0) {
+              POSTER_DATA[compKey].progression = list.map(t => ({
                 team: t.name || t.team,
-                champion: parseFloat(t.champion_prob || t.champion || 0),
-                final: parseFloat(t.final_prob || t.final || 0),
-                sf: parseFloat(t.sf_prob || t.sf || 0),
-                qf: parseFloat(t.qf_prob || t.qf || 0)
+                champion: parseFloat(t.champion_prob || t.champion || (t.win_prob ? t.win_prob * 100 : 0) || 0),
+                final: parseFloat(t.final_prob || t.final || (t.top_2_prob ? t.top_2_prob * 100 : 0) || 0),
+                sf: parseFloat(t.sf_prob || t.sf || (t.top_4_prob ? t.top_4_prob * 100 : 0) || 0),
+                qf: parseFloat(t.qf_prob || t.qf || (t.top_8_prob ? t.top_8_prob * 100 : 0) || 0)
               }));
               const topOne = POSTER_DATA[compKey].progression[0];
               if (topOne && topOne.champion > 0) {
