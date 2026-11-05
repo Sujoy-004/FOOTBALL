@@ -160,3 +160,6 @@ study_guide/
 
 # Calibration output (regeneratable runtime artifact)
 competitions/ucl/config/
+
+.wrangler/
+.playwright-mcp/
