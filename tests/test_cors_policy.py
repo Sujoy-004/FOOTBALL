@@ -54,6 +54,11 @@ def test_cors_cloudflare_pages_regex_matching(client):
     assert resp2.status_code == 200
     assert resp2.headers.get("access-control-allow-origin") == "https://preview-12.football-frontend.pages.dev"
 
+    # Cloudflare Workers dev domain (e.g. https://football.iamsujoy004.workers.dev)
+    resp3 = client.get("/health", headers={"Origin": "https://football.iamsujoy004.workers.dev"})
+    assert resp3.status_code == 200
+    assert resp3.headers.get("access-control-allow-origin") == "https://football.iamsujoy004.workers.dev"
+
 
 def test_cors_unauthorized_origin_rejected(client):
     headers = {"Origin": "https://malicious-attacker.com"}

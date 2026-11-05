@@ -243,7 +243,7 @@ from web.security import get_allowed_origins, register_exception_handlers, verif
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_origins(),
-    allow_origin_regex=r"^https://.*\.pages\.dev$",
+    allow_origin_regex=r"^https://.*\.(pages|workers)\.dev$",
     allow_methods=["GET", "POST", "OPTIONS", "HEAD"],
     allow_headers=["Content-Type", "Authorization", "X-Admin-Key", "Accept", "Origin", "X-Requested-With"],
     allow_credentials=True,
