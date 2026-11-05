@@ -100,7 +100,16 @@ def test_failed_ledger_write_logs_and_raises(tmp_path, caplog):
             raised = False
 
     assert raised, "a failed ledger write must re-raise, not return silently"
-    failures = [r for r in caplog.records if r.exc_info is not None]
+    # The record must still be LOUD, but ``exc_info`` is not the only loud
+    # shape: when ``web.server`` has been imported earlier in the session,
+    # its ``SecretRedactingFilter`` (installed on root handlers that pytest's
+    # live-logging handlers ride) pre-formats the traceback into
+    # ``record.exc_text`` and clears ``record.exc_info`` before caplog sees
+    # the record. Either shape proves ``logger.exception`` fired.
+    failures = [
+        r for r in caplog.records
+        if r.exc_info is not None or getattr(r, "exc_text", None)
+    ]
     assert failures, (
         "logger.exception never fired — a swallowed ledger write is the exact "
         "defect HARD-02 exists to ratchet out"
