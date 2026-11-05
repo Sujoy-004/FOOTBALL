@@ -2077,3 +2077,65 @@ body.theme-light.competition-laliga {
     animation: none;
   }
 }
+
+/* ── Render Free-Tier Cold-Start Status Banner (Non-Blocking) ── */
+.wake-banner,
+#render-wake-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
+}
+
+.wake-banner.active,
+#render-wake-banner.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.wake-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(15, 21, 31, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 8px 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.wake-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--poster-accent, #EA580C);
+  border-radius: 50%;
+  animation: wake-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes wake-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.wake-text {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: #F8FAFC;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+

@@ -213,3 +213,115 @@ def test_module_import_and_export_wiring():
     for mod_name in ("wc.js", "ucl.js", "laliga.js"):
         mod_text = (STATIC_DIR / mod_name).read_text(encoding="utf-8")
         assert "resolveApiUrl" in mod_text, f"{mod_name} must reference resolveApiUrl"
+
+
+def test_wake_up_js_exists_and_syntax():
+    """web/static/wake_up.js exists and passes Node syntax check."""
+    wake_up_js = STATIC_DIR / "wake_up.js"
+    assert wake_up_js.exists(), "web/static/wake_up.js must exist"
+
+    res = subprocess.run(["node", "--check", str(wake_up_js)], capture_output=True, text=True)
+    assert res.returncode == 0, f"wake_up.js syntax error: {res.stderr}"
+
+
+def test_wake_up_js_node_execution():
+    """Directly test wake_up.js DOM creation and probe logic in Node.js."""
+    node_test_script = """
+    // Minimal browser DOM mock for Node.js
+    class MockElement {
+      constructor(tag) {
+        this.tagName = tag;
+        this.id = '';
+        this.className = '';
+        this.classList = {
+          add: (c) => { if (!this.className.includes(c)) this.className += ' ' + c; },
+          remove: (c) => { this.className = this.className.replace(c, '').trim(); },
+          contains: (c) => this.className.includes(c)
+        };
+        this.children = [];
+        this.style = {};
+        this._text = '';
+      }
+      setAttribute(k, v) { this[k] = v; }
+      getAttribute(k) { return this[k]; }
+      appendChild(child) { this.children.push(child); return child; }
+      prepend(child) { this.children.unshift(child); return child; }
+      querySelector(sel) {
+        if (sel === '.wake-spinner') return this.children.find(c => c.className.includes('wake-spinner')) || null;
+        return null;
+      }
+      get textContent() { return this._text; }
+      set textContent(v) { this._text = v; }
+    }
+
+    const elementsById = {};
+    const mockDoc = {
+      createElement: (tag) => new MockElement(tag),
+      getElementById: (id) => elementsById[id] || null,
+      body: new MockElement('body')
+    };
+
+    globalThis.document = mockDoc;
+    globalThis.window = globalThis;
+
+    const { showWakeUpBanner, hideWakeUpBanner, probeBackendHealth } = await import('./web/static/wake_up.js');
+    const assert = (await import('node:assert')).default;
+
+    // Test 1: showWakeUpBanner creates banner
+    const b1 = showWakeUpBanner("Waking prediction engine (~30s)...");
+    elementsById['render-wake-banner'] = b1;
+    const txtEl = b1.children[0].children[1];
+    elementsById['wake-banner-text'] = txtEl;
+
+    assert.ok(b1, "Banner element must be created");
+    assert.strictEqual(b1.id, "render-wake-banner");
+    assert.ok(b1.classList.contains("active"));
+    assert.strictEqual(txtEl.textContent, "Waking prediction engine (~30s)...");
+
+    // Test 2: hideWakeUpBanner
+    hideWakeUpBanner();
+    assert.ok(!b1.classList.contains("active"));
+
+    // Test 3: probeBackendHealth with 200 response
+    let onReadyCalled = false;
+    globalThis.fetch = async (url) => {
+      assert.ok(url.includes('/health'), 'Must poll /health');
+      return { status: 200, ok: true };
+    };
+
+    probeBackendHealth('https://api.test.com', () => {
+      onReadyCalled = true;
+    });
+
+    // Wait for the probe timeout
+    await new Promise(r => setTimeout(r, 4800));
+    assert.ok(onReadyCalled, 'onReady callback must be called when /health succeeds');
+
+    console.log('WAKE_UP_NODE_OK');
+    """
+
+    res = subprocess.run(
+        ["node", "--input-type=module", "-e", node_test_script],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 0, f"Node wake_up tests failed:\nSTDOUT: {res.stdout}\nSTDERR: {res.stderr}"
+    assert "WAKE_UP_NODE_OK" in res.stdout
+
+
+def test_shared_css_wake_banner_rules():
+    """Verify shared.css includes non-blocking styling rules for render wake banner."""
+    css_text = (STATIC_DIR / "shared.css").read_text(encoding="utf-8")
+    assert "#render-wake-banner" in css_text or ".wake-banner" in css_text
+    assert "pointer-events: none" in css_text
+    assert "z-index: 9999" in css_text
+    assert ".wake-spinner" in css_text
+    assert ".wake-content" in css_text
+
+
+def test_index_html_includes_wake_up_js():
+    """Verify index.html includes wake_up.js in its script tags."""
+    index_html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    assert "/wake_up.js" in index_html
+
