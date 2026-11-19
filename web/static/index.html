@@ -37,106 +37,160 @@
   <script src="/config.js"></script>
   <script type="module" src="/api.js"></script>
   <script type="module" src="/wake_up.js"></script>
-  <link rel="stylesheet" href="/shared.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <style>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
     /* ==========================================================================
-       SWISS INTERNATIONAL TYPOGRAPHIC POSTER THEMES (WC / UCL / LALIGA)
+       SWISS INTERNATIONAL TYPOGRAPHIC SYSTEM // ARCHITECTURAL DATA INTERFACE
+       Self-hosted distinct typefaces: Sora (Display) + Manrope (Body) + JetBrains Mono (Telemetry)
        ========================================================================== */
+
+    @font-face {
+      font-family: 'Sora';
+      font-style: normal;
+      font-weight: 500 800;
+      font-display: swap;
+      src: url('/fonts/sora-latin.woff2') format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: 'Manrope';
+      font-style: normal;
+      font-weight: 500;
+      font-display: swap;
+      src: url('/fonts/manrope-500.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Manrope';
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url('/fonts/manrope-700.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      font-style: normal;
+      font-weight: 500;
+      font-display: swap;
+      src: url('/fonts/jetbrainsmono-500.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url('/fonts/jetbrainsmono-700.woff2') format('woff2');
+    }
+
     :root {
-      --font-display: 'Space Grotesk', -apple-system, sans-serif;
-      --font-body: 'Inter', -apple-system, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-      --transition-theme: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+      --font-display: 'Sora', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-body: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --transition-theme: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
     }
 
-    /* THEME 1: WORLD CUP 2026 // MINIMALIST ORANGE POSTER (Terracotta, Ochre & Warm Paper) */
+    /* THEME 1: WORLD CUP 2026 // HIGH-CONTRAST INTERNATIONAL SLATE & TERRACOTTA */
     body.theme-worldcup {
-      --poster-bg: #F8F5F0;
+      --poster-bg: #F8FAFC;
       --poster-surface: #FFFFFF;
-      --poster-surface-subtle: #F0EAE1;
+      --poster-surface-subtle: #F1F5F9;
       --poster-surface-card: #FFFFFF;
-      --poster-border: #D8CEBE;
-      --poster-border-strong: #1F1B16;
-      --poster-text: #1C1917;
-      --poster-text-muted: #544A3F;
-      --poster-text-dim: #6E6152;
-      --poster-accent: #C2410C;           /* Deep High-Contrast Terracotta Safety Orange (passes 4.8:1) */
-      --poster-accent-hover: #9A3412;
-      --poster-accent-tint: #FFF4E6;
-      --poster-accent-line: #EA580C;
-      --poster-secondary: #B45309;        /* Warm Gold */
-      --poster-hero-num: rgba(194, 65, 12, 0.12);
-      --badge-fact-bg: #E6F4EA;
-      --badge-fact-txt: #137333;
-      --badge-sim-bg: #FFF4E6;
-      --badge-sim-txt: #9A3412;
-      --poster-grain-tint: rgba(194, 65, 12, 0.03);
+      --poster-border: #CBD5E1;
+      --poster-border-strong: #0F172A;
+      --poster-text: #0F172A;
+      --poster-text-muted: #475569;
+      --poster-text-dim: #475569;
+      --poster-accent: #9A3412;           /* Deep High-Contrast Terracotta (5.6:1 against #FFFFFF, 4.7:1 against #F1F5F9) */
+      --poster-accent-hover: #7C2D12;
+      --poster-accent-tint: #FEF3C7;
+      --poster-accent-line: #C2410C;
+      --poster-secondary: #B45309;
+      --badge-fact-bg: #DCFCE7;
+      --badge-fact-txt: #14532D;          /* Passes 7.8:1 */
+      --badge-sim-bg: #FFEDD5;
+      --badge-sim-txt: #7C2D12;           /* Passes 7.1:1 */
     }
 
-    /* THEME 2: UEFA CHAMPIONS LEAGUE // MINIMALIST BLUE POSTER (Midnight Navy, Royal Cobalt & Celestial Ice) */
+    /* THEME 2: UEFA CHAMPIONS LEAGUE // HIGH-CONTRAST ROYAL COBALT & SLATE */
     body.theme-ucl {
-      --poster-bg: #F4F7FB;
+      --poster-bg: #F8FAFC;
       --poster-surface: #FFFFFF;
-      --poster-surface-subtle: #E2EBF5;
+      --poster-surface-subtle: #F1F5F9;
       --poster-surface-card: #FFFFFF;
-      --poster-border: #C5D7EA;
+      --poster-border: #CBD5E1;
       --poster-border-strong: #0B192C;
       --poster-text: #0B192C;
-      --poster-text-muted: #3B536E;
-      --poster-text-dim: #546C86;
-      --poster-accent: #0047BA;           /* Deep High-Contrast UEFA Cobalt (passes 6.5:1) */
+      --poster-text-muted: #334E68;
+      --poster-text-dim: #334E68;
+      --poster-accent: #0047BA;           /* Official High-Contrast UEFA Cobalt (6.5:1 against #FFFFFF) */
       --poster-accent-hover: #00368C;
-      --poster-accent-tint: #EDF4FE;
-      --poster-accent-line: #2563EB;
+      --poster-accent-tint: #EBF3FE;
+      --poster-accent-line: #1D4ED8;
       --poster-secondary: #0284C7;
-      --poster-hero-num: rgba(0, 71, 186, 0.10);
-      --badge-fact-bg: #E6F4EA;
-      --badge-fact-txt: #137333;
-      --badge-sim-bg: #EDF4FE;
-      --badge-sim-txt: #0047BA;
-      --poster-grain-tint: rgba(0, 71, 186, 0.03);
+      --badge-fact-bg: #DCFCE7;
+      --badge-fact-txt: #14532D;
+      --badge-sim-bg: #EBF3FE;
+      --badge-sim-txt: #00368C;
     }
 
-    /* THEME 3: LALIGA EA SPORTS // MINIMALIST RED POSTER (Spanish Crimson, Vermilion & Warm Chalk) */
+    /* THEME 3: LALIGA EA SPORTS // HIGH-CONTRAST SPANISH CRIMSON */
     body.theme-laliga {
-      --poster-bg: #FBF7F7;
+      --poster-bg: #F8FAFC;
       --poster-surface: #FFFFFF;
-      --poster-surface-subtle: #EFE4E2;
+      --poster-surface-subtle: #F1F5F9;
       --poster-surface-card: #FFFFFF;
-      --poster-border: #E0CECC;
+      --poster-border: #CBD5E1;
       --poster-border-strong: #201213;
-      --poster-text: #1E1213;
-      --poster-text-muted: #5E3D3F;
-      --poster-text-dim: #795254;
-      --poster-accent: #B91C1C;           /* Deep High-Contrast Spanish Crimson (passes 5.8:1) */
+      --poster-text: #201213;
+      --poster-text-muted: #593537;
+      --poster-text-dim: #593537;
+      --poster-accent: #B91C1C;           /* Official Spanish Crimson (5.8:1 against #FFFFFF) */
       --poster-accent-hover: #991B1B;
-      --poster-accent-tint: #FFF0F2;
+      --poster-accent-tint: #FEE2E2;
       --poster-accent-line: #DC2626;
-      --poster-secondary: #C0001B;
-      --poster-hero-num: rgba(185, 28, 28, 0.10);
-      --badge-fact-bg: #E6F4EA;
-      --badge-fact-txt: #137333;
-      --badge-sim-bg: #FFF0F2;
-      --badge-sim-txt: #991B1B;
-      --poster-grain-tint: rgba(185, 28, 28, 0.03);
+      --poster-secondary: #991B1B;
+      --badge-fact-bg: #DCFCE7;
+      --badge-fact-txt: #14532D;
+      --badge-sim-bg: #FEE2E2;
+      --badge-sim-txt: #7F1D1D;
     }
 
-    /* DARK EXHIBITION MODE OVERRIDES */
+    /* DARK EXHIBITION TELEMETRY MODE OVERRIDES */
     body.theme-dark {
-      --poster-bg: #121417;
-      --poster-surface: #181C21;
-      --poster-surface-subtle: #20262E;
-      --poster-surface-card: #181C21;
-      --poster-border: #2C3542;
-      --poster-border-strong: #E2E8F0;
-      --poster-text: #F8FAFC;
-      --poster-text-muted: #94A3B8;
-      --poster-text-dim: #64748B;
-      --poster-hero-num: rgba(255, 255, 255, 0.06);
+      --poster-bg: #090D13;
+      --poster-surface: #111827;
+      --poster-surface-subtle: #1F2937;
+      --poster-surface-card: #111827;
+      --poster-border: #374151;
+      --poster-border-strong: #E5E7EB;
+      --poster-text: #F9FAFB;             /* 16:1 against #111827 */
+      --poster-text-muted: #9CA3AF;       /* 6.4:1 against #111827 */
+      --poster-text-dim: #6B7280;
+      --badge-fact-bg: #064E3B;
+      --badge-fact-txt: #86EFAC;
+      --badge-sim-bg: #7C2D12;
+      --badge-sim-txt: #FDBA74;
     }
+    body.theme-dark.theme-worldcup {
+      --poster-accent: #FB923C;
+      --poster-accent-hover: #F97316;
+      --poster-accent-tint: #1C1917;
+      --poster-accent-line: #EA580C;
+    }
+    body.theme-dark.theme-ucl {
+      --poster-accent: #38BDF8;
+      --poster-accent-hover: #0EA5E9;
+      --poster-accent-tint: #0B192C;
+      --poster-accent-line: #2563EB;
+    }
+    body.theme-dark.theme-laliga {
+      --poster-accent: #F87171;
+      --poster-accent-hover: #EF4444;
+      --poster-accent-tint: #201213;
+      --poster-accent-line: #DC2626;
+    }
+
     body.theme-dark .masthead-frame,
     body.theme-dark .poster-card,
     body.theme-dark .hero-poster-strip,
@@ -145,7 +199,11 @@
     body.theme-dark .sim-ctrl-card,
     body.theme-dark .sim-results-card,
     body.theme-dark .match-tile-swiss,
-    body.theme-dark .poster-footer {
+    body.theme-dark .poster-footer,
+    body.theme-dark .cockpit-outer-frame,
+    body.theme-dark .site-card,
+    body.theme-dark .landing-guide-card,
+    body.theme-dark .site-nav-header {
       background: var(--poster-surface);
       color: var(--poster-text);
       border-color: var(--poster-border);
@@ -153,69 +211,525 @@
     body.theme-dark .btn-refresh,
     body.theme-dark .select-swiss,
     body.theme-dark .input-swiss,
-    body.theme-dark .btn-action-secondary {
+    body.theme-dark .btn-action-secondary,
+    body.theme-dark .cmd-box,
+    body.theme-dark .faq-item,
+    body.theme-dark .acquisition-bar,
+    body.theme-dark .hero-right-stats,
+    body.theme-dark .cockpit-frame-bar {
       background: var(--poster-surface-subtle);
       color: var(--poster-text);
       border-color: var(--poster-border);
     }
 
-    /* Global reset & typography */
+    /* ==========================================================================
+       BROWSER SURFACES & ACCESSIBILITY RESETS
+       ========================================================================== */
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
 
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
     body {
       background-color: var(--poster-bg);
       color: var(--poster-text);
       font-family: var(--font-body);
-      font-size: 13px;
-      line-height: 1.45;
+      font-size: 15px;
+      line-height: 1.6;
       letter-spacing: -0.01em;
       transition: var(--transition-theme);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
-    /* Modernist Poster Grid Container */
-    .poster-container {
-      max-width: 1440px;
+    ::selection {
+      background: var(--poster-accent);
+      color: #FFFFFF;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--poster-surface-subtle);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--poster-border);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--poster-text-dim);
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible,
+    details summary:focus-visible {
+      outline: 2px solid var(--poster-accent);
+      outline-offset: 2px;
+    }
+
+    /* Headings & Typographic Hierarchy */
+    h1, h2, h3, h4 {
+      font-family: var(--font-display);
+      color: var(--poster-text);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+    }
+
+    .num-col, .stat-number, .metric-val, .tile-score, code {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* BANNED KICKERS OUTRIGHT PURGE */
+    .hero-pretitle,
+    .site-section-kicker,
+    .cockpit-workspace-kicker,
+    .site-hero-overline {
+      display: none !important;
+    }
+
+    /* Watermark graphic suppression for zero low-contrast text */
+    .hero-watermark-num {
+      display: none !important;
+    }
+
+    /* ==========================================================================
+       TOP GLOBAL STICKY NAVIGATION BAR
+       ========================================================================== */
+    .site-nav-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 64px;
+      padding: 10px 28px;
+      background: var(--poster-surface);
+      border-bottom: 1px solid var(--poster-border);
+      transition: var(--transition-theme);
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .site-nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--poster-text);
+    }
+
+    .site-nav-logo {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--poster-text);
+    }
+
+    .site-nav-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      background: var(--poster-surface-subtle);
+      border: 1px solid var(--poster-border);
+      color: var(--poster-text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .site-nav-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      flex-wrap: wrap;
+    }
+
+    .site-nav-link {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--poster-text-muted);
+      text-decoration: none;
+      padding: 6px 4px;
+      transition: color 0.15s ease;
+    }
+
+    .site-nav-link:hover {
+      color: var(--poster-accent);
+    }
+
+    .site-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .site-btn-cockpit {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 18px;
+      background: var(--poster-accent);
+      color: #FFFFFF !important;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      border: 1px solid var(--poster-accent-hover);
+      min-height: 44px;
+      border-radius: 2px;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .site-btn-cockpit:hover {
+      background: var(--poster-accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .site-btn-github {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 14px;
+      background: var(--poster-surface-subtle);
+      border: 1px solid var(--poster-border);
+      color: var(--poster-text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      min-height: 44px;
+      border-radius: 2px;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .site-btn-github:hover {
+      border-color: var(--poster-border-strong);
+      background: var(--poster-surface);
+    }
+
+    /* ==========================================================================
+       HERO PRESENTATION BANNER
+       ========================================================================== */
+    .site-hero-section {
+      max-width: 1400px;
       margin: 0 auto;
-      padding: 24px 32px 48px 32px;
+      padding: 56px 28px 36px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .site-hero-h1 {
+      font-family: var(--font-display);
+      font-size: clamp(34px, 4.8vw, 56px);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.035em;
+      margin: 0;
+      color: var(--poster-text);
+      max-width: 1020px;
+    }
+
+    .site-hero-lead {
+      font-size: clamp(16px, 1.8vw, 18px);
+      line-height: 1.65;
+      color: var(--poster-text-muted);
+      max-width: 880px;
+      margin: 0;
+    }
+
+    .site-hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .site-hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: var(--poster-surface);
+      border: 1px solid var(--poster-border);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--poster-text);
+      border-radius: 2px;
+    }
+
+    .site-hero-badge .pip {
+      width: 8px;
+      height: 8px;
+      background: #15803D;
+      display: inline-block;
+      border-radius: 50%;
+    }
+
+    .site-hero-ctas {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .site-cta-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 24px;
+      background: var(--poster-accent);
+      color: #FFFFFF !important;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      min-height: 44px;
+      border-radius: 2px;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .site-cta-primary:hover {
+      background: var(--poster-accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .site-cta-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 20px;
+      background: var(--poster-surface);
+      border: 1px solid var(--poster-border-strong);
+      color: var(--poster-text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      min-height: 44px;
+      border-radius: 2px;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .site-cta-secondary:hover {
+      background: var(--poster-surface-subtle);
+    }
+
+    /* ==========================================================================
+       DEDICATED INTERACTIVE COCKPIT WORKSPACE
+       ========================================================================== */
+    .site-cockpit-workspace {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 28px 56px 28px;
       width: 100%;
-      flex: 1;
+    }
+
+    .cockpit-workspace-header {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    @media (min-width: 768px) {
+      .cockpit-workspace-header {
+        flex-direction: row;
+        align-items: flex-end;
+        justify-content: space-between;
+      }
+    }
+
+    .cockpit-workspace-title {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3.2vw, 34px);
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin: 0;
+      color: var(--poster-text);
+    }
+
+    .cockpit-fullscreen-link {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--poster-accent);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--poster-surface);
+      border: 1px solid var(--poster-border);
+      min-height: 44px;
+      border-radius: 2px;
+      transition: border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .cockpit-fullscreen-link:hover {
+      border-color: var(--poster-accent);
+      text-decoration: none;
+    }
+
+    /* Cockpit Error Banner State */
+    .cockpit-error-banner {
+      background: #FEF2F2;
+      border: 1px solid #F87171;
+      padding: 14px 18px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    body.theme-dark .cockpit-error-banner {
+      background: #450A0A;
+      border-color: #EF4444;
+    }
+    .error-banner-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .error-banner-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14px;
+      color: #991B1B;
+    }
+    body.theme-dark .error-banner-title {
+      color: #FCA5A5;
+    }
+    .error-banner-desc {
+      font-size: 13px;
+      color: #7F1D1D;
+    }
+    body.theme-dark .error-banner-desc {
+      color: #F87171;
+    }
+    .btn-error-retry {
+      padding: 6px 14px;
+      background: #DC2626;
+      color: #FFFFFF;
+      border: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+
+    /* Cockpit Outer Frame */
+    .cockpit-outer-frame {
+      border: 1px solid var(--poster-border-strong);
+      background: var(--poster-surface);
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+
+    .cockpit-frame-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 44px;
+      padding: 10px 18px;
+      background: var(--poster-surface-subtle);
+      border-bottom: 1px solid var(--poster-border);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--poster-text-muted);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .cockpit-frame-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cockpit-status-dot {
+      width: 8px;
+      height: 8px;
+      background: #15803D;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Poster Container Inside Workspace */
+    .poster-container {
+      padding: 24px;
       display: flex;
       flex-direction: column;
       gap: 20px;
     }
 
     /* ==========================================================================
-       TOP MASTHEAD // SWISS POSTER HEADER
+       MASTHEAD FRAME // LOGO, SWITCHER & PROVENANCE
        ========================================================================== */
     .masthead-frame {
-      border: 2px solid var(--poster-border-strong);
+      border: 1px solid var(--poster-border-strong);
       background: var(--poster-surface);
       padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 16px;
-      position: relative;
+      flex-wrap: wrap;
     }
 
     .masthead-left {
       display: flex;
       align-items: baseline;
       gap: 16px;
+      flex-wrap: wrap;
     }
 
     .brand-mark-swiss {
       font-family: var(--font-display);
-      font-weight: 900;
-      font-size: 26px;
-      letter-spacing: -0.04em;
+      font-weight: 800;
+      font-size: 24px;
+      letter-spacing: -0.03em;
       text-transform: uppercase;
       line-height: 1;
       color: var(--poster-text);
@@ -225,33 +739,35 @@
     }
 
     .brand-mark-swiss .accent-bar {
-      width: 6px;
-      height: 24px;
+      width: 5px;
+      height: 22px;
       background: var(--poster-accent);
       display: inline-block;
     }
 
     .brand-meta {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 12px;
       color: var(--poster-text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.05em;
     }
 
-    /* Competition Switcher - Swiss Editorial Style */
+    /* Competition Switcher */
     .comp-switcher {
       display: flex;
       border: 1px solid var(--poster-border-strong);
       background: var(--poster-surface-subtle);
-      border-radius: 0;
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
     }
 
     .comp-switch-btn {
       background: transparent;
       border: none;
       border-right: 1px solid var(--poster-border-strong);
-      padding: 8px 16px;
+      padding: 10px 18px;
       font-family: var(--font-display);
       font-size: 12px;
       font-weight: 700;
@@ -259,6 +775,7 @@
       cursor: pointer;
       text-transform: uppercase;
       letter-spacing: 0.04em;
+      min-height: 44px;
       transition: all 0.15s ease;
       display: flex;
       align-items: center;
@@ -284,27 +801,29 @@
       width: 8px;
       height: 8px;
       border: 1px solid currentColor;
+      border-radius: 1px;
     }
 
-    /* Masthead Right: Refresh CTA & Provenance Pill */
     .masthead-right {
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
     }
 
     .mode-pill {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      padding: 4px 8px;
+      padding: 6px 10px;
       border: 1px solid var(--poster-border-strong);
       display: flex;
       align-items: center;
       gap: 6px;
       background: var(--poster-surface-subtle);
+      border-radius: 2px;
     }
 
     .mode-pill.simulated-active {
@@ -317,15 +836,17 @@
       background: var(--poster-surface);
       color: var(--poster-text);
       border: 1px solid var(--poster-border-strong);
-      padding: 6px 12px;
+      padding: 8px 14px;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
+      min-height: 44px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       text-transform: uppercase;
+      border-radius: 2px;
       transition: all 0.15s ease;
     }
 
@@ -343,24 +864,26 @@
     }
 
     /* ==========================================================================
-       SUB-BANNER // ACQUISITION STATUS & IMMUTABLE PROVENANCE LEDGER
+       ACQUISITION & PROVENANCE LEDGER SUB-BANNER
        ========================================================================== */
     .acquisition-bar {
       background: var(--poster-surface-subtle);
-      border: 1px solid var(--poster-border);
-      border-left: 4px solid var(--poster-accent);
-      padding: 8px 16px;
+      border: 1px solid var(--poster-border-strong);
+      padding: 10px 18px;
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       color: var(--poster-text-muted);
+      gap: 16px;
+      flex-wrap: wrap;
     }
 
     .acq-items {
       display: flex;
-      gap: 16px;
+      gap: 18px;
+      flex-wrap: wrap;
     }
 
     .acq-item span.status-tag {
@@ -370,77 +893,52 @@
 
     .acq-item span.accent-bold {
       font-weight: 700;
-      color: #9A3412;
+      color: var(--poster-accent);
     }
 
     /* ==========================================================================
-       POSTER HERO STRIP // COMPETITION TITLE & ASYMMETRIC GRID HEAD
+       HERO POSTER STRIP // TOURNAMENT TITLE & METRICS
        ========================================================================== */
     .hero-poster-strip {
       display: grid;
-      grid-template-columns: 2fr 1fr;
-      border: 2px solid var(--poster-border-strong);
+      grid-template-columns: 1.8fr 1.2fr;
+      border: 1px solid var(--poster-border-strong);
       background: var(--poster-surface);
       position: relative;
-      overflow: hidden;
     }
 
     .hero-left-copy {
-      padding: 24px 28px;
-      border-right: 2px solid var(--poster-border-strong);
+      padding: 28px 32px;
+      border-right: 1px solid var(--poster-border-strong);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      position: relative;
-    }
-
-    .hero-watermark-num {
-      position: absolute;
-      right: 20px;
-      bottom: 10px;
-      font-family: var(--font-display);
-      font-size: 72px;
-      font-weight: 900;
-      line-height: 1;
-      color: var(--poster-hero-num);
-      pointer-events: none;
-      user-select: none;
-    }
-
-    .hero-pretitle {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--poster-accent);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 6px;
+      gap: 16px;
     }
 
     .hero-title {
       font-family: var(--font-display);
-      font-size: 38px;
+      font-size: clamp(28px, 3.8vw, 42px);
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: -0.03em;
-      line-height: 1.05;
+      line-height: 1.1;
       color: var(--poster-text);
       margin-bottom: 8px;
     }
 
     .hero-subtitle {
-      font-size: 13px;
+      font-size: 15px;
       color: var(--poster-text-muted);
-      max-width: 580px;
-      line-height: 1.5;
+      max-width: 640px;
+      line-height: 1.6;
     }
 
-    /* Hero Right Stats Cards */
     .hero-right-stats {
-      padding: 20px;
+      padding: 24px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 20px;
       background: var(--poster-surface-subtle);
       align-content: center;
     }
@@ -448,16 +946,16 @@
     .hero-stat-card {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 4px;
     }
 
     .stat-label {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       color: var(--poster-text-muted);
-      letter-spacing: 0.08em;
+      letter-spacing: 0.05em;
     }
 
     .stat-number {
@@ -469,7 +967,7 @@
     }
 
     .stat-extra {
-      font-size: 10px;
+      font-size: 12px;
       font-family: var(--font-mono);
       color: var(--poster-text-dim);
     }
@@ -482,13 +980,16 @@
       border-bottom: 2px solid var(--poster-border-strong);
       background: transparent;
       gap: 2px;
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
     }
 
     .tab-btn-swiss {
       background: transparent;
       border: 1px solid transparent;
       border-bottom: none;
-      padding: 10px 22px;
+      padding: 12px 24px;
       font-family: var(--font-display);
       font-size: 13px;
       font-weight: 700;
@@ -497,6 +998,7 @@
       color: var(--poster-text-muted);
       cursor: pointer;
       position: relative;
+      min-height: 44px;
       transition: all 0.15s ease;
       display: flex;
       align-items: center;
@@ -530,7 +1032,7 @@
 
     .tab-index-badge {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
       color: var(--poster-text-dim);
     }
 
@@ -542,7 +1044,7 @@
     .tab-pane {
       display: none;
       flex-direction: column;
-      gap: 20px;
+      gap: 24px;
     }
 
     .tab-pane.active {
@@ -550,22 +1052,21 @@
     }
 
     /* ==========================================================================
-       TAB 1: OVERVIEW PANE // MODEL DECK, SIGNALS & PROVENANCE
+       TAB 1: OVERVIEW PANE // ARCHITECTURAL UN-NESTED WORKBENCH
        ========================================================================== */
     .overview-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 24px;
     }
 
     .poster-card {
       background: var(--poster-surface);
-      border: 1px solid var(--poster-border);
-      border-top: 3px solid var(--poster-border-strong);
-      padding: 20px;
+      border: 1px solid var(--poster-border-strong);
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 16px;
     }
 
     .card-title-bar {
@@ -573,12 +1074,14 @@
       justify-content: space-between;
       align-items: baseline;
       border-bottom: 1px solid var(--poster-border);
-      padding-bottom: 8px;
+      padding-bottom: 10px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .card-title {
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: 20px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: -0.01em;
@@ -590,31 +1093,39 @@
 
     .card-subtitle {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
+      font-weight: 600;
       color: var(--poster-text-muted);
       text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
-    /* Elo Table */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
     .table-swiss {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12px;
+      font-size: 13px;
     }
 
     .table-swiss th {
       text-align: left;
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 0.05em;
       color: var(--poster-text-muted);
       border-bottom: 1px solid var(--poster-border-strong);
-      padding: 6px 8px;
+      padding: 8px 10px;
     }
 
     .table-swiss td {
-      padding: 8px;
+      padding: 10px;
       border-bottom: 1px solid var(--poster-border);
     }
 
@@ -636,7 +1147,7 @@
     .signal-stack {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
     }
 
     .sig-row {
@@ -649,7 +1160,8 @@
       display: flex;
       justify-content: space-between;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 12px;
+      font-weight: 600;
     }
 
     .sig-bar-track {
@@ -665,17 +1177,20 @@
       height: 100%;
     }
 
-    /* Evaluation Metric Cards */
+    /* Evaluation Metric Strip - UN-NESTED TELEMETRY (NO NESTED CARDS) */
     .metrics-row {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 12px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      border-top: 1px solid var(--poster-border);
+      padding-top: 16px;
+      margin-top: 8px;
     }
 
     .metric-box {
-      border: 1px solid var(--poster-border);
-      background: var(--poster-surface-subtle);
-      padding: 12px;
+      border: none;
+      background: transparent;
+      padding: 0;
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -694,42 +1209,40 @@
     .groups-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 16px;
+      gap: 20px;
     }
 
     .group-card {
       border: 1px solid var(--poster-border);
       background: var(--poster-surface);
-      padding: 12px;
+      padding: 16px;
+      border-radius: 2px;
     }
 
     .group-header {
       font-family: var(--font-display);
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 800;
       text-transform: uppercase;
-      padding-bottom: 6px;
+      padding-bottom: 8px;
       border-bottom: 2px solid var(--poster-border-strong);
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       display: flex;
       justify-content: space-between;
       color: var(--poster-accent);
     }
 
-    /* Cutoff Tier Color Bands for UCL Swiss & LaLiga */
+    /* Cutoff Tier Color Bands (Clean subtle tints without one-sided border tabs) */
     tr.tier-direct td {
       background: rgba(34, 197, 94, 0.08);
-      border-left: 3px solid #16A34A;
     }
 
     tr.tier-playoff td {
       background: rgba(59, 130, 246, 0.08);
-      border-left: 3px solid #2563EB;
     }
 
     tr.tier-relegation td {
       background: rgba(239, 68, 68, 0.08);
-      border-left: 3px solid #DC2626;
     }
 
     /* ==========================================================================
@@ -750,7 +1263,7 @@
 
     .stage-col-header {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 800;
       text-transform: uppercase;
       padding-bottom: 6px;
@@ -763,8 +1276,8 @@
     .match-tile-swiss {
       background: var(--poster-surface);
       border: 1px solid var(--poster-border);
-      border-left: 3px solid var(--poster-border-strong);
-      padding: 10px 12px;
+      border-radius: 2px;
+      padding: 12px 14px;
       cursor: pointer;
       transition: all 0.15s ease;
       display: flex;
@@ -774,24 +1287,24 @@
 
     .match-tile-swiss:hover {
       border-color: var(--poster-accent);
-      border-left-color: var(--poster-accent);
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
     }
 
     .match-tile-swiss.fact-match {
-      border-left-color: #16A34A;
+      border-color: var(--poster-border);
     }
 
     .match-tile-swiss.sim-match {
-      border-left-color: var(--poster-accent);
+      border-color: var(--poster-border);
     }
 
     .tile-meta {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: 11px;
       color: var(--poster-text-muted);
     }
 
@@ -799,7 +1312,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
     }
 
@@ -811,21 +1324,19 @@
     .tile-score {
       font-family: var(--font-mono);
       font-weight: 800;
-      font-size: 13px;
+      font-size: 14px;
     }
 
-    /* Fixtures schedule list for LaLiga */
     .fixtures-schedule {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 16px;
     }
 
-    /* Top-Down Knockout Tournament Tree */
     .bracket-top-down-tree {
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 20px;
       margin-top: 14px;
       width: 100%;
     }
@@ -842,13 +1353,13 @@
       justify-content: space-between;
       align-items: baseline;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 800;
       text-transform: uppercase;
       padding-bottom: 6px;
       border-bottom: 2px solid var(--poster-border-strong);
       color: var(--poster-text);
-      letter-spacing: 0.06em;
+      letter-spacing: 0.05em;
     }
 
     .tree-tier-grid {
@@ -860,19 +1371,15 @@
     .tree-grid-r32 {
       grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     }
-
     .tree-grid-r16 {
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     }
-
     .tree-grid-qf {
       grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
     }
-
     .tree-grid-sf {
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     }
-
     .tree-grid-final {
       display: flex;
       justify-content: center;
@@ -892,15 +1399,15 @@
 
     .tree-connector-down .connector-line {
       flex: 1;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--poster-border-strong), transparent);
+      height: 1px;
+      background: var(--poster-border-strong);
     }
 
     .tree-connector-down .connector-label {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 800;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.06em;
       color: var(--poster-accent);
       background: var(--poster-surface-subtle);
       border: 1px solid var(--poster-border-strong);
@@ -913,7 +1420,6 @@
     .match-tile-final {
       background: var(--poster-surface);
       border: 2px solid var(--poster-accent) !important;
-      border-left: 4px solid var(--poster-accent) !important;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
       position: relative;
     }
@@ -922,7 +1428,6 @@
       display: none;
       flex-direction: column;
     }
-
     .group-match-list.open {
       display: flex;
     }
@@ -932,17 +1437,18 @@
        ========================================================================== */
     .sim-shell-grid {
       display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 20px;
+      grid-template-columns: 380px 1fr;
+      gap: 24px;
     }
 
     .sim-ctrl-card {
-      border: 2px solid var(--poster-border-strong);
+      border: 1px solid var(--poster-border-strong);
       background: var(--poster-surface);
-      padding: 20px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
+      border-radius: 2px;
     }
 
     .ctrl-field {
@@ -953,34 +1459,39 @@
 
     .ctrl-label {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       color: var(--poster-text-muted);
+      letter-spacing: 0.04em;
     }
 
     .select-swiss, .input-swiss {
       border: 1px solid var(--poster-border-strong);
       background: var(--poster-surface-subtle);
-      padding: 8px 12px;
+      padding: 10px 14px;
       font-family: var(--font-mono);
       font-size: 12px;
       font-weight: 700;
       color: var(--poster-text);
+      min-height: 44px;
       outline: none;
+      border-radius: 2px;
     }
 
     .btn-action-primary {
       background: var(--poster-accent);
       color: #FFFFFF;
-      border: 2px solid var(--poster-border-strong);
-      padding: 12px;
+      border: 1px solid var(--poster-border-strong);
+      padding: 12px 18px;
       font-family: var(--font-display);
       font-size: 13px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       cursor: pointer;
+      min-height: 44px;
+      border-radius: 2px;
       transition: all 0.15s ease;
       display: flex;
       justify-content: center;
@@ -996,11 +1507,13 @@
       background: var(--poster-surface);
       color: var(--poster-text);
       border: 1px solid var(--poster-border-strong);
-      padding: 10px;
+      padding: 10px 16px;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
+      min-height: 44px;
+      border-radius: 2px;
       cursor: pointer;
       text-align: center;
     }
@@ -1011,10 +1524,11 @@
 
     .sim-progress-box {
       border: 1px solid var(--poster-border);
-      height: 6px;
+      height: 8px;
       background: var(--poster-surface-subtle);
       overflow: hidden;
       display: none;
+      border-radius: 4px;
     }
 
     .sim-progress-inner {
@@ -1024,15 +1538,13 @@
       transition: width 0.1s linear;
     }
 
-    /* Simulation Results Progression Table */
     .sim-results-card {
-      border: 1px solid var(--poster-border);
-      border-top: 3px solid var(--poster-accent);
+      border: 1px solid var(--poster-border-strong);
       background: var(--poster-surface);
-      padding: 20px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 16px;
     }
 
     /* ==========================================================================
@@ -1041,7 +1553,7 @@
     .modal-backdrop-swiss {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.65);
+      background: rgba(15, 23, 42, 0.7);
       backdrop-filter: blur(4px);
       z-index: 1000;
       display: none;
@@ -1056,7 +1568,7 @@
 
     .modal-window-swiss {
       background: var(--poster-surface);
-      border: 2px solid var(--poster-border-strong);
+      border: 1px solid var(--poster-border-strong);
       max-width: 840px;
       width: 100%;
       box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15);
@@ -1064,11 +1576,12 @@
       flex-direction: column;
       max-height: 90vh;
       overflow-y: auto;
+      border-radius: 4px;
     }
 
     .modal-header-swiss {
-      border-bottom: 2px solid var(--poster-border-strong);
-      padding: 14px 20px;
+      border-bottom: 1px solid var(--poster-border-strong);
+      padding: 16px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -1077,7 +1590,7 @@
 
     .modal-title-swiss {
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: -0.01em;
@@ -1087,31 +1600,32 @@
     .btn-modal-close {
       background: transparent;
       border: 1px solid var(--poster-border-strong);
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 700;
-      width: 28px;
-      height: 28px;
+      width: 36px;
+      height: 36px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      border-radius: 2px;
     }
 
     .modal-body-swiss {
       padding: 24px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 22px;
     }
 
-    /* Modal Clash Header */
     .modal-clash-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       border: 1px solid var(--poster-border);
-      padding: 16px 20px;
+      padding: 18px 24px;
       background: var(--poster-surface-subtle);
+      border-radius: 2px;
     }
 
     .m-team {
@@ -1133,22 +1647,25 @@
 
     .m-vs-badge {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 800;
-      padding: 4px 10px;
+      padding: 4px 12px;
       border: 1px solid var(--poster-border-strong);
       background: var(--poster-surface);
+      border-radius: 2px;
     }
 
-    /* Probability Bar in Modal */
     .m-prob-bar-wrap {
       display: flex;
-      height: 32px;
+      min-height: 44px;
       border: 1px solid var(--poster-border-strong);
       overflow: hidden;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
+      padding: 8px 10px;
+      background: var(--poster-surface-subtle);
+      gap: 4px;
     }
 
     .m-prob-home {
@@ -1158,17 +1675,17 @@
       align-items: center;
       justify-content: center;
       transition: width 0.3s ease;
+      border-radius: 1px;
     }
 
     .m-prob-draw {
-      background: var(--poster-surface-subtle);
-      color: var(--poster-text-muted);
-      border-left: 1px solid var(--poster-border-strong);
-      border-right: 1px solid var(--poster-border-strong);
+      background: var(--poster-surface);
+      color: var(--poster-text);
       display: flex;
       align-items: center;
       justify-content: center;
       transition: width 0.3s ease;
+      border-radius: 1px;
     }
 
     .m-prob-away {
@@ -1178,19 +1695,19 @@
       align-items: center;
       justify-content: center;
       transition: width 0.3s ease;
+      border-radius: 1px;
     }
 
-    /* Poisson Matrix Grid */
     .poisson-grid-swiss {
       width: 100%;
       border-collapse: collapse;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 12px;
     }
 
     .poisson-grid-swiss th, .poisson-grid-swiss td {
       border: 1px solid var(--poster-border);
-      padding: 8px;
+      padding: 10px;
       text-align: center;
     }
 
@@ -1206,40 +1723,43 @@
       font-weight: 800;
     }
 
-    /* What-if sandbox in modal */
     .modal-what-if {
       border: 1px dashed var(--poster-accent-line);
-      background: var(--poster-accent-tint);
-      padding: 16px;
+      background: var(--poster-surface-subtle);
+      padding: 18px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
+      border-radius: 2px;
     }
 
     .what-if-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 20px;
     }
 
     /* ==========================================================================
        POSTER FOOTER // IMPRINT & DIAGNOSTICS
        ========================================================================== */
     .poster-footer {
-      border-top: 2px solid var(--poster-border-strong);
+      border-top: 1px solid var(--poster-border-strong);
       background: var(--poster-surface);
-      padding: 16px 32px;
+      padding: 16px 24px;
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
       color: var(--poster-text-muted);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
     }
 
     .footer-col {
       display: flex;
       gap: 20px;
+      flex-wrap: wrap;
     }
 
     .footer-col span b {
@@ -1247,661 +1767,37 @@
     }
 
     /* ==========================================================================
-       GLOBAL SHIMMER SKELETON LOADING ANIMATION
+       GENERIC WEBSITE CONTENT SECTIONS // CLEAN ARCHITECTURAL LAYOUT
        ========================================================================== */
-    @keyframes skeleton-shimmer {
-      0% {
-        background-position: -200% 0;
-      }
-      100% {
-        background-position: 200% 0;
-      }
-    }
-
-    .skeleton-shimmer {
-      background: linear-gradient(
-        90deg,
-        var(--poster-surface-subtle) 25%,
-        var(--poster-border) 50%,
-        var(--poster-surface-subtle) 75%
-      );
-      background-size: 200% 100%;
-      animation: skeleton-shimmer 1.5s infinite ease-in-out;
-      border-radius: 4px;
-      color: transparent !important;
-      user-select: none;
-      pointer-events: none;
-    }
-
-    .skeleton-card {
-      border: 1px solid var(--poster-border);
-      background: var(--poster-surface);
-      padding: 16px;
-      margin-bottom: 12px;
-    }
-
-    .skeleton-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 14px;
-    }
-
-    /* Brand mark title heading element reset */
-    .brand-title {
-      font-family: inherit;
-      font-weight: inherit;
-      font-size: inherit;
-      letter-spacing: inherit;
-      text-transform: inherit;
-      line-height: inherit;
-      color: inherit;
-      margin: 0;
-      padding: 0;
-      display: inline;
-    }
-
-    /* ==========================================================================
-       LANDING ARCHITECTURE & ON-PAGE SEO GUIDE (SWISS POSTER CARDS)
-       ========================================================================== */
-    .landing-guide-section {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      margin-top: 10px;
-    }
-
-    .landing-guide-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-      gap: 20px;
-    }
-
-    .landing-guide-card {
-      background: var(--poster-surface);
-      border: 1px solid var(--poster-border);
-      border-top: 3px solid var(--poster-border-strong);
-      padding: 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .landing-guide-card.featured-card {
-      border-top-color: var(--poster-accent);
-    }
-
-    .landing-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      border-bottom: 1px solid var(--poster-border);
-      padding-bottom: 10px;
-      gap: 12px;
-    }
-
-    .landing-card-title {
-      font-family: var(--font-display);
-      font-size: 15px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: -0.01em;
-      color: var(--poster-text);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 0;
-    }
-
-    .landing-card-badge {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--poster-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      white-space: nowrap;
-    }
-
-    .landing-body-copy {
-      font-size: 13px;
-      line-height: 1.6;
-      color: var(--poster-text);
-    }
-
-    .landing-body-copy p {
-      margin-bottom: 10px;
-    }
-
-    .landing-body-copy p:last-child {
-      margin-bottom: 0;
-    }
-
-    .landing-comp-list {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .landing-comp-item {
-      padding: 14px;
-      background: var(--poster-surface-subtle);
-      border-left: 3px solid var(--poster-border-strong);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .landing-comp-item.comp-wc {
-      border-left-color: #EA580C;
-    }
-
-    .landing-comp-item.comp-ucl {
-      border-left-color: #0047BA;
-    }
-
-    .landing-comp-item.comp-laliga {
-      border-left-color: #B91C1C;
-    }
-
-    .landing-comp-title {
-      font-family: var(--font-display);
-      font-size: 13px;
-      font-weight: 800;
-      color: var(--poster-text);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .landing-comp-desc {
-      font-size: 12px;
-      color: var(--poster-text-muted);
-      line-height: 1.5;
-    }
-
-    .landing-comp-link {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--poster-accent);
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 4px;
-      align-self: flex-start;
-    }
-
-    .landing-comp-link:hover {
-      text-decoration: underline;
-    }
-
-    .landing-feature-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 0;
-      margin: 0;
-    }
-
-    .landing-feature-item {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      padding-left: 12px;
-      border-left: 2px solid var(--poster-border);
-    }
-
-    .landing-feature-name {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--poster-text);
-      text-transform: uppercase;
-    }
-
-    .landing-feature-desc {
-      font-size: 12px;
-      color: var(--poster-text-muted);
-      line-height: 1.45;
-    }
-
-    .landing-docs-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 10px;
-    }
-
-    .landing-doc-link {
-      padding: 10px 12px;
-      background: var(--poster-surface-subtle);
-      border: 1px solid var(--poster-border);
-      color: var(--poster-text);
-      text-decoration: none;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-    }
-
-    .landing-doc-link:hover {
-      background: var(--poster-accent-tint);
-      border-color: var(--poster-accent);
-      color: var(--poster-accent);
-    }
-
-    /* Focus visible accessibility */
-    a:focus-visible,
-    button:focus-visible,
-    select:focus-visible,
-    input:focus-visible {
-      outline: 2px solid var(--poster-accent);
-      outline-offset: 2px;
-    }
-
-    /* Reduced motion preference */
-    @media (prefers-reduced-motion: reduce) {
-      *,
-      *::before,
-      *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-      }
-    }
-  
-
-    /* ==========================================================================
-       WEBSITE SHELL & SPA LAYER STYLES (MATCHING RGB-ASCII.PAGES.DEV CONCEPT)
-       ========================================================================== */
-    html {
-      scroll-behavior: smooth;
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-      background: var(--poster-bg);
-      color: var(--poster-text);
-      font-family: var(--font-body);
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* Sticky Global Site Header */
-    .site-nav-header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 60px;
-      padding: 0 24px;
-      background: var(--poster-surface);
-      border-bottom: 1px solid var(--poster-border);
-      backdrop-filter: blur(12px);
-      transition: var(--transition-theme);
-    }
-
-    .site-nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      text-decoration: none;
-      color: var(--poster-text);
-    }
-
-    .site-nav-logo {
-      font-family: var(--font-display);
-      font-size: 20px;
-      font-weight: 900;
-      letter-spacing: -0.04em;
-      color: var(--poster-text);
-    }
-
-    .site-nav-tag {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3px 8px;
-      background: var(--poster-surface-subtle);
-      border: 1px solid var(--poster-border);
-      color: var(--poster-text-muted);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    .site-nav-links {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    .site-nav-link {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--poster-text-muted);
-      text-decoration: none;
-      transition: color 0.15s ease;
-    }
-
-    .site-nav-link:hover {
-      color: var(--poster-accent);
-    }
-
-    .site-nav-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .site-btn-cockpit {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      background: var(--poster-accent);
-      color: #FFFFFF !important;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      text-decoration: none;
-      border: 1px solid var(--poster-accent-hover);
-      transition: background 0.15s ease, transform 0.1s ease;
-    }
-
-    .site-btn-cockpit:hover {
-      background: var(--poster-accent-hover);
-      transform: translateY(-1px);
-    }
-
-    .site-btn-github {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 12px;
-      background: var(--poster-surface-subtle);
-      border: 1px solid var(--poster-border);
-      color: var(--poster-text);
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      text-decoration: none;
-      transition: border-color 0.15s ease;
-    }
-
-    .site-btn-github:hover {
-      border-color: var(--poster-border-strong);
-    }
-
-    /* Website Hero Banner */
-    .site-hero-section {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 48px 24px 32px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .site-hero-overline {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--poster-accent);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .site-hero-h1 {
-      font-family: var(--font-display);
-      font-size: clamp(32px, 5vw, 56px);
-      font-weight: 900;
-      line-height: 1.05;
-      letter-spacing: -0.04em;
-      margin: 0;
-      color: var(--poster-text);
-      max-width: 1000px;
-    }
-
-    .site-hero-lead {
-      font-size: clamp(15px, 2vw, 18px);
-      line-height: 1.6;
-      color: var(--poster-text-muted);
-      max-width: 860px;
-      margin: 0;
-    }
-
-    .site-hero-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 4px;
-    }
-
-    .site-hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 12px;
-      background: var(--poster-surface);
-      border: 1px solid var(--poster-border);
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--poster-text);
-    }
-
-    .site-hero-badge .pip {
-      width: 6px;
-      height: 6px;
-      background: #16A34A;
-      display: inline-block;
-    }
-
-    .site-hero-ctas {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 14px;
-      margin-top: 12px;
-    }
-
-    .site-cta-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 24px;
-      background: var(--poster-accent);
-      color: #FFFFFF !important;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      text-decoration: none;
-      transition: background 0.15s ease, transform 0.1s ease;
-    }
-
-    .site-cta-primary:hover {
-      background: var(--poster-accent-hover);
-      transform: translateY(-1px);
-    }
-
-    .site-cta-secondary {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 11px 20px;
-      background: var(--poster-surface);
-      border: 1px solid var(--poster-border-strong);
-      color: var(--poster-text);
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      text-decoration: none;
-      transition: border-color 0.15s ease, background 0.15s ease;
-    }
-
-    .site-cta-secondary:hover {
-      background: var(--poster-surface-subtle);
-    }
-
-    /* Dedicated Interactive Cockpit Workspace Section */
-    .site-cockpit-workspace {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 24px 24px 48px 24px;
-    }
-
-    .cockpit-workspace-header {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    @media (min-width: 768px) {
-      .cockpit-workspace-header {
-        flex-direction: row;
-        align-items: flex-end;
-        justify-content: space-between;
-      }
-    }
-
-    .cockpit-workspace-kicker {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--poster-text-muted);
-    }
-
-    .cockpit-workspace-title {
-      font-family: var(--font-display);
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin: 0;
-      color: var(--poster-text);
-    }
-
-    .cockpit-fullscreen-link {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--poster-accent);
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 6px 12px;
-      background: var(--poster-surface);
-      border: 1px solid var(--poster-border);
-      transition: border-color 0.15s ease, color 0.15s ease;
-    }
-
-    .cockpit-fullscreen-link:hover {
-      border-color: var(--poster-accent);
-      text-decoration: none;
-    }
-
-    /* Cockpit Outer Frame */
-    .cockpit-outer-frame {
-      border: 1px solid var(--poster-border-strong);
-      background: var(--poster-bg);
-      overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.06);
-    }
-
-    .cockpit-frame-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 32px;
-      padding: 0 14px;
-      background: var(--poster-surface-subtle);
-      border-bottom: 1px solid var(--poster-border);
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--poster-text-muted);
-    }
-
-    .cockpit-frame-bar-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .cockpit-status-dot {
-      width: 7px;
-      height: 7px;
-      background: #16A34A;
-      border-radius: 50%;
-      display: inline-block;
-    }
-
-    /* Generic Website Content Sections */
     .site-section {
       max-width: 1400px;
       margin: 0 auto;
-      padding: 64px 24px;
+      padding: 64px 28px;
       border-top: 1px solid var(--poster-border);
+      width: 100%;
     }
 
     .site-section-header {
-      margin-bottom: 32px;
-    }
-
-    .site-section-kicker {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--poster-accent);
-      margin-bottom: 6px;
+      margin-bottom: 36px;
     }
 
     .site-section-title {
       font-family: var(--font-display);
-      font-size: clamp(24px, 3.5vw, 36px);
-      font-weight: 900;
-      letter-spacing: -0.03em;
+      font-size: clamp(24px, 3.2vw, 36px);
+      font-weight: 800;
+      letter-spacing: -0.025em;
       margin: 0 0 10px 0;
       color: var(--poster-text);
     }
 
     .site-section-desc {
-      font-size: 15px;
-      line-height: 1.6;
+      font-size: 16px;
+      line-height: 1.65;
       color: var(--poster-text-muted);
-      max-width: 800px;
+      max-width: 820px;
       margin: 0;
     }
 
-    /* Section Grids */
     .site-grid-3 {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -1910,24 +1806,23 @@
 
     .site-grid-2 {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
       gap: 24px;
     }
 
     .site-card {
       background: var(--poster-surface);
       border: 1px solid var(--poster-border);
-      border-top: 3px solid var(--poster-border-strong);
-      padding: 24px;
+      padding: 28px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      transition: border-color 0.2s ease, transform 0.15s ease;
+      gap: 16px;
+      border-radius: 4px;
+      transition: border-color 0.15s ease;
     }
 
     .site-card:hover {
-      border-top-color: var(--poster-accent);
-      transform: translateY(-2px);
+      border-color: var(--poster-border-strong);
     }
 
     .site-card-header {
@@ -1936,6 +1831,8 @@
       align-items: baseline;
       border-bottom: 1px solid var(--poster-border);
       padding-bottom: 12px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .site-card-title {
@@ -1950,7 +1847,7 @@
 
     .site-card-badge {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       color: var(--poster-text-muted);
       text-transform: uppercase;
@@ -1958,8 +1855,8 @@
     }
 
     .site-card-body {
-      font-size: 13px;
-      line-height: 1.6;
+      font-size: 14px;
+      line-height: 1.65;
       color: var(--poster-text);
     }
 
@@ -1971,12 +1868,10 @@
       margin: 0;
     }
 
-    /* Code Snippet Box with Copy Button */
     .cmd-box {
       background: var(--poster-surface-subtle);
       border: 1px solid var(--poster-border);
-      padding: 14px;
-      position: relative;
+      padding: 14px 16px;
       font-family: var(--font-mono);
       font-size: 12px;
       color: var(--poster-text);
@@ -1984,6 +1879,7 @@
       justify-content: space-between;
       align-items: center;
       gap: 12px;
+      border-radius: 2px;
     }
 
     .cmd-box code {
@@ -1993,14 +1889,16 @@
     .btn-copy-cmd {
       background: var(--poster-surface);
       border: 1px solid var(--poster-border);
-      padding: 5px 10px;
+      padding: 6px 12px;
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       color: var(--poster-text);
       cursor: pointer;
       white-space: nowrap;
+      border-radius: 2px;
+      min-height: 32px;
       transition: background 0.15s ease, color 0.15s ease;
     }
 
@@ -2011,16 +1909,16 @@
     }
 
     .btn-copy-cmd.copied {
-      background: #16A34A !important;
+      background: #15803D !important;
       color: #FFFFFF !important;
-      border-color: #16A34A !important;
+      border-color: #15803D !important;
     }
 
-    /* FAQ Details/Summary Accordion */
     .faq-item {
       background: var(--poster-surface);
       border: 1px solid var(--poster-border);
       margin-bottom: 12px;
+      border-radius: 2px;
       transition: border-color 0.2s ease;
     }
 
@@ -2029,10 +1927,10 @@
     }
 
     .faq-summary {
-      padding: 18px 20px;
+      padding: 18px 22px;
       font-family: var(--font-display);
-      font-size: 15px;
-      font-weight: 800;
+      font-size: 16px;
+      font-weight: 700;
       color: var(--poster-text);
       cursor: pointer;
       list-style: none;
@@ -2052,7 +1950,6 @@
       font-size: 18px;
       font-weight: 700;
       color: var(--poster-text-muted);
-      transition: transform 0.2s ease;
     }
 
     .faq-item[open] .faq-summary::after {
@@ -2061,9 +1958,9 @@
     }
 
     .faq-content {
-      padding: 0 20px 18px 20px;
-      font-size: 13px;
-      line-height: 1.6;
+      padding: 0 22px 18px 22px;
+      font-size: 14px;
+      line-height: 1.65;
       color: var(--poster-text-muted);
       border-top: 1px solid var(--poster-border);
       padding-top: 14px;
@@ -2077,28 +1974,31 @@
       margin: 0;
     }
 
-    /* Global Site Footer */
+    /* ==========================================================================
+       GLOBAL SITE FOOTER
+       ========================================================================== */
     .site-footer {
       max-width: 1400px;
       margin: 0 auto;
-      padding: 48px 24px;
+      padding: 48px 28px;
       border-top: 2px solid var(--poster-border-strong);
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 32px;
-      font-size: 12px;
+      gap: 36px;
+      font-size: 13px;
       color: var(--poster-text-muted);
+      width: 100%;
     }
 
     .site-footer-col {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
     }
 
     .site-footer-title {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
@@ -2116,38 +2016,63 @@
       color: var(--poster-accent);
     }
 
-    /* Standalone App Top Banner */
-    .app-top-nav {
-      height: 40px;
-      background: var(--poster-surface-subtle);
-      border-bottom: 1px solid var(--poster-border);
+    .md-row {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      padding: 0 16px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-    }
-
-    .app-return-link {
-      color: var(--poster-accent);
-      font-weight: 700;
-      text-decoration: none;
-      display: inline-flex;
       align-items: center;
-      gap: 4px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--poster-border);
     }
 
-    .app-return-link:hover {
-      text-decoration: underline;
+    /* Responsive Breakpoints & Hardening */
+    @media (max-width: 860px) {
+      .overview-grid {
+        grid-template-columns: 1fr;
+      }
+      .hero-poster-strip {
+        grid-template-columns: 1fr;
+      }
+      .hero-left-copy {
+        border-right: none;
+        border-bottom: 1px solid var(--poster-border-strong);
+        padding: 20px;
+      }
+      .hero-right-stats {
+        padding: 20px;
+      }
+      .sim-shell-grid {
+        grid-template-columns: 1fr;
+      }
+      .fixtures-schedule {
+        grid-template-columns: 1fr;
+      }
+      .site-grid-2 {
+        grid-template-columns: 1fr;
+      }
+      .what-if-grid {
+        grid-template-columns: 1fr;
+      }
+      .cockpit-frame-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        height: auto;
+        padding: 12px 16px;
+        gap: 8px;
+      }
+      .poster-container {
+        padding: 16px;
+      }
+      .site-hero-section {
+        padding: 36px 16px 24px 16px;
+      }
+      .site-cockpit-workspace {
+        padding: 16px 16px 40px 16px;
+      }
+      .site-section {
+        padding: 48px 16px;
+      }
     }
-
-    .app-title-tag {
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      color: var(--poster-text);
-    }
-</style>
+  </style>
 </head>
 <body class="theme-worldcup">
 
@@ -2188,10 +2113,7 @@
 
   <!-- Website Hero Presentation -->
   <section class="site-hero-section" aria-label="Platform Overview">
-    <div class="site-hero-overline">
-      <span>●</span> UEFA CHAMPIONS LEAGUE 2026/27 &bull; FIFA WORLD CUP 2026 &bull; LALIGA EA SPORTS 2026/27
-    </div>
-    <h1 class="site-hero-h1">Truthful Football Match Prediction &amp; Simulation Platform</h1>
+        <h1 class="site-hero-h1">Truthful Football Match Prediction &amp; Simulation Platform</h1>
     <p class="site-hero-lead">
       A mathematically rigorous prediction kernel and seeded Monte Carlo simulation engine.
       Real played fixtures are treated as immutable facts; simulated outcomes carry explicit mathematical
@@ -2219,13 +2141,27 @@
   <section class="site-cockpit-workspace" id="cockpit" aria-label="Interactive Prediction Cockpit">
     <div class="cockpit-workspace-header">
       <div>
-        <div class="cockpit-workspace-kicker">Direct Product Interface</div>
-        <h2 class="cockpit-workspace-title">Interactive Multi-Competition Prediction &amp; Simulation Cockpit</h2>
+                <h2 class="cockpit-workspace-title">Interactive Multi-Competition Prediction &amp; Simulation Cockpit</h2>
       </div>
       <a class="cockpit-fullscreen-link" href="/app/" title="Open distraction-free full-screen application">
         <span>Launch Full-Screen App</span>
         <span>&nearr;</span>
       </a>
+    </div>
+
+    
+    <!-- Cockpit Connection & Error Status Banner -->
+    <div class="cockpit-error-banner" id="cockpit-error-banner" role="alert" style="display: none;">
+      <div class="error-banner-content">
+        <div class="error-banner-title" id="cockpit-error-title">API Connection Unavailable</div>
+        <div class="error-banner-desc" id="cockpit-error-desc">
+          Live prediction backend is unreachable. The platform has automatically engaged verified offline snapshot mode.
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-error-retry" onclick="triggerManualRefresh()">Retry Connection</button>
+        <button class="btn-error-retry" style="background: var(--poster-surface-subtle); color: var(--poster-text); border: 1px solid var(--poster-border);" onclick="document.getElementById('cockpit-error-banner').style.display='none'">Dismiss</button>
+      </div>
     </div>
 
     <!-- Outer Frame Container -->
@@ -2236,9 +2172,9 @@
           <span style="font-weight: 700; color: var(--poster-text);">FOOTBALL PREDICTOR v1.0.0 [FASTAPI + NUMPY]</span>
         </div>
         <div style="display: flex; gap: 16px;">
-          <span>RENDER BACKEND: <b style="color: #16A34A;">CONNECTED</b></span>
+          <span>RENDER BACKEND: <b style="color: #15803D;">CONNECTED</b></span>
           <span>BOOT POLICY: <b>0 CALLS</b></span>
-          <span>PROVENANCE: <b style="color: #16A34A;">FACTUAL / SIMULATED STRICT</b></span>
+          <span>PROVENANCE: <b style="color: #15803D;">FACTUAL / SIMULATED STRICT</b></span>
         </div>
       </div>
 
@@ -2306,13 +2242,13 @@
     <section class="hero-poster-strip" data-od-id="hero-strip">
       <div class="hero-left-copy">
         <div>
-          <div class="hero-pretitle" id="hero-pretitle">FIFA INTERNATIONAL TOURNAMENT</div>
+          <span id="hero-pretitle" style="display:none;" aria-hidden="true"></span>
           <h2 class="hero-title" id="hero-title">WORLD CUP 2026</h2>
           <p class="hero-subtitle" id="hero-desc">
             48-team mega tournament across North America. 12 groups of 4 with 8 best third-placed qualifiers advancing to a 32-team single elimination knockout phase.
           </p>
         </div>
-        <div style="margin-top: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+        <div style="margin-top: 16px; font-family: var(--font-mono); font-size: 12px; color: var(--poster-text-muted);">
           PREDICTION KERNEL: <b style="color: var(--poster-text);">5-SIGNAL ENSEMBLE + BIVARIATE POISSON MODEL</b>
         </div>
         <div class="hero-watermark-num" id="hero-watermark">26</div>
@@ -2375,7 +2311,7 @@
             <h2 class="card-title">TOP POWER RANKINGS // REFINED ELO</h2>
             <span class="card-subtitle">UPDATED FROM VERIFIED MATCHES</span>
           </div>
-          <table class="table-swiss" id="overview-elo-table">
+          <div class="table-responsive"><table class="table-swiss" id="overview-elo-table">
             <thead>
               <tr>
                 <th style="width: 36px;">#</th>
@@ -2388,7 +2324,7 @@
             <tbody id="overview-elo-body">
               <!-- Dynamically rendered -->
             </tbody>
-          </table>
+          </table></div>
         </div>
 
         <!-- 5-Signal Ensemble Decomposition Card -->
@@ -2490,7 +2426,7 @@
             RESET TO FACTUAL STORE
           </button>
 
-          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-muted); line-height: 1.5; border-top: 1px solid var(--poster-border); padding-top: 10px;">
+          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--poster-text-muted); line-height: 1.5; border-top: 1px solid var(--poster-border); padding-top: 10px;">
             <b>STRICT TRUTHFULNESS GUARANTEE:</b> Simulated numbers exist in transient memory only. Real played match results are immutable facts and will never be overwritten.
           </div>
         </div>
@@ -2502,7 +2438,7 @@
             <span class="card-subtitle" id="sim-sample-count">BASED ON 10,000 ITERATIONS</span>
           </div>
 
-          <table class="table-swiss" id="sim-progression-table">
+          <div class="table-responsive"><table class="table-swiss" id="sim-progression-table">
             <thead>
               <tr>
                 <th style="width: 32px;">#</th>
@@ -2517,7 +2453,7 @@
             <tbody id="sim-progression-body">
               <!-- Dynamically populated -->
             </tbody>
-          </table>
+          </table></div>
         </div>
 
       </div>
@@ -2538,8 +2474,7 @@
        ======================================================================== -->
   <section class="site-section" id="competitions" aria-label="Tournament Brains">
     <div class="site-section-header">
-      <div class="site-section-kicker">Tournament Brains</div>
-      <h2 class="site-section-title">Three Autonomous Competition Engines</h2>
+            <h2 class="site-section-title">Three Autonomous Competition Engines</h2>
       <p class="site-section-desc">
         Each competition is an independent brain owning its format rules, tiebreaker criteria, and progression logic.
         The shared kernel provides mathematical predictions and simulation without enforcing tournament formats.
@@ -2599,8 +2534,7 @@
        ======================================================================== -->
   <section class="site-section" id="engine" aria-label="Prediction Kernel & Signals">
     <div class="site-section-header">
-      <div class="site-section-kicker">Prediction Kernel</div>
-      <h2 class="site-section-title">5-Signal Ensemble &amp; Bivariate Poisson Engine</h2>
+            <h2 class="site-section-title">5-Signal Ensemble &amp; Bivariate Poisson Engine</h2>
       <p class="site-section-desc">
         Match probabilities are produced by an ensemble engine blending five independent signals with inverse log-loss calibration weights, combined with a Poisson expected-goals distribution.
       </p>
@@ -2680,8 +2614,7 @@
        ======================================================================== -->
   <section class="site-section" id="architecture" aria-label="System Architecture & Truthfulness">
     <div class="site-section-header">
-      <div class="site-section-kicker">Architectural Integrity</div>
-      <h2 class="site-section-title">Truthful Ingestion Guarantees &amp; Baseline Edge</h2>
+            <h2 class="site-section-title">Truthful Ingestion Guarantees &amp; Baseline Edge</h2>
       <p class="site-section-desc">
         FOOTBALL does not guess, fabricate numbers, or blend simulated data into factual stores.
         Every computation follows strict architectural contracts.
@@ -2743,8 +2676,7 @@
        ======================================================================== -->
   <section class="site-section" id="quickstart" aria-label="Quick Start Reference">
     <div class="site-section-header">
-      <div class="site-section-kicker">Developer Reference</div>
-      <h2 class="site-section-title">Quick Start &amp; CLI Commands</h2>
+            <h2 class="site-section-title">Quick Start &amp; CLI Commands</h2>
       <p class="site-section-desc">
         Launch the FastAPI backend, run historical evaluation backfills, or execute Monte Carlo simulations directly from the command line.
       </p>
@@ -2803,8 +2735,7 @@
        ======================================================================== -->
   <section class="site-section" id="faq" aria-label="Frequently Asked Questions">
     <div class="site-section-header">
-      <div class="site-section-kicker">Common Questions</div>
-      <h2 class="site-section-title">Frequently Asked Questions</h2>
+            <h2 class="site-section-title">Frequently Asked Questions</h2>
       <p class="site-section-desc">
         Understanding the core methodologies, data provenance boundaries, and operational guarantees.
       </p>
@@ -2859,7 +2790,7 @@
         Truthful match prediction &amp; Monte Carlo simulation engine across World Cup 2026, UEFA Champions League 2026/27, and LaLiga 2026/27.
       </p>
       <div style="margin-top: 8px;">
-        PROVENANCE: <b style="color: #16A34A;">100% UNFABRICATED FACTS</b>
+        PROVENANCE: <b style="color: #15803D;">100% UNFABRICATED FACTS</b>
       </div>
     </div>
 
@@ -2882,9 +2813,9 @@
     <div class="site-footer-col">
       <div class="site-footer-title">SOURCE &amp; LICENSE</div>
       <span>RUNTIME: <b>PYTHON 3.11 + FASTAPI</b></span>
-      <span>TEST SUITE: <b style="color: #16A34A;">2,339 PASSING</b></span>
+      <span>TEST SUITE: <b style="color: #15803D;">2,339 PASSING</b></span>
       <a class="site-footer-link" href="https://github.com/Sujoy-004/FOOTBALL" target="_blank" rel="noopener noreferrer">GitHub Repository &nearr;</a>
-      <span style="margin-top: 8px; font-size: 11px;">&copy; 2026 FOOTBALL. Released under MIT License.</span>
+      <span style="margin-top: 8px; font-size: 12px;">&copy; 2026 FOOTBALL. Released under MIT License.</span>
     </div>
   </footer>
 
@@ -2901,17 +2832,17 @@
         <div class="modal-clash-header">
           <div class="m-team home">
             <div class="m-team-name" id="m-home-name">Real Madrid</div>
-            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+            <div style="font-family: var(--font-mono); font-size: 12px; color: var(--poster-text-muted);">
               ELO: <b id="m-home-elo">2014</b> • xG: <b id="m-home-xg">1.82</b>
             </div>
           </div>
           <div style="text-align: center;">
             <div class="m-vs-badge" id="m-clash-status">SCHEDULED</div>
-            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent); margin-top: 4px; font-weight: 700;" id="m-clash-provenance">PROJECTION</div>
+            <div style="font-family: var(--font-mono); font-size: 12px; color: var(--poster-accent); margin-top: 4px; font-weight: 700;" id="m-clash-provenance">PROJECTION</div>
           </div>
           <div class="m-team away">
             <div class="m-team-name" id="m-away-name">Manchester City</div>
-            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">
+            <div style="font-family: var(--font-mono); font-size: 12px; color: var(--poster-text-muted);">
               ELO: <b id="m-away-elo">1998</b> • xG: <b id="m-away-xg">1.38</b>
             </div>
           </div>
@@ -2919,7 +2850,7 @@
 
         <!-- Triple Probability Bar -->
         <div>
-          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-muted); margin-bottom: 4px;">
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; color: var(--poster-text-muted); margin-bottom: 4px;">
             <span>HOME WIN: <b id="m-prob-home-txt">48.2%</b></span>
             <span>DRAW: <b id="m-prob-draw-txt">25.4%</b></span>
             <span>AWAY WIN: <b id="m-prob-away-txt">26.4%</b></span>
@@ -2935,9 +2866,9 @@
         <div>
           <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
             <h4 style="font-family: var(--font-display); font-size: 13px; text-transform: uppercase;">POISSON SCORELINE DENSITY</h4>
-            <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-muted);" id="m-poisson-lambdas">λ1 = 1.82, λ2 = 1.38</span>
+            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--poster-text-muted);" id="m-poisson-lambdas">λ1 = 1.82, λ2 = 1.38</span>
           </div>
-          <table class="poisson-grid-swiss" id="modal-poisson-table">
+          <div class="table-responsive"><table class="poisson-grid-swiss" id="modal-poisson-table">
             <thead>
               <tr>
                 <th>H \ A</th>
@@ -2950,7 +2881,7 @@
             <tbody id="modal-poisson-body">
               <!-- Dynamically populated -->
             </tbody>
-          </table>
+          </table></div>
         </div>
 
         <!-- Counterfactual "What-If" Sensitivity Tester -->
@@ -2960,14 +2891,14 @@
           </div>
           <div class="what-if-grid">
             <div>
-              <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; margin-bottom: 4px;">
+              <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; margin-bottom: 4px;">
                 <span>REST DAYS DIFFERENTIAL:</span>
                 <span id="m-whatif-rest-val" style="font-weight: 700;">+1 Day</span>
               </div>
               <input type="range" id="m-slider-rest" min="-5" max="5" value="1" step="1" oninput="updateModalWhatIf()" style="width: 100%;">
             </div>
             <div>
-              <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; margin-bottom: 4px;">
+              <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; margin-bottom: 4px;">
                 <span>SQUAD VALUE MULTIPLIER:</span>
                 <span id="m-whatif-squad-val" style="font-weight: 700;">1.00x</span>
               </div>
@@ -5344,7 +5275,7 @@
           <td><b>${item.name}</b></td>
           <td class="num-col" style="color: var(--poster-accent);">${item.elo}</td>
           <td class="num-col">${item.delta}</td>
-          <td class="num-col" style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-muted);">${item.tier}</td>
+          <td class="num-col" style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-muted);">${item.tier}</td>
         `;
         eloBody.appendChild(tr);
       });
@@ -5356,7 +5287,7 @@
         sigBody.innerHTML = `
           <div style="padding: 16px 8px; font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-dim); text-align: center; border: 1px dashed var(--poster-border); border-radius: 4px; line-height: 1.5;">
             COLD START &bull; NO CALIBRATED WEIGHTS YET<br>
-            <span style="font-size: 10px; color: var(--poster-text-muted);">Signals currently combine with uniform 1/K weights</span>
+            <span style="font-size: 11px; color: var(--poster-text-muted);">Signals currently combine with uniform 1/K weights</span>
           </div>`;
       } else {
         data.signals.forEach(sig => {
@@ -5478,7 +5409,7 @@
             rows += `
               <tr style="${isTop2 ? 'font-weight: 600;' : ''}">
                 <td style="font-family: var(--font-mono); width: 22px; color: ${isTop2 ? 'var(--poster-accent)' : 'inherit'};">${t.pos}</td>
-                <td><b>${t.name}</b> ${isTop2 ? '<span style="font-size:9px; color:var(--poster-accent); margin-left:3px;">●</span>' : ''}</td>
+                <td><b>${t.name}</b> ${isTop2 ? '<span style="font-size: 11px; color:var(--poster-accent); margin-left:3px;">●</span>' : ''}</td>
                 <td class="num-col">${t.p}</td>
                 <td class="num-col">${t.w}</td>
                 <td class="num-col">${t.d}</td>
@@ -5491,7 +5422,7 @@
           card.innerHTML = `
             <div class="group-header">
               <span>${g.name}</span>
-              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-dim);">TOP 2 ADVANCE</span>
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-dim);">TOP 2 ADVANCE</span>
             </div>
             <table class="table-swiss">
               <thead>
@@ -5524,7 +5455,7 @@
               <td class="num-col">${t.l}</td>
               <td class="num-col">${t.gf}:${t.ga}</td>
               <td class="num-col" style="color: var(--poster-accent); font-weight: 800;">${t.pts}</td>
-              <td class="num-col" style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-dim);">${t.zone}</td>
+              <td class="num-col" style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-dim);">${t.zone}</td>
             </tr>
           `;
         });
@@ -5603,15 +5534,15 @@
       if (isFinal && m.winner) {
         footerCallout = `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-accent); font-weight: 800; margin-top: 6px; border-top: 1px solid var(--poster-accent); padding-top: 6px; text-align: center;">🏆 ${m.winner.toUpperCase()} WORLD CHAMPION</div>`;
       } else if (customHeader && customHeader.includes('THIRD') && m.winner) {
-        footerCallout = `<div style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent); font-weight: 800; margin-top: 6px; border-top: 1px dashed var(--poster-border); padding-top: 5px; text-align: center;">🥉 ${m.winner.toUpperCase()} THIRD PLACE</div>`;
+        footerCallout = `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-accent); font-weight: 800; margin-top: 6px; border-top: 1px dashed var(--poster-border); padding-top: 5px; text-align: center;">🥉 ${m.winner.toUpperCase()} THIRD PLACE</div>`;
       } else if (m.winner) {
-        footerCallout = `<div style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent); font-weight: 700; margin-top: 4px; border-top: 1px dashed var(--poster-border); padding-top: 4px;">▶ ${m.winner} ADVANCES</div>`;
+        footerCallout = `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-accent); font-weight: 700; margin-top: 4px; border-top: 1px dashed var(--poster-border); padding-top: 4px;">▶ ${m.winner} ADVANCES</div>`;
       }
 
       tile.innerHTML = `
         <div class="m-tile-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-          <span class="${badgeClass}" style="font-size: 9px; padding: 1px 5px;">${customHeader ? customHeader : badgeText}</span>
-          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-text-dim);">${m.id ? '#' + m.id : ''}</span>
+          <span class="${badgeClass}" style="font-size: 11px; padding: 1px 5px;">${customHeader ? customHeader : badgeText}</span>
+          <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-dim);">${m.id ? '#' + m.id : ''}</span>
         </div>
         <div class="m-tile-team" style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin: 2px 0;">
           <span class="m-tile-name" style="${isWinnerH ? 'font-weight: 800; color: var(--poster-accent);' : 'font-weight: 600;'}">${teamH}</span>
@@ -5768,7 +5699,7 @@
                     <span style="flex:1; text-align:right; ${isHWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.h}</span>
                     <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px;">${m.sH} – ${m.sA}</span>
                     <span style="flex:1; ${isAWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.a}</span>
-                    <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+                    <span style="margin-left:6px; font-size: 11px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
                   </div>
                 `;
               });
@@ -5776,7 +5707,7 @@
               card.innerHTML = `
                 <div class="group-header" style="cursor: pointer; display: flex; justify-content: space-between; padding: 10px 12px; background: var(--poster-surface-subtle); border-bottom: 1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
                   <span style="font-weight: 800; text-transform: uppercase;">${r.name}</span>
-                  <span style="font-family: var(--font-mono); font-size: 10px; color: var(--poster-accent);">
+                  <span style="font-family: var(--font-mono); font-size: 11px; color: var(--poster-accent);">
                     ${r.matches.length} RESULTS &#9662;
                   </span>
                 </div>
@@ -5850,7 +5781,7 @@
                   <span style="flex:1; text-align:right; ${isHWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.h}</span>
                   <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px; font-size:${m.fact ? '12px' : '10px'};">${scoreDisplay}</span>
                   <span style="flex:1; ${isAWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.a}</span>
-                  <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+                  <span style="margin-left:6px; font-size: 11px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
                 </div>
               `;
             });
@@ -5860,7 +5791,7 @@
             card.innerHTML = `
               <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
                 <span style="font-weight: 800;">${md.name}</span>
-                <span style="font-family: var(--font-mono); font-size: 10px; color: ${isPlayedMd ? '#10B981' : 'var(--poster-accent)'};">${statusLabel} (${md.matches.length}) &#9662;</span>
+                <span style="font-family: var(--font-mono); font-size: 11px; color: ${isPlayedMd ? '#10B981' : 'var(--poster-accent)'};">${statusLabel} (${md.matches.length}) &#9662;</span>
               </div>
               <div class="group-match-list open" style="flex-direction: column;">
                 ${mRows}
@@ -5935,7 +5866,7 @@
                   <span style="flex:1; text-align:right; ${isHWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.h}</span>
                   <span style="margin:0 10px; font-weight:800; font-family:var(--font-mono); min-width:44px; text-align:center; color:var(--poster-accent); background:var(--poster-surface-subtle); padding:2px 6px; border-radius:3px; font-size:${m.fact ? '12px' : '10px'};">${scoreDisplay}</span>
                   <span style="flex:1; ${isAWin ? 'font-weight:700; color:var(--poster-accent);' : 'font-weight:500;'}">${m.a}</span>
-                  <span style="margin-left:6px; font-size:9px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
+                  <span style="margin-left:6px; font-size: 11px; color:${m.fact ? '#10B981' : '#F59E0B'};">●</span>
                 </div>
               `;
             });
@@ -5945,7 +5876,7 @@
             card.innerHTML = `
               <div class="group-header" style="cursor: pointer; display:flex; justify-content:space-between; padding:10px 12px; background:var(--poster-surface-subtle); border-bottom:1px solid var(--poster-border);" onclick="this.nextElementSibling.classList.toggle('open');">
                 <span style="font-weight: 800;">MATCHDAY ${md.matchday}</span>
-                <span style="font-family: var(--font-mono); font-size: 10px; color: ${isPlayedMd ? '#10B981' : (isNextUpcoming ? 'var(--poster-accent)' : 'var(--poster-text-dim)')};">
+                <span style="font-family: var(--font-mono); font-size: 11px; color: ${isPlayedMd ? '#10B981' : (isNextUpcoming ? 'var(--poster-accent)' : 'var(--poster-text-dim)')};">
                   ${statusLabel} (${md.matches.length}) &#9662;
                 </span>
               </div>
@@ -5969,7 +5900,7 @@
           <tr>
             <td colspan="7" style="text-align: center; padding: 48px 16px; font-family: var(--font-mono); font-size: 11px; color: var(--poster-text-dim); letter-spacing: 0.05em; line-height: 1.6;">
               NO TOURNAMENT SIMULATION EXECUTED YET<br>
-              <span style="font-size: 10px; color: var(--poster-text-muted);">Select iteration count above and click "RUN MONTE CARLO" to generate projections</span>
+              <span style="font-size: 11px; color: var(--poster-text-muted);">Select iteration count above and click "RUN MONTE CARLO" to generate projections</span>
             </td>
           </tr>`;
         return;
