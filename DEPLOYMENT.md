@@ -149,23 +149,15 @@ Total Monthly Operational Expense:        $0.00 USD
 
 ---
 
-## 7. Cloudflare Workers Edge Deployment (Frontend & Static SPA)
+## 7. Cloudflare Pages Edge Deployment (Frontend & Static SPA)
 
-The single-page application frontend and client assets are served at the edge using Cloudflare Workers with static assets bindings.
+The single-page application frontend and client assets are served at the edge using Cloudflare Pages.
 
-- **Live URL:** [https://football.iamsujoy004.workers.dev](https://football.iamsujoy004.workers.dev)
+- **Live URL:** [https://football.pages.dev](https://football.pages.dev)
 - **Configuration Files:**
-  - [`wrangler.worker.toml`](wrangler.worker.toml):
+  - [`wrangler.toml`](wrangler.toml) (Cloudflare Pages configuration):
     ```toml
     name = "football"
-    compatibility_date = "2026-01-01"
-
-    [assets]
-    directory = "./web/static"
-    ```
-  - [`wrangler.toml`](wrangler.toml) (Cloudflare Pages fallback):
-    ```toml
-    name = "football-frontend"
     compatibility_date = "2026-01-01"
     pages_build_output_dir = "web/static"
     ```
@@ -177,7 +169,7 @@ The single-page application frontend and client assets are served at the edge us
 - **Deployment Command:**
   Deploy using Wrangler CLI:
   ```bash
-  npx wrangler deploy --config wrangler.worker.toml
+  npx wrangler pages deploy web/static --project-name football
   ```
 
 ---

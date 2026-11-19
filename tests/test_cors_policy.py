@@ -45,19 +45,19 @@ def test_cors_simple_get_localhost(client):
 
 def test_cors_cloudflare_pages_regex_matching(client):
     # Production Cloudflare Pages apex domain
-    resp1 = client.get("/health", headers={"Origin": "https://football-frontend.pages.dev"})
+    resp1 = client.get("/health", headers={"Origin": "https://football.pages.dev"})
     assert resp1.status_code == 200
-    assert resp1.headers.get("access-control-allow-origin") == "https://football-frontend.pages.dev"
+    assert resp1.headers.get("access-control-allow-origin") == "https://football.pages.dev"
 
     # Branch preview subdomain on Cloudflare Pages
-    resp2 = client.get("/health", headers={"Origin": "https://preview-12.football-frontend.pages.dev"})
+    resp2 = client.get("/health", headers={"Origin": "https://preview-12.football.pages.dev"})
     assert resp2.status_code == 200
-    assert resp2.headers.get("access-control-allow-origin") == "https://preview-12.football-frontend.pages.dev"
+    assert resp2.headers.get("access-control-allow-origin") == "https://preview-12.football.pages.dev"
 
-    # Cloudflare Workers dev domain (e.g. https://football.iamsujoy004.workers.dev)
-    resp3 = client.get("/health", headers={"Origin": "https://football.iamsujoy004.workers.dev"})
+    # Legacy / fallback Cloudflare Pages domain
+    resp3 = client.get("/health", headers={"Origin": "https://football-frontend.pages.dev"})
     assert resp3.status_code == 200
-    assert resp3.headers.get("access-control-allow-origin") == "https://football.iamsujoy004.workers.dev"
+    assert resp3.headers.get("access-control-allow-origin") == "https://football-frontend.pages.dev"
 
 
 def test_cors_unauthorized_origin_rejected(client):

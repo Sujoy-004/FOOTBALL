@@ -1,6 +1,6 @@
 # FOOTBALL
 
-[![Live App](https://img.shields.io/badge/Live%20Website-football.iamsujoy004.workers.dev-brightgreen?style=for-the-badge&logo=cloudflare)](https://football.iamsujoy004.workers.dev)
+[![Live App](https://img.shields.io/badge/Live%20Website-football.pages.dev-brightgreen?style=for-the-badge&logo=cloudflare)](https://football.pages.dev)
 
 A shared football prediction and Monte Carlo simulation engine with
 competition-specific brains — World Cup 2026, UEFA Champions League 2026/27
@@ -9,7 +9,7 @@ completed history), and LaLiga EA Sports 2026/27 — where real played matches
 are immutable facts and every simulated number is explicitly labeled as
 simulated.
 
-**Live Application:** [https://football.iamsujoy004.workers.dev](https://football.iamsujoy004.workers.dev)
+**Live Application:** [https://football.pages.dev](https://football.pages.dev)
 
 ## What it does
 
