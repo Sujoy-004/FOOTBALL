@@ -1,0 +1,5 @@
+# robots.txt for https://football.iamsujoy004.workers.dev
+User-agent: *
+Allow: /
+
+Sitemap: https://football.iamsujoy004.workers.dev/sitemap.xml
