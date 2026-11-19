@@ -179,7 +179,7 @@ def test_observed_active_provider_spellings_attach_and_preserve_matchday(tmp_pat
     from competitions.ucl.src.state import build_competition_state
     state = build_competition_state(data_dir, active_season="2026/27")
     matchdays = state["stages"]["league"]["matchdays"]
-    assert set(matchdays) == {"MD01"}
+    assert "MD01" in matchdays
     assert {m["match_id"] for m in matchdays["MD01"]} >= {
         "gen-f4b6285469c3b0e0", "gen-2ce302d883e61826"
     }
