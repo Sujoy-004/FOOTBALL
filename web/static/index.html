@@ -3,7 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FOOTBALL — Minimalist Poster Truth & Simulation Engine</title>
+  <title>FOOTBALL — Multi-Competition Match Prediction &amp; Simulation Engine</title>
+  <meta name="description" content="Truthful football match prediction and Monte Carlo simulation engine across World Cup 2026, UEFA Champions League 2026/27, and LaLiga 2026/27. Immutable match facts separated from simulated projections.">
+  <link rel="canonical" href="https://football.iamsujoy004.workers.dev/">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="FOOTBALL">
+  <meta property="og:title" content="FOOTBALL — Multi-Competition Match Prediction &amp; Simulation Engine">
+  <meta property="og:description" content="Truthful football match prediction and Monte Carlo simulation engine across World Cup 2026, UEFA Champions League 2026/27, and LaLiga 2026/27. Real match facts separated from simulated projections.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://football.iamsujoy004.workers.dev/">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="FOOTBALL — Multi-Competition Match Prediction &amp; Simulation Engine">
+  <meta name="twitter:description" content="Truthful football match prediction and Monte Carlo simulation engine across World Cup 2026, UEFA Champions League 2026/27, and LaLiga 2026/27. Real match facts separated from simulated projections.">
+
+  <!-- Structured Data: WebApplication Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "FOOTBALL",
+    "url": "https://football.iamsujoy004.workers.dev/",
+    "description": "Truthful football match prediction and seeded Monte Carlo simulation platform across World Cup 2026, UEFA Champions League 2026/27, and LaLiga 2026/27.",
+    "applicationCategory": "SportsApplication",
+    "operatingSystem": "All"
+  }
+  </script>
+
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23090D13' stroke='%23EA580C' stroke-width='2'/%3E%3Cpolygon points='16,8 22,13 20,20 12,20 10,13' fill='%23EA580C'/%3E%3C/svg%3E">
   <script src="/config.js"></script>
   <script type="module" src="/api.js"></script>
@@ -234,6 +263,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      text-decoration: none;
     }
 
     .comp-switch-btn:last-child {
@@ -1255,6 +1285,235 @@
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 14px;
     }
+
+    /* Brand mark title heading element reset */
+    .brand-title {
+      font-family: inherit;
+      font-weight: inherit;
+      font-size: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      line-height: inherit;
+      color: inherit;
+      margin: 0;
+      padding: 0;
+      display: inline;
+    }
+
+    /* ==========================================================================
+       LANDING ARCHITECTURE & ON-PAGE SEO GUIDE (SWISS POSTER CARDS)
+       ========================================================================== */
+    .landing-guide-section {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 10px;
+    }
+
+    .landing-guide-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+    }
+
+    .landing-guide-card {
+      background: var(--poster-surface);
+      border: 1px solid var(--poster-border);
+      border-top: 3px solid var(--poster-border-strong);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .landing-guide-card.featured-card {
+      border-top-color: var(--poster-accent);
+    }
+
+    .landing-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid var(--poster-border);
+      padding-bottom: 10px;
+      gap: 12px;
+    }
+
+    .landing-card-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      color: var(--poster-text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .landing-card-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--poster-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .landing-body-copy {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--poster-text);
+    }
+
+    .landing-body-copy p {
+      margin-bottom: 10px;
+    }
+
+    .landing-body-copy p:last-child {
+      margin-bottom: 0;
+    }
+
+    .landing-comp-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .landing-comp-item {
+      padding: 14px;
+      background: var(--poster-surface-subtle);
+      border-left: 3px solid var(--poster-border-strong);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .landing-comp-item.comp-wc {
+      border-left-color: #EA580C;
+    }
+
+    .landing-comp-item.comp-ucl {
+      border-left-color: #0047BA;
+    }
+
+    .landing-comp-item.comp-laliga {
+      border-left-color: #B91C1C;
+    }
+
+    .landing-comp-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--poster-text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .landing-comp-desc {
+      font-size: 12px;
+      color: var(--poster-text-muted);
+      line-height: 1.5;
+    }
+
+    .landing-comp-link {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--poster-accent);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+      align-self: flex-start;
+    }
+
+    .landing-comp-link:hover {
+      text-decoration: underline;
+    }
+
+    .landing-feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+    }
+
+    .landing-feature-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding-left: 12px;
+      border-left: 2px solid var(--poster-border);
+    }
+
+    .landing-feature-name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--poster-text);
+      text-transform: uppercase;
+    }
+
+    .landing-feature-desc {
+      font-size: 12px;
+      color: var(--poster-text-muted);
+      line-height: 1.45;
+    }
+
+    .landing-docs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+    }
+
+    .landing-doc-link {
+      padding: 10px 12px;
+      background: var(--poster-surface-subtle);
+      border: 1px solid var(--poster-border);
+      color: var(--poster-text);
+      text-decoration: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .landing-doc-link:hover {
+      background: var(--poster-accent-tint);
+      border-color: var(--poster-accent);
+      color: var(--poster-accent);
+    }
+
+    /* Focus visible accessibility */
+    a:focus-visible,
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--poster-accent);
+      outline-offset: 2px;
+    }
+
+    /* Reduced motion preference */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
   </style>
 </head>
 <body class="theme-worldcup">
@@ -1265,31 +1524,31 @@
   <div class="poster-container" data-od-id="main-poster">
 
     <!-- Top Masthead Frame -->
-    <header class="masthead-frame" data-od-id="masthead">
+    <header class="masthead-frame" data-od-id="masthead" role="banner">
       <div class="masthead-left">
         <div class="brand-mark-swiss">
-          <span class="accent-bar"></span>
-          <span>FOOTBALL</span>
+          <span class="accent-bar" aria-hidden="true"></span>
+          <h1 class="brand-title">FOOTBALL</h1>
         </div>
         <div class="brand-meta" id="masthead-meta">
-          TRUTHFUL PREDICTOR // 1,751 TESTS VERIFIED
+          MULTI-COMPETITION PREDICTOR // 2,338 TESTS VERIFIED
         </div>
       </div>
 
       <!-- Competition Switcher (WC, UCL, LaLiga) -->
-      <nav class="comp-switcher" data-od-id="competition-tabs" aria-label="Tournament Selection">
-        <button class="comp-switch-btn active" id="btn-comp-worldcup" onclick="setCompetition('worldcup')">
-          <span class="color-pip" style="background: #E8590C;"></span>
+      <nav class="comp-switcher" data-od-id="competition-tabs" aria-label="Tournament Selection" role="tablist">
+        <a class="comp-switch-btn active" id="btn-comp-worldcup" href="#/worldcup" onclick="setCompetition('worldcup')" role="tab" aria-selected="true">
+          <span class="color-pip" style="background: #E8590C;" aria-hidden="true"></span>
           <span>WORLD CUP 2026</span>
-        </button>
-        <button class="comp-switch-btn" id="btn-comp-ucl" onclick="setCompetition('ucl')">
-          <span class="color-pip" style="background: #0252CD;"></span>
+        </a>
+        <a class="comp-switch-btn" id="btn-comp-ucl" href="#/ucl" onclick="setCompetition('ucl')" role="tab" aria-selected="false">
+          <span class="color-pip" style="background: #0252CD;" aria-hidden="true"></span>
           <span>CHAMPIONS LEAGUE</span>
-        </button>
-        <button class="comp-switch-btn" id="btn-comp-laliga" onclick="setCompetition('laliga')">
-          <span class="color-pip" style="background: #D90429;"></span>
+        </a>
+        <a class="comp-switch-btn" id="btn-comp-laliga" href="#/laliga" onclick="setCompetition('laliga')" role="tab" aria-selected="false">
+          <span class="color-pip" style="background: #D90429;" aria-hidden="true"></span>
           <span>LALIGA EA SPORTS</span>
-        </button>
+        </a>
       </nav>
 
       <!-- Provenance Mode & Refresh CTA -->
@@ -1327,7 +1586,7 @@
       <div class="hero-left-copy">
         <div>
           <div class="hero-pretitle" id="hero-pretitle">FIFA INTERNATIONAL TOURNAMENT</div>
-          <h1 class="hero-title" id="hero-title">WORLD CUP 2026</h1>
+          <h2 class="hero-title" id="hero-title">WORLD CUP 2026</h2>
           <p class="hero-subtitle" id="hero-desc">
             48-team mega tournament across North America. 12 groups of 4 with 8 best third-placed qualifiers advancing to a 32-team single elimination knockout phase.
           </p>
@@ -1442,6 +1701,216 @@
         </div>
 
       </div>
+
+      <!-- ====================================================================
+           LANDING GUIDE // PRODUCT SPECIFICATION, TOURNAMENTS & TRUTHFULNESS
+           Delivered in initial static HTML for search crawlers and no-JS clients.
+           ==================================================================== -->
+      <section class="landing-guide-section" id="landing-guide" aria-label="Tournament Architecture &amp; Prediction Methodology">
+        
+        <!-- Row 1: Competitions Overview & Prediction Methodology -->
+        <div class="landing-guide-grid">
+          
+          <!-- Card 1: Supported Competitions -->
+          <article class="poster-card landing-guide-card featured-card" id="guide-competitions" aria-labelledby="guide-comp-title">
+            <header class="landing-card-header">
+              <h3 class="landing-card-title" id="guide-comp-title">TOURNAMENT SELECTION // 3 SUPPORTED COMPETITIONS</h3>
+              <span class="landing-card-badge">CRAWLABLE NAVIGATION</span>
+            </header>
+            <div class="landing-body-copy">
+              <p>FOOTBALL implements competition-specific tournament rules, deterministic standings tiebreakers, and seeded Monte Carlo simulation across three major football competitions. All tournaments are navigable views within this single-page application.</p>
+            </div>
+            <div class="landing-comp-list">
+              <div class="landing-comp-item comp-wc">
+                <div class="landing-comp-title">
+                  <span>FIFA WORLD CUP 2026</span>
+                  <span class="stat-extra">48 TEAMS &bull; 104 MATCHES</span>
+                </div>
+                <div class="landing-comp-desc">
+                  Expanded 48-team mega tournament hosted across Canada, Mexico, and the United States. 12 groups of 4 teams play 72 round-robin group fixtures. The top 2 from each group plus the 8 best third-placed qualifiers (governed by FIFA Annex-C 495-combination assignment tables) advance to the 32-team single-elimination knockout phase (Round of 32 through Final, plus the third-place playoff).
+                </div>
+                <a class="landing-comp-link" href="#/worldcup">Explore World Cup 2026 Predictor &rarr;</a>
+              </div>
+
+              <div class="landing-comp-item comp-ucl">
+                <div class="landing-comp-title">
+                  <span>UEFA CHAMPIONS LEAGUE 2026/27</span>
+                  <span class="stat-extra">36 CLUBS &bull; SWISS LEAGUE</span>
+                </div>
+                <div class="landing-comp-desc">
+                  Features the 36-club Swiss-system league phase where every club contests 8 matches against 8 distinct opponents (4 home, 4 away). Ranks 1–8 qualify directly for the Round of 16; ranks 9–24 enter the two-legged knockout playoff round; ranks 25–36 are eliminated. Knockout ties are decided over two legs (aggregate score, extra time, penalties), culminating in a neutral single-match final. 2025/26 tournament data is preserved as selectable historical replay.
+                </div>
+                <a class="landing-comp-link" href="#/ucl">Explore Champions League Predictor &rarr;</a>
+              </div>
+
+              <div class="landing-comp-item comp-laliga">
+                <div class="landing-comp-title">
+                  <span>LALIGA EA SPORTS 2026/27</span>
+                  <span class="stat-extra">20 CLUBS &bull; 380 FIXTURES</span>
+                </div>
+                <div class="landing-comp-desc">
+                  A 20-club double round-robin league campaign comprising 380 total fixtures (19 home and 19 away matches per club). Standings strictly reflect official league rules: 3 points for a win, 1 for a draw, with head-to-head points, head-to-head goal difference, overall goal difference, and goals scored resolving ties once head-to-head fixtures conclude.
+                </div>
+                <a class="landing-comp-link" href="#/laliga">Explore LaLiga Predictor &rarr;</a>
+              </div>
+            </div>
+            <div class="stat-extra" style="margin-top: 8px;">
+              * Note: Tournament views are client-side navigable states within this single-page application (SPA).
+            </div>
+          </article>
+
+          <!-- Card 2: Prediction Kernel & Methodology -->
+          <article class="poster-card landing-guide-card" id="guide-methodology" aria-labelledby="guide-method-title">
+            <header class="landing-card-header">
+              <h3 class="landing-card-title" id="guide-method-title">PREDICTION METHODOLOGY // 5-SIGNAL ENSEMBLE</h3>
+              <span class="landing-card-badge">SHARED MATHEMATICAL KERNEL</span>
+            </header>
+            <div class="landing-body-copy">
+              <p>Match forecasting combines five specialized prediction signals blended through the shared <code>EnsembleEngine</code>, paired with a bivariate Poisson scoreline distribution model and seeded Monte Carlo simulation.</p>
+            </div>
+            <ul class="landing-feature-list">
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">1. Refined Elo (refined_elo)</span>
+                <span class="landing-feature-desc">Dynamic team strength ratings updated from verified match results, incorporating margin-of-victory scaling and home advantage multipliers.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">2. Market Odds (market_odds)</span>
+                <span class="landing-feature-desc">De-vigged market implied probabilities derived from live bookmaker odds where available.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">3. Rolling Form (rolling_form)</span>
+                <span class="landing-feature-desc">Exponentially weighted recent performance trajectory across domestic and international play.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">4. Squad Value (squad_value)</span>
+                <span class="landing-feature-desc">Relative transfer market valuation ratios reflecting player talent and squad depth.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">5. Rest Days (rest_days)</span>
+                <span class="landing-feature-desc">Schedule interval differential capturing physical recovery and fixture congestion.</span>
+              </li>
+            </ul>
+            <div class="landing-body-copy" style="margin-top: 10px;">
+              <p><strong>Ensemble Calibration:</strong> The shared <code>EnsembleEngine</code> determines signal contributions using inverse log-loss calibration weights fitted on verified historical matches. It reverts gracefully to equal uniform weights (1/K) during cold-start phases when fewer than 30 labeled matches are available.</p>
+              <p><strong>Bivariate Poisson Modeling:</strong> Expected goals (&lambda;1, &lambda;2) computed from blended ratings project joint scoreline probabilities across 36 discrete score permutations (0–5 &times; 0–5).</p>
+              <p><strong>Seeded Monte Carlo Engine:</strong> Generic simulation engine executes 1 to 1,000,000 tournament iterations with isolated, seeded pseudo-random number generation (RNG) for strict mathematical reproducibility.</p>
+              <p class="stat-extra">Scientific modeling policy: All projections reflect deterministic mathematical modeling. FOOTBALL makes no speculative AI or guaranteed gambling claims.</p>
+            </div>
+          </article>
+
+        </div>
+
+        <!-- Row 2: Truthfulness Guarantee, Data Sources, Technical Specification -->
+        <div class="landing-guide-grid">
+          
+          <!-- Card 3: Provenance & Truthfulness -->
+          <article class="poster-card landing-guide-card" id="guide-provenance" aria-labelledby="guide-prov-title">
+            <header class="landing-card-header">
+              <h3 class="landing-card-title" id="guide-prov-title">PROVENANCE GUARANTEE // FACTS VS. SIMULATION</h3>
+              <span class="landing-card-badge">STRICT TRUTHFULNESS</span>
+            </header>
+            <div class="landing-body-copy">
+              <p>A core architectural foundation of FOOTBALL is the absolute separation of factual reality from simulated projections:</p>
+            </div>
+            <ul class="landing-feature-list">
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Played Matches are Immutable Facts</span>
+                <span class="landing-feature-desc">Completed matches are ingested and permanently recorded in canonical stores. Factual results are never overwritten, simulated, or modified.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Unplayed Matches Remain Unknown</span>
+                <span class="landing-feature-desc">Upcoming or scheduled fixtures remain strictly unknown until real results are officially published.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Explicit Simulated Labeling</span>
+                <span class="landing-feature-desc">Simulations run only upon explicit user trigger in transient memory. Every simulated number, probability, and tournament progression metric carries explicit <code>ResultProvenance.SIMULATED</code> labeling.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Automatic Retirement</span>
+                <span class="landing-feature-desc">The moment an actual match result lands, all simulated projections for that fixture are automatically and permanently retired.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Zero Unlabeled Inference</span>
+                <span class="landing-feature-desc">Simulated champions or projected advancement odds are never depicted as real outcomes. Missing or unplayed data is never rendered as zeros or empty tables without context.</span>
+              </li>
+            </ul>
+          </article>
+
+          <!-- Card 4: Data Acquisition & Privacy -->
+          <article class="poster-card landing-guide-card" id="guide-data" aria-labelledby="guide-data-title">
+            <header class="landing-card-header">
+              <h3 class="landing-card-title" id="guide-data-title">DATA ACQUISITION &amp; PRIVACY // ZERO SECRETS</h3>
+              <span class="landing-card-badge">ON-DEMAND INGESTION</span>
+            </header>
+            <div class="landing-body-copy">
+              <p>Data acquisition is designed for auditability, offline resilience, and strict credential isolation:</p>
+            </div>
+            <ul class="landing-feature-list">
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Authoritative Results Provider</span>
+                <span class="landing-feature-desc">Match fixtures, schedules, and official results are ingested from Football-Data.org.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Optional Market Odds Provider</span>
+                <span class="landing-feature-desc">Live bookmaker odds are acquired as an optional enrichment layer from The Odds API where available.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Zero Boot Provider Calls</span>
+                <span class="landing-feature-desc">The backend enforces a strict zero-provider-call boot policy. Server startup is pure and offline-safe; ingestion happens exclusively on-demand via the explicit <code>POST /api/refresh</code> endpoint.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Deterministic Offline Execution</span>
+                <span class="landing-feature-desc">Setting <code>FOOTBALL_SNAPSHOT=1</code> or passing <code>--offline</code> runs the system entirely from committed local JSON snapshots with zero network requests.</span>
+              </li>
+              <li class="landing-feature-item">
+                <span class="landing-feature-name">Strict Credential Hygiene</span>
+                <span class="landing-feature-desc">Zero API keys, private tokens, or secrets exist in client code, bundles, HTML markup, or DOM elements. All provider credentials remain server-side in <code>.env</code>.</span>
+              </li>
+            </ul>
+          </article>
+
+          <!-- Card 5: Technical Specification & Docs -->
+          <article class="poster-card landing-guide-card" id="guide-architecture" aria-labelledby="guide-arch-title">
+            <header class="landing-card-header">
+              <h3 class="landing-card-title" id="guide-arch-title">TECHNICAL SPECIFICATION // REPOSITORY &amp; DOCS</h3>
+              <span class="landing-card-badge">OPEN REPOSITORY</span>
+            </header>
+            <div class="landing-body-copy">
+              <p><strong>Core Stack:</strong> Python 3.11 backend &bull; FastAPI ASGI framework &bull; NumPy numerical simulation kernel &bull; Vanilla ES modules frontend &bull; Cloudflare Workers static edge hosting.</p>
+              <p><strong>Verification Suite:</strong> 2,338 automated test cases verifying mathematical contracts, tournament format rules, data immutability, and headless browser navigation.</p>
+              <p>Explore full documentation and verified project specs in the official repository:</p>
+            </div>
+            <div class="landing-docs-grid">
+              <a class="landing-doc-link" href="https://github.com/Sujoy-004/FOOTBALL" target="_blank" rel="noopener noreferrer">
+                <span>Repository</span>
+                <span>GitHub &rarr;</span>
+              </a>
+              <a class="landing-doc-link" href="https://github.com/Sujoy-004/FOOTBALL#readme" target="_blank" rel="noopener noreferrer">
+                <span>README</span>
+                <span>Overview &rarr;</span>
+              </a>
+              <a class="landing-doc-link" href="https://github.com/Sujoy-004/FOOTBALL/blob/main/docs/GETTING-STARTED.md" target="_blank" rel="noopener noreferrer">
+                <span>Getting Started</span>
+                <span>Setup &rarr;</span>
+              </a>
+              <a class="landing-doc-link" href="https://github.com/Sujoy-004/FOOTBALL/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener noreferrer">
+                <span>Architecture</span>
+                <span>Docs &rarr;</span>
+              </a>
+              <a class="landing-doc-link" href="https://github.com/Sujoy-004/FOOTBALL/blob/main/docs/DEVELOPMENT.md" target="_blank" rel="noopener noreferrer">
+                <span>Development</span>
+                <span>Guide &rarr;</span>
+              </a>
+              <a class="landing-doc-link" href="https://github.com/Sujoy-004/FOOTBALL/blob/main/docs/CONFIGURATION.md" target="_blank" rel="noopener noreferrer">
+                <span>Configuration</span>
+                <span>Specs &rarr;</span>
+              </a>
+            </div>
+          </article>
+
+        </div>
+
+      </section>
     </div>
 
     <!-- ======================================================================
@@ -1637,15 +2106,15 @@
   <!-- ========================================================================
        POSTER FOOTER // IMPRINT & REPOSITORY ARCHITECTURE
        ======================================================================== -->
-  <footer class="poster-footer" data-od-id="footer">
+  <footer class="poster-footer" data-od-id="footer" role="contentinfo">
     <div class="footer-col">
       <span>SERVER: <b>FASTAPI (PORT 8080)</b></span>
       <span>RUNTIME: <b>PYTHON 3.11 + NUMPY</b></span>
       <span>TRUTH CONVENTION: <b>NO UNLABELED INFERENCE</b></span>
     </div>
     <div class="footer-col">
-      <span>SYSTEM TESTS: <b style="color: #15803D;">1,751 PASSING</b></span>
-      <span>DESIGN: <b>SWISS POSTER SPECIFICATION</b></span>
+      <span>SYSTEM TESTS: <b style="color: #15803D;">2,338 PASSING</b></span>
+      <span>SOURCE: <a href="https://github.com/Sujoy-004/FOOTBALL" target="_blank" rel="noopener noreferrer" style="color: var(--poster-text); font-weight: 700; text-decoration: underline;">GITHUB</a></span>
     </div>
   </footer>
 
@@ -3933,9 +4402,15 @@
       document.body.className = data.themeClass;
 
       // Update Switcher Buttons
-      document.querySelectorAll('.comp-switch-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.comp-switch-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+      });
       const activeBtn = document.getElementById(`btn-comp-${key}`);
-      if (activeBtn) activeBtn.classList.add('active');
+      if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.setAttribute('aria-selected', 'true');
+      }
 
       // Update Hero Content
       document.getElementById('hero-pretitle').textContent = data.pretitle;

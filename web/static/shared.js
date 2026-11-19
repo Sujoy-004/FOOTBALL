@@ -234,14 +234,25 @@ function renderLanding() {
   pendingFocus = "";
   stopAllCompetitionRefresh();
   document.body.className = "landing";
-  document.getElementById("landingBackdrop").classList.add("show");
+  const lb = document.getElementById("landingBackdrop");
+  if (lb) lb.classList.add("show");
   // The topbar CTA is view-scoped: leaving a competition clears it so the
   // landing view never shows a stale Refresh button for the wrong competition.
-  document.getElementById("appTopbar").innerHTML = "";
+  const topbar = document.getElementById("appTopbar");
+  if (topbar) topbar.innerHTML = "";
 
-  document.getElementById("navBar").innerHTML = "";
+  const navBar = document.getElementById("navBar");
+  if (navBar) navBar.innerHTML = "";
 
-  document.getElementById("contentArea").innerHTML = `
+  const contentArea = document.getElementById("contentArea");
+  if (!contentArea) return;
+
+  // Progressive enhancement: if static landing content is already present,
+  // do not erase or re-inject duplicate landing markup on startup.
+  if (contentArea.dataset.rendered === "1") return;
+  contentArea.dataset.rendered = "1";
+
+  contentArea.innerHTML = `
     <div class="landing-hero">
       <div class="lh-copy">
         <div class="lh-badge">Predictive Analytics</div>
