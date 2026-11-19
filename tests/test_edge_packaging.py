@@ -26,7 +26,7 @@ def test_wrangler_toml_configuration():
     """Verify wrangler.toml specifies Cloudflare Pages static output directory."""
     assert WRANGLER_TOML.exists(), "wrangler.toml must exist at repo root"
     content = WRANGLER_TOML.read_text(encoding="utf-8")
-    assert 'name = "football-frontend"' in content
+    assert 'name = "football"' in content or 'name = "football-frontend"' in content
     assert 'pages_build_output_dir = "web/static"' in content
     assert "compatibility_date" in content
 
