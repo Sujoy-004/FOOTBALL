@@ -306,3 +306,17 @@ tests/                    cross-cutting regression suites (truth model,
                           engine contract, immutability, product contract)
 docs/                     ARCHITECTURE.md, GETTING-STARTED.md, TESTING.md
 ```
+
+## License and Attribution
+
+This project's original source code is released under the [MIT License](LICENSE) © 2026 Sujoy.
+
+### Scope and Exclusions
+
+The MIT license covers original prediction algorithms, simulation engines, orchestration pipelines, and web application code. It explicitly excludes and does not grant rights to:
+
+- **Third-Party Web Fonts (`web/static/fonts/`):** Space Grotesk, Manrope, and JetBrains Mono are distributed under the [SIL Open Font License 1.1](web/static/fonts/OFL.txt).
+- **Sports Data & Fixtures (`competitions/*/data/`):** Historical results and backfill corpora are compiled from public domain sources (openfootball under CC0-1.0), research archives (football-data.co.uk per academic use terms), API-Football closing odds (CC-BY-4.0), and ClubElo mirrors (MIT).
+- **External API Data:** Real-time fixture, score, and market odds data accessed via Football-Data.org and The Odds API remain governed by their respective API terms of service.
+- **Trademarks & Competition Marks:** Competition names (FIFA World Cup, UEFA Champions League, LaLiga EA Sports), club names, and badges are property of their respective trademark holders. This project is unofficial and unaffiliated with FIFA, UEFA, or LNFP.
+

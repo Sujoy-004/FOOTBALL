@@ -1,0 +1,10 @@
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+
+The font assets in this directory are distributed under the SIL Open Font License, Version 1.1:
+
+- JetBrains Mono (500, 700): Copyright (c) 2020 JetBrains s.r.o.
+- Manrope (500, 700): Copyright (c) 2018-2021 Mikhail Sharanda
+- Space Grotesk (500, 700): Copyright (c) 2020 Florian Karsten
+
+The Open Font License permits bundling and embedding with software applications.
+The full text of the license is available at https://openfontlicense.org/

@@ -149,18 +149,16 @@ def test_esm_syntax_valid(name):
         assert res.returncode == 0, res.stdout + res.stderr
 
 
-# ── Phase 12B — LaLiga exclusive background ──────────────────────────
+# ── Phase 12B — LaLiga exclusive theme background ─────────────────────
 
-def test_laliga_body_background_uses_its_own_image():
+def test_laliga_body_background_uses_thematic_gradient():
     block = CSS.split(".competition-laliga {", 1)[1].split("\n}", 1)[0]
-    assert 'url("images/laliga.webp")' in block
-    assert "linear-gradient" in block          # darkening overlay for readability
-    assert "fixed no-repeat" in block
+    assert "linear-gradient" in block
 
 
-def test_laliga_landing_card_background_uses_its_own_image():
+def test_laliga_landing_card_background_uses_thematic_gradient():
     block = CSS.split(".lc-card.laliga {", 1)[1].split("\n}", 1)[0]
-    assert 'url("images/laliga.webp")' in block
+    assert "linear-gradient" in block
 
 
 def test_background_paths_are_relative_and_never_absolute():
@@ -172,13 +170,15 @@ def test_background_paths_are_relative_and_never_absolute():
 
 
 def file_drive_residue_check(css):
-    # No windows drive-letter absolute path residue ("x:\..." or "x:/...").
     import re
     return not re.search(r"[a-zA-Z]:[\\/]", css)
 
 
-def test_laliga_background_image_ships_in_static_assets():
-    assert (WEB_STATIC / "images" / "laliga.webp").is_file()
+def test_no_unprovenanced_background_images_in_static_assets():
+    assert not (WEB_STATIC / "images" / "laliga.webp").exists()
+    assert not (WEB_STATIC / "images" / "stadium.webp").exists()
+    assert not (WEB_STATIC / "images" / "wc.webp").exists()
+    assert not (WEB_STATIC / "images" / "ucl.webp").exists()
 
 
 # ── Phase 12B — Overview parity ──────────────────────────────────────

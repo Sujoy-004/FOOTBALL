@@ -535,8 +535,7 @@ body.landing .app-sidebar {
   display: block;
   background-image: 
     radial-gradient(circle at 50% 10%, rgba(226, 184, 110, 0.08) 0%, transparent 60%),
-    linear-gradient(rgba(6, 8, 11, 0.88) 0%, rgba(6, 8, 11, 0.94) 50%, rgba(6, 8, 11, 0.98) 100%),
-    url("images/stadium.webp");
+    linear-gradient(rgba(6, 8, 11, 0.88) 0%, rgba(6, 8, 11, 0.94) 50%, rgba(6, 8, 11, 0.98) 100%);
   background-size: cover;
   background-position: center;
 }
@@ -753,21 +752,21 @@ body.landing .app-sidebar {
 }
 
 .lc-card.worldcup {
-  background: linear-gradient(135deg, rgba(6,8,11,0.7), rgba(6,8,11,0.85)), url("images/wc.webp") center / cover no-repeat;
+  background: linear-gradient(135deg, rgba(6,8,11,0.85), rgba(16,24,39,0.95));
   border-color: rgba(226, 184, 110, 0.25);
 }
 .lc-card.worldcup::before { background: #10B981; }
 .lc-card.worldcup .lcc-badge { color: #10B981; }
 
 .lc-card.ucl {
-  background: linear-gradient(135deg, rgba(6,8,11,0.7), rgba(6,8,11,0.85)), url("images/ucl.webp") center / cover no-repeat;
+  background: linear-gradient(135deg, rgba(6,8,11,0.85), rgba(15,23,42,0.95));
   border-color: rgba(56, 189, 248, 0.25);
 }
 .lc-card.ucl::before { background: #38BDF8; }
 .lc-card.ucl .lcc-badge { color: #38BDF8; }
 
 .lc-card.laliga {
-  background: linear-gradient(135deg, rgba(16,8,12,0.6), rgba(16,8,12,0.8)), url("images/laliga.webp") center / cover no-repeat;
+  background: linear-gradient(135deg, rgba(16,8,12,0.85), rgba(28,12,16,0.95));
   border-color: rgba(249, 115, 22, 0.25);
 }
 .lc-card.laliga::before { background: #F97316; }
@@ -1816,7 +1815,7 @@ body.landing .app-sidebar {
 
 /* ── LaLiga EA Sports Thematic Palette (Minimalist Red Poster) ── */
 .competition-laliga {
-  background: linear-gradient(rgba(16,8,12,0.65), rgba(16,8,12,0.85)), url("images/laliga.webp") center / cover fixed no-repeat;
+  background: linear-gradient(180deg, rgba(16,8,12,0.95) 0%, rgba(28,12,16,0.98) 100%);
 }
 .competition-laliga .tab-btn.active { color: #D90429; border-bottom-color: #D90429; }
 .competition-laliga .nav-btn.active { border-left-color: #D90429; }
@@ -1837,7 +1836,7 @@ body.landing .app-sidebar {
 
 /* ── World Cup 2026 Thematic Palette (Minimalist Orange Poster) ── */
 .competition-worldcup {
-  background: linear-gradient(rgba(10,12,20,0.65), rgba(10,12,20,0.85)), url("images/wc.webp") center / cover fixed no-repeat;
+  background: linear-gradient(180deg, rgba(10,12,20,0.95) 0%, rgba(20,14,24,0.98) 100%);
   color: #FFF2DF;
 }
 .competition-worldcup .tab-btn.active { color: #EA580C; border-bottom-color: #EA580C; }
@@ -1857,7 +1856,7 @@ body.landing .app-sidebar {
 
 /* ── UEFA Champions League Thematic Palette (Minimalist Blue Poster) ── */
 .competition-ucl {
-  background: linear-gradient(rgba(10,12,20,0.65), rgba(10,12,20,0.85)), url("images/ucl.webp") center / cover fixed no-repeat;
+  background: linear-gradient(180deg, rgba(10,12,20,0.95) 0%, rgba(12,18,34,0.98) 100%);
 }
 .competition-ucl .tab-btn.active { color: #0252CD; border-bottom-color: #0252CD; }
 .competition-ucl .nav-btn.active { border-left-color: #0252CD; }

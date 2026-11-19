@@ -87,13 +87,9 @@ a body class that is the ONLY place palette colors live
 (`.competition-laliga` / `-worldcup` / `-ucl`), so a competition fork is a
 block of `color:` overrides, never new page structure.
 
-- **Backgrounds are per-competition image + overlay.** WC (`images/wc.webp`),
-  UCL (`images/ucl.webp`) and — new in 12B — LaLiga (`images/laliga.webp`)
-  each declare a `linear-gradient(...), url("images/<comp>.webp") center /
-  cover fixed no-repeat;` on the body class, and the same image as an
-  `lc-card` landing tile (no absolute paths; the darkening gradient is the
-  readability guarantee over the artwork). `fixed` rides the last layer the
-  same way it does on the pre-existing W.C./UCL rules.
+- **Backgrounds are per-competition theme gradients.** WC, UCL, and LaLiga
+  each declare dedicated `linear-gradient(...)` rules on their body class and
+  landing card tiles, providing high-contrast readability without external artwork dependencies.
 - **Shared structural primitives** (defined once, themed by the palette
   block): `.stats-row/.stat-card` (dashboard strip), `.chart-section/.title`
   (section), `.eval-table` (data tables), `.status-btn`, `.m-sub`/`.dim`
