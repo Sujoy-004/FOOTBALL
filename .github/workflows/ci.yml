@@ -13,6 +13,7 @@ concurrency:
 env:
   FOOTBALL_SNAPSHOT: "1"
   PYTHONUNBUFFERED: "1"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   quality-gate:
@@ -39,6 +40,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install mypy types-requests httpx
+          python -m playwright install --with-deps chromium
 
       - name: Step 1 - Linting (ruff)
         run: |
@@ -54,7 +56,7 @@ jobs:
 
       - name: Step 4 - Test Suite & Coverage Floor
         run: |
-          pytest --cov=football_core --cov-report=term-missing
+          pytest -rs --cov=football_core --cov-report=term-missing
 
       - name: Step 5 - Frontend UI Unit Tests (Node)
         run: |
