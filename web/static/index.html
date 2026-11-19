@@ -4313,7 +4313,7 @@
         watermark: "UCL",
         standingsLabel: "SWISS LEAGUE TABLE (36 TEAMS)",
         bracketLabel: "KNOCKOUT PHASE (2-LEGGED)",
-        stats: { teams: 36, played: 18, unplayed: "126 UNPLAYED", topTeam: "—", topProb: "— PROJECTION" },
+        stats: { teams: 36, played: 72, unplayed: "72 UNPLAYED", topTeam: "—", topProb: "— PROJECTION" },
         eloList: [
           { name: "Real Madrid", elo: 2014, delta: "+24", tier: "POT 1" },
           { name: "Manchester City", elo: 1998, delta: "+15", tier: "POT 1" },
@@ -4338,7 +4338,7 @@
         watermark: "LALIGA",
         standingsLabel: "LEAGUE TABLE (20 CLUBS)",
         bracketLabel: "FIXTURES & SCHEDULE",
-        stats: { teams: 20, played: 110, unplayed: "270 UNPLAYED", topTeam: "—", topProb: "— PROJECTION" },
+        stats: { teams: 20, played: 119, unplayed: "261 UNPLAYED", topTeam: "—", topProb: "— PROJECTION" },
         eloList: [
           { name: "Real Madrid", elo: 2014, delta: "+31", tier: "CHAMPIONSHIP" },
           { name: "Barcelona", elo: 1968, delta: "+19", tier: "CHAMPIONSHIP" },
@@ -4391,6 +4391,19 @@
         else if (h.includes('laliga') && activeComp !== 'laliga') setCompetition('laliga');
         else if (h.includes('worldcup') && activeComp !== 'worldcup') setCompetition('worldcup');
       });
+
+      // Auto-polling & visibility catch-up (keeps live match data fresh)
+      function triggerPeriodicSync() {
+        if (document.visibilityState === 'visible') {
+          syncCompetitionFromBackend(activeComp);
+        }
+      }
+      setInterval(triggerPeriodicSync, 60000);
+      document.addEventListener('visibilitychange', triggerPeriodicSync);
+      window.addEventListener('focus', triggerPeriodicSync);
+
+      // Follow-up catch-up 15s after initial boot to catch background sync worker results
+      setTimeout(triggerPeriodicSync, 15000);
     }
 
     // Switch Competition & Palette

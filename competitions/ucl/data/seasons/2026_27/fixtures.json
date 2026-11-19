@@ -50,7 +50,7 @@
       "team_b": "Liverpool",
       "event_date": "2026-11-04T17:45:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 1,
       "provenance": {
@@ -162,7 +162,7 @@
       "team_b": "Aston Villa",
       "event_date": "2026-11-03T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 1,
       "provenance": {
@@ -176,7 +176,7 @@
       "team_b": "Napoli",
       "event_date": "2026-11-04T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 1,
       "provenance": {
@@ -260,7 +260,7 @@
       "team_b": "Bayern Munich",
       "event_date": "2026-11-03T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 2,
       "provenance": {
@@ -316,7 +316,7 @@
       "team_b": "Como",
       "event_date": "2026-11-04T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 2,
       "provenance": {
@@ -330,7 +330,7 @@
       "team_b": "Real Madrid",
       "event_date": "2026-11-04T17:45:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 2,
       "provenance": {
@@ -358,7 +358,7 @@
       "team_b": "Real Betis",
       "event_date": "2026-11-04T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 2,
       "provenance": {
@@ -708,7 +708,7 @@
       "team_b": "Inter Milan",
       "event_date": "2026-11-03T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 3,
       "provenance": {
@@ -750,7 +750,7 @@
       "team_b": "Arsenal",
       "event_date": "2026-11-04T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 3,
       "provenance": {
@@ -876,7 +876,7 @@
       "team_b": "Club Brugge",
       "event_date": "2026-11-04T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 4,
       "provenance": {
@@ -946,7 +946,7 @@
       "team_b": "Roma",
       "event_date": "2026-11-03T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 4,
       "provenance": {
@@ -1058,7 +1058,7 @@
       "team_b": "VfB Stuttgart",
       "event_date": "2026-11-03T17:45:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 5,
       "provenance": {
@@ -1128,7 +1128,7 @@
       "team_b": "Sabah",
       "event_date": "2026-11-04T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 5,
       "provenance": {
@@ -1450,7 +1450,7 @@
       "team_b": "Sporting CP",
       "event_date": "2026-11-03T17:45:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 6,
       "provenance": {
@@ -1604,7 +1604,7 @@
       "team_b": "Paris Saint-Germain",
       "event_date": "2026-11-03T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 7,
       "provenance": {
@@ -1688,7 +1688,7 @@
       "team_b": "Manchester City",
       "event_date": "2026-11-04T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 7,
       "provenance": {
@@ -1884,7 +1884,7 @@
       "team_b": "Slovan Bratislava",
       "event_date": "2026-11-03T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 8,
       "provenance": {
@@ -2010,7 +2010,7 @@
       "team_b": "Lille",
       "event_date": "2026-11-03T20:00:00Z",
       "stage": "LEAGUE_STAGE",
-      "status": "timed",
+      "status": "finished",
       "official_matchday": 4,
       "simulation_matchday": 8,
       "provenance": {

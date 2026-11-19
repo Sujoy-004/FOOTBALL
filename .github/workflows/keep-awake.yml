@@ -1,0 +1,16 @@
+name: Keep Awake Ping
+
+on:
+  schedule:
+    # Ping every 10 minutes to stay within Render's 15-minute idle sleep threshold
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Render Health Probe
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Health Endpoint
+        run: |
+          curl -sSf https://football-api-c83v.onrender.com/health || exit 0

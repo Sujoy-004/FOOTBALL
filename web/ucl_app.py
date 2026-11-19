@@ -1010,7 +1010,7 @@ def api_bracket():
         from competitions.ucl.src.pipeline import build_league_matchdays, build_matchday_map, load_results
         from competitions.ucl.src.orchestrator import resolve_active_data_dir
         from football_core.domain import load_json_store, DataAvailability
-        active_dp = resolve_active_data_dir(DATA_DIR)
+        active_dp = Path(resolve_active_data_dir(DATA_DIR))
         fixtures_payload, fixtures_avail, _ = load_json_store(active_dp / "fixtures.json")
         fixtures_list = None
         if fixtures_avail is DataAvailability.AVAILABLE and isinstance(fixtures_payload, dict):

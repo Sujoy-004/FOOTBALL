@@ -112,21 +112,453 @@
       "team_a": "PSV Eindhoven",
       "team_b": "Shakhtar Donetsk",
       "home_score": 1,
-      "away_score": 0
+      "away_score": 1
     },
     {
       "match_id": "gen-571f9760a45da61c",
       "team_a": "Como",
       "team_b": "RB Leipzig",
-      "home_score": 0,
-      "away_score": 2
+      "home_score": 4,
+      "away_score": 1
     },
     {
       "match_id": "gen-b3bc36bb158a34cf",
       "team_a": "Manchester United",
       "team_b": "Sabah",
-      "home_score": 3,
+      "home_score": 4,
       "away_score": 0
+    },
+    {
+      "match_id": "gen-55f504ed0b3266d0",
+      "team_a": "Lens",
+      "team_b": "Sporting CP",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2026-10-13T16:45:00Z"
+    },
+    {
+      "match_id": "gen-5b32aac774435b2a",
+      "team_a": "Sabah",
+      "team_b": "Slavia Prague",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2026-10-13T16:45:00Z"
+    },
+    {
+      "match_id": "gen-729c733ee5d13908",
+      "team_a": "Inter Milan",
+      "team_b": "Club Brugge",
+      "home_score": 3,
+      "away_score": 4,
+      "event_date": "2026-10-13T19:00:00Z"
+    },
+    {
+      "match_id": "gen-c94b19a95ff790bc",
+      "team_a": "Galatasaray",
+      "team_b": "Barcelona",
+      "home_score": 1,
+      "away_score": 4,
+      "event_date": "2026-10-13T19:00:00Z"
+    },
+    {
+      "match_id": "gen-cfa3a0d0b5c3f5d9",
+      "team_a": "Atlético Madrid",
+      "team_b": "Manchester United",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2026-10-13T19:00:00Z"
+    },
+    {
+      "match_id": "gen-4e0490d00ec17f65",
+      "team_a": "Arsenal",
+      "team_b": "Lille",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2026-10-13T19:00:00Z"
+    },
+    {
+      "match_id": "gen-f66d1613a6a668b3",
+      "team_a": "Viking",
+      "team_b": "Bayern Munich",
+      "home_score": 3,
+      "away_score": 3,
+      "event_date": "2026-10-13T19:00:00Z"
+    },
+    {
+      "match_id": "gen-0409ff27d73bac2b",
+      "team_a": "RB Leipzig",
+      "team_b": "PSV Eindhoven",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2026-10-13T19:00:00Z"
+    },
+    {
+      "match_id": "gen-e8defe066271c28a",
+      "team_a": "Villarreal",
+      "team_b": "Napoli",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2026-10-13T19:00:00Z"
+    },
+    {
+      "match_id": "gen-8b017838492ac2c0",
+      "team_a": "LASK",
+      "team_b": "Liverpool",
+      "home_score": 3,
+      "away_score": 6,
+      "event_date": "2026-10-14T16:45:00Z"
+    },
+    {
+      "match_id": "gen-f4f057d898c4aa8f",
+      "team_a": "Feyenoord",
+      "team_b": "Como",
+      "home_score": 3,
+      "away_score": 2,
+      "event_date": "2026-10-14T16:45:00Z"
+    },
+    {
+      "match_id": "gen-817543726d71ae10",
+      "team_a": "Roma",
+      "team_b": "Real Madrid",
+      "home_score": 3,
+      "away_score": 4,
+      "event_date": "2026-10-14T19:00:00Z"
+    },
+    {
+      "match_id": "gen-34b19eaea1a292b4",
+      "team_a": "Manchester City",
+      "team_b": "Paris Saint-Germain",
+      "home_score": 2,
+      "away_score": 4,
+      "event_date": "2026-10-14T19:00:00Z"
+    },
+    {
+      "match_id": "gen-8bd81d79ded72f69",
+      "team_a": "Bodø/Glimt",
+      "team_b": "Borussia Dortmund",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2026-10-14T19:00:00Z"
+    },
+    {
+      "match_id": "gen-f9d86dca5eabc51c",
+      "team_a": "Aston Villa",
+      "team_b": "Fenerbahçe",
+      "home_score": 6,
+      "away_score": 0,
+      "event_date": "2026-10-14T19:00:00Z"
+    },
+    {
+      "match_id": "gen-5c3a8de868104628",
+      "team_a": "Real Betis",
+      "team_b": "Porto",
+      "home_score": 3,
+      "away_score": 2,
+      "event_date": "2026-10-14T19:00:00Z"
+    },
+    {
+      "match_id": "gen-14780746885626a7",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "AEK Athens",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2026-10-14T19:00:00Z"
+    },
+    {
+      "match_id": "gen-7538b1d248781782",
+      "team_a": "Slovan Bratislava",
+      "team_b": "VfB Stuttgart",
+      "home_score": 0,
+      "away_score": 3,
+      "event_date": "2026-10-14T19:00:00Z"
+    },
+    {
+      "match_id": "gen-9e79d7ed9136dfab",
+      "team_a": "Sabah",
+      "team_b": "Borussia Dortmund",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2026-10-20T16:45:00Z"
+    },
+    {
+      "match_id": "gen-9be516c8dcd00cfa",
+      "team_a": "Fenerbahçe",
+      "team_b": "Slavia Prague",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2026-10-20T16:45:00Z"
+    },
+    {
+      "match_id": "gen-b6270f9dd0e2bd03",
+      "team_a": "Manchester City",
+      "team_b": "AEK Athens",
+      "home_score": 5,
+      "away_score": 1,
+      "event_date": "2026-10-20T19:00:00Z"
+    },
+    {
+      "match_id": "gen-a01c089bec7b4d58",
+      "team_a": "VfB Stuttgart",
+      "team_b": "Atlético Madrid",
+      "home_score": 1,
+      "away_score": 1,
+      "event_date": "2026-10-20T19:00:00Z"
+    },
+    {
+      "match_id": "gen-bda9b4c43abf4bcf",
+      "team_a": "Liverpool",
+      "team_b": "Villarreal",
+      "home_score": 4,
+      "away_score": 3,
+      "event_date": "2026-10-20T19:00:00Z"
+    },
+    {
+      "match_id": "gen-5b3613099a46709c",
+      "team_a": "Roma",
+      "team_b": "Slovan Bratislava",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2026-10-20T19:00:00Z"
+    },
+    {
+      "match_id": "gen-f0ca44f73b9bf5cf",
+      "team_a": "Porto",
+      "team_b": "PSV Eindhoven",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2026-10-20T19:00:00Z"
+    },
+    {
+      "match_id": "gen-88d49fec37fb064a",
+      "team_a": "Napoli",
+      "team_b": "Bodø/Glimt",
+      "home_score": 4,
+      "away_score": 3,
+      "event_date": "2026-10-20T19:00:00Z"
+    },
+    {
+      "match_id": "gen-968d8b69c826a446",
+      "team_a": "Paris Saint-Germain",
+      "team_b": "Barcelona",
+      "home_score": 4,
+      "away_score": 2,
+      "event_date": "2026-10-20T19:00:00Z"
+    },
+    {
+      "match_id": "gen-5d5baaccc119d0d1",
+      "team_a": "Como",
+      "team_b": "Manchester United",
+      "home_score": 4,
+      "away_score": 1,
+      "event_date": "2026-10-21T16:45:00Z"
+    },
+    {
+      "match_id": "gen-4b6641910aeb743c",
+      "team_a": "Lille",
+      "team_b": "Galatasaray",
+      "home_score": 2,
+      "away_score": 4,
+      "event_date": "2026-10-21T16:45:00Z"
+    },
+    {
+      "match_id": "gen-001139e885adedfd",
+      "team_a": "Real Madrid",
+      "team_b": "RB Leipzig",
+      "home_score": 4,
+      "away_score": 1,
+      "event_date": "2026-10-21T19:00:00Z"
+    },
+    {
+      "match_id": "gen-ed697a84419e3a71",
+      "team_a": "Inter Milan",
+      "team_b": "Shakhtar Donetsk",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2026-10-21T19:00:00Z"
+    },
+    {
+      "match_id": "gen-2ae71f18a1008722",
+      "team_a": "Bayern Munich",
+      "team_b": "Arsenal",
+      "home_score": 2,
+      "away_score": 2,
+      "event_date": "2026-10-21T19:00:00Z"
+    },
+    {
+      "match_id": "gen-b87fae1ffee88283",
+      "team_a": "Club Brugge",
+      "team_b": "Lens",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2026-10-21T19:00:00Z"
+    },
+    {
+      "match_id": "gen-f3a20c8422f4a86e",
+      "team_a": "Aston Villa",
+      "team_b": "Viking",
+      "home_score": 3,
+      "away_score": 1,
+      "event_date": "2026-10-21T19:00:00Z"
+    },
+    {
+      "match_id": "gen-c8b2ffb61d5c309d",
+      "team_a": "Sporting CP",
+      "team_b": "LASK",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2026-10-21T19:00:00Z"
+    },
+    {
+      "match_id": "gen-4ecd54b2bbefb070",
+      "team_a": "Real Betis",
+      "team_b": "Feyenoord",
+      "home_score": 1,
+      "away_score": 0,
+      "event_date": "2026-10-21T19:00:00Z"
+    },
+    {
+      "match_id": "gen-b542c6a6703e7c00",
+      "team_a": "Shakhtar Donetsk",
+      "team_b": "Sporting CP",
+      "home_score": 0,
+      "away_score": 1,
+      "event_date": "2026-11-03T17:45:00Z"
+    },
+    {
+      "match_id": "gen-7fc3d33a0aad5361",
+      "team_a": "Galatasaray",
+      "team_b": "VfB Stuttgart",
+      "home_score": 2,
+      "away_score": 0,
+      "event_date": "2026-11-03T17:45:00Z"
+    },
+    {
+      "match_id": "gen-552ab488815f6dfb",
+      "team_a": "Feyenoord",
+      "team_b": "Inter Milan",
+      "home_score": 0,
+      "away_score": 3,
+      "event_date": "2026-11-03T20:00:00Z"
+    },
+    {
+      "match_id": "gen-11410b53dc3786e5",
+      "team_a": "Barcelona",
+      "team_b": "Aston Villa",
+      "home_score": 3,
+      "away_score": 0,
+      "event_date": "2026-11-03T20:00:00Z"
+    },
+    {
+      "match_id": "gen-1a2d89e47295a002",
+      "team_a": "Atlético Madrid",
+      "team_b": "Bayern Munich",
+      "home_score": 0,
+      "away_score": 2,
+      "event_date": "2026-11-03T20:00:00Z"
+    },
+    {
+      "match_id": "gen-cc641f82cba838a6",
+      "team_a": "Villarreal",
+      "team_b": "Paris Saint-Germain",
+      "home_score": 0,
+      "away_score": 6,
+      "event_date": "2026-11-03T20:00:00Z"
+    },
+    {
+      "match_id": "gen-6d15c19a65f835ab",
+      "team_a": "Manchester United",
+      "team_b": "Roma",
+      "home_score": 3,
+      "away_score": 2,
+      "event_date": "2026-11-03T20:00:00Z"
+    },
+    {
+      "match_id": "gen-fafc29018d4d56f9",
+      "team_a": "Bodø/Glimt",
+      "team_b": "Lille",
+      "home_score": 0,
+      "away_score": 0,
+      "event_date": "2026-11-03T20:00:00Z"
+    },
+    {
+      "match_id": "gen-f48c9afbdc8a8f56",
+      "team_a": "LASK",
+      "team_b": "Slovan Bratislava",
+      "home_score": 4,
+      "away_score": 0,
+      "event_date": "2026-11-03T20:00:00Z"
+    },
+    {
+      "match_id": "gen-271337131da2e40d",
+      "team_a": "AEK Athens",
+      "team_b": "Real Madrid",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2026-11-04T17:45:00Z"
+    },
+    {
+      "match_id": "gen-04d0b5fe60d6c6b1",
+      "team_a": "Fenerbahçe",
+      "team_b": "Liverpool",
+      "home_score": 3,
+      "away_score": 2,
+      "event_date": "2026-11-04T17:45:00Z"
+    },
+    {
+      "match_id": "gen-d9c0be17b26e51b6",
+      "team_a": "RB Leipzig",
+      "team_b": "Manchester City",
+      "home_score": 2,
+      "away_score": 3,
+      "event_date": "2026-11-04T20:00:00Z"
+    },
+    {
+      "match_id": "gen-593529bfa4d673eb",
+      "team_a": "Slavia Prague",
+      "team_b": "Arsenal",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2026-11-04T20:00:00Z"
+    },
+    {
+      "match_id": "gen-613cafa4fc6a791d",
+      "team_a": "PSV Eindhoven",
+      "team_b": "Club Brugge",
+      "home_score": 1,
+      "away_score": 2,
+      "event_date": "2026-11-04T20:00:00Z"
+    },
+    {
+      "match_id": "gen-2a83ca4e669d42e4",
+      "team_a": "Borussia Dortmund",
+      "team_b": "Real Betis",
+      "home_score": 2,
+      "away_score": 1,
+      "event_date": "2026-11-04T20:00:00Z"
+    },
+    {
+      "match_id": "gen-1387bdef5a54c6fb",
+      "team_a": "Porto",
+      "team_b": "Napoli",
+      "home_score": 4,
+      "away_score": 1,
+      "event_date": "2026-11-04T20:00:00Z"
+    },
+    {
+      "match_id": "gen-2637feb3f505c4f9",
+      "team_a": "Lens",
+      "team_b": "Como",
+      "home_score": 1,
+      "away_score": 9,
+      "event_date": "2026-11-04T20:00:00Z"
+    },
+    {
+      "match_id": "gen-8874471fc8fe3a07",
+      "team_a": "Viking",
+      "team_b": "Sabah",
+      "home_score": 4,
+      "away_score": 1,
+      "event_date": "2026-11-04T20:00:00Z"
     }
   ],
   "meta": {
