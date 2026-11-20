@@ -7,5 +7,5 @@
 window.__APP_CONFIG__ = window.__APP_CONFIG__ || {
   API_URL: "https://football-api-c83v.onrender.com",
   ENVIRONMENT: "production",
-  VERSION: "2.0.0",
+  VERSION: "2.1.0",
 };
