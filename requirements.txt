@@ -7,7 +7,7 @@
 fastapi==0.135.2
 starlette==0.52.1
 uvicorn==0.42.0
-requests==2.32.5
+requests==2.33.0
 numpy==1.26.4
 python-dotenv==1.2.2
 psycopg2-binary==2.9.13
