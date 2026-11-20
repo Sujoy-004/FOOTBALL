@@ -8,11 +8,11 @@ Target: **$0/month, zero credit card requirement**, completely free tier archite
 
 The system architecture partitions concerns cleanly into three free-tier cloud platforms:
 
-```text
-Browser / Client ──► Cloudflare Edge ──► FastAPI on Render ──► Neon Serverless Postgres
-                     (Vanilla JS / SPA   (Native Python 3.11   (PostgreSQL 16, pooled,
-                      edge cache)         0.1 CPU / 512 MB,     scales to zero,
-                                          sleeps after 15m)     EU Frankfurt)
+```mermaid
+flowchart LR
+    Client["Browser / Client<br/>(Vanilla JS Single-Page App)"] -->|"HTTPS / Requests"| CF["Cloudflare Edge<br/>(Edge Cache, Static Assets &amp; Routing)"]
+    CF -->|"API Reverse Proxy"| Render["FastAPI on Render<br/>(Native Python 3.11 ASGI Engine,<br/>0.1 CPU / 512 MB, Frankfurt)"]
+    Render -->|"Connection Pooler (SSL)"| Neon["Neon Serverless Postgres<br/>(PostgreSQL 16 Relational Store,<br/>Auto-scale to Zero, EU)"]
 ```
 
 | Component | Platform | Resource Plan | Operational Quota | Role / Purpose |
