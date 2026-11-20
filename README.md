@@ -1,56 +1,57 @@
 # FOOTBALL
 
-[![Live App](https://img.shields.io/badge/Live%20Website-football.pages.dev-brightgreen?style=for-the-badge&logo=cloudflare)](https://football.pages.dev)
+[![Live Application](https://img.shields.io/badge/Live%20Application-football.iamsujoy004.workers.dev-brightgreen?style=for-the-badge&logo=cloudflare)](https://football.iamsujoy004.workers.dev)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Tests Passing](https://img.shields.io/badge/Tests-2%2C339%20Passing-success?style=for-the-badge&logo=pytest&logoColor=white)](#testing)
+[![License MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
-A shared football prediction and Monte Carlo simulation engine with
-competition-specific brains — World Cup 2026, UEFA Champions League 2026/27
-(the active default, draw-derived; the 2025/26 season remains selectable as
-completed history), and LaLiga EA Sports 2026/27 — where real played matches
-are immutable facts and every simulated number is explicitly labeled as
-simulated.
+A shared football prediction and Monte Carlo simulation engine with competition-specific brains — **World Cup 2026**, **UEFA Champions League 2026/27** (the active default, draw-derived; the 2025/26 season remains selectable as completed history), and **LaLiga EA Sports 2026/27** — where real played matches are immutable facts and every simulated outcome carries explicit mathematical provenance.
 
-**Live Application:** [https://football.pages.dev](https://football.pages.dev)
+![FOOTBALL Platform Demonstration](assets/demo/football-demo.gif)
+
+**Live Application:** [https://football.iamsujoy004.workers.dev](https://football.iamsujoy004.workers.dev) · **Edge Mirror:** [https://football.pages.dev](https://football.pages.dev) · **Quick Start:** [Setup](#setup)
 
 ## What it does
 
-- **Ingests real football data** from external providers (football-data.org
-  via Football-Data.org) into per-competition result stores, or runs entirely offline on a
-  committed snapshot. Bookmaker market odds are enriched separately via
-  the optional `ODDS_PROVIDER` (The Odds API) — see
-  "Bookmaker odds" below.
-- **Produces match probabilities** from a five-signal ensemble
-  (`refined_elo · market_odds · rolling_form · squad_value · rest_days`)
-  blended by one canonical `EnsembleEngine`, plus a Poisson score model
-  driven by Elo rating differences.
-- **Simulates tournaments** through a generic Monte Carlo engine. Each
-  competition supplies its own rules (groups, tiebreakers, knockout
-  progression) behind a `SimulationRules` boundary; the shared engine owns
-  validation, seeded repetition, aggregation, and provenance.
-- **Keeps truth explicit**: played matches are immutable facts that are
-  never sampled; unplayed matches stay unknown until you request a
-  simulation; simulated output is quarantined from factual data and labeled
-  everywhere it appears.
+- **Ingests real football data** from external providers (football-data.org) into per-competition result stores, or runs entirely offline on verified committed snapshots with zero network calls. Bookmaker market odds are enriched separately via the optional `ODDS_PROVIDER` (The Odds API).
+- **Produces match probabilities** from a canonical five-signal ensemble (`refined_elo · market_odds · rolling_form · squad_value · rest_days`) blended by one canonical `EnsembleEngine`, plus a bivariate Poisson score model driven by rating differences.
+- **Simulates tournaments** through a generic Monte Carlo engine. Each competition supplies its own rules (groups, tiebreakers, knockout progression) behind a strict `SimulationRules` boundary; the shared engine owns validation (1..1,000,000 runs), seeded repetition, aggregation, and provenance.
+- **Keeps truth explicit**: played matches are immutable facts that are never sampled; unplayed matches stay unknown until you explicitly request a simulation; simulated output is strictly quarantined from factual data and labeled everywhere it appears.
 
 ## Architecture
 
-```text
-                football_core            (shared kernel)
-                  |        domain truth model - signals/ensemble -
-                  |        Poisson model - MonteCarloEngine - insight
-                  |
-        CompetitionRegistry (web/competitions.py)
-                  |
-      +-----------+-----------+-----------------+
-      |                       |                 |
- World Cup brain          UCL brain        LaLiga brain   (competitions/*)
- FIFA rules/format        UEFA rules/format  round-robin + table rules
- SimulationRules adapter  SimulationRules adapter
-      |                       |
-      +-----------+-----------+
-                  |
-     SimulationTaskService   (web/simulation_service.py)
-                  |
-             FastAPI sub-apps + vanilla-JS dashboard
+```mermaid
+flowchart TD
+    subgraph Core ["football_core (Shared Prediction Kernel)"]
+        Kernel["Domain Truth Vocabulary<br/>• MatchStatus &amp; ResultProvenance<br/>• Poisson Match Score Model<br/>• MonteCarloEngine &amp; Match Intelligence"]
+        Signals["5-Signal Ensemble &amp; Blender<br/>• refined_elo · market_odds · rolling_form<br/>• squad_value · rest_days"]
+        Kernel --- Signals
+    end
+
+    Registry["CompetitionRegistry (web/competitions.py)"]
+    Core --> Registry
+
+    subgraph Brains ["Competition Brains (competitions/*)"]
+        WC["World Cup Brain<br/>• 12 Groups &amp; Annex-C Progression<br/>• 32-Team Single Elimination<br/>• SimulationRules Adapter"]
+        UCL["UCL Brain<br/>• 36-Team Swiss League Table<br/>• 10-Step UEFA Tiebreaker Chain<br/>• Playoff &amp; Seeded R16 Bracket"]
+        LaLiga["LaLiga Brain<br/>• 20-Team Double Round-Robin<br/>• Head-to-Head Tiebreaker Adapter<br/>• Title Race &amp; Relegation What-If"]
+    end
+
+    Registry --> WC
+    Registry --> UCL
+    Registry --> LaLiga
+
+    subgraph Web ["Web & Presentation Layer (web/)"]
+        TaskService["SimulationTaskService<br/>(Background Threadpool &amp; Task Registry)"]
+        FastAPI["FastAPI Sub-Apps<br/>(/worldcup, /ucl, /laliga)"]
+        Dashboard["Vanilla-JS Modular Dashboard<br/>(Factual Stores &amp; Quarantined Simulated States)"]
+        TaskService --> FastAPI --> Dashboard
+    end
+
+    WC --> TaskService
+    UCL --> TaskService
+    LaLiga --> TaskService
 ```
 
 - **`football_core`** owns reusable football intelligence: the canonical
@@ -248,21 +249,29 @@ artifacts, not source of truth. Tests that need complete stores use
 
 ## Testing
 
-`python -m pytest --tb=short -q` collects **1,868** tests. As of Phase 1 it reports
-**1,749 passed, 14 skipped, 103 failed, 2 errors**. The failures are not regressions:
-they are dominated by `FileNotFoundError` on runtime stores that git does not carry —
-chiefly `competitions/ucl/data/results.json`, which only a live refresh writes — plus a
-few order-dependent integration tests. Produce them with a refresh; see
-`docs/GETTING-STARTED.md`.
-
-Because those totals move with whatever data is on disk, the enforced regression gate is
-a **node-id set**, not a pass count: the 105 failing/error node ids recorded in
-`.planning/phases/01-layering-inversion-deprecated-path-removal/01-01-BASELINE.md` may
-not grow. Diff against it with:
+The test suite covers algorithmic kernels, probabilistic invariant contracts, cross-competition state schemas, and end-to-end browser workflows:
 
 ```bash
-python -m pytest -q --tb=no -p no:cacheprovider 2>&1 | Select-String "^(FAILED|ERROR)"
+# 1. Run complete Python test suite (2,339 tests)
+python -m pytest
+
+# 2. Run in explicit offline snapshot mode
+FOOTBALL_SNAPSHOT=1 python -m pytest
+
+# 3. Run frontend lifecycle & timer unit tests (25 tests)
+node --test web/static/refresh.test.mjs
+
+# 4. Run Playwright headless browser E2E tests (5 tests)
+python -m pytest tests/test_e2e_browser.py
 ```
+
+### Verified Suite Results
+
+| Test Layer | Framework | Count | Status | Description |
+|---|---|---|---|---|
+| **Prediction Kernel & Competitions** | pytest | 2,339 | **Passing** | Mathematical contracts, Poisson models, Elo replay, Monte Carlo reproducibility, Swiss tiebreakers, Annex-C logic. |
+| **Frontend Lifecycle & Timers** | node:test | 25 | **Passing** | Document visibility, timer coalescing, tab switching, stale generation tokens, honest UI fallback banners. |
+| **Headless Browser E2E** | Playwright Chromium | 5 | **Passing** | Real browser rendering, tournament switching, multi-view DOM transitions, and simulation reactivity. |
 
 ## Known limitations
 

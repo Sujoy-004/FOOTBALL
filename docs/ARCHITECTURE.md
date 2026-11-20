@@ -2,25 +2,22 @@
 
 ## Overview
 
-```text
-Elo ratings (self-calculated seed+replay kernel + eloratings.net offline sync)
-        ↓
-5-signal refinement ensemble          refined_elo · market_odds ·
-(EnsembleEngine, weighted blend)      rolling_form · squad_value · rest_days
-        ↓
-Match probabilities  (Poisson score model driven by rating difference)
-        ↓
-MonteCarloEngine (football_core)      ← validation · seeded RNG · N runs ·
-        ↓                                aggregation · SIMULATED provenance
-SimulationRules (one adapter per competition brain)
-        ↙                    ↘               ↘
-World Cup 2026          UCL 2026/27     LaLiga 2026/27
-  12 groups +            Swiss league +   20-team
-  Annex-C + TPP          playoff +        round-robin
-                         seeded R16       + table rules
-                         ↳ 2025/26 retained as historical
-        ↘                    ↙
-CompetitionRegistry ── FastAPI shell ── dashboard
+```mermaid
+flowchart TD
+    Elo["Elo Ratings<br/>(Self-calculated seed + replay kernel &amp; offline sync)"]
+    --> Ensemble["5-Signal Refinement Ensemble<br/>(EnsembleEngine: refined_elo · market_odds · rolling_form · squad_value · rest_days)"]
+    --> Probs["Match Probabilities<br/>(Bivariate Poisson score model driven by rating differential)"]
+    --> Engine["MonteCarloEngine (football_core)<br/>(Validation 1..1M runs, isolated seeded RNG, schema-free aggregation)"]
+    --> Rules["SimulationRules Adapter<br/>(Real played matches = immutable facts; unplayed = Poisson draw)"]
+
+    Rules --> WC["World Cup 2026<br/>12 Groups, Annex-C Table,<br/>32-Team Knockout Tree"]
+    Rules --> UCL["UCL 2026/27<br/>36-Team Swiss League,<br/>Playoff + Seeded R16"]
+    Rules --> LaLiga["LaLiga 2026/27<br/>20-Team Double Round-Robin,<br/>Head-to-head Table Rules"]
+
+    WC --> Presentation["CompetitionRegistry &amp; FastAPI Shell<br/>(CompetitionState: MatchStatus + ResultProvenance)"]
+    UCL --> Presentation
+    LaLiga --> Presentation
+    Presentation --> UI["Vanilla-JS Multi-Competition Dashboard<br/>(Factual store views &amp; quarantined simulated states)"]
 ```
 
 ## Layer responsibilities
